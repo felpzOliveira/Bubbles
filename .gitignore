@@ -2,3 +2,4 @@ bubbles
 bb2pbrt
 *.pbrt
 *.txt
+*.o

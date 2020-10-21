@@ -53,10 +53,7 @@ __host__ void PredictVelocityAndPositionGPU(PciSphSolverData2 *data,
 {
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    PredictVelocityAndPositionKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>
-        (data, timeIntervalInSeconds, is_first);
-    cudaDeviceAssert();
+    GPULaunch(N, PredictVelocityAndPositionKernel, data, timeIntervalInSeconds, is_first);
 }
 
 // NOTE: Potential error as tmpPi was not reditributed in the grid
@@ -119,9 +116,7 @@ __global__ void PredictPressureKernel(PciSphSolverData2 *data, Float delta){
 __host__ void PredictPressureGPU(PciSphSolverData2 *data, Float delta){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    PredictPressureKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data, delta);
-    cudaDeviceAssert();
+    GPULaunch(N, PredictPressureKernel, data, delta);
 }
 
 __bidevice__ void PredictPressureForceFor(PciSphSolverData2 *pciData, int particleId){
@@ -196,9 +191,7 @@ __global__ void PredictPressureForceKernel(PciSphSolverData2 *data){
 __host__ void PredictPressureForceGPU(PciSphSolverData2 *data){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    PredictPressureForceKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data);
-    cudaDeviceAssert();
+    GPULaunch(N, PredictPressureForceKernel, data);
 }
 
 __bidevice__ void AccumulateAndIntegrateFor(PciSphSolverData2 *pciData, int particleId,
@@ -232,9 +225,7 @@ __global__ void AccumulateAndIntegrateKernel(PciSphSolverData2 *data, Float time
 __host__ void AccumulateAndIntegrateGPU(PciSphSolverData2 *data, Float timeStep){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    AccumulateAndIntegrateKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data,timeStep);
-    cudaDeviceAssert();
+    GPULaunch(N, AccumulateAndIntegrateKernel, data, timeStep);
 }
 
 __bidevice__ inline Float AbsfMax(Float x, Float y){

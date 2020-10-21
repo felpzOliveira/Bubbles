@@ -348,14 +348,9 @@ __host__ void UpdateGridDistributionGPU(SphSolverData2 *data){
     AssertA(grid, "SphSolver2 has no domain for UpdateGridDistribution");
     int N = grid->GetCellCount();
     int index = data->frame_index;
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    UpdateGridDistributionKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(grid, pSet, 
-                                                                              index);
-    
-    cudaDeviceAssert();
+    GPULaunch(N, UpdateGridDistributionKernel, grid, pSet, index);
     if(data->frame_index == 1){
-        SwapGridStatesKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(grid);
-        cudaDeviceAssert();
+        GPULaunch(N, SwapGridStatesKernel, grid);
     }
     
     data->frame_index = 1;
@@ -381,9 +376,7 @@ __global__ void ComputeDensityKernel(SphSolverData2 *data, int compute_pressure)
 __host__ void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    ComputeDensityKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data, compute_pressure);
-    cudaDeviceAssert();
+    GPULaunch(N, ComputeDensityKernel, data, compute_pressure);
 }
 
 __bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep){
@@ -408,9 +401,7 @@ __global__ void ComputeNonPressureForceKernel(SphSolverData2 *data){
 __host__ void ComputeNonPressureForceGPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    ComputeNonPressureForceKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data);
-    cudaDeviceAssert();
+    GPULaunch(N, ComputeNonPressureForceKernel, data);
 }
 
 __global__ void ComputePressureForceKernel(SphSolverData2 *data, Float timeStep){
@@ -429,9 +420,7 @@ __host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep){
     AssertA(pSet->GetParticleCount() > 0,
             "SphSolver2 has no particles for ComputePressureForce");
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    ComputePressureForceKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data, timeStep);
-    cudaDeviceAssert();
+    GPULaunch(N, ComputePressureForceKernel, data, timeStep);
 }
 
 __bidevice__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended){
@@ -454,10 +443,7 @@ __global__ void TimeIntegrationKernel(SphSolverData2 *data, Float timeStep, int 
 __host__ void TimeIntegrationGPU(SphSolverData2 *data, Float timeStep, int extended){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    TimeIntegrationKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data, timeStep,
-                                                                       extended);
-    cudaDeviceAssert();
+    GPULaunch(N, TimeIntegrationKernel, data, timeStep, extended);
 }
 
 __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particleId,
@@ -500,8 +486,5 @@ __host__ void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin,
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    ComputeInitialTemperatureMapKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>
-        (data, Tmin, Tmax, maxLevel);
-    cudaDeviceAssert();
+    GPULaunch(N, ComputeInitialTemperatureMapKernel, data, Tmin, Tmax, maxLevel);
 }

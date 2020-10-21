@@ -16,12 +16,8 @@ __global__ void UpdateGridSpeciesKernel(Grid2 *grid, SpecieSet2 **ppSet, int n){
 
 __host__ void UpdateGridDistribution(Grid2 *grid, SpecieSet2 **ppSet, int n){
     int N = grid->GetCellCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    UpdateGridSpeciesKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(grid, ppSet, n);
-    cudaDeviceAssert();
-    
-    SwapGridStates<<<(N + nThreads - 1) / nThreads, nThreads>>>(grid);
-    cudaDeviceAssert();
+    GPULaunch(N, UpdateGridSpeciesKernel, grid, ppSet, n);
+    GPULaunch(N, SwapGridStates, grid);
 }
 
 __bidevice__ EspicSolver2::EspicSolver2(){}

@@ -1,5 +1,6 @@
-run_obj = src/Bubbles2Pbrt.o
-bubbles_obj = src/main.o
+run_obj = src/bb2pbrt.o
+mesh2p_obj = src/bbmesh2part.o
+bubbles_obj = src/bubbles.o
 core_objs = src/cuda/cutil.o src/core/kernel.o src/core/point_generator.o src/core/particle.o src/core/transform.o src/core/shape.o src/core/emitter.o src/core/collider.o src/core/statics.o
 
 generator_objs = src/generator/triangle.o src/generator/bcclattice.o
@@ -16,6 +17,7 @@ test_objs = src/tests/test_grid.o src/tests/test_kernel.o src/tests/test_point_g
 
 bb_objects = $(core_objs) $(bubbles_obj) $(shape_objs) $(generator_objs) $(solvers_objs) $(eqs_objs) $(third_objs) $(test_objs)
 r_objects = $(core_objs) $(run_obj) $(shape_objs) $(generator_objs) $(solvers_objs) $(eqs_objs) $(third_objs) $(test_objs)
+m2p_objects = $(core_objs) $(mesh2p_obj) $(shape_objs) $(generator_objs) $(solvers_objs) $(eqs_objs) $(third_objs) $(test_objs)
 
 compile_debug_opts=-g -G
 compile_fast_opts=-Xptxas -O3
@@ -26,7 +28,10 @@ includes = -I./src/cuda -I./src/core -I./src/third -I./src/third/graphy -I./src/
 
 libs = -ldl
 
-all: bubbles bb2pbrt
+all: bubbles bb2pbrt bbmesh2part
+
+bbmesh2part: $(m2p_objects)
+	nvcc $(compile_opts) $(m2p_objects) -o $@ $(libs)
 
 bb2pbrt: $(r_objects)
 	nvcc $(compile_opts) $(r_objects) -o $@ $(libs)

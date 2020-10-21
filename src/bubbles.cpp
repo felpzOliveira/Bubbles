@@ -45,46 +45,16 @@ void run_self_tests(){
     
     test_bcclattice_point_generator();
     test_pcisph3_water_sphere();
+    test_pcisph3_double_dam_break();
 }
 #endif
-
-void MeshToParticles(const char *name, const Transform &transform,
-                     Float spacing, const char *output)
-{
-    printf("===== Emitting particles from mesh\n");
-    
-    UseDefaultAllocatorFor(AllocatorType::CPU);
-    ParsedMesh *mesh = LoadObj(name);
-    
-    Shape *shape = MakeMesh(mesh, transform);
-    ParticleSetBuilder3 builder;
-    VolumeParticleEmitter3 emitter(shape, shape->GetBounds(), spacing);
-    
-    emitter.Emit(&builder);
-    
-    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&builder);
-    SphSolverData3 *data = DefaultSphSolverData3();
-    data->sphpSet = sphSet;
-    data->domain = nullptr;
-    
-    SerializerSaveSphDataSet3(data, output, SERIALIZER_POSITION);
-    
-    printf("===== OK\n");
-    exit(0);
-}
 
 int main(int argc, char **argv){
     cudaInitEx();
-#if 0
-    MeshToParticles("/home/felpz/Documents/models/dragon_aligned.obj",
-                    Scale(0.7) * RotateY(-90), 0.02, "output.txt");
-    MeshToParticles("/home/felpz/Downloads/happy_whale.obj",
-                    Scale(0.3), 0.02, "output.txt");
-#endif
-    
+    test_pcisph3_double_dam_break();
     //test_pcisph3_water_sphere();
     //test_pcisph3_dragon();
-    test_pcisph3_happy_whale();
+    //test_pcisph3_happy_whale();
     //test_display_set();
     
 #if defined(RUN_TESTS)

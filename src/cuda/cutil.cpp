@@ -109,11 +109,9 @@ int cudaInit(){
         global_memory.allocated = 0;
         std::cout << "Using device " << prop.name << " [ " <<  prop.major << "." << prop.minor << " ]" << std::endl; 
         
-        void *ptr = NULL;
-        
         clock_t start = clock();
-        CUCHECK(cudaMalloc(&ptr, 1));
-        clock_t mid = clock();
+        cudaFree(0);
+		clock_t mid = clock();
         
         cudaDeviceReset();
         clock_t end = clock();

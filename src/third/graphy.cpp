@@ -3,7 +3,7 @@
 #include <graphy.h>
 #include <gr_display.hpp>
 #include <gr_opengl.hpp>
-#define GraphyPath "/home/felpz/Documents/Graphics/build/libgraphy.so"
+#define GraphyPath "/home/felipe/Documents/Graphics/build/libgraphy.so"
 
 #define NEW_DISPLAY "_Z14gr_new_displayii"
 #define NEW_DISPLAY_EX "_Z14gr_new_displayiiffff"

@@ -2,8 +2,6 @@
 #include <grid.h>
 #include <cutil.h>
 
-// TODO: Implement GPU version and non iterative version
-
 template<typename T, typename U, typename Q>
 __bidevice__ bool CNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned int cellId){
     int *neighbors = nullptr;
@@ -86,13 +84,11 @@ template<typename T, typename U, typename Q>
 __host__ int CNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1){
     bool done = false;
     int level = 0;
-    int nThreads = CUDA_THREADS_PER_BLOCK;
     int N = domain->GetCellCount();
     
     while(!done){
         domain->indicator = 0;
-        CNMOnceKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(domain, level);
-        cudaDeviceAssert();
+        GPULaunch(N, GPUKernel(CNMOnceKernel<T, U, Q>), domain, level);
         
         level++;
         done = (domain->indicator == 0 || (levels > 0 && level > levels));

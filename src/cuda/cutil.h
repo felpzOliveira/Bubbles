@@ -4,11 +4,12 @@
 #include <device_launch_parameters.h>
 #include <string.h>
 #include <iostream>
+#include <map>
+#include <typeindex>
 
 /*
 * CUDA UTILITIES
 */
-#define CUDA_THREADS_PER_BLOCK 8
 
 #define CUCHECK(r) _check((r), __LINE__, __FILE__)
 #define cudaAllocate(bytes) _cudaAllocate(bytes, __LINE__, __FILE__, true)
@@ -139,5 +140,31 @@ class DataBuffer{
         if(data) cudaFree(data);
     }
 };
+
+#define GPUKernel(...) (__VA_ARGS__)
+#define GPULaunch(nItems, call, ...)\
+{\
+    int __blockSize = 32;\
+    int __gridSize = (nItems + __blockSize - 1) / __blockSize;\
+    call<<<__gridSize, __blockSize>>>(__VA_ARGS__);\
+    cudaDeviceAssert();\
+}
+
+template<typename F>
+inline int GetBlockSize(F kernel){
+    static std::map<std::type_index, int> kernelBlockSizes;
+    std::type_index index = std::type_index(typeid(F));
+    
+    auto iter = kernelBlockSizes.find(index);
+    if(iter != kernelBlockSizes.end()){
+        return iter->second;
+    }
+    
+    int minGridSize, blockSize;
+    CUCHECK(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize,
+                                               kernel, 0, 0));
+    kernelBlockSizes[index] = blockSize;
+    return blockSize;
+}
 
 #endif

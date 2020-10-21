@@ -109,9 +109,7 @@ __global__ void ComputeExtendedDensityKernel(SphSolverData2 *data){
 __host__ void ComputeExtendedDensityGPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    ComputeExtendedDensityKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data);
-    cudaDeviceAssert();
+    GPULaunch(N, ComputeExtendedDensityKernel, data);
 }
 
 __host__ void ComputeExtendedDensityCPU(SphSolverData2 *data){
@@ -138,9 +136,7 @@ __global__ void ComputeExtendedPressureKernel(SphSolverData2 *data){
 __host__ void ComputePressureGPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    ComputeExtendedPressureKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data);
-    cudaDeviceAssert();
+    GPULaunch(N, ComputeExtendedPressureKernel, data);
 }
 
 __host__ void ComputePressureCPU(SphSolverData2 *data){
@@ -165,9 +161,7 @@ __global__ void ComputeExtendedPressureForceKernel(SphSolverData2 *data){
 __host__ void ComputeExtendedPressureForceGPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    ComputeExtendedPressureForceKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(data);
-    cudaDeviceAssert();
+    GPULaunch(N, ComputeExtendedPressureForceKernel, data);
 }
 
 __host__ void ComputeExtendedPressureForceCPU(SphSolverData2 *data){

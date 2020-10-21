@@ -4,6 +4,7 @@
 #include <sstream>
 #include <fstream>
 #include <obj_loader.h> // get parser utilities
+#include <transform.h>
 
 #define TARGET_FILE "/home/felipe/Documents/Bubbles/whale/output_300.txt"
 #define TARGET_OUTFILE "geometry.pbrt"
@@ -20,6 +21,7 @@ struct convert_opts{
     std::string output;
     std::string radius;
     RenderMode mode;
+    Float rotate;
     int level;
     int flags;
 };
@@ -83,6 +85,7 @@ void InitializeArguments(convert_opts *opts, int argc, char **argv){
     opts->flags = SERIALIZER_POSITION;
     opts->radius = DEFAULT_R;
     opts->mode = RenderMode::ALL;
+    opts->rotate = 0;
     opts->level = -1;
     //TODO: flags
     for(int i = 1; i < argc; i++){
@@ -104,6 +107,10 @@ void InitializeArguments(convert_opts *opts, int argc, char **argv){
             const char *token = value.c_str();
             opts->level = (int)ParseFloat(&token);
             opts->mode = RenderMode::LEVEL;
+        }else if(arg == "--rotate"){
+            std::string value = ParseNext(argc, argv, i, "--rotate");
+            const char *token = value.c_str();
+            opts->rotate = ParseFloat(&token);
         }else{
             printf("Unknown argument %s\n", argv[i]);
             exit(0);
@@ -112,9 +119,7 @@ void InitializeArguments(convert_opts *opts, int argc, char **argv){
 }
 
 void PrintArgs(convert_opts *opts){
-    printf("* Bubbles2Pbrt - Built %s at %s *\n", __DATE__, __TIME__);
-    std::cout << "Converts a Bubbles simulation result file ";
-    std::cout << "into a PBRT renderable particle cloud." << std::endl;
+    printf("* Bubbles2Pbrt - Bubbles converter built %s at %s *\n", __DATE__, __TIME__);
     std::cout << "Configs: " << std::endl;
     std::cout << "    * Target file : " << opts->input << std::endl;
     std::cout << "    * Target output : " << opts->output << std::endl;
@@ -123,13 +128,23 @@ void PrintArgs(convert_opts *opts){
     if(opts->mode == RenderMode::LEVEL){
         std::cout << "    * Level : " << opts->level << std::endl;
     }
+    
+    if(!IsZero(opts->rotate)){
+        std::cout  << "    * Rotate (Y) : " << opts->rotate << std::endl;
+    }
 }
 
 int SplitByLayer(std::vector<SerializedParticle> **renderflags, 
-                 std::vector<SerializedParticle> *pSet, int pCount)
+                 std::vector<SerializedParticle> *pSet, int pCount,
+                 convert_opts *opts)
 {
     int mCount = 0;
     std::vector<SerializedParticle> *groups;
+    Transform transform;
+    if(!IsZero(opts->rotate)){
+        transform = RotateY(opts->rotate);
+    }
+    
     for(int i = 0; i < pCount; i++){
         SerializedParticle p = pSet->at(i);
         if((p.boundary + 1) > mCount) mCount = p.boundary + 1;
@@ -138,6 +153,7 @@ int SplitByLayer(std::vector<SerializedParticle> **renderflags,
     groups = new std::vector<SerializedParticle>[mCount];
     for(int i = 0; i < pCount; i++){
         SerializedParticle p = pSet->at(i);
+        p.position = transform.Point(p.position);
         groups[p.boundary].push_back(p);
     }
     
@@ -175,7 +191,7 @@ int main(int argc, char **argv){
             return 0;
         }
         
-        count = SplitByLayer(&rendergroups, &particles, total);
+        count = SplitByLayer(&rendergroups, &particles, total, &opts);
         for(int i = 0; i < count; i++){
             std::vector<SerializedParticle> *layer = &rendergroups[i];
             printf("\rProcessing layer %d / %d ... ", i+1, count);

@@ -332,6 +332,8 @@ void test_pcisph3_double_dam_break(){
     Shape *container = MakeBox(Transform(), vec3f(boxLen), true);
     Shape *boxp = MakeBox(Translate(xof, -yof, zof), boxSize);
     Shape *boxn = MakeBox(Translate(-xof, -yof, -zof), boxSize);
+    Shape *boxnp = MakeBox(Translate(-xof, -yof, zof), boxSize);
+    Shape *boxpp = MakeBox(Translate(xof, -yof, -zof), boxSize);
     
     /* Emit particles */
     ParticleSetBuilder3 pBuilder;
@@ -342,7 +344,7 @@ void test_pcisph3_double_dam_break(){
     
     emitterSet.AddEmitter(&emitterp);
     emitterSet.AddEmitter(&emittern);
-    emitterSet.SetJitter(0.01);
+    //emitterSet.SetJitter(0.001);
     emitterSet.Emit(&pBuilder);
     
     /* Build domain and colliders */

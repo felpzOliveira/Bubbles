@@ -43,9 +43,7 @@ __host__ void TimeIntegrationGPU(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
                                  ColliderSet2 *collider, Float dt)
 {
     int N = pSet->GetParticleCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    TimeIntegrationKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(ef, pSet, collider, dt);
-    cudaDeviceAssert();
+    GPULaunch(N, TimeIntegrationKernel, ef, pSet, collider, dt);
 }
 
 __host__ void TimeIntegration(NodeEdgeGrid2v *ef, SpecieSet2 *pSet, 
@@ -92,10 +90,7 @@ __host__ void ComputeChargeDensityGPU(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
                                       NodeEdgeGrid2f **dens, int n)
 {
     unsigned int N = rho->GetNodeCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    ComputeChargeDensityKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(rho, ppSet,
-                                                                            dens, n);
-    cudaDeviceAssert();
+    GPULaunch(N, ComputeChargeDensityKernel, rho, ppSet, dens, n);
 }
 
 __host__ void ComputeChargeDensity(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet, 
@@ -150,9 +145,7 @@ __host__ void ComputeNumberDensityCPU(NodeEdgeGrid2f *den, SpecieSet2 *ppSet){
 
 __host__ void ComputeNumberDensityGPU(NodeEdgeGrid2f *den, SpecieSet2 *ppSet){
     int N = den->GetNodeCount();
-    int nThreads = CUDA_THREADS_PER_BLOCK;
-    ComputeNumberDensityKernel<<<(N + nThreads - 1) / nThreads, nThreads>>>(den, ppSet);
-    cudaDeviceAssert();
+    GPULaunch(N, ComputeNumberDensityKernel, den, ppSet);
 }
 
 __host__ void ComputeNumberDensity(NodeEdgeGrid2f *den, SpecieSet2 *ppSet, int is_cpu){
@@ -218,8 +211,8 @@ __host__ void ComputeElectricFieldCPU(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
 
 __host__ void ComputeElectricFieldGPU(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
     vec2ui count = ef->GetNodeIndexCount();
-    int tx = CUDA_THREADS_PER_BLOCK;
-    int ty = CUDA_THREADS_PER_BLOCK;
+    int tx = 8;
+    int ty = 8;
     dim3 blocks(count.x / tx + 1, count.y / ty + 1);
     dim3 threads(tx, ty);
     ComputeElectricFieldKernel<<<blocks, threads>>>(ef, phi);

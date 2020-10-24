@@ -28,6 +28,8 @@ void run_self_tests(){
     test_rectangle_distance_inside();
     test_rectangle_distance_outside();
     test_rectangle_emit();
+    test_field_grid();
+    test_mesh_collision();
     test_box_distance();
     test_espic_1D();
     test_node_grid_2D();
@@ -38,6 +40,10 @@ void run_self_tests(){
     test_sph2_double_dam_break();
     test_sph2_water_drop();
     test_sph2_gas_sphere();
+    test_sph3_water_sphere();
+    test_sph3_water_block();
+    test_sph3_double_dam_break();
+    
     test_pcisph2_double_dam_break();
     test_pcisph2_water_sphere();
     test_pcisph2_water_drop();
@@ -51,7 +57,11 @@ void run_self_tests(){
 
 int main(int argc, char **argv){
     cudaInitEx();
-    test_pcisph3_double_dam_break();
+    
+    //test_mesh_collision();
+    test_pcisph3_dam_whale();
+    //test_sampling_barycentric();
+    //test_pcisph3_double_dam_break();
     //test_pcisph3_water_sphere();
     //test_pcisph3_dragon();
     //test_pcisph3_happy_whale();

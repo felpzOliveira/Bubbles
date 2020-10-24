@@ -23,6 +23,7 @@ struct pack_data_t{
 
 
 static int memoryInitialized = 0;
+AllocatorType memoryType = AllocatorType::GPU;
 MemoryAllocator memoryAlloc;
 MemoryFree memoryFree;
 
@@ -521,6 +522,7 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
             if(!making_mesh){
                 MeshMtl mtl;
                 currentMesh = AllocType(ParsedMesh, 1);
+                currentMesh->allocator = memoryType;
                 currentMesh->nVertices = 0;
                 currentMesh->nTriangles = 0;
 #if defined(WITH_TRANSFORM)
@@ -603,6 +605,7 @@ __host__ ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props){
         duplicated->nTriangles = mesh->nTriangles;
         duplicated->nUvs = mesh->nUvs;
         duplicated->nNormals = mesh->nNormals;
+        duplicated->allocator = memoryType;
         vec3f center;
         Float w = 0.f;
         if(mesh->p){
@@ -672,12 +675,6 @@ __host__ ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props){
     return duplicated;
 }
 
-__host__ void SetAllocators(MemoryAllocator memAlloc, MemoryFree memFree){
-    memoryAlloc = memAlloc;
-    memoryFree  = memFree;
-    memoryInitialized = 1;
-}
-
 __host__ void UseDefaultAllocatorFor(AllocatorType type){
     if(type == AllocatorType::CPU){
         memoryAlloc = CPUMemAlloc;
@@ -687,5 +684,17 @@ __host__ void UseDefaultAllocatorFor(AllocatorType type){
         memoryFree  = GPUMemFree;
     }
     
+    memoryType = type;
     memoryInitialized = 1;
+}
+
+
+void *DefaultAllocatorMemory(long size){
+    MemoryCheck();
+    return memoryAlloc(size);
+}
+
+void DefaultAllocatorFree(void *ptr){
+    MemoryCheck();
+    memoryFree(ptr);
 }

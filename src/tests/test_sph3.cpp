@@ -180,7 +180,7 @@ void test_sph3_water_sphere(){
     vec3f origin(0,0,3);
     vec3f target(0,0,0);
     
-    Float spacing = 0.015;
+    Float spacing = 0.02;
     //Float spacing = 0.05;
     Shape *sphere = MakeSphere(Translate(-0.4,0.25,0.0), 0.5);
     Shape *container = MakeSphere(Transform(), 1.0, true);

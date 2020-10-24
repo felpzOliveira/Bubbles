@@ -7,34 +7,6 @@ __bidevice__ vec3f SampleSphere(const vec2f &u){
     return vec3f(std::cos(utheta) * usqrt, std::sin(utheta) * usqrt, 1 - 2*u[1]);
 }
 
-/*
-* Compute a ray direction from a point and a bounding box being sampled,
-* all computations must be performed centered at the origin.
-*/
-__bidevice__ vec3f ComputeRayDirection(const vec3f &origin, const Bounds3f &bound){
-    vec3f dir(0);
-    Float dx = Absf(bound.ExtentOn(0) * 0.5f - origin.x);
-    Float dy = Absf(bound.ExtentOn(1) * 0.5f - origin.y);
-    Float dz = Absf(bound.ExtentOn(2) * 0.5f - origin.z);
-    vec4f ref[] = {
-        vec4f(dx, 1, 0, 0),
-        vec4f(dy, 0, 1, 0),
-        vec4f(dz, 0, 0, 1),
-        vec4f(Absf(bound.ExtentOn(0) - dx), -1, 0, 0),
-        vec4f(Absf(bound.ExtentOn(1) - dy), 0, -1, 0),
-        vec4f(Absf(bound.ExtentOn(2) - dz), 0, 0, -1)
-    };
-    
-    Float mind = Infinity;
-    for(int i = 0; i < 6; i++){
-        if(mind > ref[i].x){
-            dir = vec3f(ref[i].y, ref[i].z, ref[i].w);
-            mind = ref[i].x;
-        }
-    }
-    
-    return dir;
-}
 
 /**************************************************************/
 //               U N I F O R M   B O X   2 D                  //
@@ -221,21 +193,7 @@ __host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder){
                 * If the Shape does not provide a SDF map, perform Ray Tracing
                 * for detecting interior points
 */
-                int hits = 0;
-                bool hitAnything = false;
-                vec3f direction = ComputeRayDirection(target, bound);
-                Ray ray(target, direction);
-                do{
-                    SurfaceInteraction isect;
-                    Float tHit = 0;
-                    hitAnything = shape->Intersect(ray, &isect, &tHit);
-                    if(hitAnything){
-                        ray = SpawnRayInDirection(isect, ray.d);
-                        if(hitAnything) hits++;
-                    }
-                }while(hitAnything);
-                
-                if(hits % 2 != 0 && hits > 0){
+                if(MeshIsPointInside(target, shape, bound)){
                     if(emittedParticles < maxParticles){
                         Builder->AddParticle(target);
                         emittedParticles++;

@@ -5,6 +5,7 @@
 #include <obj_loader.h>
 #include <serializer.h>
 #include <iostream>
+#include <graphy.h>
 
 /*
 * Happy Whale cmd: ./bbmesh2part --input HappyWhale.obj --scale 0.3 --spacing 0.02
@@ -17,7 +18,8 @@ typedef struct{
     Float xrot, yrot, zrot;
     Float scale;
     Transform transform;
-}emit_opts;
+    int preview;
+}config_opts;
 
 std::string ParseNext(int argc, char **argv, int &i, const char *arg, int count=1){
     int ok = (argc > i+count) ? 1 : 0;
@@ -43,7 +45,7 @@ Float ParseNextFloat(int argc, char **argv, int &i, const char *arg){
     return ParseFloat(&token);
 }
 
-void ParseArguments(int argc, char **argv, emit_opts *opts){
+void ParseArguments(int argc, char **argv, config_opts *opts){
     opts->spacing = 0;
     opts->transform = Transform();
     opts->output = "output.txt";
@@ -52,6 +54,7 @@ void ParseArguments(int argc, char **argv, emit_opts *opts){
     opts->xrot = 0;
     opts->yrot = 0;
     opts->zrot = 0;
+    opts->preview = 0;
     for(int i = 1; i < argc; i++){
         std::string arg(argv[i]);
         if(arg == "--rotateX"){
@@ -70,14 +73,17 @@ void ParseArguments(int argc, char **argv, emit_opts *opts){
             Float scale = ParseNextFloat(argc, argv, i, "--scale");
             opts->scale = scale;
             opts->transform = Scale(scale) * opts->transform;
-        }else if(arg == "--input"){
-            opts->input = ParseNext(argc, argv, i, "--input");
-        }else if(arg == "--output"){
-            opts->output = ParseNext(argc, argv, i, "--output");
+        }else if(arg == "--in"){
+            opts->input = ParseNext(argc, argv, i, "--in");
+        }else if(arg == "--out"){
+            opts->output = ParseNext(argc, argv, i, "--out");
         }else if(arg == "--spacing"){
             Float spacing = ParseNextFloat(argc, argv, i, "--spacing");
             opts->spacing = spacing;
-        }else{
+        }else if(arg == "--preview"){
+            opts->preview = 1;
+        }
+        else{
             std::cout << "Unknwon argument " << arg << std::endl;
             exit(0);
         }
@@ -89,7 +95,7 @@ void ParseArguments(int argc, char **argv, emit_opts *opts){
     }
 }
 
-void PrintArguments(emit_opts *opts){
+void PrintArguments(config_opts *opts){
     printf("* BubblesMesh2Part - Bubbles mesh2particle built %s at %s *\n", __DATE__, __TIME__);
     std::cout << "Configs: " << std::endl;
     std::cout << "    * Target file : " << opts->input << std::endl;
@@ -100,11 +106,41 @@ void PrintArguments(emit_opts *opts){
     std::cout << "        - Rotate Y : " << opts->yrot << std::endl;
     std::cout << "        - Rotate Z : " << opts->zrot << std::endl;
     std::cout << "        - Scale : " << opts->scale << std::endl;
+    std::cout << "    * Preview : " << opts->preview << std::endl;
+}
+
+void PreviewParticles(SphParticleSet3 *sphSet){
+    vec3f at(3);
+    vec3f to(0);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    int pCount = pSet->GetParticleCount();
+    int it = 0;
+    float *pos = new float[3 * pCount];
+    float *col = new float[3 * pCount];
+    
+    memset(col, 0x00, 3 * pCount * sizeof(float));
+    for(int i = 0; i < pCount; i++){
+        vec3f pi = pSet->GetParticlePosition(i);
+        pos[it++] = pi.x; pos[it++] = pi.y;
+        pos[it++] = pi.z; col[3 * i + 0] = 1;
+    }
+    
+    graphy_set_3d(at.x, at.y, at.z, to.x, to.y, to.z, 45.0, 0.1f, 100.0f);
+    graphy_render_points3f(pos, col, pCount, 0.012);
+    
+    std::cout << "Press anything ... " << std::flush;
+    getchar();
+    
+    graphy_close_display();
+    
+    delete[] pos;
+    delete[] col;
 }
 
 void MeshToParticles(const char *name, const Transform &transform,
-                     Float spacing, const char *output)
+                     Float spacing, SphSolverData3 **data)
 {
+    SphParticleSet3 *sphSet = nullptr;
     printf("===== Emitting particles from mesh\n");
     
     UseDefaultAllocatorFor(AllocatorType::CPU);
@@ -116,12 +152,10 @@ void MeshToParticles(const char *name, const Transform &transform,
     
     emitter.Emit(&builder);
     
-    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&builder);
-    SphSolverData3 *data = DefaultSphSolverData3();
-    data->sphpSet = sphSet;
-    data->domain = nullptr;
-    
-    SerializerSaveSphDataSet3(data, output, SERIALIZER_POSITION);
+    sphSet = SphParticleSet3FromBuilder(&builder);
+    *data = DefaultSphSolverData3();
+    (*data)->sphpSet = sphSet;
+    (*data)->domain = nullptr;
     
     printf("===== OK\n");
 }
@@ -136,10 +170,18 @@ MeshToParticles("/home/felpz/Downloads/happy_whale.obj",
 
 
 int main(int argc, char **argv){
-    emit_opts opts;
+    config_opts opts;
+    SphSolverData3 *data = nullptr;
+    
     ParseArguments(argc, argv, &opts);
     PrintArguments(&opts);
     MeshToParticles(opts.input.c_str(), opts.transform, 
-                    opts.spacing, opts.output.c_str());
+                    opts.spacing, &data);
+    
+    if(opts.preview){
+        PreviewParticles(data->sphpSet);
+    }
+    
+    SerializerSaveSphDataSet3(data, opts.output.c_str(), SERIALIZER_POSITION);
     return 0;
 }

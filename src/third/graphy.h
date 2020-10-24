@@ -15,3 +15,5 @@ void graphy_set_3d(float ex, float ey, float ez, float ox, float oy,
 void graphy_render_points3(float *pos, float rgb[3], int num, float radius);
 
 void graphy_render_points3f(float *pos, float *col, int num, float radius);
+
+void graphy_close_display();

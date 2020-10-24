@@ -2,6 +2,8 @@
 #include <cutil.h>
 #include <statics.h>
 #include <shape.h>
+#include <obj_loader.h>
+#include <collider.h>
 
 typedef struct{
     Node *nodes;
@@ -46,10 +48,12 @@ bool QuickSort(T *arr, int elements, C compare){
     return true;
 }
 
-__host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld){
+__host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld,
+                         bool reverseOrientation)
+{
     toWorld.Mesh(mesh);
     Shape *meshShape = cudaAllocateVx(Shape, 1);
-    meshShape->InitMesh(mesh);
+    meshShape->InitMesh(mesh, reverseOrientation);
     return meshShape;
 }
 
@@ -65,13 +69,14 @@ __host__ void MakeNodeDistribution(NodeDistribution *dist, int nElements,
     mem /= (1024 * 1024);
     
     printf(" * Requesting %ld Mb for nodes ...", mem);
-    dist->nodes = new Node[c]; // TODO: GPU
+    dist->nodes = (Node *)DefaultAllocatorMemory(sizeof(Node) * c);
     printf("OK\n");
     
     mem = sizeof(PrimitiveHandle) * nElements;
     mem /= (1024 * 1024);
     printf(" * Requsting %ld Mb for handles ...", mem);
-    dist->handles = new PrimitiveHandle[nElements]; // TODO: GPU
+    dist->handles = (PrimitiveHandle *)DefaultAllocatorMemory(
+        sizeof(PrimitiveHandle) * nElements);
     printf("OK\n");
     
     dist->length = c;
@@ -202,6 +207,31 @@ __host__ void BVHMeshTrianglesBoundsCPU(ParsedMesh *mesh, PrimitiveHandle *handl
         handles[i].bound  = BVHBoundsOf(mesh, i);
         handles[i].handle = i;
     }
+}
+
+__bidevice__ Float DistanceTriangle(const vec3f &p, int triNum, ParsedMesh *mesh){
+    int i0 = mesh->indices[3 * triNum + 0].x;
+    int i1 = mesh->indices[3 * triNum + 1].x;
+    int i2 = mesh->indices[3 * triNum + 2].x;
+    vec3f a = mesh->p[i0];
+    vec3f b = mesh->p[i1];
+    vec3f c = mesh->p[i2];
+    
+    vec3f ba = b - a; vec3f pa = p - a;
+    vec3f cb = c - b; vec3f pb = p - b;
+    vec3f ac = a - c; vec3f pc = p - c;
+    
+    vec3f nor = Cross(ba, ac);
+    return std::sqrt(
+        Sign(Dot(Cross(ba, nor), pa)) +
+        Sign(Dot(Cross(cb, nor), pb)) +
+        Sign(Dot(Cross(ac, nor), pc)) < 2.0 ?
+        Min(Min(
+        Dot2(ba * Clamp(Dot(ba, pa)/Dot2(ba), 0.0, 1.0) - pa),
+        Dot2(cb * Clamp(Dot(cb, pb)/Dot2(cb), 0.0, 1.0) - pb) ),
+            Dot2(ac * Clamp(Dot(ac, pc)/Dot2(ac), 0.0, 1.0) - pc) )
+        :
+        Dot(nor, pa) * Dot(nor, pa) / Dot2(nor) );
 }
 
 __bidevice__ bool IntersectTriangle(const Ray &ray, SurfaceInteraction * isect,
@@ -340,75 +370,126 @@ __bidevice__ bool IntersectMeshNode(Node *node, ParsedMesh *mesh, const Ray &r,
     return hit_anything;
 }
 
+__bidevice__ Float DistanceMeshNode(const vec3f &point, ParsedMesh *mesh, Node *node,
+                                    int *handle)
+{
+    Assert(node->n > 0 && node->is_leaf && node->handles);
+    Float distance = Infinity;
+    for(int i = 0; i < node->n; i++){
+        int nTri = node->handles[i].handle;
+        Float d = DistanceTriangle(point, nTri, mesh);
+        if(d < distance){
+            distance = d;
+            *handle = nTri;
+        }
+    }
+    
+    return distance;
+}
+
 #define MAX_STACK_SIZE 256
+__bidevice__ Float BVHMeshClosestDistance(const vec3f &point, int *closest,
+                                          ParsedMesh *mesh, Node *bvh)
+{
+    NodePtr stack[MAX_STACK_SIZE];
+    NodePtr *stackPtr = stack;
+    Float closestDistance = SqrtInfinity;
+    NodePtr node = bvh;
+    int tmpClosest = -1;
+    
+    *stackPtr++ = NULL;
+    
+    while(node != nullptr){
+        if(node->is_leaf){
+            Float distance = DistanceMeshNode(point, mesh, node, &tmpClosest);
+            if(distance < closestDistance){
+                closestDistance = distance;
+                *closest = tmpClosest;
+            }
+            
+            node = *--stackPtr;
+            
+        }else{
+            const Float closestDistance2 = closestDistance * closestDistance;
+            NodePtr childL = node->left;
+            NodePtr childR = node->right;
+            vec3f closestLeft  = childL->bound.Clamped(point);
+            vec3f closestRight = childR->bound.Clamped(point);
+            
+            Float leftDist2 = SquaredDistance(closestLeft, point);
+            Float rightDist2 = SquaredDistance(closestRight, point);
+            
+            bool shouldVisitLeft  = leftDist2  < closestDistance2;
+            bool shouldVisitRight = rightDist2 < closestDistance2;
+            
+            if(shouldVisitLeft && shouldVisitRight){
+                NodePtr firstChild = nullptr, secondChild = nullptr;
+                if(leftDist2 < rightDist2){
+                    firstChild = childL;
+                    secondChild = childR;
+                }else{
+                    firstChild = childR;
+                    secondChild = childL;
+                }
+                
+                *stackPtr++ = secondChild;
+                node = firstChild;
+            }else if(shouldVisitRight){
+                node = childR;
+            }else if(shouldVisitLeft){
+                node = childL;
+            }else{
+                node = *--stackPtr;
+            }
+        }
+    }
+    
+    return closestDistance;
+}
+
 __bidevice__ bool BVHMeshIntersect(const Ray &r, SurfaceInteraction *isect,
                                    Float *tHit, ParsedMesh *mesh, Node *bvh)
 {
     NodePtr stack[MAX_STACK_SIZE];
     NodePtr *stackPtr = stack;
     *stackPtr++ = NULL;
-    
     NodePtr node = bvh;
-    SurfaceInteraction tmp;
-    int curr_depth = 1;
     bool hit_anything = false;
     
-    Float t0, t1;
-    bool hit_bound = node->bound.Intersect(r, &t0, &t1);
-    if(hit_bound && node->is_leaf){
-        return IntersectMeshNode(node, mesh, r, isect, tHit);
-    }
+    bool hit_bound = node->bound.Intersect(r);
+    if(!hit_bound) return false;
     
-    do{
-        if(hit_bound){
+    while(node != nullptr){
+        if(node->is_leaf){
+            hit_anything |= IntersectMeshNode(node, mesh, r, isect, tHit);
+            node = *--stackPtr;
+        }else{
+            Float tl0, tr0;
             NodePtr childL = node->left;
             NodePtr childR = node->right;
-            bool hitl = false;
-            bool hitr = false;
-            if(childL->n > 0 || childR->n > 0){
-                hitl = childL->bound.Intersect(r, &t0, &t1);
-                hitr = childR->bound.Intersect(r, &t0, &t1);
-            }
+            bool shouldVisitLeft  = childL->bound.Intersect(r, &tl0);
+            bool shouldVisitRight = childR->bound.Intersect(r, &tr0);
             
-            if(hitl && childL->is_leaf){
-                if(IntersectMeshNode(childL, mesh, r, &tmp, tHit)){
-                    hit_anything = true;
+            if(shouldVisitRight && shouldVisitLeft){
+                NodePtr firstChild = nullptr, secondChild = nullptr;
+                if(tr0 < tl0){
+                    firstChild  = childR;
+                    secondChild = childL;
+                }else{
+                    firstChild  = childL;
+                    secondChild = childR;
                 }
-            }
-            
-            if(hitr && childR->is_leaf){
-                if(IntersectMeshNode(childR, mesh, r, &tmp, tHit)){
-                    hit_anything = true;
-                }
-            }
-            
-            bool transverseL = (hitl && !childL->is_leaf);
-            bool transverseR = (hitr && !childR->is_leaf);
-            if(!transverseR && !transverseL){
-                node = *--stackPtr;
-                curr_depth -= 1;
+                
+                *stackPtr++ = secondChild;
+                node = firstChild;
+            }else if(shouldVisitLeft){
+                node = childL;
+            }else if(shouldVisitRight){
+                node = childR;
             }else{
-                node = (transverseL) ? childL : childR;
-                if(transverseL && transverseR){
-                    *stackPtr++ = childR;
-                    curr_depth += 1;
-                }
+                node = *--stackPtr;
             }
-        }else{
-            node = *--stackPtr;
-            curr_depth -= 1;
         }
-        
-        Assert(curr_depth <= MAX_STACK_SIZE-2);
-        
-        if(node){
-            hit_bound = node->bound.Intersect(r, &t0, &t1);
-        }
-        
-    }while(node != NULL);
-    
-    if(hit_anything){
-        *isect = tmp;
     }
     
     return hit_anything;
@@ -443,11 +524,15 @@ __host__ Node *MakeBVH(ParsedMesh *mesh, int maxDepth){
     fflush(stdout);
     timers.Reset();
     
+    delete[] handles;
+    
     return bvh;
 }
 
-__host__ void Shape::InitMesh(ParsedMesh *msh, int maxDepth){
+__host__ void Shape::InitMesh(ParsedMesh *msh, bool reverseOr, int maxDepth){
     mesh = msh;
+    grid = nullptr; // don't generate the sdf in case this is a emitter
+    reverseOrientation = reverseOr;
     bvh = MakeBVH(msh, maxDepth);
     type = ShapeType::ShapeMesh;
 }
@@ -463,12 +548,44 @@ __bidevice__ bool Shape::MeshIntersect(const Ray &ray, SurfaceInteraction *isect
 }
 
 __bidevice__ Float Shape::MeshClosestDistance(const vec3f &point) const{
-    printf("Warning: Invalid function call for Mesh {MeshClosestDistance}\n");
-    return Infinity;
+    int id = -1;
+    return BVHMeshClosestDistance(point, &id, mesh, bvh);
 }
 
+#define MAX_ITERATIONS_COUNT 5
 __bidevice__ void Shape::MeshClosestPoint(const vec3f &point, 
                                           ClosestPointQuery *query) const
 {
-    printf("Warning: Invalid function call for Mesh {MeshClosestPoint}\n");
+    vec3f targetNormal(0, 1, 0);
+    vec3f targetPoint = point;
+    int hasGradient = 0;
+    if(grid == nullptr){
+        printf("Error: Query for closest point on mesh without SDF\n");
+        return;
+    }
+    
+    for(int i = 0; i < MAX_ITERATIONS_COUNT; i++){
+        Float sdf = grid->Sample(targetPoint);
+        if(reverseOrientation) sdf = -sdf;
+        
+        if(Absf(sdf) < 0.001){ break; }
+        
+        targetNormal = grid->Gradient(targetPoint);
+        AssertA(!targetNormal.HasNaN(), "NaN in gradient");
+        if(reverseOrientation) targetNormal = -targetNormal;
+        
+        targetPoint = targetPoint - sdf * targetNormal;
+        AssertA(!targetPoint.HasNaN(), "NaN in ray marching");
+        hasGradient = 1;
+    }
+    
+    if(!hasGradient){
+        targetNormal = grid->Gradient(targetPoint);
+        if(reverseOrientation) targetNormal = -targetNormal;
+    }
+    
+    Float distance = Distance(point, targetPoint);
+    targetNormal = Normalize(targetNormal);
+    Normal3f normal(targetNormal.x, targetNormal.y, targetNormal.z);
+    *query = ClosestPointQuery(targetPoint, normal, distance);
 }

@@ -8,6 +8,7 @@
 #include <collider.h>
 #include <emitter.h>
 #include <sph_solver.h>
+#include <sampling.h>
 
 // God, float point precision is hard. Don't want to use double but accumulating
 // float multiplications in matrix breaks precision on zero computations
@@ -30,6 +31,79 @@ inline vec2f PointOnSphere2(Float radius){
         p = PointOnBox(radius);
     }while(p.Length() > radius);
     return p;
+}
+
+void test_sampling_barycentric(){
+    printf("===== Test Sampling Barycentric\n");
+    vec3f p(5.3, 5.2, 5.4);
+    vec3f o(0);
+    Float spacing = 1;
+    Float fx, fy, fz;
+    int iSize = 11;
+    int i, j, k;
+    
+    vec3f N = (p - o) / spacing;
+    
+    GetBarycentric(N.x, 0, iSize-1, &i, &fx);
+    GetBarycentric(N.y, 0, iSize-1, &j, &fy);
+    GetBarycentric(N.z, 0, iSize-1, &k, &fz);
+    
+    printf("(i,j,k) = (%d,%d,%d)\n", i, j, k);
+    printf("(fx,fy,fz) = (%g,%g,%g)\n", fx, fy, fz);
+    
+    printf("===== OK\n");
+}
+
+void test_simple_triangle_distance(){
+    printf("===== Test Triangle Distance 3D\n");
+    
+    // 2 triangles
+    Float pos[] = { 
+        0.4, -0.5, 0.0, 
+        0.8, -0.5, 0.0,
+        0.6, 1.0, 0.0,
+        
+        -0.4, -0.5, 0.0,
+        -0.8, -0.5, 0.0,
+        -0.6, 1.0, 0.0
+    };
+    
+    unsigned int indices[] = {
+        0, 1, 2,
+        3, 4, 5
+    };
+    
+    int pointCount = (sizeof(pos) / sizeof(Float)) / 3;
+    int iCount = (sizeof(indices) / sizeof(unsigned int));
+    int it = Max(pointCount, iCount);
+    
+    /* manually construct ParsedMesh */
+    ParsedMesh mesh;
+    memset(&mesh, 0x00, sizeof(ParsedMesh));
+    mesh.p = new Point3f[pointCount];
+    mesh.indices = new Point3i[iCount];
+    
+    for(int i = 0; i < it; i++){
+        if(i < pointCount){
+            int st = 3 * i;
+            mesh.p[i] = Point3f(pos[st+0], pos[st+1], pos[st+2]);
+        }
+        
+        if(i < iCount){
+            mesh.indices[i] = Point3i(indices[i], 0, 0);
+        }
+    }
+    
+    mesh.nTriangles = iCount / 3;
+    mesh.nVertices = pointCount;
+    
+    Node *bvh = MakeBVH(&mesh, 8);
+    int tri = -1;
+    Float dist = BVHMeshClosestDistance(vec3f(-0.1, 0.0, 0.0), &tri, &mesh, bvh);
+    TEST_CHECK(tri == 1, "Failed to find closest triangle");
+    dist = BVHMeshClosestDistance(vec3f(0.1, 0.0, 0.0), &tri, &mesh, bvh);
+    TEST_CHECK(tri == 0, "Failed to find closest triangle");
+    printf("===== OK\n");
 }
 
 // Theres not really a way to validate particles are indeed from boundary

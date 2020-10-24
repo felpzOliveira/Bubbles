@@ -292,7 +292,7 @@ __bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId,
     pi += timeStep * vi;
     
     vec3f opi = pi;
-    data->collider->ResolveCollision(pSet->GetRadius(), 0, &pi, &vi);
+    data->collider->ResolveCollision(pSet->GetRadius(), 0.5, &pi, &vi);
     
     if(!Inside(pi, data->domain->bounds)){
         vec3f pMin = data->domain->bounds.pMin;

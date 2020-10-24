@@ -2,6 +2,7 @@
 
 #include <geometry.h>
 #include <transform.h>
+#include <grid.h>
 
 /*
 * NOTE: Currently the Mesh shape is only supported for particle emitter
@@ -99,6 +100,8 @@ __host__ Shape2 *MakeRectangle2(const Transform2 &toWorld, vec2f extension,
 __host__ Node *MakeBVH(ParsedMesh *mesh, int maxDepth);
 __bidevice__ bool BVHMeshIntersect(const Ray &r, SurfaceInteraction *isect,
                                    Float *tHit, ParsedMesh *mesh, Node *bvh);
+__bidevice__ Float BVHMeshClosestDistance(const vec3f &point, int *closest,
+                                          ParsedMesh *mesh, Node *bvh);
 
 class Plane3{
     public:
@@ -125,6 +128,7 @@ class Shape{
     
     // Mesh
     ParsedMesh *mesh;
+    FieldGrid3f *grid;
     Node *bvh;
     
     __bidevice__ Shape(){}
@@ -133,7 +137,8 @@ class Shape{
                                  bool reverseOrientation=false);
     __host__ void InitBox(const Transform &toWorld, Float sizex, Float sizey, Float sizez,
                           bool reverseOrientation=false);
-    __host__ void InitMesh(ParsedMesh *mesh, int maxDepth=22);
+    __host__ void InitMesh(ParsedMesh *mesh, bool reverseOrientation=false, 
+                           int maxDepth=22);
     __bidevice__ bool CanSolveSdf(void) const;
     __bidevice__ Bounds3f GetBounds();
     __bidevice__ bool Intersect(const Ray &ray, SurfaceInteraction *isect,
@@ -182,4 +187,20 @@ __host__ Shape *MakeSphere(const Transform &toWorld, Float radius,
                            bool reverseOrientation = false);
 __host__ Shape *MakeBox(const Transform &toWorld, const vec3f &size, 
                         bool reverseOrientation = false);
-__host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld);
+__host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld,
+                         bool reverseOrientation = false);
+
+__host__ void GenerateMeshShapeSDF(Shape *shape, Float dx=0.01, Float margin=0.1);
+
+/*
+* Expose also symbols for tests
+*/
+__global__ void CreateShapeSDFGPU(FieldGrid3f *grid, ParsedMesh *mesh, Shape *shape);
+__host__ void CreateShapeSDFCPU(FieldGrid3f *grid, ParsedMesh *mesh, Shape *shape);
+
+/*
+* Performs Ray Tracing to find if point 'point' is inside the mesh
+* described by 'meshShape' using 'bounds' as a clip container.
+*/
+__bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
+                                    const Bounds3f &bounds);

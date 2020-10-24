@@ -57,6 +57,7 @@
 #define MIN_FLT -FLT_MAX
 #define MAX_FLT  FLT_MAX
 #define Infinity FLT_MAX
+#define SqrtInfinity 3.1622776601683794E+18
 #define IntInfinity 2147483646
 
 typedef float Float;
@@ -94,6 +95,16 @@ inline __bidevice__ bool IsZero(Float a){ return Absf(a) < 1e-8; }
 inline __bidevice__ bool IsHighpZero(Float a) { return Absf(a) < 1e-22; }
 inline __bidevice__ bool IsUnsafeHit(Float a){ return Absf(a) < 1e-6; }
 inline __bidevice__ bool IsUnsafeZero(Float a){ return Absf(a) < 1e-6; }
+inline __bidevice__ Float Sign(Float a){
+    if(IsZero(a)) return 0;
+    if(a > 0) return 1;
+    return -1;
+}
+
+inline __bidevice__ Float LinearRemap(Float x, Float a, Float b, Float A, Float B){
+    return A + (B - A) * ((x - a) / (b - a));
+}
+
 inline __bidevice__ Float Log2(Float x){
     const Float invLog2 = 1.442695040888963387004650940071;
     return std::log(x) * invLog2;
@@ -452,7 +463,7 @@ template<typename T> class vec3{
     }
     
     __bidevice__ vec3<T> operator/(T f) const{
-        //Assert(!IsZero(f));
+        Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
@@ -461,7 +472,7 @@ template<typename T> class vec3{
     }
     
     __bidevice__ vec3<T> &operator/(T f){
-        //Assert(!IsZero(f));
+        Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
@@ -562,10 +573,11 @@ template<typename T> class vec4{
     }
     
     __bidevice__ T operator[](int i) const{
-        Assert(i >= 0 && i < 3);
+        Assert(i >= 0 && i < 4);
         if(i == 0) return x;
         if(i == 1) return y;
-        return z;
+        if(i == 2) return z;
+        return w;
     }
     
     __bidevice__ T &operator[](int i){
@@ -577,7 +589,7 @@ template<typename T> class vec4{
     }
     
     __bidevice__ vec4<T> operator/(T f) const{
-        //Assert(!IsZero(f));
+        Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
@@ -586,7 +598,7 @@ template<typename T> class vec4{
     }
     
     __bidevice__ vec4<T> &operator/(T f){
-        //Assert(!IsZero(f));
+        Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
@@ -666,7 +678,25 @@ template<typename T> class vec4{
     }
 };
 
+template<typename T>
+inline __bidevice__ bool HasZero(const vec3<T> &v){ 
+    return (IsZero(v.x) || (IsZero(v.y)) || (IsZero(v.z)));
+}
 
+template<typename T>
+inline __bidevice__ Float SquaredDistance(const vec2<T> &p1, const vec2<T> &p2){
+    return (p1 - p2).LengthSquared();
+}
+
+template<typename T>
+inline __bidevice__ Float SquaredDistance(const vec3<T> &p1, const vec3<T> &p2){
+    return (p1 - p2).LengthSquared();
+}
+
+template<typename T>
+inline __bidevice__ Float SquaredDistance(const vec4<T> &p1, const vec4<T> &p2){
+    return (p1 - p2).LengthSquared();
+}
 
 template<typename T> 
 inline __bidevice__ Float Distance(const vec2<T> &p1, const vec2<T> &p2){
@@ -754,6 +784,18 @@ template<typename T> inline __bidevice__ T Dot(const vec3<T> &v1, const vec3<T> 
 
 template<typename T> inline __bidevice__ T Dot(const vec4<T> &v1, const vec4<T> &v2){
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
+}
+
+template<typename T> inline __bidevice__ T Dot2(const vec2<T> &v1){
+    return Dot(v1, v1);
+}
+
+template<typename T> inline __bidevice__ T Dot2(const vec3<T> &v1){
+    return Dot(v1, v1);
+}
+
+template<typename T> inline __bidevice__ T Dot2(const vec4<T> &v1){
+    return Dot(v1, v1);
 }
 
 template<typename T> inline __bidevice__ T AbsDot(const vec3<T> &v1, const vec3<T> &v2){
@@ -916,13 +958,7 @@ template<typename T> inline __bidevice__ T Mix(const T &p0, const T &p1, T t){
     return (1 - t) * p0 + t * p1;
 }
 
-template<typename T> inline __bidevice__ T Lerp(T t, const T &p0, const T &p1){
-    return (1 - t) * p0 + t * p1;
-}
-
-template<typename T> inline __bidevice__ vec3<T> Lerp(Float t, const vec3<T> &p0, 
-                                                      const vec3<T> &p1)
-{
+template<typename T, typename Q> inline __bidevice__ T Lerp(const T &p0, const T &p1, Q t){
     return (1 - t) * p0 + t * p1;
 }
 
@@ -1142,10 +1178,6 @@ class Bounds1{
         return 0;
     }
     
-    __bidevice__ T Lerp(const T &t) const{
-        return T(Lerp(t, pMin, pMax));
-    }
-    
     __bidevice__ T Offset(const T &p) const{
         T o = p - pMin;
         if (pMax > pMin) o /= pMax - pMin;
@@ -1228,11 +1260,6 @@ class Bounds2 {
             return 1;
     }
     
-    __bidevice__ vec2<T> Lerp(const vec2f &t) const{
-        return vec2<T>(Lerp(t.x, pMin.x, pMax.x),
-                       Lerp(t.y, pMin.y, pMax.y));
-    }
-    
     __bidevice__ vec2<T> Offset(const vec2<T> &p) const{
         vec2<T> o = p - pMin;
         if (pMax.x > pMin.x) o.x /= pMax.x - pMin.x;
@@ -1251,10 +1278,15 @@ class Bounds2 {
         return vec2<T>(Min(x0, x1), Min(y0, y1));
     }
     
-    __bidevice__ bool Intersect(const Ray2 &ray, Float *tHit0, Float *tHit1) const;
+    __bidevice__ bool Intersect(const Ray2 &ray, Float *tHit0=nullptr,
+                                Float *tHit1=nullptr) const;
     
     template <typename U> __bidevice__ explicit operator Bounds2<U>() const{
         return Bounds2<U>((vec2<U>)pMin, (vec2<U>)pMax);
+    }
+    
+    __bidevice__ vec2<T> Clamped(const vec2<T> &point) const{
+        return Clamp(point, pMin, pMax);
     }
     
     __bidevice__ void PrintSelf() const{
@@ -1334,18 +1366,16 @@ class Bounds3 {
             return 2;
     }
     
-    __bidevice__ vec3<T> Lerp(const vec3f &t) const{
-        return vec3<T>(Lerp(t.x, pMin.x, pMax.x),
-                       Lerp(t.y, pMin.y, pMax.y),
-                       Lerp(t.z, pMin.z, pMax.z));
-    }
-    
     __bidevice__ vec3<T> Offset(const vec3<T> &p) const{
         vec3<T> o = p - pMin;
         if (pMax.x > pMin.x) o.x /= pMax.x - pMin.x;
         if (pMax.y > pMin.y) o.y /= pMax.y - pMin.y;
         if (pMax.z > pMin.z) o.z /= pMax.z - pMin.z;
         return o;
+    }
+    
+    __bidevice__ vec3<T> Clamped(const vec3<T> &point) const{
+        return Clamp(point, pMin, pMax);
     }
     
     __bidevice__ void BoundingSphere(vec3<T> *center, Float *radius) const{
@@ -1360,7 +1390,8 @@ class Bounds3 {
         return vec3<T>(Min(x0, x1), Min(y0, y1), Min(z0, z1));
     }
     
-    __bidevice__ bool Intersect(const Ray &ray, Float *tHit0, Float *tHit1) const;
+    __bidevice__ bool Intersect(const Ray &ray, Float *tHit0=nullptr, 
+                                Float *tHit1=nullptr) const;
     
     template <typename U> __bidevice__ explicit operator Bounds3<U>() const{
         return Bounds3<U>((vec3<U>)pMin, (vec3<U>)pMax);
@@ -1612,4 +1643,5 @@ typedef struct{
     Point3i *indices;
     int nTriangles, nVertices;
     int nUvs, nNormals;
+    AllocatorType allocator;
 }ParsedMesh;

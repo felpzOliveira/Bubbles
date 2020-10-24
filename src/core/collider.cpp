@@ -83,6 +83,11 @@ __bidevice__ bool Collider3::IsPenetrating(const ClosestPointQuery &colliderPoin
                                            const vec3f &position, Float radius)
 {
     AssertA(shape, "Invalid shape pointer for Collider");
+    if(shape->type == ShapeType::ShapeMesh){
+        if(!Inside(position, shape->GetBounds())){
+            return false;
+        }
+    }
     return shape->IsInside(position) || Absf(colliderPoint.signedDistance) < radius;
 }
 
@@ -240,6 +245,7 @@ __host__ void ColliderSetBuilder3::Release(){
 ////////////////
 // Utility 
 ///////////////
+
 __host__ Collider2 *MakeCollider2(Shape2 *shape, Float frictionCoef){
     Collider2 *collider = cudaAllocateVx(Collider2, 1);
     collider->Initialize(shape, frictionCoef);
@@ -249,5 +255,9 @@ __host__ Collider2 *MakeCollider2(Shape2 *shape, Float frictionCoef){
 __host__ Collider3 *MakeCollider3(Shape *shape, Float frictionCoef){
     Collider3 *collider = cudaAllocateVx(Collider3, 1);
     collider->Initialize(shape, frictionCoef);
+    if(shape->type == ShapeMesh){
+        // make sure this mesh has SDF otherwise we can't collide
+        GenerateMeshShapeSDF(shape);
+    }
     return collider;
 }

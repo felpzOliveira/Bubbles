@@ -1,8 +1,13 @@
 #pragma once
-#include <cutil.h>
 #include <vector>
 #include <string.h>
 #include <fstream>
+
+/*
+* Must provide the symbol cudaAllocate(bytes) that returns GPU managed memory:
+* void *cudaAllocate(size_t bytes);
+*/
+#include <cutil.h>
 
 /*
 * Defines data types to be used for components:
@@ -57,10 +62,6 @@ struct MeshProperties{
     int flip_x;
 };
 
-typedef enum{
-    GPU=0, CPU
-}AllocatorType;
-
 typedef void*(*MemoryAllocator)(long size);
 typedef void(*MemoryFree)(void *);
 
@@ -102,21 +103,28 @@ __host__ ParsedMesh *LoadObj(const char *path);
 __host__ ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props=nullptr);
 
 /*
-* Configure function allocators to your desired environment, if no configuration
-* is performed Meshes are allocated for GPU usage.
-*/
-__host__ void SetAllocators(MemoryAllocator memAlloc, MemoryFree memFree);
-
-/*
-* Configures the allocators by flag instead. If you don't want to 
-* provide allocators use 'is_cpu = 1' so API use defaults CPU allocation or '0'
-* for default GPU allocators.
+* Configures the allocators to be use. AllocatorType::GPU for allocation through
+* cutil.h and GPU ready memory and AllocatorType::CPU for standard libc allocators.
 */
 __host__ void UseDefaultAllocatorFor(AllocatorType type);
 
-//////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////
+// Exposing allocator for BVH component to sync mesh access
+/////////////////////////////////////////////////////////////
+
+/*
+* Get memory from the default allocator configured.
+*/
+__host__ void *DefaultAllocatorMemory(long size);
+
+/*
+* Release memory from the default allocator configured.
+*/
+__host__ void DefaultAllocatorFree(void *ptr);
+
+/////////////////////////////////////////////////////////////
 // Exposing parsing routines for serializer
-//////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////
 
 /*
 * Get one line from the input stream and return it in 't'.

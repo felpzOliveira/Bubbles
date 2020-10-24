@@ -31,6 +31,10 @@ typedef struct{
     size_t allocated;
 }Memory;
 
+typedef enum{
+    GPU=0, CPU
+}AllocatorType;
+
 extern Memory global_memory;
 
 /*

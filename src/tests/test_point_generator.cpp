@@ -8,6 +8,67 @@
 #include <emitter.h>
 #include <obj_loader.h>
 
+void test_mesh_collision(){
+    printf("===== Test Particle Mesh Collision\n");
+    
+    const char *whaleObj = "/home/felipe/Documents/CGStuff/models/HappyWhale.obj";
+    Transform transform = Translate(-0.5, -0.5, 0) * Scale(0.05); // happy whale
+    UseDefaultAllocatorFor(AllocatorType::GPU);
+    
+    ParsedMesh *mesh = LoadObj(whaleObj);
+    Shape *shape = MakeMesh(mesh, transform, true);
+    
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(shape);
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    
+    vec3f p0 = shape->grid->bounds.pMin;
+    vec3f p1 = shape->grid->bounds.pMax;
+    Float h = 0.05;
+    std::vector<vec3f> particles;
+    
+    int tests = 0;
+    for(Float x = p0.x; x < p1.x; x += h){
+        for(Float y = p0.y; y < p1.y; y += h){
+            for(Float z = p0.z; z < p1.z; z += h){
+                vec3f p(x, y, z);
+                vec3f v(1, 0, 0);
+                
+                if(colliders->ResolveCollision(h, 0, &p, &v)){
+                    particles.push_back(p);
+                }
+                
+                tests++;
+            }
+        }
+    }
+    
+    int size = particles.size();
+    float *pos = new float[size * 3];
+    float *col = new float[size * 3];
+    
+    int itp = 0;
+    int itc = 0;
+    
+    printf("Got %d particles from %d tests\n", size, tests);
+    
+    for(vec3f &p : particles){
+        pos[itp++] = p.x; pos[itp++] = p.y; pos[itp++] = p.z;
+        col[itc++] = 1; col[itc++] = 0; col[itc++] = 0;
+    }
+    
+    vec3f at(0, 1, 4);
+    vec3f to(0,0,0);
+    
+    graphy_set_3d(at.x, at.y, at.z, to.x, to.y, to.z, 45.0, 0.1f, 100.0f);
+    graphy_render_points3f(pos, col, itp/3, h/2.0);
+    
+    getchar();
+    graphy_close_display();
+    
+    printf("===== OK\n");
+}
+
 void test_volume_particle_emitter3_mesh(){
     printf("===== Test Volume Particle Emitter3 Mesh\n");
     vec3f origin(1.5, 3, 5);
@@ -21,7 +82,7 @@ void test_volume_particle_emitter3_mesh(){
     Float spacing = 0.02;
     Bounds3f bound = shape->GetBounds();
     Float lenc = Max(bound.ExtentOn(0), Max(bound.ExtentOn(1), bound.ExtentOn(2)));
-    int reso = (int)std::floor(lenc / (spacing * 4.0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            ));
+    int reso = (int)std::floor(lenc / (spacing * 4.0));
     printf("Using grid with resolution %d x %d x %d\n", reso, reso, reso);
     
     ParticleSetBuilder3 pBuilder;
@@ -47,12 +108,6 @@ void test_volume_particle_emitter3_mesh(){
     int pCount = pSet->GetParticleCount();
     Float *pos = new Float[3 * pCount];
     Float *col = new Float[3 * pCount];
-    
-    auto accept_call = [&](const vec3f &pi) -> bool{
-        Float dist = Distance(pi, origin);
-        if(dist > 0) return true;
-        return false;
-    };
     
     int it = 0;
     for(int i = 0; i < pSet->GetParticleCount(); i++){

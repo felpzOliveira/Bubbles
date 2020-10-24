@@ -70,11 +70,14 @@ void test_particle_to_node_2D();
 void test_kernels_2D();
 void test_kernels_3D();
 
+void test_simple_triangle_distance();
 void test_triangle_point_generator();
 void test_bcclattice_point_generator();
 void test_volume_particle_emitter3();
 void test_volume_particle_emitter3_mesh();
+void test_mesh_collision();
 void test_matrix_operations();
+void test_sampling_barycentric();
 void test_ray2_intersect();
 void test_closest_point_sphere2D();
 void test_color_field_2D();
@@ -102,8 +105,10 @@ void test_pcisph3_water_sphere();
 void test_pcisph3_double_dam_break();
 void test_pcisph3_dragon();
 void test_pcisph3_happy_whale();
+void test_pcisph3_dam_whale();
 
 void test_espic_1D();
 void test_espic_particles_2D();
 
 void test_display_set();
+void test_field_grid();

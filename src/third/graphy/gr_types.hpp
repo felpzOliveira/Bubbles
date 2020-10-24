@@ -13,6 +13,7 @@ typedef enum{
     GL_OP_SET_POINTS3,
     GL_OP_SET_LINES,
     GL_OP_SET_PIXELS,
+	GL_OP_CLOSE_WINDOW_REQUEST,
     GL_OP_NONE
 }gr_opengl_op;
 
@@ -100,6 +101,10 @@ typedef struct{
     float r,g,b,a;
     gr_display *display;
 }gr_window_request;
+
+typedef struct{
+	gr_display *display;
+}gr_destroy_window_request;
 
 typedef struct{
     gr_shader *shader;

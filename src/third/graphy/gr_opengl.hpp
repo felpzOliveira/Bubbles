@@ -4,6 +4,7 @@
 #include "gr_types.hpp"
 
 void gr_opengl_window_request(gr_window_request *request);
+void gr_opengl_close_window_request(gr_destroy_window_request *request);
 gr_shader gr_opengl_shader(const char *vertexFile, const char *fragmentFile);
 
 void gr_shader_use(gr_shader *shader);

@@ -4,6 +4,7 @@
 #include <graphy.h>
 #include <unistd.h>
 #include <espic_solver.h>
+#include <obj_loader.h>
 
 static int with_graphy = 1;
 
@@ -617,6 +618,160 @@ void test_uniform_grid2D(){
         ci++;
     }
     
+    printf("===== OK\n");
+}
+
+void test_field_grid(){
+    printf("===== Test Field Grid\n");
+    FieldGrid3f *grid = cudaAllocateVx(FieldGrid3f, 1);
+    int resolution = 64;
+    Float margin = 0.01;
+    
+    const char *whaleObj = "/home/felipe/Documents/CGStuff/models/HappyWhale.obj";
+    //Transform transform = Scale(0.02); //dragon
+    Transform transform = Scale(0.3); // happy whale
+    
+    UseDefaultAllocatorFor(AllocatorType::GPU);
+    
+    ParsedMesh *mesh = LoadObj(whaleObj);
+    Shape *shape = MakeMesh(mesh, transform);
+    
+    Bounds3f bounds = shape->GetBounds();
+    vec3f scale(bounds.ExtentOn(0), bounds.ExtentOn(1), bounds.ExtentOn(2));
+    bounds.pMin -= margin * scale;
+    bounds.pMax += margin * scale;
+    
+    Float dx = 0.024;
+    Float width = bounds.ExtentOn(0);
+    Float height = bounds.ExtentOn(1);
+    Float depth = bounds.ExtentOn(2);
+    
+    resolution = (int)std::ceil(width / dx);
+    int resolutionY = (int)std::ceil(resolution * height / width);
+    int resolutionZ = (int)std::ceil(resolution * depth / width);
+    
+    unsigned int expec = (resolution+1) * (resolutionY+1) * (resolutionZ+1);
+    
+    printf("Using resolution %d x %d x %d\n", resolution, resolutionY, resolutionZ);
+    
+    grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx), 
+                bounds.pMin, VertexCentered);
+    
+    TEST_CHECK(grid->total == expec, "Incorrect amount of nodes");
+    
+    /* minimal hash tests first */
+    for(int i = 0; i < grid->resolution.x; i++){
+        for(int j = 0; j < grid->resolution.y; j++){
+            for(int k = 0; k < grid->resolution.z; k++){
+                vec3ui u(i,j,k);
+                vec3f p = grid->GetVertexPosition(u);
+                vec3f o = bounds.pMin + vec3f(i, j, k) * grid->spacing;
+                
+                grid->SetValueAt(i+j+k, u);
+                Float f = grid->GetValueAt(u);
+                TEST_CHECK((int)f == (i + j + k), "Incorrect hash value");
+                for(int d = 0; d < 3; d++){
+                    if(!IsZero(p[d] - o[d])){
+                        printf("Error at : p = {%g %g %g} o = {%g %g %g}\n", 
+                               p.x, p.y, p.z, o.x, o.y, o.z);
+                        printf("Index is %d %d %d\n", i, j, k);
+                        
+                        grid->bounds.PrintSelf();
+                        printf("\n");
+                        
+                    }
+                    TEST_CHECK(IsZero(p[d] - o[d]), "Vertex position incorrect");
+                }
+            }
+        }
+    }
+    
+    Float sdMin =  FLT_MAX;
+    Float sdMax = -FLT_MAX;
+    /* make sdf */
+#if 0
+    CreateShapeSDFCPU(grid, mesh, shape);
+#else
+    GPULaunch(grid->total, CreateShapeSDFGPU, grid, mesh, shape);
+#endif
+    
+    for(int i = 0; i < grid->resolution.x; i++){
+        for(int j = 0; j < grid->resolution.y; j++){
+            for(int k = 0; k < grid->resolution.z; k++){
+                vec3ui u(i,j,k);
+                Float f = grid->GetValueAt(u);
+                if(f < sdMin) sdMin = f;
+                if(f > sdMax) sdMax = f;
+            }
+        }
+    }
+    
+    std::vector<vec3f> particles;
+    vec3f p0 = grid->bounds.pMin;
+    vec3f p1 = grid->bounds.pMax;
+    Float h = 0.05;
+    
+    for(Float x = p0.x; x < p1.x; x += h){
+        for(Float y = p0.y; y < p1.y; y += h){
+            for(Float z = p0.z; z < p1.z; z += h){
+                vec3f p(x, y, z);
+                vec3f pt = p;
+                for(int i = 0; i < 5; i++){
+                    Float sdf = grid->Sample(pt);
+                    if(Absf(sdf) < 0.001){
+                        break;
+                    }
+                    
+                    vec3f g = grid->Gradient(pt);
+                    pt = pt - sdf * g;
+                }
+                
+                particles.push_back(pt);
+            }
+        }
+    }
+    
+    int size = particles.size();
+    float *pos = new float[size * 3];
+    float *col = new float[size * 3];
+    
+    int itp = 0;
+    int itc = 0;
+    
+    printf("Got %d particles\n", size);
+    
+    for(vec3f &p : particles){
+        pos[itp++] = p.x; pos[itp++] = p.y; pos[itp++] = p.z;
+        col[itc++] = 1; col[itc++] = 0; col[itc++] = 0;
+    }
+    
+#if 0
+    for(int i = 0; i < grid->resolution.x; i++){
+        for(int j = 0; j < grid->resolution.y; j++){
+            for(int k = 0; k < grid->resolution.z; k++){
+                vec3ui u(i,j,k);
+                vec3f p = grid->GetVertexPosition(u);
+                Float f = grid->GetValueAt(u);
+                if(f > 0) continue;
+                Float mp = LinearRemap(f, sdMin, sdMax, 0, 1);
+                pos[itp++] = p.x; pos[itp++] = p.y; pos[itp++] = p.z;
+                col[itc++] = 1 - mp; col[itc++] = mp; col[itc++] = 0;
+            }
+        }
+    }
+#endif
+    
+    vec3f at(3);
+    vec3f to(0);
+    
+    graphy_set_3d(at.x, at.y, at.z, to.x, to.y, to.z, 45.0, 0.1f, 100.0f);
+    graphy_render_points3f(pos, col, itp/3, h/2.0);
+    
+    getchar();
+    
+    graphy_close_display();
+    grid->Release();
+    cudaFree(grid);
     printf("===== OK\n");
 }
 

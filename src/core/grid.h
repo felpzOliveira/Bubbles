@@ -1,6 +1,7 @@
 #pragma once
 #include <geometry.h>
 #include <particle.h>
+#include <sampling.h>
 
 /*
 * This is a minimal grid acceleration for SPH-based simulations,
@@ -185,9 +186,8 @@ unsigned int LinearIndex(const U &u, const U &usizes, int dimensions){
     unsigned int h = u[0]; // x
     if(dimensions > 1)
         h += u[1] * usizes[0]; // y * sizeX
-    if(dimensions == 3){
-        h += (u[2] * usizes[0] * usizes[2]); // z * sizeX * sizeY
-    }
+    if(dimensions == 3)
+        h += (u[2] * usizes[0] * usizes[1]); // z * sizeX * sizeY
     return h;
 }
 
@@ -575,7 +575,7 @@ class NodeEdgeGrid{
     
     /* 
 * Initializes the NodeEdgeGrid with the underlying grid,
-* the grid needs to be already builted.
+* the grid needs to be already built.
 */
     __host__ void Build(Grid<T, U, Q> *gridPtr, F initialValue = F(0)){
         AssertA(gridPtr, "Invalid grid pointer given for {NodeEdgeGrid::Setup}");
@@ -772,3 +772,168 @@ class NodeEdgeGrid{
 
 typedef NodeEdgeGrid<vec2f, vec2ui, Bounds2f, Float> NodeEdgeGrid2f;
 typedef NodeEdgeGrid<vec2f, vec2ui, Bounds2f, vec2f> NodeEdgeGrid2v;
+
+/*
+* Because NodeEdgeGrid is made for particle <=> grid data transfers
+* it might be too complex for a few operations. The Grid structure also
+* is made for particles, we need a simpler version of Grid that can hold
+* components based on edge/center locations and allow interpolation. Enters FieldGrid.
+*/
+
+typedef enum{
+    VertexCentered, 
+}VertexType;
+
+// Vector computation  Dimension computation  Domain computation          Field Values
+// T = vec2f/vec3f,    U = vec2ui/vec3ui,     Q = Bounds2f/Bounds3f,  F = Float/vec2f/vec3f
+template<typename T, typename U, typename Q, typename F>
+class FieldGrid{
+    public:
+    U resolution; // the amount of elements in each direction
+    unsigned int total; // the total amount of elements
+    F *field; // the actual value stored in each node
+    T minPoint; // minimal point (bottom-left)
+    T spacing; // spacing between nodes
+    Q bounds; // bounds of the grid
+    int dimensions; // number of dimensions of the grid
+    VertexType type; // where should position hash to
+    
+    __bidevice__ FieldGrid(){ SetDimension(T(0)); }
+    __bidevice__ void SetDimension(const Float &u){ (void)u; dimensions = 1; }
+    __bidevice__ void SetDimension(const vec2f &u){ (void)u; dimensions = 2; }
+    __bidevice__ void SetDimension(const vec3f &u){ (void)u; dimensions = 3; }
+    
+    __bidevice__ T GetVertexCenteredPosition(const U &index){
+        T res;
+        for(int i = 0; i < dimensions; i++){
+            res[i] = minPoint[i] + spacing[i] * index[i];
+        }
+        
+        return res;
+    }
+    
+    //TODO: Implement other types
+    __bidevice__ unsigned int Get1DLengthFor(int count){
+        switch(type){
+            case VertexCentered: return count+1;
+            default:{
+                printf("Unknown grid node distribution\n");
+                return 0;
+            }
+        }
+    }
+    
+    
+    __bidevice__ T GetVertexPosition(const U &index){
+        switch(type){
+            case VertexCentered: return GetVertexCenteredPosition(index);
+            default:{
+                printf("Unknown grid node distribution\n");
+                return T(0);
+            }
+        }
+    }
+    
+    __bidevice__ void SetValueAt(const F &value, const U &u){
+        unsigned int h = LinearIndex(u, resolution, dimensions);
+        field[h] = value;
+    }
+    
+    __bidevice__ F GetValueAt(const U &u){
+        unsigned int h = LinearIndex(u, resolution, dimensions);
+        return field[h];
+    }
+    
+    /*
+    * Sample the field in the given point p.
+*/
+    __bidevice__ F Sample(const T &p){
+        U ii(0);
+        U jj(0);
+        T weight(0);
+        T normalized = p - minPoint;
+        for(int i = 0; i < dimensions; i++){
+            int id;
+            Float f;
+            AssertA(!IsZero(spacing[i]), "Zero spacing");
+            normalized[i] /= spacing[i];
+            AssertA(!normalized.HasNaN(), "NaN normalized position");
+            GetBarycentric(normalized[i], 0, resolution[i]-1, &id, &f);
+            weight[i] = f;
+            AssertA(!IsNaN(f), "NaN at barycentric weight");
+            ii[i] = id;
+            jj[i] = Min(id+1, resolution[i]-1);
+        }
+        
+        if(dimensions == 3){
+            return Trilerp(
+                GetValueAt(ii), // (i,j,k)
+                GetValueAt(U(jj[0], ii[1], ii[2])), // (i+1,j,k)
+                GetValueAt(U(ii[0], jj[1], ii[2])), // (i,j+1,k)
+                GetValueAt(U(jj[0], jj[1], ii[2])), // (i+1,j+1,k)
+                GetValueAt(U(ii[0], ii[1], jj[2])), // (i,j,k+1)
+                GetValueAt(U(jj[0], ii[1], jj[2])), // (i+1,j,k+1)
+                GetValueAt(U(ii[0], jj[1], jj[2])), // (i,j+1,k+1)
+                GetValueAt(jj),  // (i+1,j+1,k+1)
+                weight[0], weight[1], weight[2]);
+        }else{
+            printf("TODO: Implement interpolation for %d dimension\n", dimensions);
+            return F(0);
+        }
+    }
+    
+    /*
+    * Compute gradient at p. We basically sample a bunch of times
+    * for central differences method.
+*/
+    __bidevice__ T Gradient(const T &p){
+        T value;
+        // the way our setup works is we adjust resolution in Y/Z axis
+        // so the reference spacing is X
+        AssertA(!HasZero(spacing), "Zero spacing");
+        
+        // central differences at each axis
+        for(int i = 0; i < dimensions; i++){
+            T s(0); s[i] = 0.5 * spacing[i];
+            Float forward  = Sample(p + s);
+            Float backward = Sample(p - s);
+            value[i] = (forward - backward) / spacing[i];
+        }
+        
+        return value;
+    }
+    
+    
+    __host__ void Build(const U &resol, const T &space, 
+                        const T &origin, VertexType vtype, 
+                        const F &initialValue = F(0))
+    {
+        T fres;
+        SetDimension(T(0));
+        resolution = resol;
+        minPoint = origin;
+        spacing = space;
+        type = vtype;
+        total = 1;
+        
+        for(int i = 0; i < dimensions; i++){
+            resolution[i] = Get1DLengthFor(resol[i]);
+            total *= resolution[i];
+            fres[i] = (Float)resol[i];
+        }
+        
+        bounds = Q(origin, origin + spacing * fres);
+        
+        field = cudaAllocateVx(F, total);
+        for(int i = 0; i < total; i++){
+            field[i] = initialValue;
+        }
+    }
+    
+    __host__ void Release(){
+        if(field) cudaFree(field);
+    }
+};
+
+typedef FieldGrid<vec2f, vec2ui, Bounds2f, Float> FieldGrid2f;
+typedef FieldGrid<vec3f, vec3ui, Bounds3f, Float> FieldGrid3f;

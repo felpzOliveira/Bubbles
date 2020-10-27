@@ -107,8 +107,9 @@ int cudaInit(){
         CUCHECK(cudaChooseDevice(&dev, &prop));
         CUCHECK(cudaGetDeviceProperties(&prop, dev));
         global_memory.allocated = 0;
+#if defined(PRINT_INIT)
         std::cout << "Using device " << prop.name << " [ " <<  prop.major << "." << prop.minor << " ]" << std::endl; 
-        
+#endif
         clock_t start = clock();
         cudaFree(0);
 		clock_t mid = clock();
@@ -206,22 +207,3 @@ void cudaSafeExit(){
     exit(0);
 }
 
-void *_cudaAllocate(size_t bytes, int line, const char *filename, bool abort){
-    void *ptr = nullptr;
-    if(cudaHasMemory(bytes)){
-        cudaError_t err = cudaMallocManaged(&ptr, bytes);
-        if(err != cudaSuccess){
-            std::cout << "Failed to allocate memory " << filename << ":" << line << "[" << bytes << " bytes]" << std::endl;
-            ptr = nullptr;
-        }else{
-            global_memory.allocated += bytes;
-        }
-    }
-    
-    if(!ptr && abort){
-        getchar();
-        cudaSafeExit();
-    }
-    
-    return ptr;
-}

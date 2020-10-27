@@ -104,11 +104,13 @@ void test_pcisph2_water_drop();
 void test_pcisph3_water_sphere();
 void test_pcisph3_double_dam_break();
 void test_pcisph3_dragon();
+void test_pcisph3_lucy_dam();
 void test_pcisph3_happy_whale();
-void test_pcisph3_dam_whale();
+void test_pcisph3_whale_obstacle();
+void test_pcisph3_lucy_ball();
+void test_pcisph3_quadruple_dam();
 
 void test_espic_1D();
 void test_espic_particles_2D();
 
-void test_display_set();
 void test_field_grid();

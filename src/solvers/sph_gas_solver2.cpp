@@ -260,10 +260,3 @@ __host__ void SphGasSolver2::Setup(Float targetDensity, Float targetSpacing,
 __host__ void SphGasSolver2::UpdateDensity(){
     solver->UpdateDensity();
 }
-
-__host__ void SphGasSolver2::Cleanup(){
-    if(solver){
-        solver->Cleanup();
-        cudaFree(solver);
-    }
-}

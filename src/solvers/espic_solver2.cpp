@@ -83,30 +83,3 @@ __host__ void EspicSolver2::Setup(Grid2 *domain, SpecieSet2 **species, int speci
 __host__ void EspicSolver2::SetColliders(ColliderSet2 *coll){
     collider = coll;
 }
-
-__host__ void EspicSolver2::Release(){
-    if(den){
-        for(int i = 0; i < spCount; i++){
-            if(den[i]){
-                den[i]->Release();
-                cudaFree(den[i]);
-            }
-        }
-        cudaFree(den);
-    }
-    
-    if(phi){
-        phi->Release();
-        cudaFree(phi);
-    }
-    
-    if(rho){
-        rho->Release();
-        cudaFree(rho);
-    }
-    
-    if(ef){
-        ef->Release();
-        cudaFree(ef);
-    }
-}

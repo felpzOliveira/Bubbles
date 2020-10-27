@@ -233,16 +233,7 @@ void test_espic_particles_2D(){
                                      &pos[0], &col[0], 5.0);
     }
     
-    for(int i = 0; i < speciesCount; i++) cudaFree(ppSet[i]);
-    
     delete[] col;
     delete[] pos;
-    cudaFree(ppSet);
-    grid->Release();
-    cudaFree(grid);
-    cudaFree(container);
-    pBuilderE.Release();
-    pBuilderI.Release();
-    solver.Release();
     printf("===== OK\n");
 }

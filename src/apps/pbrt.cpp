@@ -1,14 +1,10 @@
-#include <iostream>
-#include <string>
+#include <args.h>
 #include <serializer.h>
 #include <sstream>
 #include <fstream>
 #include <obj_loader.h> // get parser utilities
 #include <transform.h>
 
-#define TARGET_FILE "/home/felipe/Documents/Bubbles/whale/output_300.txt"
-#define TARGET_OUTFILE "geometry.pbrt"
-#define DEFAULT_R "0.012"
 #define __to_stringf __to_string<Float>
 #define __to_stringi __to_string<int>
 
@@ -16,14 +12,111 @@ typedef enum{
     LAYERED=0, LEVEL, ALL
 }RenderMode;
 
-struct convert_opts{
+typedef struct{
     std::string input;
     std::string output;
-    std::string radius;
     RenderMode mode;
     Float rotate;
+    Float radius;
     int level;
     int flags;
+}pbrt_opts;
+
+ARGUMENT_PROCESS(pbrt_input_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    opts->input = ParseNext(argc, argv, i, "--in");
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_output_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    opts->output = ParseNext(argc, argv, i, "--out");
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_radius_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    Float radius = ParseNextFloat(argc, argv, i, "--radius");
+    opts->radius = radius;
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_serializer_pos_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    opts->flags |= SERIALIZER_POSITION;
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_serializer_bod_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    opts->flags |= SERIALIZER_BOUNDARY;
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_layered_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    opts->mode = RenderMode::LAYERED;
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_level_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "--level");
+    const char *token = value.c_str();
+    opts->level = (int)ParseFloat(&token);
+    opts->mode = RenderMode::LEVEL;
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_rotate_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "--rotate");
+    const char *token = value.c_str();
+    opts->rotate = ParseFloat(&token);
+    return 0;
+}
+
+std::map<const char *, arg_desc> pbrt_argument_map = {
+    {"--in", 
+        { .processor = pbrt_input_arg, 
+            .help = "Where to read input file." 
+        }
+    },
+    {"--out", 
+        { .processor = pbrt_output_arg, 
+            .help = "Where to write output." 
+        }
+    },
+    {"--radius", 
+        { .processor = pbrt_radius_arg, 
+            .help = "Radius to use for particle cloud. (default: 0.012)" 
+        }
+    },
+    {"--ppos", 
+        { .processor = pbrt_serializer_pos_arg, 
+            .help = "Input format contains position. (default)" 
+        }
+    },
+    {"--pbod", 
+        { .processor = pbrt_serializer_bod_arg, 
+            .help = "Input format contains boundary." 
+        }
+    },
+    {"--layered", 
+        { .processor = pbrt_layered_arg, 
+            .help = "Generates geometry containing only CNM-based layered boundary particles." 
+        }
+    },
+    {"--level", 
+        { .processor = pbrt_level_arg, 
+            .help = "Generates geometry containing only a specific level of CNM classification." 
+        }
+    },
+    {"--rotate", 
+        { .processor = pbrt_rotate_arg, 
+            .help = "Rotate input in the Y direction. (degrees)" 
+        }
+    },
 };
 
 const char *render_mode_string(RenderMode mode){
@@ -62,64 +155,16 @@ std::string GetMaterialString(int layer){
     return data;
 }
 
-std::string ParseNext(int argc, char **argv, int &i, const char *arg, int count=1){
-    int ok = (argc > i+count) ? 1 : 0;
-    if(!ok){
-        printf("Invalid argument for %s\n", arg);
-        exit(0);
-    }
-    
-    std::string res;
-    for(int n = 1; n < count+1; n++){
-        res += std::string(argv[n+i]);
-        if(n < count) res += " ";
-    }
-    
-    i += count;
-    return res;
-}
-
-void InitializeArguments(convert_opts *opts, int argc, char **argv){
-    opts->input = TARGET_FILE;
-    opts->output = TARGET_OUTFILE;
+void default_pbrt_opts(pbrt_opts *opts){
+    opts->output = "geometry.pbrt";
     opts->flags = SERIALIZER_POSITION;
-    opts->radius = DEFAULT_R;
+    opts->radius = 0.012;
     opts->mode = RenderMode::ALL;
     opts->rotate = 0;
     opts->level = -1;
-    //TODO: flags
-    for(int i = 1; i < argc; i++){
-        std::string arg(argv[i]);
-        if(arg == "--in"){
-            opts->input = ParseNext(argc, argv, i, "--in");
-        }else if(arg == "--out"){ // output file
-            opts->output = ParseNext(argc, argv, i, "--out");
-        }else if(arg == "--radius"){ // target radius
-            opts->radius = ParseNext(argc, argv, i, "--radius");
-        }else if(arg == "--ppos"){ // parse position
-            opts->flags |= SERIALIZER_POSITION;
-        }else if(arg == "--pbod"){ // parse boundary
-            opts->flags |= SERIALIZER_BOUNDARY;
-        }else if(arg == "--layered"){ // layered mode
-            opts->mode = RenderMode::LAYERED;
-        }else if(arg == "--level"){ // single level mode
-            std::string value = ParseNext(argc, argv, i, "--level");
-            const char *token = value.c_str();
-            opts->level = (int)ParseFloat(&token);
-            opts->mode = RenderMode::LEVEL;
-        }else if(arg == "--rotate"){
-            std::string value = ParseNext(argc, argv, i, "--rotate");
-            const char *token = value.c_str();
-            opts->rotate = ParseFloat(&token);
-        }else{
-            printf("Unknown argument %s\n", argv[i]);
-            exit(0);
-        }
-    }
 }
 
-void PrintArgs(convert_opts *opts){
-    printf("* Bubbles2Pbrt - Bubbles converter built %s at %s *\n", __DATE__, __TIME__);
+void print_configs(pbrt_opts *opts){
     std::cout << "Configs: " << std::endl;
     std::cout << "    * Target file : " << opts->input << std::endl;
     std::cout << "    * Target output : " << opts->output << std::endl;
@@ -136,7 +181,7 @@ void PrintArgs(convert_opts *opts){
 
 int SplitByLayer(std::vector<SerializedParticle> **renderflags, 
                  std::vector<SerializedParticle> *pSet, int pCount,
-                 convert_opts *opts)
+                 pbrt_opts *opts)
 {
     int mCount = 0;
     std::vector<SerializedParticle> *groups;
@@ -161,7 +206,7 @@ int SplitByLayer(std::vector<SerializedParticle> **renderflags,
     return mCount;
 }
 
-int AcceptLayer(int layer, convert_opts *opts){
+int AcceptLayer(int layer, pbrt_opts *opts){
     if(opts->mode == RenderMode::ALL) return 1;
     if(opts->mode == RenderMode::LAYERED) return (layer > 0 && layer < 3 ? 1 : 0);
     if(opts->mode == RenderMode::LEVEL) return (layer == opts->level ? 1 : 0);
@@ -169,15 +214,29 @@ int AcceptLayer(int layer, convert_opts *opts){
     exit(0);
 }
 
-int main(int argc, char **argv){
-    convert_opts opts;
+void pbrt_command(int argc, char **argv){
+    pbrt_opts opts;
     std::vector<SerializedParticle> particles;
     std::vector<SerializedParticle> *rendergroups = nullptr;
     int count = 0;
     int pAdded = 0;
+    std::string radiusString;
     
-    InitializeArguments(&opts, argc, argv);
-    PrintArgs(&opts);
+    default_pbrt_opts(&opts);
+    argument_process(pbrt_argument_map, argc, argv, &opts);
+    print_configs(&opts);
+    
+    if(opts.input.size() == 0){
+        printf("No input given\n");
+        return;
+    }
+    
+    if(opts.mode != RenderMode::ALL && !(opts.flags & SERIALIZER_BOUNDARY)){
+        printf("This mode requires CNM-based boundary output from Bubbles\n");
+        return;
+    }
+    
+    radiusString = __to_stringf(opts.radius);
     
     count = SerializerLoadParticles3(&particles, opts.input.c_str(), opts.flags);
     
@@ -188,7 +247,7 @@ int main(int argc, char **argv){
         
         if(!ofs.is_open()){
             std::cout << "Failed to open output file: " << opts.output << std::endl;
-            return 0;
+            return;
         }
         
         count = SplitByLayer(&rendergroups, &particles, total, &opts);
@@ -210,7 +269,7 @@ int main(int argc, char **argv){
                     data += __to_stringf(p.position.y); data += " ";
                     data += __to_stringf(p.position.z); data += "\n";
                     data += "\tShape \"sphere\" \"float radius\" [";
-                    data += opts.radius;
+                    data += radiusString;
                     data += "]\nTransformEnd\n";
                     pAdded += 1;
                 }
@@ -225,6 +284,4 @@ int main(int argc, char **argv){
     }
     
     if(rendergroups) delete[] rendergroups;
-    
-    return 0;
 }

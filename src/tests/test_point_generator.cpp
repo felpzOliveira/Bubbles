@@ -193,10 +193,6 @@ void test_volume_particle_emitter3(){
     sleep(4);
     delete[] pos;
     delete[] col;
-    grid->Release();
-    pSet->Release();
-    cudaFree(pSet);
-    cudaFree(grid);
     printf("===== OK\n");
 }
 

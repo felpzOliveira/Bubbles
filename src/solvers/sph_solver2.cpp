@@ -151,11 +151,6 @@ __host__ void SphSolver2::UpdateDensity(){
     ComputeDensityCPU(solverData);
 }
 
-__host__ void SphSolver2::Cleanup(){
-    if(solverData) cudaFree(solverData);
-    solverData = nullptr;
-}
-
 __host__ SphSolverData2 *DefaultSphSolverData2(){
     SphSolverData2 *data = cudaAllocateVx(SphSolverData2, 1);
     data->eosExponent = 7.0;

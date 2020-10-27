@@ -2,7 +2,7 @@
 #include <shape.h>
 #include <point_generator.h>
 
-Float kDefaultTimeStepLimitScale = 6.0;
+Float kDefaultTimeStepLimitScale = 5.0;
 
 __bidevice__ PciSphSolver2::PciSphSolver2(){}
 
@@ -60,6 +60,7 @@ __host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep,
         ComputeDensityGPU(data);
     timers.StopAndNext();
     
+    //TODO: Implement CPU version for 2D?
     ComputeNonPressureForceGPU(data);
     
     timers.StopAndNext();
@@ -196,18 +197,4 @@ __host__ Float PciSphSolver2::ComputeDelta(Float timeIntervalInSeconds){
 __host__ Float PciSphSolver2::ComputeBeta(Float timeIntervalInSeconds){
     Float timeStepSquare = timeIntervalInSeconds * timeIntervalInSeconds;
     return 2.0 * massOverTargetDensitySquared * timeStepSquare;
-}
-
-__host__ void PciSphSolver2::Cleanup(){
-    if(solverData){
-        cudaFree(solverData->sphData);
-        
-        if(solverData->refMemory)
-            cudaFree(solverData->refMemory);
-        
-        if(solverData->densityErrors)
-            cudaFree(solverData->densityErrors);
-        
-        cudaFree(solverData);
-    }
 }

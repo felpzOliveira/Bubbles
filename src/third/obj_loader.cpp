@@ -33,7 +33,8 @@ void * GPUMemAlloc(long size){
 }
 
 void GPUMemFree(void *ptr){
-    if(ptr) cudaFree(ptr);
+    //if(ptr) cudaFree(ptr);
+    (void)ptr;
 }
 
 void *CPUMemAlloc(long size){

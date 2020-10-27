@@ -215,9 +215,6 @@ void test_color_field_2D(){
     delete[] bpos;
     delete[] cols;
     delete[] lens;
-    solver.Cleanup();
-    cudaFree(pSet);
-    builder.Release();
     printf("===== OK\n");
 }
 
@@ -488,8 +485,6 @@ void test_rectangle_emit(){
     graphy_render_points(pos, col, pSet->GetParticleCount(), -h, h, h, -h);
     sleep(4);
     
-    cudaFree(pSet);
-    builder.Release();
     delete[] pos;
     printf("===== OK\n");
 }

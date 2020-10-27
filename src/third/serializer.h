@@ -18,8 +18,8 @@ struct SerializedParticle{
 
 void SerializerSaveSphDataSet3(SphSolverData3 *pSet, const char *filename, int flags);
 void SerializerSaveSphDataSet2(SphSolverData2 *pSet, const char *filename, int flags);
-void SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder,
-                               const char *filename, int flags);
+int SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder,
+                              const char *filename, int flags);
 void SerializerLoadPoints3(std::vector<vec3f> *points,
                            const char *filename, int flags);
 int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int flags,

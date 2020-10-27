@@ -299,10 +299,7 @@ __host__ void GenerateMeshShapeSDF(Shape *shape, Float dx, Float margin){
     if(shape->type != ShapeType::ShapeMesh){
         printf("Warning: Called for SDF generation on non-mesh shape\n");
     }else{
-        if(shape->grid != nullptr){
-            shape->grid->Release();
-            cudaFree(shape->grid);
-        }
+        //TODO: Update grid if already exists
         
         int resolution = 0;
         Bounds3f bounds = shape->GetBounds();
@@ -315,6 +312,12 @@ __host__ void GenerateMeshShapeSDF(Shape *shape, Float dx, Float margin){
         Float depth = bounds.ExtentOn(2);
         
         resolution = (int)std::ceil(width / dx);
+#if 0
+        if(resolution > 200){ // very high resolution reduce
+            resolution = 200;
+        }
+#endif
+        
         dx = width / (Float)resolution;
         int resolutionY = (int)std::ceil(resolution * height / width);
         int resolutionZ = (int)std::ceil(resolution * depth / width);

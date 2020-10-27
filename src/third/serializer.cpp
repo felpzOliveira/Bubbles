@@ -146,13 +146,13 @@ int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
 }
 
 //TODO: I'm feeling lazy so let fscanf rule this, but change sometime
-void SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder,
-                               const char *filename, int flags)
+int SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder,
+                              const char *filename, int flags)
 {
+    int pCount = 0;
     FILE *fp = fopen(filename, "r");
     if(fp){
         Float x, y, z;
-        int pCount = 0;
         fscanf(fp, "%d\n", &pCount);
         for(int i = 0; i < pCount; i++){
             if(flags & SERIALIZER_POSITION){
@@ -165,6 +165,8 @@ void SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder,
         
         fclose(fp);
     }
+    
+    return pCount;
 }
 
 int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int flags,
@@ -177,18 +179,20 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int fl
     FILE *fp = fopen(filename.c_str(), "r");
     int pCount = 0;
     if(fp){
-        *data = new std::vector<vec3f>*[end-start+1];
+        *data = new std::vector<vec3f>*[end-start];
         fscanf(fp, "%d\n", &pCount);
         fclose(fp);
         
-        for(int i = 0; i < end-start+1; i++){
+        for(int i = 0; i < end-start; i++){
             std::string file(basename);
             file += std::to_string(i + start);
             file += ".txt";
             (*data)[i] = new std::vector<vec3f>();
             SerializerLoadPoints3((*data)[i], file.c_str(), flags);
-            printf("Loaded %d\n", i);
+            printf("\rLoaded %d / %d", i, end-start);
+            fflush(stdout);
         }
+        printf("\rLoaded %d\n", end-start);
     }else{
         printf("Failed to open file %s\n", filename.c_str());
         exit(0);

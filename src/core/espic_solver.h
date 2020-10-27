@@ -17,7 +17,6 @@ class EspicSolver2{
     __host__ void Setup(Grid2 *domain, SpecieSet2 **species, int speciesCount);
     __host__ void SetColliders(ColliderSet2 *collider);
     __host__ void Advance(Float dt);
-    __host__ void Release();
 };
 
 // Apply Gauss-Seidel SOR to compute L(phi) = -rho / e

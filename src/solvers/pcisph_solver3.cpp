@@ -1,4 +1,5 @@
 #include <pcisph_solver.h>
+#include <util.h>
 
 extern const Float kDefaultTimeStepLimitScale;
 
@@ -51,12 +52,16 @@ __host__ void AdvanceTimeStep(PciSphSolver3 *solver, Float timeStep,
         ComputeDensityGPU(data);
     timers.StopAndNext();
     
-    ComputeNonPressureForceGPU(data);
+    if(use_cpu)
+        ComputeNonPressureForceCPU(data);
+    else
+        ComputeNonPressureForceGPU(data);
     
     timers.StopAndNext();
     
     Float delta = solver->ComputeDelta(timeStep);
-    ComputePressureForceAndIntegrate(solver->solverData, timeStep, 0.01, delta, 5);
+    ComputePressureForceAndIntegrate(solver->solverData, timeStep, 
+                                     0.01, delta, 5, use_cpu);
     
     timers.Stop();
     
@@ -187,16 +192,13 @@ __host__ Float PciSphSolver3::ComputeBeta(Float timeIntervalInSeconds){
     return 2.0 * massOverTargetDensitySquared * timeStepSquare;
 }
 
-__host__ void PciSphSolver3::Cleanup(){
-    if(solverData){
-        cudaFree(solverData->sphData);
-        
-        if(solverData->refMemory)
-            cudaFree(solverData->refMemory);
-        
-        if(solverData->densityErrors)
-            cudaFree(solverData->densityErrors);
-        
-        cudaFree(solverData);
-    }
+__host__ void PciSphRunSimulation3(PciSphSolver3 *solver, Float spacing,
+                                   vec3f origin, vec3f target, 
+                                   Float targetInterval, std::vector<Shape*> sdfs)
+{
+    SphParticleSet3 *sphSet = solver->GetSphParticleSet();
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    return UtilRunSimulation3<PciSphSolver3, ParticleSet3>(solver, pSet,  spacing, 
+                                                           origin, target, 
+                                                           targetInterval, sdfs);
 }

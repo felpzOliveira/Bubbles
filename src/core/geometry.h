@@ -15,6 +15,9 @@
 #define DBG_PRINT(...) 
 #endif
 
+#define Assure(x) __assert_check_host((x), #x, __FILE__, __LINE__, "Safe exit")
+#define AssureA(x, msg) __assert_check_host((x), #x, __FILE__, __LINE__, msg)
+
 #ifdef ASSERT_ENABLE
 #define Assert(x) __assert_check((x), #x, __FILE__, __LINE__, NULL)
 #define AssertA(x, msg) __assert_check((x), #x, __FILE__, __LINE__, msg)
@@ -73,14 +76,31 @@ Float rand_float();
 * must choose a bound for a edge particle so re-use Inside with care.
 */
 
+
+inline __host__
+void __assert_check_host(bool v, const char *name, const char *filename,
+                         int line, const char *msg)
+{
+    if(!v){
+        if(!msg)
+            printf("Assert: %s (%s:%d) : (No message)\n", name, filename, line);
+        else
+            printf("Assert: %s (%s:%d) : (%s)\n", name, filename, line, msg);
+        exit(0);
+    }
+}
+
 inline __bidevice__ 
-void __assert_check(bool v, const char *name, const char *filename, int line, const char *msg){
+void __assert_check(bool v, const char *name, const char *filename,
+                    int line, const char *msg, int can_exit=0)
+{
     if(!v){
         int* ptr = nullptr;
         if(!msg)
             printf("Assert: %s (%s:%d) : (No message)\n", name, filename, line);
         else
             printf("Assert: %s (%s:%d) : (%s)\n", name, filename, line, msg);
+        if(can_exit) exit(0);
         *ptr = 10;
     }
 }
@@ -463,10 +483,10 @@ template<typename T> class vec3{
     }
     
     __bidevice__ vec3<T> operator/(T f) const{
-        Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
+        Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         return vec3<T>(x * inv, y * inv, z * inv);
     }
@@ -1178,6 +1198,10 @@ class Bounds1{
         return 0;
     }
     
+    __bidevice__ int MinimumExtent() const{
+        return 0;
+    }
+    
     __bidevice__ T Offset(const T &p) const{
         T o = p - pMin;
         if (pMax > pMin) o /= pMax - pMin;
@@ -1226,6 +1250,11 @@ class Bounds2 {
                        (*this)[(corner & 2) ? 1 : 0].y);
     }
     
+    __bidevice__ void Expand(Float d){
+        pMin -= vec2<T>(Absf(d));
+        pMax += vec2<T>(Absf(d));
+    }
+    
     __bidevice__ T LengthAt(int i, int axis) const{
         Assert(axis == 0 || axis == 1);
         return (i == 0) ? pMin[axis] : pMax[axis];
@@ -1258,6 +1287,14 @@ class Bounds2 {
             return 0;
         else
             return 1;
+    }
+    
+    __bidevice__ int MinimumExtent() const{
+        vec2<T> d = Diagonal();
+        if (d.x > d.y)
+            return 1;
+        else
+            return 0;
     }
     
     __bidevice__ vec2<T> Offset(const vec2<T> &p) const{
@@ -1322,6 +1359,11 @@ class Bounds3 {
         return b.pMin != pMin || b.pMax != pMax;
     }
     
+    __bidevice__ void Expand(Float d){
+        pMin -= vec3<T>(Absf(d));
+        pMax += vec3<T>(Absf(d));
+    }
+    
     __bidevice__ vec3<T> Corner(int corner) const{
         Assert(corner >= 0 && corner < 8);
         return vec3<T>((*this)[(corner & 1)].x,
@@ -1364,6 +1406,16 @@ class Bounds3 {
             return 1;
         else
             return 2;
+    }
+    
+    __bidevice__ int MinimumExtent() const{
+        vec3<T> d = Diagonal();
+        if (d.x > d.z && d.y > d.z)
+            return 2;
+        else if (d.x > d.y)
+            return 1;
+        else
+            return 0;
     }
     
     __bidevice__ vec3<T> Offset(const vec3<T> &p) const{

@@ -1,5 +1,5 @@
 #pragma once
-
+#include <vector>
 #include <sph_solver.h>
 
 typedef struct{
@@ -38,7 +38,6 @@ class PciSphSolver2{
     __bidevice__ SphSolverData2 *GetSphSolverData();
     __bidevice__ SphParticleSet2 *GetSphParticleSet();
     __host__ void Advance(Float timeIntervalInSeconds);
-    __host__ void Cleanup();
     
     __host__ Float ComputeBeta(Float timeIntervalInSeconds);
     __host__ Float ComputeDelta(Float timeIntervalInSeconds);
@@ -61,7 +60,6 @@ class PciSphSolver3{
     __bidevice__ SphSolverData3 *GetSphSolverData();
     __bidevice__ SphParticleSet3 *GetSphParticleSet();
     __host__ void Advance(Float timeIntervalInSeconds);
-    __host__ void Cleanup();
     
     __host__ Float ComputeBeta(Float timeIntervalInSeconds);
     __host__ Float ComputeDelta(Float timeIntervalInSeconds);
@@ -79,3 +77,7 @@ __host__ void ComputePressureForceAndIntegrate(PciSphSolverData3 *data,
                                                Float maxDensityErrorRatio, 
                                                Float delta, int maxIt,
                                                int is_cpu=0);
+
+__host__ void PciSphRunSimulation3(PciSphSolver3 *solver, Float spacing,
+                                   vec3f origin, vec3f target, 
+                                   Float targetInterval, std::vector<Shape*> sdfs);

@@ -292,7 +292,7 @@ __bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId,
     pi += timeStep * vi;
     
     vec3f opi = pi;
-    data->collider->ResolveCollision(pSet->GetRadius(), 0.5, &pi, &vi);
+    data->collider->ResolveCollision(pSet->GetRadius(), 0.6, &pi, &vi);
     
     if(!Inside(pi, data->domain->bounds)){
         vec3f pMin = data->domain->bounds.pMin;
@@ -375,6 +375,12 @@ __bidevice__ void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int e
     }
 }
 
+__bidevice__ void ComputeNonPressureForceCPU(SphSolverData3 *data){
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    for(int i = 0; i < pSet->GetParticleCount(); i++){
+        ComputeNonPressureForceFor(data, i);
+    }
+}
 
 /**************************************************************/
 //                   G P U    W R A P P E R S                 //

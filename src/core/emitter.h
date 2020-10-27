@@ -60,6 +60,13 @@ class VolumeParticleEmitterSet2{
     
     __host__ VolumeParticleEmitterSet2();
     __host__ void AddEmitter(VolumeParticleEmitter2 *emitter);
+    __host__ void AddEmitter(Shape2 *shape, Float spacing, 
+                             const vec2f &initialVel = vec2f(0),
+                             const vec2f &linearVel = vec2f(0),
+                             Float angularVel = 0, int maxParticles = IntInfinity,
+                             Float jitter = 0, bool isOneShot = true,
+                             bool allowOverlapping = false, int seed = 0);
+    
     __host__ void AddEmitter(Shape2 *shape, const Bounds2f &bounds,
                              Float spacing, const vec2f &initialVel = vec2f(0),
                              const vec2f &linearVel = vec2f(0),
@@ -80,6 +87,13 @@ class VolumeParticleEmitterSet3{
     __host__ void AddEmitter(VolumeParticleEmitter3 *emitter);
     __host__ void AddEmitter(Shape *shape, const Bounds3f &bounds,
                              Float spacing, const vec3f &initialVel = vec3f(0),
+                             const vec3f &linearVel = vec3f(0),
+                             Float angularVel = 0, int maxParticles = IntInfinity,
+                             Float jitter = 0, bool isOneShot = true,
+                             bool allowOverlapping = false, int seed = 0);
+    
+    __host__ void AddEmitter(Shape *shape, Float spacing, 
+                             const vec3f &initialVel = vec3f(0),
                              const vec3f &linearVel = vec3f(0),
                              Float angularVel = 0, int maxParticles = IntInfinity,
                              Float jitter = 0, bool isOneShot = true,

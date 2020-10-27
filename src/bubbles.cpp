@@ -52,20 +52,19 @@ void run_self_tests(){
     test_bcclattice_point_generator();
     test_pcisph3_water_sphere();
     test_pcisph3_double_dam_break();
+    test_pcisph3_whale_obstacle();
 }
 #endif
 
+void test_pcisph3_rock_dam();
+
 int main(int argc, char **argv){
+    printf("* Bubbles Fluid Simulator - Built %s at %s *\n", __DATE__, __TIME__);
     cudaInitEx();
     
-    //test_mesh_collision();
-    test_pcisph3_dam_whale();
-    //test_sampling_barycentric();
-    //test_pcisph3_double_dam_break();
-    //test_pcisph3_water_sphere();
-    //test_pcisph3_dragon();
-    //test_pcisph3_happy_whale();
-    //test_display_set();
+    //test_pcisph3_lucy_ball();
+    //test_pcisph3_quadruple_dam();
+    test_pcisph3_rock_dam();
     
 #if defined(RUN_TESTS)
     //run_self_tests();

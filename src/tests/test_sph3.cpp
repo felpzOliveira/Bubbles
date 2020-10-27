@@ -103,11 +103,6 @@ void test_sph3_double_dam_break(){
     
     delete[] pos;
     delete[] col;
-    emitterSet.Release();
-    pBuilder.Release();
-    cudaFree(container);
-    cudaFree(boxp);
-    cudaFree(boxn);
     printf("===== OK\n");
 }
 

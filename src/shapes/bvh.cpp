@@ -57,6 +57,13 @@ __host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld,
     return meshShape;
 }
 
+__host__ Shape *MakeMesh(const char *path, const Transform &toWorld,
+                         bool reverseOrientation)
+{
+    ParsedMesh *mesh = LoadObj(path);
+    return MakeMesh(mesh, toWorld, reverseOrientation);
+}
+
 __host__ void MakeNodeDistribution(NodeDistribution *dist, int nElements,
                                    int maxDepth)
 {
@@ -571,7 +578,11 @@ __bidevice__ void Shape::MeshClosestPoint(const vec3f &point,
         if(Absf(sdf) < 0.001){ break; }
         
         targetNormal = grid->Gradient(targetPoint);
-        AssertA(!targetNormal.HasNaN(), "NaN in gradient");
+        Float length = targetNormal.Length();
+        if(length > 0){
+            targetNormal = targetNormal / length;
+        }
+        
         if(reverseOrientation) targetNormal = -targetNormal;
         
         targetPoint = targetPoint - sdf * targetNormal;
@@ -581,11 +592,15 @@ __bidevice__ void Shape::MeshClosestPoint(const vec3f &point,
     
     if(!hasGradient){
         targetNormal = grid->Gradient(targetPoint);
+        Float length = targetNormal.Length();
+        if(length > 0){
+            targetNormal = targetNormal / length;
+        }
+        
         if(reverseOrientation) targetNormal = -targetNormal;
     }
     
     Float distance = Distance(point, targetPoint);
-    targetNormal = Normalize(targetNormal);
     Normal3f normal(targetNormal.x, targetNormal.y, targetNormal.z);
     *query = ClosestPointQuery(targetPoint, normal, distance);
 }

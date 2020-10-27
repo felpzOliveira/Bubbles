@@ -65,12 +65,6 @@ DeviceMemoryStats cudaReportMemoryUsage(void);
 int cudaHasMemory(size_t bytes);
 
 /*
-* Attempts to allocate a block of memory in the device. The returned
-* memory when valid (!=nullptr) is managed.
-*/
-void *_cudaAllocate(size_t bytes, int line, const char *filename, bool abort);
-
-/*
 * Prints current amount of allocated device memory.
 */
 void cudaPrintMemoryTaken(void);
@@ -103,6 +97,17 @@ std::string get_time_unit(double *inval);
 * for the given time.
 */
 std::string time_to_string(std::string val, int size);
+
+/*
+* Attempts to allocate a block of memory in the device. The returned
+* memory when valid (!=nullptr) is managed. This function register the 
+* address in the active memory region implemented by memory.h.
+* NOTE: Do *not* call cudaFree in the pointers returned, for freeing memory
+* use either CudaMemoryManagerClearCurrent or CudaMemoryManagerClearAll
+* after a region is no longer nedded.
+*/
+void *_cudaAllocate(size_t bytes, int line, const char *filename, bool abort);
+
 
 template<typename T>
 class DataBuffer{
@@ -138,10 +143,6 @@ class DataBuffer{
     __bidevice__ void Set(T val, int i){
         if(i < size) data[i] = val;
         else printf("Warning: Invalid set index {%d >= %d}\n", i, size);
-    }
-    
-    __host__ void Release(){
-        if(data) cudaFree(data);
     }
 };
 

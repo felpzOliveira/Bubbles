@@ -82,7 +82,7 @@ __host__ void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder){
             vec2f target = point + offset;
             if(shape->SignedDistance(target) <= 0){
                 if(emittedParticles < maxParticles){
-                    Builder->AddParticle(target);
+                    Builder->AddParticle(target, initVel);
                     emittedParticles++;
                     numNewParticles++;
                 }else{
@@ -117,6 +117,19 @@ __host__ void VolumeParticleEmitterSet2::AddEmitter(Shape2 *shape, const Bounds2
     emitters.push_back(new VolumeParticleEmitter2(shape, bounds, spacing, initialVel,
                                                   linearVel, angularVel, maxParticles,
                                                   jitter, isOneShot, allowOverlapping, seed));
+}
+
+__host__ void VolumeParticleEmitterSet2::AddEmitter(Shape2 *shape, Float spacing, 
+                                                    const vec2f &initialVel,
+                                                    const vec2f &linearVel,
+                                                    Float angularVel, int maxParticles,
+                                                    Float jitter, bool isOneShot,
+                                                    bool allowOverlapping, int seed)
+{
+    emitters.push_back(new VolumeParticleEmitter2(shape, shape->GetBounds(), spacing, 
+                                                  initialVel,linearVel, angularVel, 
+                                                  maxParticles, jitter, isOneShot, 
+                                                  allowOverlapping, seed));
 }
 
 __host__ void VolumeParticleEmitterSet2::SetJitter(Float jitter){
@@ -181,7 +194,7 @@ __host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder){
             if(isSdf){
                 if(shape->SignedDistance(target) <= 0){
                     if(emittedParticles < maxParticles){
-                        Builder->AddParticle(target);
+                        Builder->AddParticle(target, initVel);
                         emittedParticles++;
                         numNewParticles++;
                     }else{
@@ -195,7 +208,7 @@ __host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder){
 */
                 if(MeshIsPointInside(target, shape, bound)){
                     if(emittedParticles < maxParticles){
-                        Builder->AddParticle(target);
+                        Builder->AddParticle(target, initVel);
                         emittedParticles++;
                         numNewParticles++;
                     }else{
@@ -223,6 +236,19 @@ __host__ VolumeParticleEmitterSet3::VolumeParticleEmitterSet3(){}
 
 __host__ void VolumeParticleEmitterSet3::AddEmitter(VolumeParticleEmitter3 *emitter){
     emitters.push_back(emitter);
+}
+
+__host__ void VolumeParticleEmitterSet3::AddEmitter(Shape *shape, Float spacing, 
+                                                    const vec3f &initialVel,
+                                                    const vec3f &linearVel,
+                                                    Float angularVel, int maxParticles,
+                                                    Float jitter, bool isOneShot,
+                                                    bool allowOverlapping, int seed)
+{
+    emitters.push_back(new VolumeParticleEmitter3(shape, shape->GetBounds(), spacing, 
+                                                  initialVel, linearVel, angularVel, 
+                                                  maxParticles, jitter, isOneShot, 
+                                                  allowOverlapping, seed));
 }
 
 __host__ void VolumeParticleEmitterSet3::AddEmitter(Shape *shape, const Bounds3f &bounds,

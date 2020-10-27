@@ -1,6 +1,5 @@
 bubbles
-bbmesh2part
-bb2pbrt
+bbtool
 *.pbrt
 *.txt
 *.o

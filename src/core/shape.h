@@ -189,6 +189,8 @@ __host__ Shape *MakeBox(const Transform &toWorld, const vec3f &size,
                         bool reverseOrientation = false);
 __host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld,
                          bool reverseOrientation = false);
+__host__ Shape *MakeMesh(const char *path, const Transform &toWorld,
+                         bool reverseOrientation = false);
 
 __host__ void GenerateMeshShapeSDF(Shape *shape, Float dx=0.01, Float margin=0.1);
 

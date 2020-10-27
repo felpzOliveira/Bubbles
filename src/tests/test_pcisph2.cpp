@@ -60,11 +60,6 @@ void test_pcisph2_water_block(){
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
     }
     
-    solver.Cleanup();
-    builder.Release();
-    colliderBuilder.Release();
-    grid->Release();
-    cudaFree(grid);
     delete[] pos;
     delete[] col;
     printf("===== OK\n");
@@ -135,11 +130,6 @@ void test_pcisph2_water_drop(){
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
     }
     
-    solver.Cleanup();
-    builder.Release();
-    colliderBuilder.Release();
-    grid->Release();
-    cudaFree(grid);
     delete[] pos;
     delete[] col;
     printf("===== OK\n");
@@ -212,10 +202,6 @@ void test_pcisph2_double_dam_break(){
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
     }
     
-    solver.Cleanup();
-    builder.Release();
-    colliderBuilder.Release();
-    cudaFree(grid);
     delete[] pos;
     delete[] col;
     printf("===== OK\n");
@@ -274,11 +260,6 @@ void test_pcisph2_water_sphere(){
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
     }
     
-    solver.Cleanup();
-    builder.Release();
-    colliderBuilder.Release();
-    grid->Release();
-    cudaFree(grid);
     delete[] pos;
     delete[] col;
     printf("===== OK\n");

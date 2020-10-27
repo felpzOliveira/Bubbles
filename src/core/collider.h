@@ -83,7 +83,6 @@ class ColliderSetBuilder2{
     __host__ void AddCollider2(Collider2 *collider);
     __host__ void AddCollider2(Shape2 *shape, Float frictionCoef=0.);
     __host__ ColliderSet2 *GetColliderSet();
-    __host__ void Release();
 };
 
 class ColliderSetBuilder3{
@@ -95,7 +94,6 @@ class ColliderSetBuilder3{
     __host__ void AddCollider3(Collider3 *collider);
     __host__ void AddCollider3(Shape *shape, Float frictionCoef=0.);
     __host__ ColliderSet3 *GetColliderSet();
-    __host__ void Release();
 };
 
 __host__ Collider2 *MakeCollider2(Shape2 *shape, Float frictionCoef=0.);

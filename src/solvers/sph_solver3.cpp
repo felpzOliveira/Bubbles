@@ -139,12 +139,6 @@ __host__ void SphSolver3::Setup(Float targetDensity, Float targetSpacing,
     solverData->frame_index = 1;
 }
 
-__host__ void SphSolver3::Cleanup(){
-    if(solverData) cudaFree(solverData);
-    solverData = nullptr;
-}
-
-
 __host__ SphSolverData3 *DefaultSphSolverData3(){
     SphSolverData3 *data = cudaAllocateVx(SphSolverData3, 1);
     data->eosExponent = 7.0;

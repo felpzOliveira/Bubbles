@@ -143,9 +143,6 @@ void test_node_grid_2D(){
         TEST_CHECK(LinearIndex(pi_j_, vec2ui(22,22), 2) == nodes[3], "Inverse hash failed");
     }
     
-    rho.Release();
-    grid.Release();
-    nodeGrid.Release();
     printf("===== OK\n");
 }
 
@@ -252,8 +249,6 @@ void test_neighbor_query_grid2D(){
         
         delete[] pos;
         delete[] colors;
-        cudaFree(pSet);
-        builder.Release();
         printf(" * Graphy integration\n");
     }
     
@@ -363,8 +358,6 @@ void test_distribute_random_grid2D(){
     
     TEST_CHECK(rc == count, "Failed to distribute all paticles");
     
-    builder.Release();
-    cudaFree(pSet);
     printf("===== OK\n");
 }
 
@@ -422,8 +415,6 @@ void test_distribute_random_grid3D(){
     }
     
     TEST_CHECK(rc == count, "Failed to distribute all paticles");
-    builder.Release();
-    cudaFree(pSet);
     printf("===== OK\n");
 }
 
@@ -482,8 +473,6 @@ void test_distribute_uniform_grid2D(){
         getchar();
     }
     
-    builder.Release();
-    cudaFree(pSet);
     printf("===== OK\n");
 }
 
@@ -531,8 +520,6 @@ void test_distribute_uniform_grid3D(){
     }
     
     
-    builder.Release();
-    cudaFree(pSet);
     printf("===== OK\n");
 }
 
@@ -770,8 +757,6 @@ void test_field_grid(){
     getchar();
     
     graphy_close_display();
-    grid->Release();
-    cudaFree(grid);
     printf("===== OK\n");
 }
 

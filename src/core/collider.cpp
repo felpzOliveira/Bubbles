@@ -191,18 +191,6 @@ __host__ ColliderSet2 *ColliderSetBuilder2::GetColliderSet(){
     return setReference;
 }
 
-__host__ void ColliderSetBuilder2::Release(){
-    for(int i = 0; i < colliders.size(); i++){
-        cudaFree(colliders[i]);
-    }
-    
-    colliders.clear();
-    
-    if(setReference){
-        cudaFree(setReference);
-    }
-}
-
 ////////////////////////
 // ColliderSet Builder
 ///////////////////////
@@ -228,18 +216,6 @@ __host__ ColliderSet3 *ColliderSetBuilder3::GetColliderSet(){
     setReference->Initialize(colliderList, colliders.size());
     printf("Initialized collider list with #%ld shapes\n", colliders.size());
     return setReference;
-}
-
-__host__ void ColliderSetBuilder3::Release(){
-    for(int i = 0; i < colliders.size(); i++){
-        cudaFree(colliders[i]);
-    }
-    
-    colliders.clear();
-    
-    if(setReference){
-        cudaFree(setReference);
-    }
 }
 
 ////////////////

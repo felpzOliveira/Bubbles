@@ -7,67 +7,8 @@
 #include <string>
 #include <unistd.h>
 #include <obj_loader.h>
-
-int set_position(float *pos, std::vector<vec3f> *vpos, Float removeY=-1.1, int removelow=0){
-    int it = 0;
-    for(int i = 0; i < vpos->size(); i++){
-        vec3f p = vpos->at(i);
-        if(removelow && p.y < removeY){
-            continue;
-        }
-        
-        pos[3 * it + 0] = p.x;
-        pos[3 * it + 1] = p.y;
-        pos[3 * it + 2] = p.z;
-        it ++;
-    }
-    
-    return it;
-}
-
-void test_display_set(){
-    int start = 175;
-    //int end = 477;
-    int end = start+1;
-    std::vector<vec3f> **frames = NULL;
-    int pCount = SerializerLoadMany3(&frames, "dragon/output_", 
-                                     SERIALIZER_POSITION, start, end);
-    vec3f target(0);
-    vec3f origin(-5,5,3);
-    
-    float *pos = new float[3 * pCount];
-    float *col = new float[3 * pCount];
-    
-    memset(col, 0x0, 3 * pCount * sizeof(float));
-    std::vector<vec3f> *pp = frames[0];
-    Bounds3f bound(vec3f(0), vec3f(0));
-    for(int i = 0; i < pCount; i++){
-        vec3f pi = pp->at(i);
-        bound = Union(bound, pi);
-        col[3 * i + 0] = 1;
-    }
-    
-    bound.PrintSelf();
-    
-    graphy_vector_set(origin, target);
-    int it = start;
-    while(1){
-        int v = set_position(pos, frames[it-start]);
-        graphy_render_points3f(pos, col, v, 0.01);
-        printf("Step: %d\n", it);
-        it++;
-        if(it >= end-1) it = start;
-    }
-    
-    for(int i = end-1; i >= start; i--){
-        frames[i]->clear();
-        delete frames[i];
-    }
-    
-    delete[] frames;
-    delete[] pos;
-    delete[] col;
-}
+#include <util.h>
+#include <memory.h>
 
 void test_pcisph3_dragon(){
     printf("===== PCISPH Solver 3D -- Mesh Dragon\n");
@@ -195,10 +136,63 @@ void test_pcisph3_dragon(){
                                   SERIALIZER_POSITION);
     }
     
-    builder.Release();
-    cudaFree(container);
     delete[] pos;
     delete[] col;
+    printf("===== OK\n");
+}
+
+void test_pcisph3_rock_dam(){
+    printf("===== PCISPH Solver 3D -- Rock Dam\n");
+    Float spacing = 0.04;
+    Float spacingScale = 1.8;
+    vec3f origin(8, 0, 0);
+    vec3f target(0,-1,0);
+    const char *objPath = "/home/felipe/Documents/CGStuff/models/rock.obj";
+    
+    vec3f targetPos(0, -1.1, 1.0);
+    Float rockMaxSize = 2.4;
+    vec3f containerSize(3.08, 3.30324, 4.46138);
+    vec3f waterBlockSize(3.0, 3.0, 0.5);
+    
+    CudaMemoryManagerStart("test_pcisph3_rock_dam");
+    
+    ParsedMesh *mesh = LoadObj(objPath);
+    
+    Transform meshScale = UtilComputeFitTransform(mesh, rockMaxSize);
+    Shape *rock = MakeMesh(mesh, Translate(targetPos) * RotateY(90) * meshScale);
+    
+    vec3f of = (containerSize - waterBlockSize) * 0.5; of -= vec3f(spacing);
+    Shape *waterBox = MakeBox(Translate(vec3f(of.x, -of.y, -of.z)), waterBlockSize);
+    Shape *container = MakeBox(Transform(), containerSize, true);
+    
+    VolumeParticleEmitterSet3 emitter;
+    emitter.AddEmitter(waterBox, spacing);
+    
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(container);
+    cBuilder.AddCollider3(rock);
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    
+    Assure(UtilIsEmitterOverlapping(&emitter, colliders) == 0);
+    
+    ParticleSetBuilder3 pBuilder;
+    emitter.Emit(&pBuilder);
+    pBuilder.SetVelocityForAll(vec3f(0, -10, 0));
+    
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(), 
+                                               spacing, spacingScale);
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+    
+    Float targetInterval = 1.0 / 240.0;
+    
+    PciSphRunSimulation3(&solver, spacing, origin, target, targetInterval, {rock});
+    
+    CudaMemoryManagerClearCurrent();
     printf("===== OK\n");
 }
 
@@ -305,16 +299,15 @@ void test_pcisph3_happy_whale(){
                                   SERIALIZER_POSITION);
     }
     
-    builder.Release();
-    cudaFree(container);
     delete[] pos;
     delete[] col;
     printf("===== OK\n");
 }
 
+
 void test_pcisph3_double_dam_break(){
     printf("===== PCISPH Solver 3D -- Double Dam Break\n");
-    vec3f origin(0, 1, 4);
+    vec3f origin(0, 1, -3);
     vec3f target(0,0,0);
     
     Float spacing = 0.02;
@@ -333,8 +326,6 @@ void test_pcisph3_double_dam_break(){
     Shape *container = MakeBox(Transform(), vec3f(boxLen), true);
     Shape *boxp = MakeBox(Translate(xof, -yof, zof), boxSize);
     Shape *boxn = MakeBox(Translate(-xof, -yof, -zof), boxSize);
-    Shape *boxnp = MakeBox(Translate(-xof, -yof, zof), boxSize);
-    Shape *boxpp = MakeBox(Translate(xof, -yof, -zof), boxSize);
     
     /* Emit particles */
     ParticleSetBuilder3 pBuilder;
@@ -370,6 +361,7 @@ void test_pcisph3_double_dam_break(){
     solver.SetColliders(colliders);
     
     /* Set timestep and view stuff */
+    
     ParticleSet3 *pSet = sphSet->GetParticleSet();
     int count = pSet->GetParticleCount();
     Float targetInterval = 1.0 / 240.0;
@@ -380,28 +372,276 @@ void test_pcisph3_double_dam_break(){
     graphy_vector_set(origin, target);
     
     simple_color(pos, col, pSet);
-    graphy_render_points3f(pos, col, count, 0.01);
+    graphy_render_points3f(pos, col, count, spacing/2.0);
     
     for(int i = 0; i < 20 * 26 * 20; i++){
         solver.Advance(targetInterval);
         simple_color(pos, col, pSet);
-        graphy_render_points3f(pos, col, count, 0.01);
+        graphy_render_points3f(pos, col, count, spacing/2.0);
         printf("Step: %d            \n", i+1);
     }
     
     
     delete[] pos;
     delete[] col;
-    emitterSet.Release();
-    pBuilder.Release();
-    cudaFree(container);
-    cudaFree(boxp);
-    cudaFree(boxn);
     printf("===== OK\n");
 }
 
-void test_pcisph3_dam_whale(){
-    printf("===== PCISPH Solver 3D -- Dam with Whale\n");
+void test_pcisph3_quadruple_dam(){
+    printf("===== PCISPH Solver 3D -- Quadruple Dam Break\n");
+    Float spacing = 0.02;
+    Float spacingScale = 1.8;
+    vec3f boxLen(2.0, 2.0, 2.0);
+    vec3f waterBoxLen(0.4, 1.0, 0.4);
+    vec3f initialVelocity(0.0, -3.0, 0);
+    vec3f origin(0, 2, -5);
+    vec3f target(0);
+    
+    Float xof = (boxLen.x - waterBoxLen.x) * 0.5; xof -= spacing;
+    Float yof = (boxLen.y - waterBoxLen.y) * 0.5; yof -= spacing;
+    Float zof = (boxLen.z - waterBoxLen.z) * 0.5; zof -= spacing;
+    
+    Shape *container = MakeBox(Transform(), boxLen, true);
+    Shape *box0 = MakeBox(Translate(0, -yof, -zof), waterBoxLen);
+    Shape *box1 = MakeBox(Translate(0, -yof, +zof), waterBoxLen);
+    Shape *box2 = MakeBox(Translate(+xof, -yof, 0), waterBoxLen);
+    Shape *box3 = MakeBox(Translate(-xof, -yof, 0), waterBoxLen);
+    
+    ParticleSetBuilder3 pBuilder;
+    VolumeParticleEmitterSet3 emitterSet;
+    emitterSet.AddEmitter(box0, spacing, initialVelocity);
+    emitterSet.AddEmitter(box1, spacing, initialVelocity);
+    emitterSet.AddEmitter(box2, spacing, initialVelocity);
+    emitterSet.AddEmitter(box3, spacing, initialVelocity);
+    //emitterSet.SetJitter(0.001);
+    
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(container);
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    
+    Assure(UtilIsEmitterOverlapping(&emitterSet, colliders) == 0);
+    
+    emitterSet.Emit(&pBuilder);
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(), spacing,
+                                               spacingScale);
+    
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+    
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    
+    int total = pSet->GetParticleCount();
+    float *pos = new float[total * 3];
+    float *col = new float[total * 3];
+    
+    memset(col, 0, sizeof(float) * 3 * total);
+    graphy_vector_set(origin, target);
+    
+    simple_color(pos, col, pSet);
+    graphy_render_points3f(pos, col, total, spacing/2.0);
+    Float targetInterval = 1.0 / 240.0;
+    
+    for(int i = 0; i < 20 * 26 * 20; i++){
+        solver.Advance(targetInterval);
+        simple_color(pos, col, pSet);
+        graphy_render_points3f(pos, col, total, spacing/2.0);
+        printf("Step: %d            \n", i+1);
+    }
+    
+    
+    delete[] pos;
+    delete[] col;
+    printf("===== OK\n");
+}
+
+void test_pcisph3_lucy_ball(){
+    printf("===== PCISPH Solver 3D -- Lucy Ball\n");
+    Float spacing = 0.02;
+    Float spacingScale = 1.8;
+    Float sphereRadius = 1.5;
+    Float waterRadius = 0.5;
+    
+    const char *lucyPath = "/home/felipe/Documents/CGStuff/models/lucy.obj";
+    ParsedMesh *lucyMesh = LoadObj(lucyPath);
+    Transform lucyScale = UtilComputeFitTransform(lucyMesh, sphereRadius);
+    Shape *lucyShape = MakeMesh(lucyMesh, Translate(0, -sphereRadius * 0.5, 0) * 
+                                RotateY(-90) * lucyScale);
+    
+    Shape *containerShape = MakeSphere(Transform(), sphereRadius, true);
+    Shape *waterShape = MakeSphere(Translate(0, 0.8, 0), waterRadius);
+    
+    vec3f toLucy = lucyShape->GetBounds().Center() - waterShape->GetBounds().Center();
+    Float length = toLucy.Length();
+    toLucy = toLucy / length;
+    
+    ParticleSetBuilder3 pBuilder;
+    VolumeParticleEmitterSet3 emitterSet;
+    emitterSet.AddEmitter(waterShape, waterShape->GetBounds(), spacing,
+                          toLucy * 10);
+    
+    ColliderSetBuilder3 colliderSetBuilder;
+    colliderSetBuilder.AddCollider3(lucyShape);
+    colliderSetBuilder.AddCollider3(containerShape);
+    ColliderSet3 *colliders = colliderSetBuilder.GetColliderSet();
+    
+    Assure(UtilIsEmitterOverlapping(&emitterSet, colliders) == 0);
+    
+    emitterSet.Emit(&pBuilder);
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    
+    Grid3 *domainGrid = UtilBuildGridForDomain(containerShape->GetBounds(), spacing,
+                                               spacingScale);
+    
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+    
+    std::vector<vec3f> particles;
+    UtilGetSDFParticles(lucyShape->grid, &particles, 0, spacing);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    
+    int total = particles.size() + pSet->GetParticleCount();
+    float *pos = new float[total * 3];
+    float *col = new float[total * 3];
+    
+    vec3f origin(0, 0, -5);
+    vec3f target(0);
+    memset(col, 0, sizeof(float) * 3 * total);
+    graphy_vector_set(origin, target);
+    
+    simple_color(pos, col, pSet);
+    int it = 0;
+    for(int i = pSet->GetParticleCount(); i < total; i++){
+        vec3f pi = particles[it++];
+        pos[3 * i + 0] = pi.x; pos[3 * i + 1] = pi.y;
+        pos[3 * i + 2] = pi.z; col[3 * i + 2] = 1;
+    }
+    
+    graphy_render_points3f(pos, col, total, spacing/2.0);
+    Float targetInterval = 1.0 / 240.0;
+    for(int i = 0; i < 20 * 26 * 20; i++){
+        std::string outputName("lucy/output_");
+        solver.Advance(targetInterval);
+        simple_color(pos, col, pSet);
+        graphy_render_points3f(pos, col, total, spacing/2.0);
+        outputName += std::to_string(i);
+        outputName += ".txt";
+        SerializerSaveSphDataSet3(solver.GetSphSolverData(), outputName.c_str(),
+                                  SERIALIZER_POSITION);
+        //printf("Step: %d            \n", i+1);
+    }
+    
+    
+    delete[] pos;
+    delete[] col;
+    printf("===== OK\n");
+}
+
+void test_pcisph3_lucy_dam(){
+    printf("===== PCISPH Solver 3D -- Lucy Dam\n");
+    vec3f origin(0, 1, -3);
+    vec3f target(0,0,0);
+    
+    Float spacing = 0.02;
+    Float boxLen = 1.5;
+    Float boxFluidLen = 0.5;
+    Float boxFluidYLen = 0.9;
+    Float spacingScale = 1.8;
+    
+    /* Build shapes */
+    Float xof = (boxLen - boxFluidLen)/2.0; xof -= spacing;
+    Float zof = (boxLen - boxFluidLen)/2.0; zof -= spacing;
+    Float yof = (boxLen - boxFluidYLen)/2.0; yof -= spacing;
+    
+    vec3f boxSize = vec3f(boxFluidLen, boxFluidYLen, boxFluidLen);
+    
+    const char *lucyPath = "/home/felipe/Documents/CGStuff/models/lucy.obj";
+    
+    Shape *container = MakeBox(Transform(), vec3f(boxLen), true);
+    Shape *boxp = MakeBox(Translate(xof, -yof, zof), boxSize);
+    Shape *lucyShape = MakeMesh(lucyPath, Translate(0,-0.3,0) * Scale(0.015));
+    
+    
+    /* Emit particles */
+    ParticleSetBuilder3 pBuilder;
+    VolumeParticleEmitterSet3 emitterSet;
+    
+    VolumeParticleEmitter3 emitterp(boxp, boxp->GetBounds(), spacing);
+    
+    emitterSet.AddEmitter(&emitterp);
+    //emitterSet.SetJitter(0.001);
+    emitterSet.Emit(&pBuilder);
+    
+    /* Build domain and colliders */
+    Bounds3f containerBounds = container->GetBounds();
+    vec3f pMin = containerBounds.pMin - vec3f(spacing);
+    vec3f pMax = containerBounds.pMax + vec3f(spacing);
+    
+    int resolution = (int)std::floor(boxLen / (spacing * spacingScale));
+    Grid3 *grid = MakeGrid(vec3ui(resolution), pMin, pMax);
+    
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(container);
+    cBuilder.AddCollider3(lucyShape);
+    
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    
+    /* Setup solver */
+    PciSphSolver3 solver;
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, grid, sphSet);
+    solver.SetColliders(colliders);
+    
+    /* Set timestep and view stuff */
+    std::vector<vec3f> particles;
+    UtilGetSDFParticles(lucyShape->grid, &particles, 0, spacing/2.0);
+    
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    int count = pSet->GetParticleCount() + particles.size();
+    Float targetInterval = 1.0 / 240.0;
+    float *pos = new float[count * 3];
+    float *col = new float[count * 3];
+    
+    memset(col, 0, sizeof(float) * 3 * count);
+    graphy_vector_set(origin, target);
+    
+    simple_color(pos, col, pSet);
+    int it = 0;
+    for(int i = pSet->GetParticleCount(); i < count; i++){
+        vec3f pi = particles[it++];
+        pos[3 * i + 0] = pi.x; pos[3 * i + 1] = pi.y;
+        pos[3 * i + 2] = pi.z; col[3 * i + 2] = 1;
+    }
+    
+    graphy_render_points3f(pos, col, count, spacing/2.0);
+    
+    for(int i = 0; i < 20 * 26 * 20; i++){
+        std::string outputName("lucy/output_");
+        solver.Advance(targetInterval);
+        simple_color(pos, col, pSet);
+        graphy_render_points3f(pos, col, count, spacing/2.0);
+        outputName += std::to_string(i);
+        outputName += ".txt";
+        SerializerSaveSphDataSet3(solver.GetSphSolverData(), outputName.c_str(),
+                                  SERIALIZER_POSITION);
+        //printf("Step: %d            \n", i+1);
+    }
+    
+    
+    delete[] pos;
+    delete[] col;
+    printf("===== OK\n");
+}
+
+void test_pcisph3_whale_obstacle(){
+    printf("===== PCISPH Solver 3D -- Whale Obstacle\n");
     Float spacing = 0.03;
     Float boxLen = 1.5;
     Float boxFluidLen = 1.3;
@@ -446,20 +686,7 @@ void test_pcisph3_dam_whale(){
     ColliderSet3 *colliders = cBuilder.GetColliderSet();
     
     std::vector<vec3f> particles;
-    vec3f p0 = meshShape->grid->bounds.pMin;
-    vec3f p1 = meshShape->grid->bounds.pMax;
-    Float h = 0.01;
-    
-    for(Float x = p0.x; x < p1.x; x += h){
-        for(Float y = p0.y; y < p1.y; y += h){
-            for(Float z = p0.z; z < p1.z; z += h){
-                vec3f p(x, y, z);
-                Float sdf = meshShape->grid->Sample(p);
-                if(Absf(sdf) < 0.01)
-                    particles.push_back(p);
-            }
-        }
-    }
+    UtilGetSDFParticles(meshShape->grid, &particles, 0, 0.01);
     
     /* Setup solver */
     PciSphSolver3 solver;
@@ -518,10 +745,6 @@ void test_pcisph3_dam_whale(){
     
     delete[] pos;
     delete[] col;
-    emitterSet.Release();
-    pBuilder.Release();
-    cudaFree(container);
-    cudaFree(waterBox);
     printf("===== OK\n");
 }
 
@@ -584,11 +807,6 @@ void test_pcisph3_water_sphere(){
         printf("Step: %d          \n", i+1);
     }
     
-    solver.Cleanup();
-    builder.Release();
-    colliderBuilder.Release();
-    grid->Release();
-    cudaFree(grid);
     delete[] pos;
     delete[] col;
     printf("===== OK\n");

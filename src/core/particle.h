@@ -89,14 +89,6 @@ class SpecieSet{
         AssertA(pId < count && pId >= 0, "Invalid set for particle MPW");
         mpWeight.Set(mpw, pId);
     }
-    
-    __host__ void Release(){
-        positions.Release();
-        velocities.Release();
-        mpWeight.Release();
-        chainNodes.Release();
-        chainAuxNodes.Release();
-    }
 };
 
 typedef SpecieSet<vec2f> SpecieSet2;
@@ -260,14 +252,6 @@ class ParticleSet{
     __bidevice__ void SetParticleV0(int pId, Float v0){
         AssertA(pId < count && pId >= 0, "Invalid set for particle v0s");
         v0s.Set(v0, pId);
-    }
-    
-    __host__ void Release(){
-        positions.Release(); velocities.Release();
-        forces.Release(); densities.Release();
-        pressures.Release(); chainNodes.Release();
-        chainAuxNodes.Release(); temperature.Release();
-        densitiesEx.Release(); v0s.Release();
     }
 };
 
@@ -491,6 +475,12 @@ class ParticleSetBuilder{
     std::vector<SpecieSet<T> *> ssets;
     __host__ ParticleSetBuilder(){}
     
+    __host__ void SetVelocityForAll(const T &vel){
+        for(int i = 0; i < positions.size(); i++){
+            velocities[i] = vel;
+        }
+    }
+    
     __host__ void AddParticle(const T &pos, const T &vel = T(0),
                               const T &force = T(0))
     {
@@ -560,22 +550,6 @@ class ParticleSetBuilder{
         forces.clear();
         sets.push_back(pSet);
         return pSet;
-    }
-    
-    __host__ void Release(){
-        for(ParticleSet<T> *pSet : sets){
-            pSet->Release();
-            cudaFree(pSet);
-        }
-        
-        sets.clear();
-        
-        for(SpecieSet<T> *pSet : ssets){
-            pSet->Release();
-            cudaFree(pSet);
-        }
-        
-        ssets.clear();
     }
 };
 

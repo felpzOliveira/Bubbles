@@ -40,8 +40,11 @@ struct Cell{
         level = -1;
     }
     
-    __host__ void SetNeighborList(int *list, int n){
-        neighborList = cudaAllocateVx(int, n);
+    __bidevice__ void SetNeighborListPtr(int *list){
+        neighborList = list;
+    }
+    
+    __bidevice__ void SetNeighborList(int *list, int n){
         memcpy(neighborList, list, n * sizeof(int));
         neighborListCount = n;
     }
@@ -205,6 +208,7 @@ class Grid{
     Q bounds; // the bounds of this grid after construction
     int maxLevels; // in case CNM was executed, mark the max level value {unsafe}
     int indicator; // flag for GPU-domain based operations
+    int *neighborListPtr; // address of the first neighborList
     
     __bidevice__ Grid(){ SetDimension(T(0)); }
     __bidevice__ void SetDimension(const Float &u){ (void)u; dimensions = 1; }
@@ -461,64 +465,73 @@ class Grid{
     }
     
     /* Computes and allocates the cells for this grid */
-    __host__ void Build(const U &resolution, const T &dp0, const T &dp1){
-        SetDimension(T(0));
-        T lower(Infinity), high(-Infinity);
-        T p0 = Max(dp0, dp1);
-        T p1 = Min(dp0, dp1);
-        T maxPoint;
-        total = 1;
-        for(int k = 0; k < dimensions; k++){
-            Float dl = p0[k];
-            Float du = p1[k];
-            if(dl < lower[k]) lower[k] = dl;
-            if(dl > high[k]) high[k] = dl;
-            if(du > high[k]) high[k] = du;
-            if(du < lower[k]) lower[k] = du;
-        }
-        
-        for(int k = 0; k < dimensions; k++){
-            Float s = high[k] - lower[k];
-            Float len = s / (Float)resolution[k];
-            cellsLen[k] = len;
-            usizes[k] = (int)std::ceil(s / len);
-            maxPoint[k] = lower[k] + (Float)usizes[k] * cellsLen[k];
-            total *= usizes[k];
-        }
-        
-        minPoint = lower;
-        bounds = Q(minPoint, maxPoint);
-        
-        cells = cudaAllocateVx(Cell<Q>, total);
-        int neighbor[32];
+    __host__ void Build(const U &resolution, const T &dp0, const T &dp1);
+};
+
+template<typename T, typename U, typename Q>
+__global__ void BuildNeighborListKernel(Grid<T, U, Q> *grid){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < grid->total){
+        int neighbor[27];
         int count;
-        for(int i = 0; i < total; i++){
-            printf("\rBuilding acceleration query list... {%d} [%d]", i+1, total);
-            fflush(stdout);
-            Cell<Q> *cell = &cells[i];
-            U u = GetCellIndex(i);
-            T center;
-            for(int k = 0; k < dimensions; k++){
-                center[k] = minPoint[k] + u[k] * cellsLen[k] + 0.5 * cellsLen[k];
-            }
-            
-            T pMin = center - 0.5 * cellsLen;
-            T pMax = center + 0.5 * cellsLen;
-            
-            count = GetNeighborListFor(i, 1, &neighbor[0]);
-            
-            cell->Set(Q(pMin, pMax), i);
-            cell->SetNeighborList(&neighbor[0], count);
+        Cell<Q> *cell = &grid->cells[i];
+        U u = grid->GetCellIndex(i);
+        T center;
+        for(int k = 0; k < grid->dimensions; k++){
+            center[k] = grid->minPoint[k] + u[k] * grid->cellsLen[k] + 
+                0.5 * grid->cellsLen[k];
         }
         
-        printf("\n");
-        fflush(stdout);
+        T pMin = center - 0.5 * grid->cellsLen;
+        T pMax = center + 0.5 * grid->cellsLen;
+        
+        count = grid->GetNeighborListFor(i, 1, &neighbor[0]);
+        cell->SetNeighborListPtr(&grid->neighborListPtr[27 * i]);
+        cell->Set(Q(pMin, pMax), i);
+        cell->SetNeighborList(&neighbor[0], count);
+    }
+}
+
+template<typename T, typename U, typename Q>
+__host__ void Grid<T, U, Q>::Build(const U &resolution, const T &dp0, const T &dp1){
+    SetDimension(T(0));
+    T lower(Infinity), high(-Infinity);
+    T p0 = Max(dp0, dp1);
+    T p1 = Min(dp0, dp1);
+    T maxPoint;
+    total = 1;
+    for(int k = 0; k < dimensions; k++){
+        Float dl = p0[k];
+        Float du = p1[k];
+        if(dl < lower[k]) lower[k] = dl;
+        if(dl > high[k]) high[k] = dl;
+        if(du > high[k]) high[k] = du;
+        if(du < lower[k]) lower[k] = du;
     }
     
-    __host__ void Release(){
-        if(cells) cudaFree(cells);
+    for(int k = 0; k < dimensions; k++){
+        Float s = high[k] - lower[k];
+        Float len = s / (Float)resolution[k];
+        cellsLen[k] = len;
+        usizes[k] = (int)std::ceil(s / len);
+        maxPoint[k] = lower[k] + (Float)usizes[k] * cellsLen[k];
+        total *= usizes[k];
     }
-};
+    
+    minPoint = lower;
+    bounds = Q(minPoint, maxPoint);
+    
+    cells = cudaAllocateVx(Cell<Q>, total);
+    neighborListPtr = cudaAllocateVx(int, total * 27);
+    
+    printf("Building acceleration query list [%d] ... ", total);
+    fflush(stdout);
+    
+    GPULaunch(total, BuildNeighborListKernel, this);
+    
+    printf("OK\n");
+}
+
 
 typedef Grid<vec1f, vec1ui, Bounds1f> Grid1;
 typedef Grid<vec2f, vec2ui, Bounds2f> Grid2;
@@ -762,11 +775,6 @@ class NodeEdgeGrid{
         
         return V;
     }
-    
-    // Release memory taken by this Field
-    __host__ void Release(){
-        if(data) cudaFree(data);
-    }
 };
 
 
@@ -885,19 +893,24 @@ class FieldGrid{
     /*
     * Compute gradient at p. We basically sample a bunch of times
     * for central differences method.
+    * NOTE: We already had this discussion, this method can give zero
+    *       vector as response if all vertex have the same sdf value.
+    *       This is possible since symmetry may happen and its not a bug.
 */
     __bidevice__ T Gradient(const T &p){
         T value;
         // the way our setup works is we adjust resolution in Y/Z axis
         // so the reference spacing is X
         AssertA(!HasZero(spacing), "Zero spacing");
+        Float d = spacing[0];
+        Float inv = 1.0 / (2.0 * spacing[0]);
         
         // central differences at each axis
         for(int i = 0; i < dimensions; i++){
-            T s(0); s[i] = 0.5 * spacing[i];
+            T s(0); s[i] = d;
             Float forward  = Sample(p + s);
             Float backward = Sample(p - s);
-            value[i] = (forward - backward) / spacing[i];
+            value[i] = (forward - backward) * inv;
         }
         
         return value;
@@ -928,10 +941,6 @@ class FieldGrid{
         for(int i = 0; i < total; i++){
             field[i] = initialValue;
         }
-    }
-    
-    __host__ void Release(){
-        if(field) cudaFree(field);
     }
 };
 

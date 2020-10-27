@@ -58,7 +58,6 @@ class SphSolver2{
     __bidevice__ SphParticleSet2 *GetSphParticleSet();
     __host__ void UpdateDensity();
     __host__ void Advance(Float timeIntervalInSeconds);
-    __host__ void Cleanup();
 };
 
 class SphSolver3{
@@ -79,7 +78,6 @@ class SphSolver3{
     __bidevice__ SphParticleSet3 *GetSphParticleSet();
     
     __host__ void Advance(Float timeIntervalInSeconds);
-    __host__ void Cleanup();
 };
 
 class SphGasSolver2{
@@ -104,7 +102,6 @@ class SphGasSolver2{
     
     __host__ void UpdateDensity();
     __host__ void Advance(Float timeIntervalInSeconds);
-    __host__ void Cleanup();
 };
 
 // Generic SphSolver routines
@@ -139,6 +136,7 @@ __bidevice__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure =
 __bidevice__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure = 1);
 __bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep);
 __bidevice__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
+__bidevice__ void ComputeNonPressureForceCPU(SphSolverData3 *data);
 __bidevice__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended=0);
 __bidevice__ void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended=0);
 __bidevice__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin, 

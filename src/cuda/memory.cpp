@@ -3,6 +3,8 @@
 #include <string>
 #include <map>
 
+//#define PRINT_MEMORY
+
 typedef struct{
     std::vector<void *> addresses;
     size_t size;
@@ -36,7 +38,9 @@ void CudaMemoryManagerInsertRegion(const char *key){
     manager.activeEntry = entry;
     manager.activeKey = strkey;
     manager.entries += 1;
+#if defined(PRINT_MEMORY)
     std::cout << "[Memory] Active: " << key << std::endl;
+#endif
 }
 
 void CudaMemoryManagerSelectRegion(const char *key){
@@ -44,7 +48,9 @@ void CudaMemoryManagerSelectRegion(const char *key){
     if(manager.globalMap.find(strkey) != manager.globalMap.end()){
         manager.activeEntry = manager.globalMap[strkey];
         manager.activeKey = strkey;
+#if defined(PRINT_MEMORY)
         std::cout << "[Memory] Active: " << key << std::endl;
+#endif
     }
 }
 
@@ -71,7 +77,9 @@ void *_cudaAllocator(size_t bytes, int line, const char *filename, bool abort){
 void CudaMemoryManagerClearCurrent(){
     if(manager.activeEntry){
         int size = manager.activeEntry->addresses.size();
+#if defined(PRINT_MEMORY)
         size_t bytes = manager.activeEntry->size;
+#endif
         for(int i = 0; i < size; i++){
             void *ptr = manager.activeEntry->addresses.at(i);
             cudaFree(ptr);
@@ -79,8 +87,10 @@ void CudaMemoryManagerClearCurrent(){
         
         delete manager.activeEntry;
         manager.globalMap.erase(manager.activeKey);
+#if defined(PRINT_MEMORY)
         std::cout << "[Memory] Released: " << manager.activeKey <<
             " [ " << bytes << " ]" << std::endl;
+#endif
         manager.activeEntry = nullptr;
         manager.activeKey = std::string();
         CudaMemoryManagerSelectRegion(globalKey.c_str());
@@ -133,5 +143,7 @@ void CudaMemoryManagerClearAll(){
     
     CudaMemoryManagerEmpty();
     initialized = 0;
+#if defined(PRINT_MEMORY)
     std::cout << "[Memory] Released: All [ " << mem <<" ] " << std::endl;
+#endif
 }

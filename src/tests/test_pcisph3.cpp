@@ -13,131 +13,88 @@
 void test_pcisph3_dragon(){
     printf("===== PCISPH Solver 3D -- Mesh Dragon\n");
     vec3f origin;
-    vec3f target(0);
-    Bounds3f meshBounds;
-    Float spacingScale = 1.8;
-    Float spacing = 0.02;
-    int count = 0;
-    const char *pFile = "output.txt";
-    
-    /* Load particles, must have been previously generated, use MeshToParticles */
-    ParticleSetBuilder3 builder;
-    std::vector<vec3f> points;
-    SerializerLoadPoints3(&points, pFile, SERIALIZER_POSITION);
-    
-    /* Get mesh bounds and define a view point */
-    count = points.size();
-    for(int i = 0; i < count; i++){
-        vec3f pi = points[i];
-        meshBounds = Union(meshBounds, pi);
-    }
-    
-#if 1
-    /* Move to center, emit particles manually and recompute bounds */
-    vec3f offset = meshBounds.Center();
-    meshBounds = Bounds3f(vec3f(0));
-    for(int i = 0; i < count; i++){
-        vec3f pi = points[i] - offset;
-        /*
-        *  There is a bug on VolumeParticleEmitter3 where particles emitted
-        * through ray tracing are being misplaced, untill we fix it manually
-        * correct them here.
-        */
-        if(!(pi.y < -1.2) || 1){
-            builder.AddParticle(pi);
-        }
-        
-        // I like the bounds let it consider the erroneous particle
-        meshBounds = Union(meshBounds, pi);
-    }
-    
-    vec3f lower = meshBounds.pMin + vec3f(0, -0.1, 0);
-    meshBounds = Union(meshBounds, lower);
-#endif
-    
-    // set view, target now is zero
-    origin = meshBounds.pMax + 0.5 * meshBounds.ExtentOn(meshBounds.MaximumExtent());
-    origin.x *= -1;
-    
-    meshBounds.PrintSelf();
-    printf("\n");
-    
-    Float scale = 1.1;
-    /* The mesh is now centered, can safely create a box at origin */
-    vec3f size(meshBounds.ExtentOn(0), meshBounds.ExtentOn(1), meshBounds.ExtentOn(2));
-    size *= scale;
-#if 0
-    // For boxes
-    Transform transform = Translate(meshBounds.Center()) * Scale(size.x, size.y, size.z);
-    Float refLen = MinComponent(size);
-    Shape *container = MakeBox(transform, vec3f(1), true);
-    
-    // expand by spacing for safe hash
-    Bounds3f shapeBound = container->GetBounds();
-    vec3f pMin = (shapeBound.pMin - vec3f(2 * spacing)) * scale;
-    vec3f pMax = (shapeBound.pMax + vec3f(2 * spacing)) * scale;
-    
-    printf("Domain bounds: {%g %g %g} {%g %g %g}\n",
-           pMin.x, pMin.y, pMin.z, pMax.x, pMax.y, pMax.z);
-#else
-    // For spheres
     vec3f center;
     Float radius;
-    meshBounds.BoundingSphere(&center, &radius);
-    printf("Sphere center: {%g %g %g}, radius: %g\n", center.x, center.y, center.z, radius);
-    Float refLen = 2.0f * radius * 0.8;
-    Shape *container = MakeSphere(Translate(center), radius * 0.9, true);
+    vec3f target(0);
+    Float spacingScale = 1.8;
+    Float spacing = 0.02;
+    CudaMemoryManagerStart(__FUNCTION__);
     
-    // expand by spacing for safe hash
-    vec3f pMin = -vec3f(radius + 5 * spacing);
-    vec3f pMax =  vec3f(radius + 5 * spacing);
-#endif
-    // grid resolution for better performance
-    int resolution = (int)std::floor(refLen / (spacing * spacingScale));
+    ParticleSetBuilder3 builder;
+    Bounds3f bounds = UtilParticleSetBuilder3FromBB("resources/cuteDragon.bb", &builder);
     
-    // make grid
-    Grid3 *grid = MakeGrid(vec3ui(resolution), pMin, pMax);
+    bounds.BoundingSphere(&center, &radius);
+    radius *= 1.3;
     
-    // make collider
+    origin = bounds.Center() + radius * vec3f(0, 1, 2.5);
+    target = bounds.Center();
+    
+    Shape *container = MakeSphere(Translate(center), radius, true);
     ColliderSetBuilder3 cBuilder;
     cBuilder.AddCollider3(container);
     ColliderSet3 *colliders = cBuilder.GetColliderSet();
     
-    /* Setup solver */
-    PciSphSolver3 solver;
     SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&builder);
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(), 
+                                               spacing, spacingScale);
     
+    PciSphSolver3 solver;
     solver.Initialize(DefaultSphSolverData3());
-    solver.Setup(WaterDensity, spacing, spacingScale, grid, sphSet);
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
     solver.SetColliders(colliders);
     
-    /* Simulate and display */
-    float *pos = new float[count * 3];
-    float *col = new float[count * 3];
-    
-    ParticleSet3 *pSet = sphSet->GetParticleSet();
     Float targetInterval = 1.0 / 240.0;
-    memset(col, 0, sizeof(float) * 3 * count);
-    graphy_vector_set(origin, target);
+    PciSphRunSimulation3(&solver, spacing, origin, target, targetInterval);
     
-    simple_color(pos, col, pSet);
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
+void test_pcisph3_multiple_emission(){
+    printf("===== PCISPH Solver 3D -- Multiple Emission\n");
+    Float spacing = 0.04;
+    Float spacingScale = 1.8;
+    vec3f origin(3, 0, 0);
+    vec3f target(0,0,0);
+    CudaMemoryManagerStart(__FUNCTION__);
     
-    graphy_render_points3f(pos, col, count, 0.01);
+    Shape *shape = MakeSphere(Transform(), 0.2);
+    Shape *container = MakeSphere(Transform(), 1.0, true);
     
-    for(int i = 0; i < 20 * 26 * 20; i++){
-        std::string outputName("dragon2/output_");
-        solver.Advance(targetInterval);
-        simple_color(pos, col, pSet);
-        graphy_render_points3f(pos, col, count, 0.01);
-        outputName += std::to_string(i);
-        outputName += ".txt";
+    ContinuousParticleSetBuilder3 pBuilder(50000);
+    VolumeParticleEmitterSet3 emitter;
+    emitter.AddEmitter(shape, spacing);
+    
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(container);
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    
+    Assure(UtilIsEmitterOverlapping(&emitter, colliders) == 0);
+    
+    emitter.Emit(&pBuilder);
+    
+    SphParticleSet3 *sphSet = SphParticleSet3FromContinuousBuilder(&pBuilder);
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(), 
+                                               spacing, spacingScale);
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+    
+    Float targetInterval = 1.0 / 240.0;
+    
+    auto callback = [&](int step) -> int{
+        if(step % 80 == 0 && step > 0){
+            emitter.Emit(&pBuilder);
+        }
         
-        SerializerSaveSphDataSet3(solver.GetSphSolverData(), outputName.c_str(),
-                                  SERIALIZER_POSITION);
-    }
+        return 1;
+    };
     
-    delete[] pos;
-    delete[] col;
+    PciSphRunSimulation3(&solver, spacing, origin, target, 
+                         targetInterval, {}, callback);
+    
+    CudaMemoryManagerClearCurrent();
     printf("===== OK\n");
 }
 

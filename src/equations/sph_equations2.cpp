@@ -308,10 +308,11 @@ __host__ void UpdateGridDistributionCPU(SphSolverData2 *data){
     Grid2 *grid = data->domain;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver2 has no domain for UpdateGridDistribution");
-    if(data->frame_index == 0){
+    if(data->frame_index == 0 || pSet->isDirty){
         for(int i = 0; i < grid->GetCellCount(); i++){
             grid->DistributeToCell(pSet, i);
         }
+        pSet->isDirty = 0;
     }else{
         for(int i = 0; i < grid->GetCellCount(); i++){
             grid->DistributeToCellOpt(pSet, i);

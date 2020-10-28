@@ -323,11 +323,13 @@ __host__ void UpdateGridDistributionCPU(SphSolverData3 *data){
     Grid3 *grid = data->domain;
     AssertA(grid, "SphSolver3 has no domain for UpdateGridDistribution");
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
-    if(data->sphpSet->requiresHigherLevelUpdate){
+    if(data->sphpSet->requiresHigherLevelUpdate || pSet->isDirty){
+        printf("Performing full distribution by excessive delta\n");
         for(int i = 0; i < data->domain->GetCellCount(); i++){
             data->domain->DistributeResetCell(i);
         }
         data->domain->DistributeByParticle(pSet);
+        pSet->isDirty = 0;
     }else{
         if(data->frame_index == 0){
             for(int i = 0; i < grid->GetCellCount(); i++){
@@ -406,12 +408,15 @@ __host__ void UpdateGridDistributionGPU(SphSolverData3 *data){
     Grid3 *grid = data->domain;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver3 has no domain for UpdateGridDistribution");
-    if(data->sphpSet->requiresHigherLevelUpdate){
+    if(data->sphpSet->requiresHigherLevelUpdate ||
+       pSet->isDirty)
+    {
         printf("Performing full distribution by excessive delta\n");
         for(int i = 0; i < data->domain->GetCellCount(); i++){
             data->domain->DistributeResetCell(i);
         }
         data->domain->DistributeByParticle(pSet);
+        pSet->isDirty = 0;
     }else{
         int N = grid->GetCellCount();
         int index = data->frame_index;

@@ -275,7 +275,7 @@ __bidevice__ void SetNodeSDFKernel(FieldGrid3f *grid, ParsedMesh *mesh,
                                    Shape *shape, int i)
 {
     vec3ui u = DimensionalIndex(i, grid->resolution, 3);
-    vec3f p = grid->GetVertexPosition(u);
+    vec3f p = grid->GetDataPosition(u);
     Float d = shape->ClosestDistance(p);
     bool interior = MeshIsPointInside(p, shape, shape->GetBounds()); 
     Float sd = interior ? -d : d;

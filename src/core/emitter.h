@@ -23,6 +23,7 @@ class VolumeParticleEmitter2{
     
     __host__ void SetJitter(Float jitter);
     __host__ void Emit(ParticleSetBuilder<vec2f> *Builder);
+    __host__ void Emit(ContinuousParticleSetBuilder<vec2f> *Builder);
 };
 
 class VolumeParticleEmitter3{
@@ -42,8 +43,15 @@ class VolumeParticleEmitter3{
                                     Float angularVel = 0, int maxParticles = IntInfinity,
                                     Float jitter = 0, bool isOneShot = true,
                                     bool allowOverlapping = false, int seed = 0);
+    __host__ VolumeParticleEmitter3(Shape *shape, Float spacing, 
+                                    const vec3f &initialVel = vec3f(0),
+                                    const vec3f &linearVel = vec3f(0),
+                                    Float angularVel = 0, int maxParticles = IntInfinity,
+                                    Float jitter = 0, bool isOneShot = true,
+                                    bool allowOverlapping = false, int seed = 0);
     __host__ void SetJitter(Float jitter);
     __host__ void Emit(ParticleSetBuilder<vec3f> *Builder);
+    __host__ void Emit(ContinuousParticleSetBuilder<vec3f> *Builder);
 };
 
 class UniformBoxParticleEmitter2{
@@ -76,6 +84,7 @@ class VolumeParticleEmitterSet2{
     
     __host__ void SetJitter(Float jitter);
     __host__ void Emit(ParticleSetBuilder<vec2f> *Builder);
+    __host__ void Emit(ContinuousParticleSetBuilder<vec2f> *Builder);
     __host__ void Release();
 };
 
@@ -101,5 +110,6 @@ class VolumeParticleEmitterSet3{
     
     __host__ void SetJitter(Float jitter);
     __host__ void Emit(ParticleSetBuilder<vec3f> *Builder);
+    __host__ void Emit(ContinuousParticleSetBuilder<vec3f> *Builder);
     __host__ void Release();
 };

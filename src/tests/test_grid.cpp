@@ -5,8 +5,133 @@
 #include <unistd.h>
 #include <espic_solver.h>
 #include <obj_loader.h>
+#include <memory.h>
+#include <cutil.h>
 
 static int with_graphy = 1;
+
+void test_grid_face_centered_3D(){
+    printf("===== Test 3D Face Centered Grid - Build\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+    
+    FieldGrid3f grid;
+    grid.Build(vec3ui(3), vec3f(0.5), vec3f(-0.75), FaceCentered);
+    vec3ui sizeU = grid.GetComponentDimension(0);
+    vec3ui sizeV = grid.GetComponentDimension(1);
+    vec3ui sizeW = grid.GetComponentDimension(2);
+    
+    TEST_CHECK(sizeU.x == 4 && sizeU.y == 3 && sizeU.z == 3, "Wrong u-dimension count");
+    TEST_CHECK(sizeV.x == 3 && sizeV.y == 4 && sizeV.z == 3, "Wrong v-dimension count");
+    TEST_CHECK(sizeW.x == 3 && sizeW.y == 3 && sizeW.z == 4, "Wrong w-dimension count");
+    int total = sizeU.x * sizeU.y * sizeU.z;
+    total += sizeV.x * sizeV.y * sizeV.z;
+    total += sizeW.x * sizeW.y * sizeW.z;
+    TEST_CHECK(grid.total == total, "Wrong data point count");
+    
+    float *pos = new float[3 * grid.total];
+    float *col = new float[3 * grid.total];
+    
+    int it = 0;
+    int ct = 0;
+    for(int u = 0; u < sizeU.x; u++){
+        for(int v = 0; v < sizeU.y; v++){
+            for(int w = 0; w < sizeU.z; w++){
+                vec3f p = grid.GetDataPosition(vec3ui(u, v, w), 0);
+                pos[it++] = p.x; pos[it++] = p.y; pos[it++] = p.z;
+                col[ct++] = 1; col[ct++] = 0; col[ct++] = 0;
+            }
+        }
+    }
+    
+    for(int u = 0; u < sizeV.x; u++){
+        for(int v = 0; v < sizeV.y; v++){
+            for(int w = 0; w < sizeV.z; w++){
+                vec3f p = grid.GetDataPosition(vec3ui(u, v, w), 1);
+                pos[it++] = p.x; pos[it++] = p.y; pos[it++] = p.z;
+                col[ct++] = 0; col[ct++] = 1; col[ct++] = 0;
+            }
+        }
+    }
+    
+    for(int u = 0; u < sizeW.x; u++){
+        for(int v = 0; v < sizeW.y; v++){
+            for(int w = 0; w < sizeW.z; w++){
+                vec3f p = grid.GetDataPosition(vec3ui(u, v, w), 2);
+                pos[it++] = p.x; pos[it++] = p.y; pos[it++] = p.z;
+                col[ct++] = 0; col[ct++] = 0; col[ct++] = 1;
+            }
+        }
+    }
+    
+    vec3f origin(0, 0, 5);
+    vec3f target(0);
+    graphy_set_3d(origin.x, origin.y, origin.z, target.x, target.y, target.z,
+                  45.0, 0.1f, 100.0f);
+    
+    graphy_render_points3f(pos, col, grid.total, 0.03);
+    getchar();
+    
+    graphy_close_display();
+    
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
+void test_grid_face_centered_2D(){
+    printf("===== Test 2D Face Centered Grid - Build\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+    
+    FieldGrid2f grid;
+    grid.Build(vec2ui(3, 3), vec2f(0.5), vec2f(-0.75), FaceCentered);
+    
+    vec2ui sizeU = grid.GetComponentDimension(0);
+    vec2ui sizeV = grid.GetComponentDimension(1);
+    
+    TEST_CHECK(sizeU.x == 4 && sizeU.y == 3, "Wrong u-dimension count");
+    TEST_CHECK(sizeV.x == 3 && sizeV.y == 4, "Wrong v-dimension count");
+    TEST_CHECK(grid.total == 24, "Wrong data point count");
+    
+    float *pos = new float[3 * grid.total];
+    float *col = new float[3 * grid.total];
+    
+    int it = 0;
+    int ct = 0;
+    for(int u = 0; u < sizeU.x; u++){
+        for(int v = 0; v < sizeU.y; v++){
+            vec2f p = grid.GetDataPosition(vec2ui(u, v), 0);
+            pos[it++] = p.x; pos[it++] = p.y; pos[it++] = 0;
+            if(u > -1){
+                col[ct++] = 1; col[ct++] = 0; col[ct++] = 0;
+            }else{
+                col[ct++] = 0; col[ct++] = 0; col[ct++] = 1;
+            }
+        }
+    }
+    
+    for(int u = 0; u < sizeV.x; u++){
+        for(int v = 0; v < sizeV.y; v++){
+            vec2f p = grid.GetDataPosition(vec2ui(u, v), 1);
+            pos[it++] = p.x; pos[it++] = p.y; pos[it++] = 0;
+            if(v > 0){
+                col[ct++] = 0; col[ct++] = 1; col[ct++] = 0;
+            }else{
+                col[ct++] = 0; col[ct++] = 0; col[ct++] = 1;
+            }
+        }
+    }
+    
+    vec3f origin(0, 0, 10);
+    vec3f target(0);
+    graphy_set_3d(origin.x, origin.y, origin.z, target.x, target.y, target.z,
+                  45.0, 0.1f, 100.0f);
+    
+    graphy_render_points3f(pos, col, grid.total, 0.1);
+    getchar();
+    
+    graphy_close_display();
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
 
 void test_particle_to_node_2D(){
     printf("===== Test 2D Node Grid Particle To Node - Simple\n");
@@ -651,7 +776,7 @@ void test_field_grid(){
         for(int j = 0; j < grid->resolution.y; j++){
             for(int k = 0; k < grid->resolution.z; k++){
                 vec3ui u(i,j,k);
-                vec3f p = grid->GetVertexPosition(u);
+                vec3f p = grid->GetDataPosition(u);
                 vec3f o = bounds.pMin + vec3f(i, j, k) * grid->spacing;
                 
                 grid->SetValueAt(i+j+k, u);
@@ -737,7 +862,7 @@ void test_field_grid(){
         for(int j = 0; j < grid->resolution.y; j++){
             for(int k = 0; k < grid->resolution.z; k++){
                 vec3ui u(i,j,k);
-                vec3f p = grid->GetVertexPosition(u);
+                vec3f p = grid->GetDataPosition(u);
                 Float f = grid->GetValueAt(u);
                 if(f > 0) continue;
                 Float mp = LinearRemap(f, sdMin, sdMax, 0, 1);

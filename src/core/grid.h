@@ -789,7 +789,7 @@ typedef NodeEdgeGrid<vec2f, vec2ui, Bounds2f, vec2f> NodeEdgeGrid2v;
 */
 
 typedef enum{
-    VertexCentered, 
+    VertexCentered, CellCentered, FaceCentered
 }VertexType;
 
 // Vector computation  Dimension computation  Domain computation          Field Values
@@ -797,9 +797,17 @@ typedef enum{
 template<typename T, typename U, typename Q, typename F>
 class FieldGrid{
     public:
-    U resolution; // the amount of elements in each direction
+    // the amount of elements in each direction for VertexCentered and CellCentered
+    // the amount of cells for FaceCentered
+    U resolution;
+    
     unsigned int total; // the total amount of elements
-    F *field; // the actual value stored in each node
+    // the actual value stored in each node for VertexCentered and CellCentered
+    // 1D array of (u,v,w) data for FaceCentered
+    F *field;
+    F *fieldUVW[3]; // easier access
+    int perComponent[3]; // easier access to per component count
+    
     T minPoint; // minimal point (bottom-left)
     T spacing; // spacing between nodes
     Q bounds; // bounds of the grid
@@ -811,33 +819,67 @@ class FieldGrid{
     __bidevice__ void SetDimension(const vec2f &u){ (void)u; dimensions = 2; }
     __bidevice__ void SetDimension(const vec3f &u){ (void)u; dimensions = 3; }
     
-    __bidevice__ T GetVertexCenteredPosition(const U &index){
-        T res;
+    __bidevice__ U GetComponentDimension(int component){
+        AssertA(component < dimensions, "Invalid component dimension");
+        U size(0);
+        size[component] = resolution[component] + 1;
         for(int i = 0; i < dimensions; i++){
-            res[i] = minPoint[i] + spacing[i] * index[i];
+            if(i != component){
+                size[i] = resolution[i];
+            }
+        }
+        
+        return size;
+    }
+    
+    __bidevice__ T GetDataPosition(const U &index, int component){
+        T res(0);
+        AssertA(type == FaceCentered, "Incorrect query");
+        if(component < dimensions){
+            T origin(0);
+            T gridSpacing = spacing;
+            gridSpacing[component] = 0;
+            
+            origin = minPoint + 0.5 * gridSpacing;
+            for(int i = 0; i < dimensions; i++){
+                res[i] = origin[i] + spacing[i] * index[i];
+            }
         }
         
         return res;
     }
     
+    __bidevice__ T GetDataPosition(const U &index){
+        T res(0);
+        T origin(0);
+        AssertA(type != FaceCentered, "Incorrect query");
+        switch(type){
+            case VertexCentered: origin = minPoint; break;
+            case CellCentered: origin = minPoint + 0.5 * spacing; break;
+            default:{
+                printf("Unimplemented FieldGrid type\n");
+            }
+        }
+        
+        for(int i = 0; i < dimensions; i++){
+            res[i] = origin[i] + spacing[i] * index[i];
+        }
+        
+        return res;
+    }
+    
+    /*
+    * Returns the amount of data points required to represent a type of FieldGrid,
+    * i.e.: VertexCentered for example requires n+1 points while CellCentered only n.
+*/
     //TODO: Implement other types
     __bidevice__ unsigned int Get1DLengthFor(int count){
         switch(type){
             case VertexCentered: return count+1;
+            case CellCentered: return count;
             default:{
                 printf("Unknown grid node distribution\n");
                 return 0;
-            }
-        }
-    }
-    
-    
-    __bidevice__ T GetVertexPosition(const U &index){
-        switch(type){
-            case VertexCentered: return GetVertexCenteredPosition(index);
-            default:{
-                printf("Unknown grid node distribution\n");
-                return T(0);
             }
         }
     }
@@ -916,6 +958,44 @@ class FieldGrid{
         return value;
     }
     
+    __host__ void BuildFaceCentered(const F &initialValue = F(0)){
+        T fres;
+        perComponent[0] = 0, perComponent[1] = 0;
+        perComponent[2] = 0;
+        total = 0;
+        for(int i = 0; i < dimensions; i++){
+            fres[i] = (Float)resolution[i];
+            int n = resolution[i]+1;
+            for(int j = 0; j < dimensions; j++){
+                if(i != j){
+                    n *= resolution[j];
+                }
+            }
+            
+            perComponent[i] = n;
+            total += n;
+        }
+        
+        bounds = Q(minPoint, minPoint + spacing * fres);
+        field = cudaAllocateVx(F, total);
+        
+        fieldUVW[0] = &field[0];
+        fieldUVW[1] = nullptr; 
+        fieldUVW[2] = nullptr;
+        
+        int at = perComponent[0];
+        for(int i = 1; i < dimensions; i++){
+            fieldUVW[i] = &field[at];
+            at += perComponent[i];
+        }
+        
+        int maxLen = Max(Max(perComponent[0], perComponent[2]), perComponent[1]);
+        for(int i = 0; i < maxLen; i++){
+            if(i < perComponent[0]) fieldUVW[0][i] = initialValue;
+            if(i < perComponent[1]) fieldUVW[1][i] = initialValue;
+            if(i < perComponent[2]) fieldUVW[2][i] = initialValue;
+        }
+    }
     
     __host__ void Build(const U &resol, const T &space, 
                         const T &origin, VertexType vtype, 
@@ -927,19 +1007,23 @@ class FieldGrid{
         minPoint = origin;
         spacing = space;
         type = vtype;
-        total = 1;
-        
-        for(int i = 0; i < dimensions; i++){
-            resolution[i] = Get1DLengthFor(resol[i]);
-            total *= resolution[i];
-            fres[i] = (Float)resol[i];
-        }
-        
-        bounds = Q(origin, origin + spacing * fres);
-        
-        field = cudaAllocateVx(F, total);
-        for(int i = 0; i < total; i++){
-            field[i] = initialValue;
+        if(type == FaceCentered){
+            BuildFaceCentered(initialValue);
+        }else{
+            total = 1;
+            
+            for(int i = 0; i < dimensions; i++){
+                resolution[i] = Get1DLengthFor(resol[i]);
+                total *= resolution[i];
+                fres[i] = (Float)resol[i];
+            }
+            
+            bounds = Q(origin, origin + spacing * fres);
+            
+            field = cudaAllocateVx(F, total);
+            for(int i = 0; i < total; i++){
+                field[i] = initialValue;
+            }
         }
     }
 };

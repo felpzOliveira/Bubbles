@@ -118,7 +118,8 @@ __host__ void PciSphSolver3::Setup(Float targetDensity, Float targetSpacing,
     ParticleSet3 *pData = sphData->sphpSet->GetParticleSet();
     Float rad  = pData->GetRadius();
     Float mass = pData->GetMass();
-    int pCount = pData->GetParticleCount();
+    int pCount = pData->GetReservedSize();
+    int actualCount = pData->GetParticleCount();
     
     vec3f len = sphData->domain->GetCellSize();
     Float minLen = Min(len[0], Min(len[1], len[2]));
@@ -137,7 +138,7 @@ __host__ void PciSphSolver3::Setup(Float targetDensity, Float targetSpacing,
     deltaDenom = ComputeDeltaDenom();
     
     printf("Radius : %g  Mass: %g  Density: %g  Spacing: %g, Particle Count: %d, Delta: %g\n", 
-           rad, mass, targetDensity, targetSpacing, pCount, deltaDenom);
+           rad, mass, targetDensity, targetSpacing, actualCount, deltaDenom);
     
     // Perform a particle distribution so that distribution
     // during simulation can be optmized
@@ -192,13 +193,17 @@ __host__ Float PciSphSolver3::ComputeBeta(Float timeIntervalInSeconds){
     return 2.0 * massOverTargetDensitySquared * timeStepSquare;
 }
 
+__host__ int EmptyCallback(int){ return 1; }
+
 __host__ void PciSphRunSimulation3(PciSphSolver3 *solver, Float spacing,
                                    vec3f origin, vec3f target, 
-                                   Float targetInterval, std::vector<Shape*> sdfs)
+                                   Float targetInterval, std::vector<Shape*> sdfs,
+                                   const std::function<int(int )> &callback)
 {
     SphParticleSet3 *sphSet = solver->GetSphParticleSet();
     ParticleSet3 *pSet = sphSet->GetParticleSet();
     return UtilRunSimulation3<PciSphSolver3, ParticleSet3>(solver, pSet,  spacing, 
                                                            origin, target, 
-                                                           targetInterval, sdfs);
+                                                           targetInterval, sdfs,
+                                                           callback);
 }

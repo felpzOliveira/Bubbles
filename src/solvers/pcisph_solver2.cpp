@@ -125,7 +125,8 @@ __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
     ParticleSet2 *pData = sphData->sphpSet->GetParticleSet();
     Float rad  = pData->GetRadius();
     Float mass = pData->GetMass();
-    int pCount = pData->GetParticleCount();
+    int pCount = pData->GetReservedSize();
+    int actualCount = pData->GetParticleCount();
     
     vec2f len = sphData->domain->GetCellSize();
     Float minLen = Min(len[0], len[1]);
@@ -144,7 +145,7 @@ __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
     deltaDenom = ComputeDeltaDenom();
     
     printf("Radius : %g  Mass: %g  Density: %g  Spacing: %g, Particle Count: %d, Delta: %g\n", 
-           rad, mass, targetDensity, targetSpacing, pCount, deltaDenom);
+           rad, mass, targetDensity, targetSpacing, actualCount, deltaDenom);
     
     // Perform a particle distribution so that distribution
     // during simulation can be optmized

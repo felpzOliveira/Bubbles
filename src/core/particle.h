@@ -40,6 +40,15 @@ class SpecieSet{
     __bidevice__ void SetFamilyId(unsigned int id){ familyId = id; }
     __bidevice__ unsigned int GetFamilyId(){ return familyId; }
     
+    __host__ void SetSize(int n){
+        chainNodes.SetSize(n);
+        chainAuxNodes.SetSize(n);
+        positions.SetSize(n);
+        velocities.SetSize(n);
+        mpWeight.SetSize(n);
+        count = 0;
+    }
+    
     __host__ void SetData(T *pos, T *vel, Float *mass, int n){
         positions.SetData(pos, n);
         velocities.SetData(vel, n);
@@ -117,6 +126,7 @@ class ParticleSet{
     DataBuffer<ParticleChain> chainAuxNodes;
     int count;
     int familyId;
+    int isDirty;
     
     Float radius;
     Float mass;
@@ -125,6 +135,37 @@ class ParticleSet{
         count = 0; 
         radius = 1e-3;
         mass = 1e-3;
+        isDirty = 0;
+    }
+    
+    __bidevice__ int GetReservedSize(){
+        return positions.GetSize();
+    }
+    
+    __host__ void SetSize(int n){
+        chainNodes.SetSize(n);
+        chainAuxNodes.SetSize(n);
+        positions.SetSize(n);
+        velocities.SetSize(n);
+        densities.SetSize(n);
+        pressures.SetSize(n);
+        forces.SetSize(n);
+        radius = 1e-3;
+        mass = 1e-3;
+        familyId = 0;
+        count = 0;
+        isDirty = 0;
+    }
+    
+    __host__ void AppendData(T *pos, T *vel, T *force, int n){
+        int rv = 0;
+        rv |= positions.SetDataAt(pos, n, count);
+        rv |= velocities.SetDataAt(vel, n, count);
+        rv |= forces.SetDataAt(force, n, count);
+        if(rv == 0){
+            count += n;
+            isDirty = 1;
+        }
     }
     
     __host__ void SetData(T *pos, T *vel, T *force, int n)
@@ -137,6 +178,7 @@ class ParticleSet{
         radius = 1e-3;
         mass = 1e-3;
         familyId = 0;
+        isDirty = 1;
     }
     
     __host__ void SetExtendedData(){
@@ -481,19 +523,23 @@ class ParticleSetBuilder{
         }
     }
     
-    __host__ void AddParticle(const T &pos, const T &vel = T(0),
-                              const T &force = T(0))
+    __host__ int AddParticle(const T &pos, const T &vel = T(0),
+                             const T &force = T(0))
     {
         positions.push_back(pos);
         velocities.push_back(vel);
         forces.push_back(force);
+        return 1;
     }
     
-    __host__ void AddParticle(const T &pos, Float mpW, const T &vel = T(0)){
+    __host__ int AddParticle(const T &pos, Float mpW, const T &vel = T(0)){
         positions.push_back(pos);
         velocities.push_back(vel);
         mpw.push_back(mpW);
+        return 1;
     }
+    
+    __host__ void Commit(){}
     
     __host__ int GetParticleCount(){ return positions.size(); }
     
@@ -556,9 +602,57 @@ class ParticleSetBuilder{
 typedef ParticleSetBuilder<vec2f> ParticleSetBuilder2;
 typedef ParticleSetBuilder<vec3f> ParticleSetBuilder3;
 
+template<typename T>
+class ContinuousParticleSetBuilder{
+    public:
+    std::vector<T> positions;
+    std::vector<T> velocities;
+    std::vector<T> forces;
+    ParticleSet<T> *particleSet;
+    int maxNumOfParticles;
+    
+    __host__ ContinuousParticleSetBuilder(int maxParticles){
+        maxNumOfParticles = Max(1, maxParticles);
+        particleSet = cudaAllocateVx(ParticleSet<T>, 1);
+        particleSet->SetSize(maxNumOfParticles);
+    }
+    
+    __host__ int AddParticle(const T &pos, const T &vel = T(0),
+                             const T &force = T(0))
+    {
+        int total = particleSet->GetParticleCount() + positions.size();
+        int ok = 0;
+        if(total+1 <= maxNumOfParticles){
+            positions.push_back(pos);
+            velocities.push_back(vel);
+            forces.push_back(force);
+            ok = 1;
+        }
+        
+        return ok;
+    }
+    
+    __host__ void Commit(){
+        particleSet->AppendData(positions.data(), velocities.data(),
+                                forces.data(), positions.size());
+        positions.clear();
+        velocities.clear();
+        forces.clear();
+    }
+    
+    __host__ ParticleSet<T> *GetParticleSet(){
+        return particleSet;
+    }
+};
+
+typedef ContinuousParticleSetBuilder<vec2f> ContinuousParticleSetBuilder2;
+typedef ContinuousParticleSetBuilder<vec3f> ContinuousParticleSetBuilder3;
+
 __host__ SphParticleSet2 *SphParticleSet2FromBuilder(ParticleSetBuilder2 *builder);
 __host__ SphParticleSet2 *SphParticleSet2ExFromBuilder(ParticleSetBuilder2 *builder);
+__host__ SphParticleSet2 *SphParticleSet2FromContinuousBuilder(ContinuousParticleSetBuilder2 *builder);
 __host__ SpecieSet2 *SpecieSet2FromBuilder(ParticleSetBuilder2 *builder,
                                            Float mass, Float charge, int familyId = 0);
 
 __host__ SphParticleSet3 *SphParticleSet3FromBuilder(ParticleSetBuilder3 *builder);
+__host__ SphParticleSet3 *SphParticleSet3FromContinuousBuilder(ContinuousParticleSetBuilder3 *builder);

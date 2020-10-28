@@ -66,6 +66,8 @@ void test_neighbor_query_grid2D();
 void test_neighbor_query_grid3D();
 void test_node_grid_2D();
 void test_particle_to_node_2D();
+void test_grid_face_centered_2D();
+void test_grid_face_centered_3D();
 
 void test_kernels_2D();
 void test_kernels_3D();
@@ -76,6 +78,7 @@ void test_bcclattice_point_generator();
 void test_volume_particle_emitter3();
 void test_volume_particle_emitter3_mesh();
 void test_mesh_collision();
+void test_continuous_builder2D();
 void test_matrix_operations();
 void test_sampling_barycentric();
 void test_ray2_intersect();
@@ -109,6 +112,7 @@ void test_pcisph3_happy_whale();
 void test_pcisph3_whale_obstacle();
 void test_pcisph3_lucy_ball();
 void test_pcisph3_quadruple_dam();
+void test_pcisph3_multiple_emission();
 
 void test_espic_1D();
 void test_espic_particles_2D();

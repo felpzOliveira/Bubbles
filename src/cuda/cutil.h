@@ -117,9 +117,25 @@ class DataBuffer{
     
     __bidevice__ DataBuffer(){ size = 0; data = nullptr; }
     
+    __bidevice__ int GetSize(){
+        return size;
+    }
+    
     __host__ void SetSize(int n){
         size = n;
         data = cudaAllocateVx(T, size);
+    }
+    
+    __host__ int SetDataAt(T *values, int n, int at){
+        int rv = 1;
+        if(size >= at + n){
+            memcpy(&data[at], values, n * sizeof(T));
+            rv = 0;
+        }else{
+            printf("Warning: Invalid fill index {%d + %d >= %d}\n", at, n, size);
+        }
+        
+        return rv;
     }
     
     __host__ void SetData(T *values, int n){

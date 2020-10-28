@@ -92,7 +92,7 @@ void __assert_check_host(bool v, const char *name, const char *filename,
 
 inline __bidevice__ 
 void __assert_check(bool v, const char *name, const char *filename,
-                    int line, const char *msg, int can_exit=0)
+                    int line, const char *msg)
 {
     if(!v){
         int* ptr = nullptr;
@@ -100,7 +100,6 @@ void __assert_check(bool v, const char *name, const char *filename,
             printf("Assert: %s (%s:%d) : (No message)\n", name, filename, line);
         else
             printf("Assert: %s (%s:%d) : (%s)\n", name, filename, line, msg);
-        if(can_exit) exit(0);
         *ptr = 10;
     }
 }

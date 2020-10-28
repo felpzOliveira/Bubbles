@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <sph_solver.h>
+#include <functional>
 
 typedef struct{
     SphSolverData2 *sphData;
@@ -78,6 +79,9 @@ __host__ void ComputePressureForceAndIntegrate(PciSphSolverData3 *data,
                                                Float delta, int maxIt,
                                                int is_cpu=0);
 
+__host__ int EmptyCallback(int);
+
 __host__ void PciSphRunSimulation3(PciSphSolver3 *solver, Float spacing,
                                    vec3f origin, vec3f target, 
-                                   Float targetInterval, std::vector<Shape*> sdfs);
+                                   Float targetInterval, std::vector<Shape*> sdfs={},
+                                   const std::function<int(int )> &callback=EmptyCallback);

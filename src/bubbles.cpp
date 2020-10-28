@@ -4,6 +4,7 @@
 #include <emitter.h>
 #include <obj_loader.h>
 #include <serializer.h>
+#include <memory.h>
 #define RUN_TESTS
 
 #if defined(RUN_TESTS)
@@ -29,6 +30,7 @@ void run_self_tests(){
     test_rectangle_distance_outside();
     test_rectangle_emit();
     test_field_grid();
+    test_grid_face_centered_2D();
     test_mesh_collision();
     test_box_distance();
     test_espic_1D();
@@ -64,13 +66,18 @@ int main(int argc, char **argv){
     
     //test_pcisph3_lucy_ball();
     //test_pcisph3_quadruple_dam();
-    test_pcisph3_rock_dam();
+    //test_pcisph3_rock_dam();
+    //test_grid_face_centered_3D();
+    //test_continuous_builder2D();
+    //test_pcisph3_multiple_emission();
+    test_pcisph3_dragon();
     
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else
     
 #endif
+    CudaMemoryManagerClearAll();
     cudaSafeExit();
     return 0;
 }

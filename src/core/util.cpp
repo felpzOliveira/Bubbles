@@ -95,6 +95,23 @@ __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBui
     return gtransform(bounds);
 }
 
+__host__ int UtilIsEmitterOverlapping(VolumeParticleEmitter3 *emitter,
+                                      ColliderSet3 *colliderSet)
+{
+    int emitter_collider_overlaps = 0;
+    Bounds3f bound = emitter->shape->GetBounds();
+    for(int j = 0; j < colliderSet->nColiders; j++){
+        Collider3 *collider = colliderSet->colliders[j];
+        Bounds3f boundj = collider->shape->GetBounds();
+        if(Overlaps(bound, boundj) && !collider->shape->reverseOrientation){
+            emitter_collider_overlaps = 1;
+            break;
+        }
+    }
+    
+    return emitter_collider_overlaps;
+}
+
 __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
                                       ColliderSet3 *colliderSet)
 {

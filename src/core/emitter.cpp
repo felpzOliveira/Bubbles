@@ -38,7 +38,9 @@ __host__ void UniformBoxParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builde
             if(i == 0 || i == amount.x-1) w *= 0.5;
             if(j == 0 || j == amount.y-1) w *= 0.5;
             
-            Builder->AddParticle(target, w * mpw);
+            if(!Builder->AddParticle(target, w * mpw)){
+                return;
+            }
         }
     }
 }
@@ -66,25 +68,29 @@ __host__ void VolumeParticleEmitter2::SetJitter(Float jit){
     jitter = Clamp(jit, 0.0, 1.0);
 }
 
-__host__ void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder){
-    AssertA(shape, "Cannot emit particles without a surface shape");
+template<typename ParticleBuilder2>
+__host__ void _Emit(ParticleBuilder2 *Builder, VolumeParticleEmitter2 *emitter){
+    AssertA(emitter->shape, "Cannot emit particles without a surface shape");
     
-    Float maxJitter = 0.5 * jitter * spacing;
+    Float maxJitter = 0.5 * emitter->jitter * emitter->spacing;
     int numNewParticles = 0;
     
-    AssertA(isOneShot, "Multiple emittion not supported yet");
+    AssertA(emitter->isOneShot, "Multiple emittion not supported yet");
     
-    if(isOneShot){
+    if(emitter->isOneShot){
         auto Accept = [&](const vec2f &point) -> bool{
             Float angle = (rand_float() - 0.5) * 2.0 * Pi;
             vec2f randomDir = vec2f(1, 1).Rotate(angle);
             vec2f offset = maxJitter * randomDir;
             vec2f target = point + offset;
-            if(shape->SignedDistance(target) <= 0){
-                if(emittedParticles < maxParticles){
-                    Builder->AddParticle(target, initVel);
-                    emittedParticles++;
-                    numNewParticles++;
+            if(emitter->shape->SignedDistance(target) <= 0){
+                if(emitter->emittedParticles < emitter->maxParticles){
+                    if(Builder->AddParticle(target, emitter->initVel)){
+                        emitter->emittedParticles++;
+                        numNewParticles++;
+                    }else{
+                        return false;
+                    }
                 }else{
                     return false;
                 }
@@ -93,9 +99,18 @@ __host__ void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder){
             return true;
         };
         
-        generator->ForEach(bound, spacing, Accept);
+        emitter->generator->ForEach(emitter->bound, emitter->spacing, Accept);
         DBG_PRINT("Added %d particles\n", numNewParticles);
+        if(numNewParticles > 0) Builder->Commit();
     }
+}
+
+__host__ void VolumeParticleEmitter2::Emit(ContinuousParticleSetBuilder<vec2f> *Builder){
+    _Emit<ContinuousParticleSetBuilder<vec2f>>(Builder, this);
+}
+
+__host__ void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder){
+    _Emit<ParticleSetBuilder<vec2f>>(Builder, this);
 }
 
 /**************************************************************/
@@ -139,6 +154,13 @@ __host__ void VolumeParticleEmitterSet2::SetJitter(Float jitter){
     }
 }
 
+__host__ void VolumeParticleEmitterSet2::Emit(ContinuousParticleSetBuilder<vec2f> *Builder){
+    AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
+    for(int i = 0; i < emitters.size(); i++){
+        emitters[i]->Emit(Builder);
+    }
+}
+
 __host__ void VolumeParticleEmitterSet2::Emit(ParticleSetBuilder<vec2f> *Builder){
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
     for(int i = 0; i < emitters.size(); i++){
@@ -174,29 +196,48 @@ isOneShot(isOneShot), allowOverlapping(allowOverlapping)
     emittedParticles = 0;
 }
 
+__host__ VolumeParticleEmitter3::VolumeParticleEmitter3(Shape *_shape, Float spacing, 
+                                                        const vec3f &initialVel,
+                                                        const vec3f &linearVel,
+                                                        Float angularVel, int maxParticles,
+                                                        Float jitter, bool isOneShot,
+                                                        bool allowOverlapping, int seed)
+: shape(_shape), bound(_shape->GetBounds()), spacing(spacing), initVel(initialVel), linearVel(linearVel),
+angularVel(angularVel), maxParticles(maxParticles), emittedParticles(0), jitter(jitter), 
+isOneShot(isOneShot), allowOverlapping(allowOverlapping)
+{
+    (void)seed;
+    generator = new BccLatticePointGenerator();
+    emittedParticles = 0;
+}
+
 __host__ void VolumeParticleEmitter3::SetJitter(Float jit){
     jitter = Clamp(jit, 0.0, 1.0);
 }
 
-__host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder){
-    AssertA(isOneShot, "Multiple emittion not supported yet");
+template<typename ParticleBuilder3>
+__host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter){
+    AssertA(emitter->isOneShot, "Multiple emittion not supported yet");
     TimerList timers;
-    Float maxJitter = 0.5 * jitter * spacing;
+    Float maxJitter = 0.5 * emitter->jitter * emitter->spacing;
     int numNewParticles = 0;
-    bool isSdf = shape->CanSolveSdf();
+    bool isSdf = emitter->shape->CanSolveSdf();
     
-    if(isOneShot){
+    if(emitter->isOneShot){
         auto Accept = [&](const vec3f &point) -> bool{
             vec2f u(rand_float(), rand_float());
             vec3f randomDir = SampleSphere(u);
             vec3f offset = maxJitter * randomDir;
             vec3f target = point + offset;
             if(isSdf){
-                if(shape->SignedDistance(target) <= 0){
-                    if(emittedParticles < maxParticles){
-                        Builder->AddParticle(target, initVel);
-                        emittedParticles++;
-                        numNewParticles++;
+                if(emitter->shape->SignedDistance(target) <= 0){
+                    if(emitter->emittedParticles < emitter->maxParticles){
+                        if(Builder->AddParticle(target, emitter->initVel)){
+                            emitter->emittedParticles++;
+                            numNewParticles++;
+                        }else{
+                            return false;
+                        }
                     }else{
                         return false;
                     }
@@ -206,11 +247,14 @@ __host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder){
                 * If the Shape does not provide a SDF map, perform Ray Tracing
                 * for detecting interior points
 */
-                if(MeshIsPointInside(target, shape, bound)){
-                    if(emittedParticles < maxParticles){
-                        Builder->AddParticle(target, initVel);
-                        emittedParticles++;
-                        numNewParticles++;
+                if(MeshIsPointInside(target, emitter->shape, emitter->bound)){
+                    if(emitter->emittedParticles < emitter->maxParticles){
+                        if(Builder->AddParticle(target, emitter->initVel)){
+                            emitter->emittedParticles++;
+                            numNewParticles++;
+                        }else{
+                            return false;
+                        }
                     }else{
                         return false;
                     }
@@ -223,10 +267,19 @@ __host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder){
         printf("Emitting particles ... ");
         fflush(stdout);
         timers.Start();
-        generator->ForEach(bound, spacing, Accept);
+        emitter->generator->ForEach(emitter->bound, emitter->spacing, Accept);
         timers.Stop();
         printf(" %d { %g ms }\n", numNewParticles, timers.GetElapsedCPU(0));
+        if(numNewParticles > 0) Builder->Commit();
     }
+}
+
+__host__ void VolumeParticleEmitter3::Emit(ContinuousParticleSetBuilder<vec3f> *Builder){
+    _Emit<ContinuousParticleSetBuilder<vec3f>>(Builder, this);
+}
+
+__host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder){
+    _Emit<ParticleSetBuilder<vec3f>>(Builder, this);
 }
 
 /**************************************************************/
@@ -267,6 +320,13 @@ __host__ void VolumeParticleEmitterSet3::SetJitter(Float jitter){
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::SetJitter");
     for(int i = 0; i < emitters.size(); i++){
         emitters[i]->SetJitter(jitter);
+    }
+}
+
+__host__ void VolumeParticleEmitterSet3::Emit(ContinuousParticleSetBuilder<vec3f> *Builder){
+    AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::Emit");
+    for(int i = 0; i < emitters.size(); i++){
+        emitters[i]->Emit(Builder);
     }
 }
 

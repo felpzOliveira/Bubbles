@@ -7,6 +7,31 @@
 #include <shape.h>
 #include <emitter.h>
 #include <obj_loader.h>
+#include <memory.h>
+
+void test_continuous_builder2D(){
+    printf("===== Test Continuous Builder 2D\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+    ContinuousParticleSetBuilder2 builder(10);
+    
+    for(int i = 0; i < 5; i++){
+        builder.AddParticle(vec2f(i));
+    }
+    
+    builder.Commit();
+    ParticleSet2 *pSet = builder.GetParticleSet();
+    TEST_CHECK(pSet->GetParticleCount() == 5, "Failed to generate initial particles");
+    
+    for(int i = 0; i < 5; i++){
+        builder.AddParticle(vec2f(i));
+    }
+    builder.Commit();
+    
+    TEST_CHECK(pSet->GetParticleCount() == 10, "Failed to generate second emission");
+    
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
 
 void test_mesh_collision(){
     printf("===== Test Particle Mesh Collision\n");

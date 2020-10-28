@@ -21,7 +21,7 @@ void test_pcisph3_dragon(){
     CudaMemoryManagerStart(__FUNCTION__);
     
     ParticleSetBuilder3 builder;
-    Bounds3f bounds = UtilParticleSetBuilder3FromBB("resources/cuteDragon.txt", &builder);
+    Bounds3f bounds = UtilParticleSetBuilder3FromBB("resources/cuteDragon", &builder);
     
     bounds.BoundingSphere(&center, &radius);
     radius *= 1.3;

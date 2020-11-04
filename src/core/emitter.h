@@ -2,6 +2,10 @@
 #include <geometry.h>
 #include <shape.h>
 #include <particle.h>
+#include <functional>
+
+__host__ vec2f ZeroVelocityField2(const vec2f &p);
+__host__ vec3f ZeroVelocityField3(const vec3f &p);
 
 class VolumeParticleEmitter2{
     public:
@@ -22,8 +26,10 @@ class VolumeParticleEmitter2{
                                     bool allowOverlapping = false, int seed = 0);
     
     __host__ void SetJitter(Float jitter);
-    __host__ void Emit(ParticleSetBuilder<vec2f> *Builder);
-    __host__ void Emit(ContinuousParticleSetBuilder<vec2f> *Builder);
+    __host__ void Emit(ParticleSetBuilder<vec2f> *Builder,
+                       const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
+    __host__ void Emit(ContinuousParticleSetBuilder2 *Builder,
+                       const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
 };
 
 class VolumeParticleEmitter3{
@@ -50,8 +56,10 @@ class VolumeParticleEmitter3{
                                     Float jitter = 0, bool isOneShot = true,
                                     bool allowOverlapping = false, int seed = 0);
     __host__ void SetJitter(Float jitter);
-    __host__ void Emit(ParticleSetBuilder<vec3f> *Builder);
-    __host__ void Emit(ContinuousParticleSetBuilder<vec3f> *Builder);
+    __host__ void Emit(ParticleSetBuilder<vec3f> *Builder,
+                       const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
+    __host__ void Emit(ContinuousParticleSetBuilder3 *Builder,
+                       const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
 };
 
 class UniformBoxParticleEmitter2{
@@ -83,8 +91,10 @@ class VolumeParticleEmitterSet2{
                              bool allowOverlapping = false, int seed = 0);
     
     __host__ void SetJitter(Float jitter);
-    __host__ void Emit(ParticleSetBuilder<vec2f> *Builder);
-    __host__ void Emit(ContinuousParticleSetBuilder<vec2f> *Builder);
+    __host__ void Emit(ParticleSetBuilder<vec2f> *Builder,
+                       const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
+    __host__ void Emit(ContinuousParticleSetBuilder2 *Builder,
+                       const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
     __host__ void Release();
 };
 
@@ -109,7 +119,9 @@ class VolumeParticleEmitterSet3{
                              bool allowOverlapping = false, int seed = 0);
     
     __host__ void SetJitter(Float jitter);
-    __host__ void Emit(ParticleSetBuilder<vec3f> *Builder);
-    __host__ void Emit(ContinuousParticleSetBuilder<vec3f> *Builder);
+    __host__ void Emit(ParticleSetBuilder<vec3f> *Builder,
+                       const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
+    __host__ void Emit(ContinuousParticleSetBuilder3 *Builder,
+                       const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
     __host__ void Release();
 };

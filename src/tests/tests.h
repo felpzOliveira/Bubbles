@@ -113,6 +113,9 @@ void test_pcisph3_whale_obstacle();
 void test_pcisph3_lucy_ball();
 void test_pcisph3_quadruple_dam();
 void test_pcisph3_multiple_emission();
+void test_pcisph3_dragon_shower();
+void test_pcisph3_ball_many_emission();
+void test_pcisph3_box_many_emission();
 
 void test_espic_1D();
 void test_espic_particles_2D();

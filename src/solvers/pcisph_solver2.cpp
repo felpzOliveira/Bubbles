@@ -4,7 +4,7 @@
 
 Float kDefaultTimeStepLimitScale = 5.0;
 
-__bidevice__ PciSphSolver2::PciSphSolver2(){}
+__host__ PciSphSolver2::PciSphSolver2(){}
 
 __host__ void PciSphSolver2::Initialize(SphSolverData2 *data){
     solverData = cudaAllocateVx(PciSphSolverData2, 1);
@@ -45,46 +45,59 @@ __host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep,
                               int use_cpu = 0)
 {
     SphSolverData2 *data = solver->solverData->sphData;
-    TimerList timers;
+    solver->stepTimer.Reset();
     
-    timers.Start();
+    solver->stepTimer.Start();
     if(use_cpu)
         UpdateGridDistributionCPU(data);
     else
         UpdateGridDistributionGPU(data);
-    timers.StopAndNext();
+    solver->stepTimer.StopAndNext();
     
     if(use_cpu)
         ComputeDensityCPU(data);
     else
         ComputeDensityGPU(data);
-    timers.StopAndNext();
+    solver->stepTimer.StopAndNext();
     
     //TODO: Implement CPU version for 2D?
     ComputeNonPressureForceGPU(data);
     
-    timers.StopAndNext();
+    solver->stepTimer.StopAndNext();
     
     Float delta = solver->ComputeDelta(timeStep);
     ComputePressureForceAndIntegrate(solver->solverData, timeStep, 0.01, delta, 5);
     
-    timers.Stop();
-    
-#if defined(PRINT_TIMER)
-    //PrintPciSphTimers(&timers);
-#endif
+    solver->stepTimer.Stop();
     
 }
 
+__host__ int PciSphSolver2::GetParticleCount(){
+    return solverData->sphData->sphpSet->GetParticleSet()->GetParticleCount();
+}
+
+__host__ CNMStats PciSphSolver2::GetCNMStats(){
+    return cnmStats;
+}
+
+__host__ Float PciSphSolver2::GetAdvanceTime(){
+    return advanceTimer.GetElapsedCPU(0);
+}
+
+__host__ void PciSphSolver2::UpdateDensity(){
+    UpdateGridDistributionCPU(solverData->sphData);
+    ComputeDensityCPU(solverData->sphData);
+}
 
 __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
+    TimerList cnmTimer;
     unsigned int numberOfIntervals = 0;
-    unsigned int numberOfIntervalsRunned = 0;
     Float remainingTime = timeIntervalInSeconds;
     
     SphSolverData2 *data = solverData->sphData;
-    TimerList timers;
-    timers.Start();
+    
+    advanceTimer.Reset();
+    advanceTimer.Start();
     while(remainingTime > Epsilon){
         SphParticleSet2 *sphpSet = data->sphpSet;
         numberOfIntervals = sphpSet->ComputeNumberOfTimeSteps(remainingTime,
@@ -93,21 +106,20 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
         Float timeStep = remainingTime / (Float)numberOfIntervals;
         AdvanceTimeStep(this, timeStep);
         remainingTime -= timeStep;
-        numberOfIntervalsRunned += 1;
     }
     
+    advanceTimer.Stop();
+    
     CNMInvalidateCells(data->domain);
-    timers.StopAndNext();
-    int n = CNMClassifyLazyGPU(data->domain);
-    timers.Stop();
-#ifdef PRINT_TIMER
-    Float adv = timers.GetElapsedCPU(0);
-    Float cnm = timers.GetElapsedCPU(1);
-    Float pct = cnm * 100.0 / adv;
-    printf("\rAdvance [%d] {%g} CNM [%d] {%g} [%g%%]    ", 
-           numberOfIntervalsRunned, adv, n, cnm, pct);
-    fflush(stdout);
-#endif
+    
+    Float elapsed = advanceTimer.GetElapsedCPU(0);
+    cnmTimer.Start();
+    CNMClassifyLazyGPU(data->domain);
+    cnmTimer.Stop();
+    
+    Float cnm = cnmTimer.GetElapsedGPU(0);
+    Float pct = cnm * 100.0 / elapsed;
+    cnmStats.Add(CNMData(cnm, pct));
 }
 
 __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,

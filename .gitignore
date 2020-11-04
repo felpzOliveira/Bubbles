@@ -3,3 +3,4 @@ bbtool
 *.pbrt
 *.txt
 *.o
+*.obj

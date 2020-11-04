@@ -55,11 +55,14 @@ __host__ Bounds3f UtilComputeMeshBounds(ParsedMesh *mesh){
     return _UtilComputePointsBounds(mesh->p, mesh->nVertices);
 }
 
-__host__ Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLength){
+__host__ Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLength,
+                                           Float *scaleValue)
+{
     Bounds3f bounds = UtilComputeMeshBounds(mesh);
     int shrinkAxis = bounds.MaximumExtent();
     Float length = bounds.ExtentOn(shrinkAxis);
     Float scale = maximumAxisLength / length;
+    if(scaleValue) *scaleValue = scale;
     return Scale(scale);
 }
 
@@ -95,6 +98,17 @@ __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBui
     return gtransform(bounds);
 }
 
+__host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform){
+    vec3f pi = transform.Point(mesh->p[0]);
+    Bounds3f bounds(pi, pi);
+    for(int i = 1; i < mesh->nVertices; i++){
+        pi = transform.Point(mesh->p[i]);
+        bounds = Union(bounds, pi);
+    }
+    
+    return bounds;
+}
+
 __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitter3 *emitter,
                                       ColliderSet3 *colliderSet)
 {
@@ -110,6 +124,33 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitter3 *emitter,
     }
     
     return emitter_collider_overlaps;
+}
+
+__host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *field){
+    vec2ui resolution;
+    vec2f gridSpacing;
+    vec2f origin;
+    Float kernelRadius = solverData->sphpSet->GetKernelRadius();
+    // Compute density, make sure this thing has a density value
+    UpdateGridDistributionCPU(solverData);
+    ComputeDensityCPU(solverData);
+    
+    // Build the field
+    Float scale = 0.5;
+    Float invScale = 1.0 / scale;
+    gridSpacing = vec2f(kernelRadius * scale);
+    origin = solverData->domain->minPoint;
+    resolution = solverData->domain->GetIndexCount() * invScale;
+    field->Build(resolution, gridSpacing, origin, VertexCentered);
+    
+    for(int i = 0; i < field->total; i++){
+        vec2ui u = DimensionalIndex(i, field->resolution, 2);
+        vec2f pi = field->GetDataPosition(u);
+        Float di = ComputeDensityForPoint(solverData, pi);
+        
+        Float methodDi = 0.5 - di;//TODO
+        field->SetValueAt(methodDi, u);
+    }
 }
 
 __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,

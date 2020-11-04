@@ -13,6 +13,7 @@
 #define SET_VIEW_2D "_Z21gr_display_set_view2dP12gr_display_tffff"
 #define SET_VIEW_3D "_Z21gr_display_set_view3dP12gr_display_tfffffffff"
 #define CLOSE_DISPLAY "_Z18gr_destroy_displayP12gr_display_t"
+#define RENDER_LINES "_Z22gr_opengl_render_linesPfS_iP12gr_display_t"
 
 static int display_width = 1000;
 static int display_height = 1000;
@@ -24,6 +25,7 @@ static gr_display *display = nullptr;
 typedef gr_display*(*GraphyGetDisplayEx)(int, int, float, float, float, float);
 typedef gr_display*(*GraphyGetDisplay)(int, int);
 typedef void(*GraphyRenderPoints)(float*, float*, int, gr_display *);
+typedef void(*GraphyRenderLines)(float*, float*, int, gr_display *);
 typedef void(*GraphyRenderPointsSize)(float*, float*, int, float, gr_display *);
 typedef void(*GraphySetView2D)(gr_display *, float, float, float, float);
 typedef void(*GraphySetView3D)(gr_display *, float, float, float, float,
@@ -40,6 +42,7 @@ GraphySetView2D graphy_set_view2D;
 GraphySetView3D graphy_set_view3D;
 GraphyRenderPoints3D graphy_render_pts_3d;
 GraphyCloseDisplay graphy_display_close;
+GraphyRenderLines graphy_lines_render;
 
 static int graphy_ok = 0;
 
@@ -63,10 +66,12 @@ static int LoadFunctions(){
     graphy_set_view3D = (GraphySetView3D) LoadSymbol(GraphyHandle, SET_VIEW_3D);
     graphy_render_pts_3d = (GraphyRenderPoints3D) LoadSymbol(GraphyHandle, RENDER_PTS3);
     graphy_display_close = (GraphyCloseDisplay) LoadSymbol(GraphyHandle, CLOSE_DISPLAY);
+    graphy_lines_render = (GraphyRenderLines) LoadSymbol(GraphyHandle, RENDER_LINES);
     
     return (graphy_get_display && graphy_render_pts && 
             graphy_set_view2D && graphy_render_pts_size &&
-            graphy_set_view3D && graphy_render_pts_3d && graphy_display_close) ? 1 : 0;
+            graphy_set_view3D && graphy_render_pts_3d && 
+            graphy_lines_render && graphy_display_close) ? 1 : 0;
 }
 
 static void graphy_initialize(int width, int height){
@@ -159,6 +164,21 @@ void graphy_render_points3f(float *pos, float *col, int num, float radius){
     if(graphy_ok == 0) graphy_initialize(display_width, display_height);
     if(graphy_ok > 0){
         graphy_render_pts_3d(pos, col, num, radius, display);
+    }
+}
+
+void graphy_set_orthographic(float left, float right, float top, float bottom){
+    if(graphy_ok == 0) graphy_initialize(display_width, display_height);
+    if(graphy_ok > 0){
+        graphy_set_view2D(display, left, right, top, bottom);
+    }
+}
+
+void graphy_render_lines(float *pos, float rgb[3], int num){
+    if(graphy_ok == 0) graphy_initialize(display_width, display_height);
+    if(graphy_ok > 0){
+        set_colors_by_rgb(rgb, num);
+        graphy_lines_render(pos, colors, num, display);
     }
 }
 

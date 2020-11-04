@@ -35,21 +35,45 @@ static void PrintToFile(FILE *fp, const vec2f &value, int spacing=0){
 void SerializerLoadPoints3(std::vector<vec3f> *points,
                            const char *filename, int flags)
 {
-    FILE *fp = fopen(filename, "r");
-    if(fp){
-        Float x, y, z;
+    std::ifstream ifs(filename);
+    if(ifs){
+        int start = 1;
         int pCount = 0;
-        fscanf(fp, "%d\n", &pCount);
-        for(int i = 0; i < pCount; i++){
-            if(flags & SERIALIZER_POSITION){
-                fscanf(fp, "%g %g %g", &x, &y, &z);
-                points->push_back(vec3f(x,y,z));
+        std::string linebuf;
+        while(ifs.peek() != -1){
+            GetLine(ifs, linebuf);
+            
+            if(linebuf.size() > 0){ //remove '\n'
+                if(linebuf[linebuf.size()-1] == '\n') linebuf.erase(linebuf.size() - 1);
             }
             
-            fscanf(fp, "\n");
+            if(linebuf.size() > 0){ //remove '\r'
+                if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
+            }
+            
+            // skip empty
+            if(linebuf.empty()) continue;
+            const char *token = linebuf.c_str();
+            token += strspn(token, " \t");
+            
+            if(start){ // particle count
+                pCount = (int)ParseFloat(&token);
+                start = 0;
+                if(pCount <= 0){
+                    printf("Invalid particle count %d\n", pCount);
+                    return;
+                }
+                
+                continue;
+            }
+            
+            if(flags & SERIALIZER_POSITION){
+                vec3f p;
+                ParseV3(&p, &token);
+                while(CAN_SKIP(token[0])) token++;
+                points->push_back(p);
+            }
         }
-        
-        fclose(fp);
     }
 }
 
@@ -191,6 +215,9 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int fl
             SerializerLoadPoints3((*data)[i], file.c_str(), flags);
             printf("\rLoaded %d / %d", i, end-start);
             fflush(stdout);
+            if(pCount < (*data)[i]->size()){
+                pCount = (*data)[i]->size();
+            }
         }
         printf("\rLoaded %d\n", end-start);
     }else{
@@ -249,9 +276,9 @@ void SaveSphParticleSet(SolverData *data, const char *filename, int flags){
         }
         
         fclose(fp);
+    }else{
+        printf("Error: Failed to open %s\n", filename);
     }
-    
-    printf("Saved: %s\n", filename);
 }
 
 void SerializerSaveSphDataSet3(SphSolverData3 *pSet, const char *filename, int flags){

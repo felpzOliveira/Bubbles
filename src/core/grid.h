@@ -329,6 +329,31 @@ class Grid{
         }
     }
     
+    /* 
+* Distribute a list of particles to the cell in CPU. In order to avoid
+* performing full distribution if a continuous emission is being used
+* allow for distributing a list of particles.
+ */
+    template<typename ParticleType = ParticleSet<T>>
+        __host__ void DistributeByParticleList(ParticleType *pSet, T *pList, 
+                                               int pCount, int startId)
+    {
+        for(int i = 0; i < pCount; i++){
+            T p = pList[i];
+            U u = GetHashedPosition(p);
+            unsigned int h = GetLinearCellIndex(u);
+            AssertA(h < total, "Invalid particle position");
+            Cell<Q> *cell = &cells[h];
+            AssertA(Inside(p, cell->bounds), "Invalid particle computation {Inside}");
+            
+            ParticleChain *pChain = pSet->GetParticleChainNode(startId+i);
+            pChain->cId = h;
+            pChain->pId = startId+i;
+            pChain->sId = pSet->GetFamilyId();
+            cell->AddToChain(pChain);
+        }
+    }
+    
     /* Distribute by particle, faster for initialization. Can only run on CPU */
     template<typename ParticleType = ParticleSet<T>>
         __host__ void DistributeByParticle(ParticleType *pSet){
@@ -932,13 +957,26 @@ class FieldGrid{
         }
     }
     
-    /*
-    * Compute gradient at p. We basically sample a bunch of times
-    * for central differences method.
-    * NOTE: We already had this discussion, this method can give zero
-    *       vector as response if all vertex have the same sdf value.
-    *       This is possible since symmetry may happen and its not a bug.
-*/
+    
+    __bidevice__ F DivergenceAtVertex(const U &index){
+        F value(0);
+        for(int i = 0; i < dimensions; i++){
+            unsigned int idn = index[i] > 0 ? index[i]-1 : index[i];
+            unsigned int idp = index[i] < resolution[i]-1 ? index[i]+1: index[i];
+            U forward = index;
+            U backward = index;
+            forward[i] = idp;
+            backward[i] = idn;
+            
+            F fValue = GetValueAt(forward);
+            F bValue = GetValueAt(backward);
+            
+            value += 0.5 * (fValue - bValue) / spacing[i];
+        }
+        
+        return value;
+    }
+    
     __bidevice__ T Gradient(const T &p){
         T value;
         // the way our setup works is we adjust resolution in Y/Z axis
@@ -1030,3 +1068,131 @@ class FieldGrid{
 
 typedef FieldGrid<vec2f, vec2ui, Bounds2f, Float> FieldGrid2f;
 typedef FieldGrid<vec3f, vec3ui, Bounds3f, Float> FieldGrid3f;
+
+template<typename T, typename U, typename Q>
+class ContinuousParticleSetBuilder{
+    public:
+    std::vector<T> positions;
+    std::vector<T> velocities;
+    std::vector<T> forces;
+    ParticleSet<T> *particleSet;
+    int maxNumOfParticles;
+    bool warned;
+    Grid<T, U, Q> *mappedDomain;
+    std::set<unsigned int> mappedCellSet;
+    std::map<unsigned int, std::vector<T>> mappedPositions;
+    
+    __host__ ContinuousParticleSetBuilder(int maxParticles=1000000){
+        maxNumOfParticles = Max(1, maxParticles);
+        particleSet = cudaAllocateVx(ParticleSet<T>, 1);
+        particleSet->SetSize(maxNumOfParticles);
+        mappedDomain = nullptr;
+        warned = false;
+    }
+    
+    __host__ void MapGrid(Grid<T, U, Q> *grid){
+        int count = particleSet->GetParticleCount();
+        mappedDomain = grid;
+        for(int i = 0; i < count; i++){
+            T p = particleSet->GetParticlePosition(i);
+            unsigned int h = grid->GetLinearHashedPosition(p);
+            auto ret = mappedCellSet.insert(h);
+            if(ret.first != mappedCellSet.end()){
+                std::vector<T> pos;
+                
+                Cell<Q> *cell = grid->GetCell(h);
+                ParticleChain *pChain = cell->GetChain();
+                int size = cell->GetChainLength();
+                
+                for(int j = 0; j < size; j++){
+                    T pj = particleSet->GetParticlePosition(pChain->pId);
+                    pos.push_back(pj);
+                    pChain = pChain->next;
+                }
+                
+                mappedPositions[h] = pos;
+            }
+        }
+    }
+    
+    __host__ void MapGridEmit(const std::function<T(const T &)> velocity, Float d=0.02){
+        std::set<unsigned int>::iterator it;
+        int numNewParticles = 0;
+        for(it = mappedCellSet.begin(); it != mappedCellSet.end(); it++){
+            unsigned int h = *it;
+            std::vector<T> pos = mappedPositions[h];
+            Cell<Q> *cell = mappedDomain->GetCell(h);
+            int size = cell->GetChainLength();
+            for(int i = 0; i < pos.size(); i++){
+                T pi = pos[i];
+                int can_add = 1;
+                ParticleChain *pChain = cell->GetChain();
+                for(int j = 0; j < size; j++){
+                    T pj = particleSet->GetParticlePosition(pChain->pId);
+                    if(Distance(pj, pi) < d){
+                        can_add = 0;
+                        break;
+                    }
+                    pChain = pChain->next;
+                }
+                
+                if(can_add){
+                    if(AddParticle(pi, velocity(pi))){
+                        numNewParticles++;
+                    }else{
+                        Commit(1);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        if(numNewParticles > 0) Commit(1);
+    }
+    
+    __host__ int AddParticle(const T &pos, const T &vel = T(0),
+                             const T &force = T(0))
+    {
+        int total = particleSet->GetParticleCount() + positions.size();
+        int ok = 0;
+        if(total+1 <= maxNumOfParticles){
+            positions.push_back(pos);
+            velocities.push_back(vel);
+            forces.push_back(force);
+            ok = 1;
+        }else if(!warned){
+            printf("\nReached maximum builder capacity\n");
+            warned = true;
+        }
+        
+        return ok;
+    }
+    
+    __host__ void Commit(int distribute=0){
+        if(positions.size() > 0){
+            int startId = particleSet->GetParticleCount();
+            particleSet->AppendData(positions.data(), velocities.data(),
+                                    forces.data(), positions.size());
+            if(distribute)
+                mappedDomain->DistributeByParticleList(particleSet, positions.data(), 
+                                                       positions.size(), startId);
+            positions.clear();
+            velocities.clear();
+            forces.clear();
+        }
+    }
+    
+    __host__ ParticleSet<T> *GetParticleSet(){
+        return particleSet;
+    }
+    
+    __host__ int GetParticleCount(){
+        return particleSet->GetParticleCount();
+    }
+};
+
+typedef ContinuousParticleSetBuilder<vec2f, vec2ui, Bounds2f> ContinuousParticleSetBuilder2;
+typedef ContinuousParticleSetBuilder<vec3f, vec3ui, Bounds3f> ContinuousParticleSetBuilder3;
+
+__host__ SphParticleSet2 *SphParticleSet2FromContinuousBuilder(ContinuousParticleSetBuilder2 *builder);
+__host__ SphParticleSet3 *SphParticleSet3FromContinuousBuilder(ContinuousParticleSetBuilder3 *builder);

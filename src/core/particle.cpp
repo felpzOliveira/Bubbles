@@ -1,4 +1,5 @@
 #include <particle.h>
+#include <grid.h>
 #include <cutil.h>
 
 __host__ SphParticleSet2 *SphParticleSet2FromBuilder(ParticleSetBuilder2 *builder){

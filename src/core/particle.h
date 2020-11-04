@@ -3,6 +3,7 @@
 #include <geometry.h>
 #include <point_generator.h>
 #include <kernel.h>
+#include <set>
 
 #define TimeStepLimitSpeedFactor 0.40
 #define TimeStepLimitForceFactor 0.25
@@ -126,7 +127,6 @@ class ParticleSet{
     DataBuffer<ParticleChain> chainAuxNodes;
     int count;
     int familyId;
-    int isDirty;
     
     Float radius;
     Float mass;
@@ -135,7 +135,6 @@ class ParticleSet{
         count = 0; 
         radius = 1e-3;
         mass = 1e-3;
-        isDirty = 0;
     }
     
     __bidevice__ int GetReservedSize(){
@@ -154,7 +153,6 @@ class ParticleSet{
         mass = 1e-3;
         familyId = 0;
         count = 0;
-        isDirty = 0;
     }
     
     __host__ void AppendData(T *pos, T *vel, T *force, int n){
@@ -164,7 +162,6 @@ class ParticleSet{
         rv |= forces.SetDataAt(force, n, count);
         if(rv == 0){
             count += n;
-            isDirty = 1;
         }
     }
     
@@ -178,7 +175,6 @@ class ParticleSet{
         radius = 1e-3;
         mass = 1e-3;
         familyId = 0;
-        isDirty = 1;
     }
     
     __host__ void SetExtendedData(){
@@ -602,57 +598,9 @@ class ParticleSetBuilder{
 typedef ParticleSetBuilder<vec2f> ParticleSetBuilder2;
 typedef ParticleSetBuilder<vec3f> ParticleSetBuilder3;
 
-template<typename T>
-class ContinuousParticleSetBuilder{
-    public:
-    std::vector<T> positions;
-    std::vector<T> velocities;
-    std::vector<T> forces;
-    ParticleSet<T> *particleSet;
-    int maxNumOfParticles;
-    
-    __host__ ContinuousParticleSetBuilder(int maxParticles){
-        maxNumOfParticles = Max(1, maxParticles);
-        particleSet = cudaAllocateVx(ParticleSet<T>, 1);
-        particleSet->SetSize(maxNumOfParticles);
-    }
-    
-    __host__ int AddParticle(const T &pos, const T &vel = T(0),
-                             const T &force = T(0))
-    {
-        int total = particleSet->GetParticleCount() + positions.size();
-        int ok = 0;
-        if(total+1 <= maxNumOfParticles){
-            positions.push_back(pos);
-            velocities.push_back(vel);
-            forces.push_back(force);
-            ok = 1;
-        }
-        
-        return ok;
-    }
-    
-    __host__ void Commit(){
-        particleSet->AppendData(positions.data(), velocities.data(),
-                                forces.data(), positions.size());
-        positions.clear();
-        velocities.clear();
-        forces.clear();
-    }
-    
-    __host__ ParticleSet<T> *GetParticleSet(){
-        return particleSet;
-    }
-};
-
-typedef ContinuousParticleSetBuilder<vec2f> ContinuousParticleSetBuilder2;
-typedef ContinuousParticleSetBuilder<vec3f> ContinuousParticleSetBuilder3;
-
 __host__ SphParticleSet2 *SphParticleSet2FromBuilder(ParticleSetBuilder2 *builder);
 __host__ SphParticleSet2 *SphParticleSet2ExFromBuilder(ParticleSetBuilder2 *builder);
-__host__ SphParticleSet2 *SphParticleSet2FromContinuousBuilder(ContinuousParticleSetBuilder2 *builder);
 __host__ SpecieSet2 *SpecieSet2FromBuilder(ParticleSetBuilder2 *builder,
                                            Float mass, Float charge, int familyId = 0);
 
 __host__ SphParticleSet3 *SphParticleSet3FromBuilder(ParticleSetBuilder3 *builder);
-__host__ SphParticleSet3 *SphParticleSet3FromContinuousBuilder(ContinuousParticleSetBuilder3 *builder);

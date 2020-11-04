@@ -32,12 +32,9 @@ __bidevice__ void ComputePressureFor(SphSolverData2 *data, int particleId, Float
     pSet->SetParticlePressure(particleId, ComputePressureValue(data, di));
 }
 
-__bidevice__ void ComputeDensityFor(SphSolverData2 *data, int particleId,
-                                    int compute_pressure)
-{
+__bidevice__ Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &pi){
     int *neighbors = nullptr;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
-    vec2f pi = pSet->GetParticlePosition(particleId);
     unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
     
     int count = data->domain->GetNeighborsOf(cellId, &neighbors);
@@ -46,7 +43,7 @@ __bidevice__ void ComputeDensityFor(SphSolverData2 *data, int particleId,
     
     Float sum = 0;
     for(int i = 0; i < count; i++){
-        Cell<Bounds2f> *cell = data->domain->GetCell(neighbors[i]);
+        Cell2 *cell = data->domain->GetCell(neighbors[i]);
         ParticleChain *pChain = cell->GetChain();
         int size = cell->GetChainLength();
         
@@ -59,6 +56,15 @@ __bidevice__ void ComputeDensityFor(SphSolverData2 *data, int particleId,
     }
     
     Float di = sum * pSet->GetMass();
+    return di;
+}
+
+__bidevice__ void ComputeDensityFor(SphSolverData2 *data, int particleId,
+                                    int compute_pressure)
+{
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    vec2f pi = pSet->GetParticlePosition(particleId);
+    Float di = ComputeDensityForPoint(data, pi);
     if(compute_pressure != 0){
         ComputePressureFor(data, particleId, di);
     }
@@ -308,11 +314,10 @@ __host__ void UpdateGridDistributionCPU(SphSolverData2 *data){
     Grid2 *grid = data->domain;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver2 has no domain for UpdateGridDistribution");
-    if(data->frame_index == 0 || pSet->isDirty){
+    if(data->frame_index == 0){
         for(int i = 0; i < grid->GetCellCount(); i++){
             grid->DistributeToCell(pSet, i);
         }
-        pSet->isDirty = 0;
     }else{
         for(int i = 0; i < grid->GetCellCount(); i++){
             grid->DistributeToCellOpt(pSet, i);

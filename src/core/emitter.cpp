@@ -1,6 +1,9 @@
 #include <emitter.h>
 #include <statics.h>
 
+__host__ vec2f ZeroVelocityField2(const vec2f &p){ return vec2f(0); }
+__host__ vec3f ZeroVelocityField3(const vec3f &p){ return vec3f(0); }
+
 __bidevice__ vec3f SampleSphere(const vec2f &u){
     Float usqrt = 2 * std::sqrt(u[1] * (1 - u[1]));
     Float utheta = 2 * Pi * u[0];
@@ -69,7 +72,9 @@ __host__ void VolumeParticleEmitter2::SetJitter(Float jit){
 }
 
 template<typename ParticleBuilder2>
-__host__ void _Emit(ParticleBuilder2 *Builder, VolumeParticleEmitter2 *emitter){
+__host__ void _Emit(ParticleBuilder2 *Builder, VolumeParticleEmitter2 *emitter,
+                    const std::function<vec2f(const vec2f &)> &velocity)
+{
     AssertA(emitter->shape, "Cannot emit particles without a surface shape");
     
     Float maxJitter = 0.5 * emitter->jitter * emitter->spacing;
@@ -85,7 +90,8 @@ __host__ void _Emit(ParticleBuilder2 *Builder, VolumeParticleEmitter2 *emitter){
             vec2f target = point + offset;
             if(emitter->shape->SignedDistance(target) <= 0){
                 if(emitter->emittedParticles < emitter->maxParticles){
-                    if(Builder->AddParticle(target, emitter->initVel)){
+                    vec2f vel = velocity(target) + emitter->initVel;
+                    if(Builder->AddParticle(target, vel)){
                         emitter->emittedParticles++;
                         numNewParticles++;
                     }else{
@@ -105,12 +111,16 @@ __host__ void _Emit(ParticleBuilder2 *Builder, VolumeParticleEmitter2 *emitter){
     }
 }
 
-__host__ void VolumeParticleEmitter2::Emit(ContinuousParticleSetBuilder<vec2f> *Builder){
-    _Emit<ContinuousParticleSetBuilder<vec2f>>(Builder, this);
+__host__ void VolumeParticleEmitter2::Emit(ContinuousParticleSetBuilder2 *Builder,
+                                           const std::function<vec2f(const vec2f &)> &velocity)
+{
+    _Emit<ContinuousParticleSetBuilder2>(Builder, this, velocity);
 }
 
-__host__ void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder){
-    _Emit<ParticleSetBuilder<vec2f>>(Builder, this);
+__host__ void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder,
+                                           const std::function<vec2f(const vec2f &)> &velocity)
+{
+    _Emit<ParticleSetBuilder<vec2f>>(Builder, this, velocity);
 }
 
 /**************************************************************/
@@ -154,17 +164,20 @@ __host__ void VolumeParticleEmitterSet2::SetJitter(Float jitter){
     }
 }
 
-__host__ void VolumeParticleEmitterSet2::Emit(ContinuousParticleSetBuilder<vec2f> *Builder){
+__host__ void VolumeParticleEmitterSet2::Emit(ContinuousParticleSetBuilder2 *Builder,
+                                              const std::function<vec2f(const vec2f &)> &velocity)
+{
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
     for(int i = 0; i < emitters.size(); i++){
-        emitters[i]->Emit(Builder);
+        emitters[i]->Emit(Builder, velocity);
     }
 }
 
-__host__ void VolumeParticleEmitterSet2::Emit(ParticleSetBuilder<vec2f> *Builder){
+__host__ void VolumeParticleEmitterSet2::Emit(ParticleSetBuilder<vec2f> *Builder,
+                                              const std::function<vec2f(const vec2f &)> &velocity){
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
     for(int i = 0; i < emitters.size(); i++){
-        emitters[i]->Emit(Builder);
+        emitters[i]->Emit(Builder, velocity);
     }
 }
 
@@ -216,7 +229,9 @@ __host__ void VolumeParticleEmitter3::SetJitter(Float jit){
 }
 
 template<typename ParticleBuilder3>
-__host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter){
+__host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
+                    const std::function<vec3f(const vec3f &)> &velocity)
+{
     AssertA(emitter->isOneShot, "Multiple emittion not supported yet");
     TimerList timers;
     Float maxJitter = 0.5 * emitter->jitter * emitter->spacing;
@@ -232,7 +247,8 @@ __host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter){
             if(isSdf){
                 if(emitter->shape->SignedDistance(target) <= 0){
                     if(emitter->emittedParticles < emitter->maxParticles){
-                        if(Builder->AddParticle(target, emitter->initVel)){
+                        vec3f vel = velocity(target) + emitter->initVel;
+                        if(Builder->AddParticle(target, vel)){
                             emitter->emittedParticles++;
                             numNewParticles++;
                         }else{
@@ -249,7 +265,8 @@ __host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter){
 */
                 if(MeshIsPointInside(target, emitter->shape, emitter->bound)){
                     if(emitter->emittedParticles < emitter->maxParticles){
-                        if(Builder->AddParticle(target, emitter->initVel)){
+                        vec3f vel = velocity(target) + emitter->initVel;
+                        if(Builder->AddParticle(target, vel)){
                             emitter->emittedParticles++;
                             numNewParticles++;
                         }else{
@@ -274,12 +291,16 @@ __host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter){
     }
 }
 
-__host__ void VolumeParticleEmitter3::Emit(ContinuousParticleSetBuilder<vec3f> *Builder){
-    _Emit<ContinuousParticleSetBuilder<vec3f>>(Builder, this);
+__host__ void VolumeParticleEmitter3::Emit(ContinuousParticleSetBuilder3 *Builder,
+                                           const std::function<vec3f(const vec3f &)> &velocity)
+{
+    _Emit<ContinuousParticleSetBuilder3>(Builder, this, velocity);
 }
 
-__host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder){
-    _Emit<ParticleSetBuilder<vec3f>>(Builder, this);
+__host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder,
+                                           const std::function<vec3f(const vec3f &)> &velocity)
+{
+    _Emit<ParticleSetBuilder<vec3f>>(Builder, this, velocity);
 }
 
 /**************************************************************/
@@ -323,17 +344,21 @@ __host__ void VolumeParticleEmitterSet3::SetJitter(Float jitter){
     }
 }
 
-__host__ void VolumeParticleEmitterSet3::Emit(ContinuousParticleSetBuilder<vec3f> *Builder){
+__host__ void VolumeParticleEmitterSet3::Emit(ContinuousParticleSetBuilder3 *Builder,
+                                              const std::function<vec3f(const vec3f &)> &velocity)
+{
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::Emit");
     for(int i = 0; i < emitters.size(); i++){
-        emitters[i]->Emit(Builder);
+        emitters[i]->Emit(Builder, velocity);
     }
 }
 
-__host__ void VolumeParticleEmitterSet3::Emit(ParticleSetBuilder<vec3f> *Builder){
+__host__ void VolumeParticleEmitterSet3::Emit(ParticleSetBuilder<vec3f> *Builder,
+                                              const std::function<vec3f(const vec3f &)> &velocity)
+{
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::Emit");
     for(int i = 0; i < emitters.size(); i++){
-        emitters[i]->Emit(Builder);
+        emitters[i]->Emit(Builder, velocity);
     }
 }
 

@@ -5,6 +5,8 @@
 #include <obj_loader.h>
 #include <serializer.h>
 #include <memory.h>
+#include <marching_squares.h>
+#include <graphy.h>
 #define RUN_TESTS
 
 #if defined(RUN_TESTS)
@@ -55,22 +57,64 @@ void run_self_tests(){
     test_pcisph3_water_sphere();
     test_pcisph3_double_dam_break();
     test_pcisph3_whale_obstacle();
+    test_pcisph3_dragon();
+    test_pcisph3_quadruple_dam();
+    test_pcisph3_ball_many_emission();
+    test_pcisph3_dragon_shower();
 }
 #endif
-
-void test_pcisph3_rock_dam();
+void test_pcisph2_marching_squares();
+void test(){
+    FieldGrid2f grid;
+    grid.Build(vec2ui(4, 4), vec2f(0.1), vec2f(-0.2, -0.2), VertexCentered);
+    
+    vec2ui res = grid.resolution;
+    for(int i = 0; i < res.x; i++){
+        for(int j = 0; j < res.y; j++){
+            if(i > 0 && j > 0 && i < res.x - 1 && j < res.y - 1){
+                grid.SetValueAt(-2, vec2ui(i, j));
+            }else{
+                grid.SetValueAt(2, vec2ui(i, j));
+            }
+        }
+    }
+    
+    std::vector<vec3f> triangles;
+    MarchingSquares(&grid, 0, &triangles);
+    int totalLines = triangles.size() * 3;
+    float *pos = new float[totalLines * 3];
+    
+    int it = 0;
+    for(int i = 0; i < triangles.size()/3; i++){
+        vec3f p0 = triangles[3 * i + 0];
+        vec3f p1 = triangles[3 * i + 1];
+        vec3f p2 = triangles[3 * i + 2];
+        
+        pos[it++] = p0.x; pos[it++] = p0.y; pos[it++] = p0.z;
+        pos[it++] = p1.x; pos[it++] = p1.y; pos[it++] = p1.z;
+        pos[it++] = p1.x; pos[it++] = p1.y; pos[it++] = p1.z;
+        pos[it++] = p2.x; pos[it++] = p2.y; pos[it++] = p2.z;
+        pos[it++] = p2.x; pos[it++] = p2.y; pos[it++] = p2.z;
+        pos[it++] = p0.x; pos[it++] = p0.y; pos[it++] = p0.z;
+    }
+    
+    float rgb[3] = {1, 0, 0};
+    graphy_set_orthographic(-0.2, 0.2, -0.2, 0.2);
+    graphy_render_lines(pos, rgb, totalLines);
+    getchar();
+    graphy_close_display();
+    delete[] pos;
+}
 
 int main(int argc, char **argv){
     printf("* Bubbles Fluid Simulator - Built %s at %s *\n", __DATE__, __TIME__);
     cudaInitEx();
     
-    //test_pcisph3_lucy_ball();
-    //test_pcisph3_quadruple_dam();
-    //test_pcisph3_rock_dam();
-    //test_grid_face_centered_3D();
-    //test_continuous_builder2D();
-    //test_pcisph3_multiple_emission();
-    test_pcisph3_dragon();
+    //test();
+    test_pcisph2_marching_squares();
+    
+    //test_pcisph3_box_many_emission();
+    //test_pcisph3_double_dam_break();
     
 #if defined(RUN_TESTS)
     //run_self_tests();

@@ -14,6 +14,7 @@ typedef struct{
     int origin_configured;
     int target_configured;
     Transform transform;
+    Transform pTransform;
     vec3f origin;
     vec3f target;
 }view_opts;
@@ -25,6 +26,8 @@ void default_view_opts(view_opts *opts){
     opts->origin_configured = 0;
     opts->target_configured = 0;
     opts->radius = 0.012;
+    opts->transform = Transform();
+    opts->pTransform = Transform();
 }
 
 void print_view_configs(view_opts *opts){
@@ -107,6 +110,16 @@ ARGUMENT_PROCESS(view_sdf_translate_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(view_translate_arg){
+    view_opts *opts = (view_opts *)config;
+    vec3f delta;
+    std::string strdist = ParseNext(argc, argv, i, "--translate", 3);
+    const char *ptr = strdist.c_str();
+    ParseV3(&delta, &ptr);
+    opts->pTransform = Translate(delta) * opts->pTransform;
+    return 0;
+}
+
 ARGUMENT_PROCESS(view_sdf_scale_arg){
     view_opts *opts = (view_opts *)config;
     Float scale = ParseNextFloat(argc, argv, i, "--sdf-scale");
@@ -114,6 +127,12 @@ ARGUMENT_PROCESS(view_sdf_scale_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(view_sdf_rotate_arg){
+    view_opts *opts = (view_opts *)config;
+    Float angle = ParseNextFloat(argc, argv, i, "--sdf-rotate");
+    opts->transform = RotateY(angle) * opts->transform;
+    return 0;
+}
 
 std::map<const char *, arg_desc> view_arg_map = {
     {"--basename",
@@ -170,31 +189,31 @@ std::map<const char *, arg_desc> view_arg_map = {
             .help = "Translates the SDF. (requires: --with-sdf)"
         }
     },
+    {"--translate",
+        {
+            .processor = view_translate_arg,
+            .help = "Translates the particle set."
+        }
+    },
     {"--sdf-scale",
         {
             .processor = view_sdf_scale_arg,
             .help = "Scales the SDF. (requires: --with-sdf)"
         }
+    },
+    {"--sdf-rotate",
+        {
+            .processor = view_sdf_rotate_arg,
+            .help = "Rotates the SDF around the Y-axis. (requires: --with-sdf)"
+        }
     }
 };
-
-int set_position(float *pos, std::vector<vec3f> *vpos){
-    int it = 0;
-    for(int i = 0; i < vpos->size(); i++){
-        vec3f p = vpos->at(i);
-        pos[3 * it + 0] = p.x;
-        pos[3 * it + 1] = p.y;
-        pos[3 * it + 2] = p.z;
-        it ++;
-    }
-    
-    return it;
-}
 
 void ViewDisplaySimulation(view_opts *opts){
     std::vector<vec3f> **frames = nullptr;
     Shape *sdfShape = nullptr;
     std::vector<vec3f> sdfParticles;
+    int runningCount = 0;
     int partCount = SerializerLoadMany3(&frames, opts->basename.c_str(),
                                         SERIALIZER_POSITION, opts->start, opts->end);
     vec3f origin = opts->origin;
@@ -210,24 +229,29 @@ void ViewDisplaySimulation(view_opts *opts){
     float *pos = new float[3 * bufferSize];
     float *col = new float[3 * bufferSize];
     
-    int chosenId = (opts->start + opts->end)/2;
+    int size = opts->end - opts->start;
+    int chosenId = size/2;
     
     memset(col, 0x0, 3 * bufferSize * sizeof(float));
     std::vector<vec3f> *pp = frames[chosenId];
+    runningCount = pp->size();
     
     vec3f p0 = pp->at(0);
     Bounds3f bounds(p0, p0);
-    col[0] = 1;
-    for(int i = 1; i < partCount; i++){
-        vec3f pi = pp->at(i);
-        bounds = Union(bounds, pi);
-        col[3 * i + 0] = 1;
-    }
-    
-    for(int i = partCount; i < bufferSize; i++){
-        vec3f pi = sdfParticles[i-partCount];
+    for(int i = 0; i < sdfParticles.size(); i++){
+        vec3f pi = sdfParticles[i];
         pos[3 * i + 0] = pi.x; pos[3 * i + 1] = pi.y;
         pos[3 * i + 2] = pi.z; col[3 * i + 2] = 1;
+    }
+    
+    for(int i = 0; i < partCount; i++){
+        int id = (i + sdfParticles.size());
+        col[3 * id + 0] = 1;
+    }
+    
+    for(int i = 0; i < runningCount; i++){
+        vec3f pi = opts->pTransform.Point(pp->at(i));
+        bounds = Union(bounds, pi);
     }
     
     if(opts->target_configured != 1){
@@ -246,8 +270,15 @@ void ViewDisplaySimulation(view_opts *opts){
     int count = opts->end - opts->start;
     do{
         for(int i = 0; i < count; i++){
-            int v = set_position(pos, frames[i]);
-            graphy_render_points3f(pos, col, bufferSize, opts->radius);
+            for(int j = 0; j < frames[i]->size(); j++){
+                vec3f p = opts->pTransform.Point(frames[i]->at(j));
+                int it = sdfParticles.size() + j;
+                pos[3 * it + 0] = p.x;
+                pos[3 * it + 1] = p.y;
+                pos[3 * it + 2] = p.z;
+            }
+            graphy_render_points3f(pos, col, frames[i]->size() + sdfParticles.size(), 
+                                   opts->radius);
         }
     }while(opts->loop);
     

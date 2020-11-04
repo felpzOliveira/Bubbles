@@ -9,18 +9,30 @@
 #define __to_stringi __to_string<int>
 
 typedef enum{
-    LAYERED=0, LEVEL, ALL
+    LAYERED=0, FILTERED, LEVEL, ALL
 }RenderMode;
 
 typedef struct{
+    Float cutSource;
+    Float cutDistance;
+    int cutAxis;
     std::string input;
     std::string output;
     RenderMode mode;
-    Float rotate;
     Float radius;
+    Transform transform;
     int level;
     int flags;
+    int hasClipArgs;
 }pbrt_opts;
+
+const std::string ColorsString[] = {
+    "0.78 0.78 0.78",
+    "0.87 0.0 0.1",
+    "0.8 0.34 0.1",
+    "0.85 0.66 0.30",
+    "0.35 0.60 0.84",
+};
 
 ARGUMENT_PROCESS(pbrt_input_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
@@ -59,6 +71,12 @@ ARGUMENT_PROCESS(pbrt_layered_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(pbrt_filtered_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    opts->mode = RenderMode::FILTERED;
+    return 0;
+}
+
 ARGUMENT_PROCESS(pbrt_level_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
     std::string value = ParseNext(argc, argv, i, "--level");
@@ -68,11 +86,53 @@ ARGUMENT_PROCESS(pbrt_level_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_rotate_arg){
+ARGUMENT_PROCESS(pbrt_rotate_y_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
-    std::string value = ParseNext(argc, argv, i, "--rotate");
+    std::string value = ParseNext(argc, argv, i, "--rotateY");
     const char *token = value.c_str();
-    opts->rotate = ParseFloat(&token);
+    Float rotate = ParseFloat(&token);
+    opts->transform = RotateY(rotate) * opts->transform;
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_rotate_z_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "--rotateZ");
+    const char *token = value.c_str();
+    Float rotate = ParseFloat(&token);
+    opts->transform = RotateZ(rotate) * opts->transform;
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_rotate_x_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "--rotateX");
+    const char *token = value.c_str();
+    Float rotate = ParseFloat(&token);
+    opts->transform = RotateX(rotate) * opts->transform;
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_translate_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    vec3f delta;
+    std::string value = ParseNext(argc, argv, i, "--translate", 3);
+    const char *token = value.c_str();
+    ParseV3(&delta, &token);
+    opts->transform = Translate(delta) * opts->transform;
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_clip_arg){
+    vec3f data;
+    pbrt_opts *opts = (pbrt_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "--clip-plane", 3);
+    const char *token = value.c_str();
+    ParseV3(&data, &token);
+    opts->cutSource = data[0];
+    opts->cutDistance = data[1];
+    opts->cutAxis = data[2];
+    opts->hasClipArgs = 1;
     return 0;
 }
 
@@ -107,14 +167,39 @@ std::map<const char *, arg_desc> pbrt_argument_map = {
             .help = "Generates geometry containing only CNM-based layered boundary particles." 
         }
     },
+    {"--filtered", 
+        { .processor = pbrt_filtered_arg, 
+            .help = "Generates geometry containing CNM-based layer and interior particles as gray." 
+        }
+    },
     {"--level", 
         { .processor = pbrt_level_arg, 
             .help = "Generates geometry containing only a specific level of CNM classification." 
         }
     },
-    {"--rotate", 
-        { .processor = pbrt_rotate_arg, 
+    {"--rotateY", 
+        { .processor = pbrt_rotate_y_arg, 
             .help = "Rotate input in the Y direction. (degrees)" 
+        }
+    },
+    {"--rotateZ", 
+        { .processor = pbrt_rotate_z_arg, 
+            .help = "Rotate input in the Z direction. (degrees)" 
+        }
+    },
+    {"--rotateX", 
+        { .processor = pbrt_rotate_x_arg, 
+            .help = "Rotate input in the X direction. (degrees)" 
+        }
+    },
+    {"--translate", 
+        { .processor = pbrt_translate_arg, 
+            .help = "Translate input set. (degrees)" 
+        }
+    },
+    {"--clip-plane", 
+        { .processor = pbrt_clip_arg, 
+            .help = "Specify parameters to perform plane clip, <source> <distance> <axis>." 
         }
     },
 };
@@ -123,6 +208,7 @@ const char *render_mode_string(RenderMode mode){
     switch(mode){
         case RenderMode::LAYERED: return "Layered";
         case RenderMode::LEVEL: return "Level";
+        case RenderMode::FILTERED: return "Filtered";
         case RenderMode::ALL: return "All";
         default: return "None";
     }
@@ -134,23 +220,47 @@ template<typename T> std::string __to_string(T value){
     return ss.str();
 }
 
-std::string GetMaterialString(int layer){
-    std::string data("Material \"coateddiffuse\"\n\t\"rgb reflectance\" [ ");
-    if(layer == 0){
-        data += std::string("0.78 0.78 0.78");
-    }else if(layer == 1){
-        data += std::string("0.87 0.0 0.1");
-    }else if(layer == 2){
-        data += std::string("0.8 0.34 0.1");
-    }else if(layer == 3){
-        data += std::string("0.85 0.66 0.30");
-    }else if(layer == 4){
-        data += std::string("0.35 0.60 0.84");
-    }else{
+/*
+* L1 and L2 = red;
+* any other is gray
+*/
+static std::string GetMaterialStringFiltered(int layer){
+    if(layer != 1 && layer != 2) return ColorsString[0];
+    return ColorsString[1];
+}
+
+/*
+* Follow color map
+*/
+static std::string GetMaterialStringAll(int layer){
+    if(layer > 4){
         printf("\nUnknown layer level (%d)\n", layer);
         exit(0);
     }
-    
+    return ColorsString[layer];
+}
+
+/*
+* L1 = red; L2 = yellow;
+* anything other should not get here but return gray
+*/
+static std::string GetMaterialStringLayered(int layer){
+    if(layer != 1 && layer != 2) return ColorsString[0];
+    return ColorsString[layer];
+}
+
+std::string GetMaterialString(int layer, pbrt_opts *opts){
+    std::string data("Material \"coateddiffuse\"\n\t\"rgb reflectance\" [ ");
+    switch(opts->mode){
+        case RenderMode::ALL:
+        case RenderMode::LEVEL: data += GetMaterialStringAll(layer); break;
+        case RenderMode::LAYERED: data += GetMaterialStringLayered(layer); break;
+        case RenderMode::FILTERED: data += GetMaterialStringFiltered(layer); break;
+        default:{
+            printf("Unknown render mode\n");
+            exit(0);
+        }
+    }
     data += " ]\n\t\"float roughness\" [ 0 ]\n";
     return data;
 }
@@ -160,8 +270,12 @@ void default_pbrt_opts(pbrt_opts *opts){
     opts->flags = SERIALIZER_POSITION;
     opts->radius = 0.012;
     opts->mode = RenderMode::ALL;
-    opts->rotate = 0;
+    opts->transform = Transform();
     opts->level = -1;
+    opts->cutSource = 0;
+    opts->cutAxis = -1;
+    opts->cutDistance = FLT_MAX;
+    opts->hasClipArgs = 0;
 }
 
 void print_configs(pbrt_opts *opts){
@@ -174,8 +288,10 @@ void print_configs(pbrt_opts *opts){
         std::cout << "    * Level : " << opts->level << std::endl;
     }
     
-    if(!IsZero(opts->rotate)){
-        std::cout  << "    * Rotate (Y) : " << opts->rotate << std::endl;
+    if(opts->hasClipArgs){
+        std::cout << "    * Clip source : " << opts->cutSource << std::endl;
+        std::cout << "    * Clip distance : " << opts->cutDistance << std::endl;
+        std::cout << "    * Clip axis : " << opts->cutAxis << std::endl;
     }
 }
 
@@ -185,20 +301,18 @@ int SplitByLayer(std::vector<SerializedParticle> **renderflags,
 {
     int mCount = 0;
     std::vector<SerializedParticle> *groups;
-    Transform transform;
-    if(!IsZero(opts->rotate)){
-        transform = RotateY(opts->rotate);
-    }
     
     for(int i = 0; i < pCount; i++){
         SerializedParticle p = pSet->at(i);
         if((p.boundary + 1) > mCount) mCount = p.boundary + 1;
     }
     
+    printf("Found %d layers\n", mCount);
+    
     groups = new std::vector<SerializedParticle>[mCount];
     for(int i = 0; i < pCount; i++){
         SerializedParticle p = pSet->at(i);
-        p.position = transform.Point(p.position);
+        p.position = opts->transform.Point(p.position);
         groups[p.boundary].push_back(p);
     }
     
@@ -207,7 +321,7 @@ int SplitByLayer(std::vector<SerializedParticle> **renderflags,
 }
 
 int AcceptLayer(int layer, pbrt_opts *opts){
-    if(opts->mode == RenderMode::ALL) return 1;
+    if(opts->mode == RenderMode::ALL || opts->mode == RenderMode::FILTERED) return 1;
     if(opts->mode == RenderMode::LAYERED) return (layer > 0 && layer < 3 ? 1 : 0);
     if(opts->mode == RenderMode::LEVEL) return (layer == opts->level ? 1 : 0);
     printf("[Accept] Unsupported render mode\n");
@@ -261,9 +375,17 @@ void pbrt_command(int argc, char **argv){
                 
                 data += std::string("###### Layer ");
                 data += __to_stringi(i); data += "\n";
-                data += GetMaterialString(i);
+                data += GetMaterialString(i, &opts);
                 
                 for(SerializedParticle &p : *layer){
+                    if(opts.hasClipArgs){
+                        vec3f ref(0);
+                        vec3f at(0);
+                        ref[opts.cutAxis] = opts.cutSource;
+                        at[opts.cutAxis] = p.position[opts.cutAxis];
+                        Float dist = Distance(ref, at);
+                        if(dist < opts.cutDistance) continue;
+                    }
                     data += "TransformBegin\n\tTranslate ";
                     data += __to_stringf(p.position.x); data += " ";
                     data += __to_stringf(p.position.y); data += " ";

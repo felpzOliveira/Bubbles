@@ -38,6 +38,31 @@ class GPUTimer{
     }
 };
 
+class CNMData{
+    public:
+    Float timeTaken;
+    Float simPercentage;
+    __bidevice__ CNMData(): timeTaken(0), simPercentage(0){}
+    __bidevice__ CNMData(Float ttaken, Float percentage) : timeTaken(ttaken), 
+    simPercentage(percentage){}
+};
+
+class CNMStats{
+    public:
+    std::vector<CNMData> rawCNMData;
+    __host__ CNMStats(){}
+    __host__ void Add(CNMData data);
+    __host__ CNMData Average(CNMData *faster=nullptr, CNMData *slower=nullptr);
+    __host__ CNMData Last(){
+        CNMData data(0,0);
+        if(rawCNMData.size() > 0){
+            data = rawCNMData[rawCNMData.size()-1];
+        }
+        
+        return data;
+    }
+};
+
 class TimerList{
     public:
     GPUTimer *gpuTimer;

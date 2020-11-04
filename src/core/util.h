@@ -7,6 +7,9 @@
 #include <collider.h>
 #include <graphy.h>
 #include <functional>
+#include <statics.h>
+#include <serializer.h>
+#include <sph_solver.h>
 
 /*
 * So... our simulator is looking great! However is very hard to perform
@@ -30,7 +33,13 @@ __host__ Bounds3f UtilComputeMeshBounds(ParsedMesh *mesh);
 /*
 * Computes a scale transform that makes sure the given mesh fits in a maximum length.
 */
-__host__ Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLength);
+__host__ Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLength,
+                                           Float *scaleValue=nullptr);
+
+/*
+* Computes the bounds of a mesh after a transformation.
+*/
+__host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform);
 
 /*
 * Generates a acceleration Grid3 for a domain given its bounds, the target spacing
@@ -64,6 +73,12 @@ __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBui
                                                 Transform transform=Transform(),
                                                 vec3f centerAt=vec3f(0),
                                                 vec3f initialVelocity=vec3f(0));
+
+/*
+* Creates a SDF on field for the given particle distribution in the Sph Solver using
+* density cutOffDensity - density as node value.
+*/
+__host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *field);
 
 /*
 * Run a simulation. Perform several updates on the given solver and display results
@@ -127,10 +142,41 @@ inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
         
         visible = particles.size() + pSet->GetParticleCount();
         graphy_render_points3f(pos, col, visible, spacing/2.0);
-        printf("Step: %d            \n", frame+1);
         frame++;
     }
     
     graphy_close_display();
     delete[] ptr;
+}
+
+template<typename Solver> 
+inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
+                                           std::vector<int> refFrames={})
+{
+    CNMData faster, slower, last, average;
+    CNMStats stats = solver->GetCNMStats();
+    Float advTime = solver->GetAdvanceTime();
+    average = stats.Average(&faster, &slower);
+    last = stats.Last();
+    int pCount = solver->GetParticleCount();
+    int takeFrame = 0;
+    for(int &f : refFrames){
+        if(step == f){
+            takeFrame = 1;
+            break;
+        }
+    }
+    
+    printf("\rStep (%d) : %d ms - Particles: %d - (CNM: %g ms %g%%) (Slower: %g ms %g%%) (Faster: %g ms %g%%)    ",
+           step, (int)advTime, pCount, last.timeTaken, last.simPercentage,
+           slower.timeTaken, slower.simPercentage, faster.timeTaken, faster.simPercentage);
+    if(takeFrame) printf("\n");
+}
+
+
+inline __host__ void UtilSaveSph3Frame(const char *basedir, int step, SphSolverData3 *data){
+    std::string path(basedir);
+    path += std::to_string(step);
+    path += ".txt";
+    SerializerSaveSphDataSet3(data, path.c_str(), SERIALIZER_POSITION);
 }

@@ -163,6 +163,9 @@ __host__ void UpdateGridDistributionGPU(SphSolverData2 *data);
 __host__ void UpdateGridDistributionCPU(SphSolverData3 *data);
 __host__ void UpdateGridDistributionGPU(SphSolverData3 *data);
 
+// Sph utilities for other modules
+__bidevice__ Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &p);
+
 // Generate a set of default SPH properties
 __host__ SphSolverData2 *DefaultSphSolverData2();
 __host__ SphSolverData3 *DefaultSphSolverData3();

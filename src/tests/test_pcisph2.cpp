@@ -2,6 +2,100 @@
 #include <emitter.h>
 #include <tests.h>
 #include <grid.h>
+#include <util.h>
+#include <memory.h>
+#include <marching_squares.h>
+
+void test_pcisph2_marching_squares(){
+    printf("===== SPH Solver 2D -- Marching Squares\n");
+    Float spacing = 0.01;
+    Float targetDensity = WaterDensity;
+    vec2f center(0,0);
+    Float r1 = 0.5;
+    Float r2 = 1.0;
+    vec2f pMin, pMax;
+    Bounds2f containerBounds;
+    ParticleSetBuilder2 builder;
+    ColliderSetBuilder2 colliderBuilder;
+    PciSphSolver2 solver;
+    
+    CudaMemoryManagerStart(__FUNCTION__);
+    
+    int reso = (int)std::floor(2 * r2 / (spacing * 1.8));
+    printf("Using grid with resolution %d x %d\n", reso, reso);
+    vec2ui res(reso, reso);
+    
+    solver.Initialize(DefaultSphSolverData2());
+    Shape2 *sphere = MakeSphere2(Translate2(center.x, center.y+r1/2.f), r1);
+    Shape2 *container = MakeSphere2(Translate2(center.x, center.y), r2, true);
+    
+    containerBounds = container->GetBounds();
+    pMin = containerBounds.pMin - vec2f(spacing);
+    pMax = containerBounds.pMax + vec2f(spacing);
+    
+    Grid2 *grid = MakeGrid(res, pMin, pMax);
+    
+    VolumeParticleEmitter2 emitter(sphere, sphere->GetBounds(), spacing);
+    
+    emitter.Emit(&builder);
+    SphParticleSet2 *sphSet = SphParticleSet2FromBuilder(&builder);
+    ParticleSet2 *set2 = sphSet->GetParticleSet();
+    int count = set2->GetParticleCount();
+    
+    colliderBuilder.AddCollider2(container);
+    ColliderSet2 *collider = colliderBuilder.GetColliderSet();
+    
+    solver.Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver.SetColliders(collider);
+    
+    Float targetInterval = 1.0 / 248.0;
+    float *pos = new float[count * 3];
+    float *col = new float[count * 3];
+    
+    SphSolverData2 *data = solver.GetSphSolverData();
+    
+    for(int i = 0; i < 125; i++){
+        solver.Advance(targetInterval);
+        set_colors_pressure(col, data);
+        Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
+    }
+    
+    FieldGrid2f *field = cudaAllocateVx(FieldGrid2f, 1);
+    
+    UtilSphDataToFieldGrid2f(data, field);
+    
+    std::vector<vec3f> triangles;
+    MarchingSquares(field, 0, &triangles);
+    int totalLines = triangles.size() * 3;
+    float *poss = new float[totalLines * 3];
+    
+    int it = 0;
+    for(int i = 0; i < triangles.size()/3; i++){
+        vec3f p0 = triangles[3 * i + 0];
+        vec3f p1 = triangles[3 * i + 1];
+        vec3f p2 = triangles[3 * i + 2];
+        
+        poss[it++] = p0.x; poss[it++] = p0.y; poss[it++] = p0.z;
+        poss[it++] = p1.x; poss[it++] = p1.y; poss[it++] = p1.z;
+        poss[it++] = p1.x; poss[it++] = p1.y; poss[it++] = p1.z;
+        poss[it++] = p2.x; poss[it++] = p2.y; poss[it++] = p2.z;
+        poss[it++] = p2.x; poss[it++] = p2.y; poss[it++] = p2.z;
+        poss[it++] = p0.x; poss[it++] = p0.y; poss[it++] = p0.z;
+    }
+    
+    float rgb[3] = {1, 0, 0};
+    Float os = 1.0;
+    graphy_set_orthographic(-os, os, os, -os);
+    graphy_render_lines(poss, rgb, totalLines);
+    getchar();
+    graphy_close_display();
+    delete[] poss;
+    
+    delete[] pos;
+    delete[] col;
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
 
 void test_pcisph2_water_block(){
     printf("===== SPH Solver 2D -- Water Block\n");

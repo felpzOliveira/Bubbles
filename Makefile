@@ -1,6 +1,6 @@
 tool_obj = src/bbtool.o src/apps/convert.o src/apps/sdf.o src/apps/pbrt.o src/apps/view.o
 bubbles_obj = src/bubbles.o
-core_objs = src/cuda/cutil.o src/cuda/memory.o src/core/kernel.o src/core/point_generator.o src/core/particle.o src/core/transform.o src/core/shape.o src/core/emitter.o src/core/collider.o src/core/statics.o src/core/util.o
+core_objs = src/cuda/cutil.o src/cuda/memory.o src/core/kernel.o src/core/point_generator.o src/core/particle.o src/core/transform.o src/core/shape.o src/core/emitter.o src/core/collider.o src/core/statics.o src/core/util.o src/core/explicit_grid.o src/core/marching_squares.o
 
 generator_objs = src/generator/triangle.o src/generator/bcclattice.o
 

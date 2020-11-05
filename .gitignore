@@ -1,6 +1,8 @@
 bubbles
 bbtool
+build
+simulations
+fluid_engine_questions.txt
 *.pbrt
-*.txt
 *.o
 *.obj

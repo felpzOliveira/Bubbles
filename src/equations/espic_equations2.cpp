@@ -216,7 +216,7 @@ __host__ void ComputeElectricFieldGPU(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
     dim3 blocks(count.x / tx + 1, count.y / ty + 1);
     dim3 threads(tx, ty);
     ComputeElectricFieldKernel<<<blocks, threads>>>(ef, phi);
-    cudaDeviceAssert();
+    cudaDeviceAssert("ComputeElectricFieldKernel");
 }
 
 // Compute E = -grad(phi)

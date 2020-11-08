@@ -157,6 +157,50 @@ __bidevice__ void ComputePressureForceFor(SphSolverData3 *data, int particleId){
     pSet->SetParticleForce(particleId, fi);
 }
 
+__bidevice__ void ComputeNormalFor(SphSolverData3 *data, int particleId){
+    int *neighbors = nullptr;
+    vec3f ni(0);
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    
+    vec3f pi = pSet->GetParticlePosition(particleId);
+    unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
+    int count = data->domain->GetNeighborsOf(cellId, &neighbors);
+    Float mass = pSet->GetMass();
+    Float sphRadius = data->sphpSet->GetKernelRadius();
+    
+    SphSpikyKernel3 kernel(sphRadius);
+    
+    for(int i = 0; i < count; i++){
+        Cell3 *cell = data->domain->GetCell(neighbors[i]);
+        int size = cell->GetChainLength();
+        ParticleChain *pChain = cell->GetChain();
+        
+        for(int j = 0; j < size; j++){
+            if(particleId != pChain->pId){
+                vec3f pj = pSet->GetParticlePosition(pChain->pId);
+                Float dj = pSet->GetParticleDensity(pChain->pId);
+                Float dist = Distance(pi, pj);
+                bool valid = IsWithinSpiky(dist, sphRadius);
+                if(valid){
+                    if(dist > 0 && !IsZero(dist)){
+                        vec3f dir = (pj - pi) / dist;
+                        vec3f gradij = kernel.gradW(dist, dir);
+                        ni += (mass / dj) * gradij;
+                    }
+                }
+            }
+            
+            pChain = pChain->next;
+        }
+    }
+    
+    Float sqni = ni.LengthSquared();
+    if(sqni > 1e-8){
+        ni = Normalize(ni);
+    }
+    pSet->SetParticleNormal(particleId, ni);
+}
+
 __bidevice__ void ComputeAllForcesFor(SphSolverData3 *data, int particleId, 
                                       Float timeStep, int extended)
 {
@@ -348,6 +392,15 @@ __host__ void UpdateGridDistributionCPU(SphSolverData3 *data){
     data->frame_index = 1;
 }
 
+__bidevice__ void ComputeNormalCPU(SphSolverData3 *data){
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    AssertA(pSet, "SphSolver3 has no valid particle set for ComputeDensity");
+    AssertA(pSet->GetParticleCount() > 0, "SphSolver3 has no particles for ComputeDensity");
+    for(int i = 0; i < pSet->GetParticleCount(); i++){
+        ComputeNormalFor(data, i);
+    }
+}
+
 __bidevice__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver3 has no valid particle set for ComputeDensity");
@@ -446,6 +499,20 @@ __global__ void ComputePressureForceKernel(SphSolverData3 *data, Float timeStep)
     if(i < pSet->GetParticleCount()){
         ComputeAllForcesFor(data, i, timeStep);
     }
+}
+
+__global__ void ComputeNormalKernel(SphSolverData3 *data){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    if(i < pSet->GetParticleCount()){
+        ComputeNormalFor(data, i);
+    }
+}
+
+__host__ void ComputeNormalGPU(SphSolverData3 *data){
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    int N = pSet->GetParticleCount();
+    GPULaunch(N, ComputeNormalKernel, data);
 }
 
 __host__ void ComputePressureForceGPU(SphSolverData3 *data, Float timeStep){

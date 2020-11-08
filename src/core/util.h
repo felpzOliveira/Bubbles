@@ -41,12 +41,13 @@ __host__ Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLe
 */
 __host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform);
 
+
 /*
 * Generates a acceleration Grid3 for a domain given its bounds, the target spacing
 * of the simulation and the spacing scale to be used.
 */
 __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing, 
-                                       Float spacingScale = 1.8);
+                                       Float spacingScale = 2.0);
 
 /*
 * Checks if emitting from any of the emitters in VolumeParticleEmitterSet3 
@@ -79,6 +80,22 @@ __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBui
 * density cutOffDensity - density as node value.
 */
 __host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *field);
+
+/*
+* Compute the bounds of a given particle set.
+*/
+inline 
+__host__ Bounds3f UtilComputeParticleSetBounds(ParticleSet3 *pSet){
+    int count = pSet->GetParticleCount();
+    vec3f pi = pSet->GetParticlePosition(0);
+    Bounds3f bounds(pi, pi);
+    for(int i = 1; i < count; i++){
+        pi = pSet->GetParticlePosition(i);
+        bounds = Union(bounds, pi);
+    }
+    
+    return bounds;
+}
 
 /*
 * Run a simulation. Perform several updates on the given solver and display results

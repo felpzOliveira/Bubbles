@@ -193,8 +193,8 @@ __host__ void PredictPressureForceGPU(PciSphSolverData3 *data){
     GPULaunch(N, PredictPressureForceKernel, data);
 }
 
-__bidevice__ void AccumulateAndIntegrateFor(PciSphSolverData3 *pciData, int particleId,
-                                            Float timeStep)
+__bidevice__ void AccumulateForcesFor(PciSphSolverData3 *pciData, int particleId,
+                                      Float timeStep)
 {
     SphSolverData3 *data = pciData->sphData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
@@ -202,14 +202,14 @@ __bidevice__ void AccumulateAndIntegrateFor(PciSphSolverData3 *pciData, int part
     
     fi += pciData->pressureForces[particleId];
     pSet->SetParticleForce(particleId, fi);
-    TimeIntegrationFor(data, particleId, timeStep, 0);
 }
 
 __host__ void AccumulateAndIntegrateCPU(PciSphSolverData3 *data, Float timeStep){
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
     for(int i = 0; i < count; i++){
-        AccumulateAndIntegrateFor(data, i, timeStep);
+        AccumulateForcesFor(data, i, timeStep);
+        TimeIntegrationFor(data->sphData, i, timeStep, 0);
     }
 }
 
@@ -217,7 +217,7 @@ __global__ void AccumulateAndIntegrateKernel(PciSphSolverData3 *data, Float time
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
-        AccumulateAndIntegrateFor(data, i, timeStep);
+        AccumulateForcesFor(data, i, timeStep);
     }
 }
 
@@ -225,6 +225,7 @@ __host__ void AccumulateAndIntegrateGPU(PciSphSolverData3 *data, Float timeStep)
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, AccumulateAndIntegrateKernel, data, timeStep);
+    TimeIntegrationGPU(data->sphData, timeStep, 0);
 }
 
 __bidevice__ inline Float AbsfMax(Float x, Float y){

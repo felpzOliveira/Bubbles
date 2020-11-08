@@ -15,7 +15,7 @@
 #define cudaAllocate(bytes) _cudaAllocate(bytes, __LINE__, __FILE__, true)
 #define cudaAllocateEx(bytes, abort) _cudaAllocate(bytes, __LINE__, __FILE__, abort)
 #define cudaAllocateVx(type, n) (type *)_cudaAllocate(sizeof(type)*n, __LINE__, __FILE__, true)
-#define cudaDeviceAssert() if(cudaSynchronize()){ cudaSafeExit(); }
+#define cudaDeviceAssert(fname) if(cudaSynchronize()){ printf("Failure for %s\n", fname); cudaSafeExit(); }
 
 #define __bidevice__ __host__ __device__ 
 #define MAX(a, b) a > b ? a : b
@@ -138,6 +138,10 @@ class DataBuffer{
         return rv;
     }
     
+    __host__ void Clear(){
+        memset(data, 0x0, sizeof(T) * size);
+    }
+    
     __host__ void SetData(T *values, int n){
         size = n;
         data = cudaAllocateVx(T, size);
@@ -162,17 +166,8 @@ class DataBuffer{
     }
 };
 
-#define GPUKernel(...) (__VA_ARGS__)
-#define GPULaunch(nItems, call, ...)\
-{\
-    int __blockSize = 32;\
-    int __gridSize = (nItems + __blockSize - 1) / __blockSize;\
-    call<<<__gridSize, __blockSize>>>(__VA_ARGS__);\
-    cudaDeviceAssert();\
-}
-
 template<typename F>
-inline int GetBlockSize(F kernel){
+inline int GetBlockSize(F kernel, const char *fname){
     static std::map<std::type_index, int> kernelBlockSizes;
     std::type_index index = std::type_index(typeid(F));
     
@@ -186,6 +181,20 @@ inline int GetBlockSize(F kernel){
                                                kernel, 0, 0));
     kernelBlockSizes[index] = blockSize;
     return blockSize;
+}
+
+#define GPUKernel(...) (__VA_ARGS__)
+#define GPULaunchItens(nItems, __blockSize, call, ...)\
+{\
+    int __gridSize = (nItems + __blockSize - 1) / __blockSize;\
+    call<<<__gridSize, __blockSize>>>(__VA_ARGS__);\
+    cudaDeviceAssert(#call);\
+}
+
+#define GPULaunch(nItems, call, ...)\
+{\
+    int __blockSize = GetBlockSize(call, #call);\
+    GPULaunchItens(nItems, __blockSize, call, __VA_ARGS__);\
 }
 
 #endif

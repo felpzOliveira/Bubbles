@@ -21,7 +21,7 @@ void test_pcisph2_marching_squares(){
     
     CudaMemoryManagerStart(__FUNCTION__);
     
-    int reso = (int)std::floor(2 * r2 / (spacing * 1.8));
+    int reso = (int)std::floor(2 * r2 / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -45,7 +45,7 @@ void test_pcisph2_marching_squares(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver.Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
     Float targetInterval = 1.0 / 248.0;
@@ -111,7 +111,7 @@ void test_pcisph2_water_block(){
     
     PciSphSolver2 solver;
     
-    int reso = (int)std::floor(lenc / (spacing * 1.8));
+    int reso = (int)std::floor(lenc / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -137,7 +137,7 @@ void test_pcisph2_water_block(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver.Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
     Float targetInterval = 1.0 / 240.0;
@@ -159,6 +159,75 @@ void test_pcisph2_water_block(){
     printf("===== OK\n");
 }
 
+
+void test_pcisph2_water_block_cnm(){
+    printf("===== SPH Solver 2D -- Water Block CNM\n");
+    Float spacing = 0.02;
+    Float targetDensity = WaterDensity;
+    vec2f center(0,0);
+    Float lenc = 2;
+    
+    vec2f pMin, pMax;
+    Bounds2f containerBounds;
+    ParticleSetBuilder2 builder;
+    ColliderSetBuilder2 colliderBuilder;
+    
+    PciSphSolver2 solver;
+    
+    CudaMemoryManagerStart(__FUNCTION__);
+    
+    int reso = (int)std::floor(lenc / (spacing * 2.0));
+    printf("Using grid with resolution %d x %d\n", reso, reso);
+    vec2ui res(reso, reso);
+    
+    solver.Initialize(DefaultSphSolverData2());
+    Shape2 *rect = MakeRectangle2(Translate2(center.x, center.y+0.45), vec2f(1));
+    Shape2 *block = MakeSphere2(Translate2(center.x, center.y-0.3), 0.2);
+    Shape2 *container = MakeRectangle2(Translate2(center.x, center.y), vec2f(lenc), true);
+    
+    containerBounds = container->GetBounds();
+    pMin = containerBounds.pMin - vec2f(spacing);
+    pMax = containerBounds.pMax + vec2f(spacing);
+    
+    Grid2 *grid = MakeGrid(res, pMin, pMax);
+    
+    VolumeParticleEmitter2 emitter(rect, rect->GetBounds(), spacing);
+    
+    emitter.Emit(&builder);
+    SphParticleSet2 *sphSet = SphParticleSet2FromBuilder(&builder);
+    ParticleSet2 *set2 = sphSet->GetParticleSet();
+    int count = set2->GetParticleCount();
+    
+    colliderBuilder.AddCollider2(block);
+    colliderBuilder.AddCollider2(container);
+    ColliderSet2 *collider = colliderBuilder.GetColliderSet();
+    
+    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
+    solver.SetColliders(collider);
+    
+    float *pos = new float[count * 3];
+    float *col = new float[count * 3];
+    
+    SphSolverData2 *data = solver.GetSphSolverData();
+    //set_colors_cnm(col, data);
+    //set_colors_pressure(col, data);
+    Float targetInterval = 1.0 / 240.0;
+    for(int i = 0; i < 200 * 10; i++){
+        solver.Advance(targetInterval);
+        set_colors_cnm(col, data, 0, 0);
+        //set_colors_pressure(col, data);
+        Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
+    }
+    
+    getchar();
+    
+    CudaMemoryManagerClearCurrent();
+    delete[] pos;
+    delete[] col;
+    printf("===== OK\n");
+}
+
+
 void test_pcisph2_water_drop(){
     printf("===== PCISPH Solver 2D -- Water Drop\n");
     Float spacing = 0.015;
@@ -174,7 +243,7 @@ void test_pcisph2_water_drop(){
     
     PciSphSolver2 solver;
     
-    int reso = (int)std::floor(lenc / (spacing * 1.8));
+    int reso = (int)std::floor(lenc / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -207,7 +276,7 @@ void test_pcisph2_water_drop(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver.Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
     Float targetInterval = 1.0 / 240.0;
@@ -243,7 +312,7 @@ void test_pcisph2_double_dam_break(){
     
     PciSphSolver2 solver;
     
-    int reso = (int)std::floor(lenc / (spacing * 1.8));
+    int reso = (int)std::floor(lenc / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -280,7 +349,7 @@ void test_pcisph2_double_dam_break(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver.Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
     Float targetInterval = 1.0 / 240.0;
@@ -314,7 +383,7 @@ void test_pcisph2_water_sphere(){
     ColliderSetBuilder2 colliderBuilder;
     PciSphSolver2 solver;
     
-    int reso = (int)std::floor(2 * r2 / (spacing * 1.8));
+    int reso = (int)std::floor(2 * r2 / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -339,7 +408,7 @@ void test_pcisph2_water_sphere(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver.Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
     Float targetInterval = 1.0 / 248.0;

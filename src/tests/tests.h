@@ -48,8 +48,8 @@ set_poscol_cnm(float *pos, float *col, ParticleSet3 *pSet, Grid3 *grid, F accept
 
 void simple_color(float *pos, float *col, ParticleSet3 *pSet);
 void update_colors_cnm(float *col, SphSolverData2 *data);
-void set_colors_cnm(float *col, SphSolverData2 *data, int is_first=1);
-void set_poscol_cnm(float *col, float *pos, SphSolverData3 *data, int is_first=0);
+void set_colors_cnm(float *col, SphSolverData2 *data, int is_first=1, int classify=1);
+int  set_poscol_cnm(float *col, float *pos, SphSolverData3 *data, int is_first=0, int classify=1);
 void set_colors_temperature(float *col, SphSolverData2 *data);
 void set_colors_pressure(float *col, SphSolverData2 *data);
 void graphy_vector_set(vec3f origin, vec3f target, Float fov, Float near, Float far);
@@ -103,6 +103,7 @@ void test_pcisph2_water_block();
 void test_pcisph2_water_sphere();
 void test_pcisph2_double_dam_break();
 void test_pcisph2_water_drop();
+void test_pcisph2_water_block_cnm();
 
 void test_pcisph3_water_sphere();
 void test_pcisph3_double_dam_break();

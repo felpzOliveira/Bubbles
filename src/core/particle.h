@@ -116,12 +116,12 @@ class ParticleSet{
     DataBuffer<T> forces;
     DataBuffer<Float> pressures;
     DataBuffer<Float> densities;
+    DataBuffer<T> normals;
     
     // Extended data for gaseous stuff
     DataBuffer<Float> temperature;
     DataBuffer<Float> densitiesEx;
     DataBuffer<Float> v0s;
-    DataBuffer<T> normals;
     
     DataBuffer<ParticleChain> chainNodes;
     DataBuffer<ParticleChain> chainAuxNodes;
@@ -170,7 +170,8 @@ class ParticleSet{
         positions.SetData(pos, n); velocities.SetData(vel, n);
         forces.SetData(force, n); densities.SetSize(n);
         pressures.SetSize(n); chainNodes.SetSize(n);
-        chainAuxNodes.SetSize(n);
+        chainAuxNodes.SetSize(n); v0s.SetSize(n);
+        normals.SetSize(n);
         count = n;
         radius = 1e-3;
         mass = 1e-3;
@@ -179,9 +180,11 @@ class ParticleSet{
     
     __host__ void SetExtendedData(){
         densitiesEx.SetSize(count);
-        v0s.SetSize(count);
-        normals.SetSize(count);
         temperature.SetSize(count);
+    }
+    
+    template<typename F> __host__ void ClearDataBuffer(DataBuffer<F> *buffer){
+        buffer->Clear();
     }
     
     __bidevice__ void SetRadius(Float rad){ radius = Max(0, rad); }
@@ -306,7 +309,7 @@ class SphParticleSet2{
     int requiresHigherLevelUpdate;
     
     __bidevice__ SphParticleSet2() : targetDensity(WaterDensity), targetSpacing(0.1),
-    kernelRadiusOverTargetSpacing(1.8)
+    kernelRadiusOverTargetSpacing(2.0)
     {
         particleSet = nullptr;
     }
@@ -321,7 +324,7 @@ class SphParticleSet2{
     __bidevice__ void SetParticleData(ParticleSet2 *set){
         targetDensity = WaterDensity;
         targetSpacing = 0.1;
-        kernelRadiusOverTargetSpacing = 1.8;
+        kernelRadiusOverTargetSpacing = 2.0;
         kernelRadius = kernelRadiusOverTargetSpacing * targetSpacing;
         particleSet = set;
     }
@@ -408,7 +411,7 @@ class SphParticleSet3{
     int requiresHigherLevelUpdate;
     
     __bidevice__ SphParticleSet3() : targetDensity(WaterDensity), targetSpacing(0.1),
-    kernelRadiusOverTargetSpacing(1.8)
+    kernelRadiusOverTargetSpacing(2.0)
     {
         particleSet = nullptr;
     }
@@ -423,7 +426,7 @@ class SphParticleSet3{
     __bidevice__ void SetParticleData(ParticleSet3 *set){
         targetDensity = WaterDensity;
         targetSpacing = 0.1;
-        kernelRadiusOverTargetSpacing = 1.8;
+        kernelRadiusOverTargetSpacing = 2.0;
         kernelRadius = kernelRadiusOverTargetSpacing * targetSpacing;
         particleSet = set;
     }
@@ -448,8 +451,8 @@ class SphParticleSet3{
     }
     
     __bidevice__ void ComputeMass(){
-        int max_points = 512;
-        vec3f points[512];
+        int max_points = 1024;
+        vec3f points[1024];
         BccLatticePointGeneratorDevice pGenerator;
         AssertA(!IsZero(kernelRadius), "Zero radius for mass computation");
         SphStdKernel3 kernel(kernelRadius);

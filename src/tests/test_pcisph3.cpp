@@ -16,7 +16,7 @@ void test_pcisph3_box_many_emission(){
     vec3f target(0);
     vec3f boxSize(2.0, 1.0, 1.0);
     vec2i pointRes(10, 5); //xz
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     Float spacing = 0.02;
     int maxframes = 500;
     Float pointHeight = boxSize.y * 0.5 - 0.1 - spacing;
@@ -94,7 +94,7 @@ void test_pcisph3_ball_many_emission(){
     vec3f ballCenter(0);
     vec3f origin(0,0,3);
     vec3f target(0);
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     Float spacing = 0.02;
     CudaMemoryManagerStart(__FUNCTION__);
     
@@ -180,7 +180,7 @@ void test_pcisph3_dragon_shower(){
     printf("===== PCISPH Solver 3D -- Dragon Shower\n");
     vec3f origin(2, 1, -4);
     vec3f target(0, 0, 0);
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     Float spacing = 0.02;
     vec3f boxSize(2.0, 3.0, 2.0);
     Float xIntensity = 6.0;
@@ -267,7 +267,7 @@ void test_pcisph3_dragon(){
     vec3f center;
     Float radius;
     vec3f target(0);
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     Float spacing = 0.02;
     CudaMemoryManagerStart(__FUNCTION__);
     
@@ -304,7 +304,7 @@ void test_pcisph3_dragon(){
 void test_pcisph3_multiple_emission(){
     printf("===== PCISPH Solver 3D -- Multiple Emission\n");
     Float spacing = 0.04;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     vec3f origin(3, 0, 0);
     vec3f target(0,0,0);
     CudaMemoryManagerStart(__FUNCTION__);
@@ -352,7 +352,7 @@ void test_pcisph3_multiple_emission(){
 void test_pcisph3_rock_dam(){
     printf("===== PCISPH Solver 3D -- Rock Dam\n");
     Float spacing = 0.04;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     vec3f origin(8, 0, 0);
     vec3f target(0,-1,0);
     const char *objPath = "/home/felipe/Documents/CGStuff/models/rock.obj";
@@ -409,7 +409,7 @@ void test_pcisph3_happy_whale(){
     vec3f origin;
     vec3f target(0.f, 0.f, 0.f);
     Bounds3f meshBounds;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     Float spacing = 0.02;
     int count = 0;
     const char *pFile = "output.txt";
@@ -522,7 +522,7 @@ void test_pcisph3_double_dam_break(){
     Float boxLen = 1.5;
     Float boxFluidLen = 0.5;
     Float boxFluidYLen = 0.9;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     
     /* Build shapes */
     Float xof = (boxLen - boxFluidLen)/2.0; xof -= spacing;
@@ -569,8 +569,9 @@ void test_pcisph3_double_dam_break(){
     solver.SetColliders(colliders);
     
     /* Set timestep and view stuff */
-    
+    sphSet->SetRelativeKernelRadius(spacingScale);
     ParticleSet3 *pSet = sphSet->GetParticleSet();
+    
     int count = pSet->GetParticleCount();
     Float targetInterval = 1.0 / 240.0;
     float *pos = new float[count * 3];
@@ -579,8 +580,29 @@ void test_pcisph3_double_dam_break(){
     memset(col, 0, sizeof(float) * 3 * count);
     graphy_vector_set(origin, target);
     
-    simple_color(pos, col, pSet);
-    graphy_render_points3f(pos, col, count, spacing/2.0);
+    //simple_color(pos, col, pSet);
+    //graphy_render_points3f(pos, col, count, spacing/2.0);
+    
+    vec3ui res = grid->GetIndexCount();
+    Bounds3f bound = grid->GetBounds();
+    pMin = bound.pMin;
+    pMax = bound.pMax;
+    vec3f c = grid->GetCellSize();
+    
+    
+    TimerList timers;
+    timers.Start();
+    
+    CNMBoundary(pSet, grid, spacing, 0);
+    
+    timers.Stop();
+    Float val = timers.GetElapsedGPU(0);
+    std::cout << "GPU Time > " << val << std::endl;
+    
+    int ii = set_poscol_cnm(col, pos, solver.GetSphSolverData(), 0, 0);
+    printf("Size > %d\n", ii);
+    graphy_render_points3f(pos, col, ii, spacing/2.0);
+    getchar();
     
     for(int i = 0; i < 20 * 26 * 20; i++){
         solver.Advance(targetInterval);
@@ -598,7 +620,7 @@ void test_pcisph3_double_dam_break(){
 void test_pcisph3_quadruple_dam(){
     printf("===== PCISPH Solver 3D -- Quadruple Dam Break\n");
     Float spacing = 0.02;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     vec3f boxLen(2.0, 2.0, 2.0);
     vec3f waterBoxLen(0.4, 1.0, 0.4);
     vec3f initialVelocity(0.0, -3.0, 0);
@@ -669,7 +691,7 @@ void test_pcisph3_quadruple_dam(){
 void test_pcisph3_lucy_ball(){
     printf("===== PCISPH Solver 3D -- Lucy Ball\n");
     Float spacing = 0.02;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     Float sphereRadius = 1.5;
     Float waterRadius = 0.5;
     
@@ -759,7 +781,7 @@ void test_pcisph3_lucy_dam(){
     Float boxLen = 1.5;
     Float boxFluidLen = 0.5;
     Float boxFluidYLen = 0.9;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     
     /* Build shapes */
     Float xof = (boxLen - boxFluidLen)/2.0; xof -= spacing;
@@ -854,7 +876,7 @@ void test_pcisph3_whale_obstacle(){
     Float boxLen = 1.5;
     Float boxFluidLen = 1.3;
     Float boxFluidYLen = 0.2;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     
     /* Build shapes */
     Float xof = (boxLen - boxFluidLen)/2.0; xof -= spacing;
@@ -969,7 +991,7 @@ void test_pcisph3_water_sphere(){
     ColliderSetBuilder3 colliderBuilder;
     PciSphSolver3 solver;
     
-    int reso = (int)std::floor(2 * r2 / (spacing * 1.8));
+    int reso = (int)std::floor(2 * r2 / (spacing * 2.0));
     printf("Using grid with resolution %d x %d x %d\n", reso, reso, reso);
     vec3ui res(reso);
     
@@ -993,7 +1015,7 @@ void test_pcisph3_water_sphere(){
     colliderBuilder.AddCollider3(container);
     ColliderSet3 *collider = colliderBuilder.GetColliderSet();
     
-    solver.Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
     Float targetInterval = 1.0 / 248.0;

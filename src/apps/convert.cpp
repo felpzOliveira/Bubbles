@@ -7,6 +7,8 @@
 #include <serializer.h>
 #include <iostream>
 #include <graphy.h>
+#include <memory.h>
+#include <util.h>
 
 typedef struct{
     std::string input;
@@ -16,6 +18,10 @@ typedef struct{
     Float scale;
     Transform transform;
     int preview;
+    int gen_data;
+    std::string dataArgs;
+    std::string outformArgs;
+    std::string informArgs;
     vec3f origin;
     vec3f target;
 }config_opts;
@@ -26,7 +32,11 @@ void default_opts(config_opts *opts){
     opts->spacing = 0;
     opts->transform = Transform();
     opts->output = "output.txt";
+    opts->dataArgs = "pn";
+    opts->informArgs = "p";
+    opts->outformArgs = "p";
     opts->spacing = 0.02;
+    opts->gen_data = 0;
     opts->scale = 1;
     opts->xrot = 0;
     opts->yrot = 0;
@@ -53,11 +63,17 @@ void print_configs(config_opts *opts){
         std::cout << "        - Origin : " << o.x << " " << o.y << " " << o.z << std::endl;
         std::cout << "        - Target : " << t.x << " " << t.y << " " << t.z << std::endl;
     }
+    std::cout << "    * Data Generation : " << opts->gen_data << std::endl;
+    if(opts->gen_data){
+        std::cout << "        - Inform : " << opts->informArgs << std::endl;
+        std::cout << "        - Outform : " << opts->outformArgs << std::endl;
+        std::cout << "        - Data : " << opts->dataArgs << std::endl;
+    }
 }
 
 ARGUMENT_PROCESS(rotate_x_arg){
     config_opts *opts = (config_opts *)config;
-    Float angle = ParseNextFloat(argc, argv, i, "--rotateX");
+    Float angle = ParseNextFloat(argc, argv, i, "-rotateX");
     opts->xrot = angle;
     opts->transform = RotateX(angle) * opts->transform;
     return 0;
@@ -65,7 +81,7 @@ ARGUMENT_PROCESS(rotate_x_arg){
 
 ARGUMENT_PROCESS(rotate_y_arg){
     config_opts *opts = (config_opts *)config;
-    Float angle = ParseNextFloat(argc, argv, i, "--rotateY");
+    Float angle = ParseNextFloat(argc, argv, i, "-rotateY");
     opts->yrot = angle;
     opts->transform = RotateY(angle) * opts->transform;
     return 0;
@@ -73,7 +89,7 @@ ARGUMENT_PROCESS(rotate_y_arg){
 
 ARGUMENT_PROCESS(rotate_z_arg){
     config_opts *opts = (config_opts *)config;
-    Float angle = ParseNextFloat(argc, argv, i, "--rotateZ");
+    Float angle = ParseNextFloat(argc, argv, i, "-rotateZ");
     opts->zrot = angle;
     opts->transform = RotateZ(angle) * opts->transform;
     return 0;
@@ -81,7 +97,7 @@ ARGUMENT_PROCESS(rotate_z_arg){
 
 ARGUMENT_PROCESS(scale_arg){
     config_opts *opts = (config_opts *)config;
-    Float scale = ParseNextFloat(argc, argv, i, "--scale");
+    Float scale = ParseNextFloat(argc, argv, i, "-scale");
     opts->scale = scale;
     opts->transform = Scale(scale) * opts->transform;
     return 0;
@@ -89,26 +105,26 @@ ARGUMENT_PROCESS(scale_arg){
 
 ARGUMENT_PROCESS(input_arg){
     config_opts *opts = (config_opts *)config;
-    opts->input = ParseNext(argc, argv, i, "--in");
+    opts->input = ParseNext(argc, argv, i, "-in");
     return 0;
 }
 
 ARGUMENT_PROCESS(output_arg){
     config_opts *opts = (config_opts *)config;
-    opts->output = ParseNext(argc, argv, i, "--out");
+    opts->output = ParseNext(argc, argv, i, "-out");
     return 0;
 }
 
 ARGUMENT_PROCESS(spacing_arg){
     config_opts *opts = (config_opts *)config;
-    Float spacing = ParseNextFloat(argc, argv, i, "--spacing");
+    Float spacing = ParseNextFloat(argc, argv, i, "-spacing");
     opts->spacing = spacing;
     return 0;
 }
 
 ARGUMENT_PROCESS(preview_origin_arg){
     config_opts *opts = (config_opts *)config;
-    std::string strdist = ParseNext(argc, argv, i, "--origin", 3);
+    std::string strdist = ParseNext(argc, argv, i, "-origin", 3);
     const char *ptr = strdist.c_str();
     ParseV3(&opts->origin, &ptr);
     return 0;
@@ -116,7 +132,7 @@ ARGUMENT_PROCESS(preview_origin_arg){
 
 ARGUMENT_PROCESS(preview_target_arg){
     config_opts *opts = (config_opts *)config;
-    std::string strdist = ParseNext(argc, argv, i, "--target", 3);
+    std::string strdist = ParseNext(argc, argv, i, "-target", 3);
     const char *ptr = strdist.c_str();
     ParseV3(&opts->target, &ptr);
     return 0;
@@ -128,53 +144,87 @@ ARGUMENT_PROCESS(preview_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(gen_data_arg){
+    config_opts *opts = (config_opts *)config;
+    opts->dataArgs = ParseNext(argc, argv, i, "-gen-data", 1);
+    opts->gen_data = 1;
+    return 0;
+}
+
+ARGUMENT_PROCESS(parse_outform_arg){
+    config_opts *opts = (config_opts *)config;
+    opts->outformArgs = ParseNext(argc, argv, i, "-outform", 1);
+    return 0;
+}
+
+ARGUMENT_PROCESS(parse_inform_arg){
+    config_opts *opts = (config_opts *)config;
+    opts->informArgs = ParseNext(argc, argv, i, "-inform", 1);
+    return 0;
+}
+
 std::map<const char *, arg_desc> argument_map = {
-    {"--origin", 
+    {"-gen-data",
+        {.processor = gen_data_arg,
+            .help = "Given a bubbles output result generates its normal vector."
+        }
+    },
+    {"-inform",
+        {.processor = parse_inform_arg,
+            .help = "When reading simulation file use specific format."
+        }
+    },
+    {"-outform",
+        {.processor = parse_outform_arg,
+            .help = "When writting output use specific format."
+        }
+    },
+    {"-origin", 
         { .processor = preview_origin_arg, 
-            .help = "Sets the origin point for previewing. (requires: --preview)" 
+            .help = "Sets the origin point for previewing. (requires: -preview)" 
         }
     },
-    {"--target", 
+    {"-target", 
         { .processor = preview_target_arg, 
-            .help = "Sets the target point for previewing. (requires: --preview)" 
+            .help = "Sets the target point for previewing. (requires: -preview)" 
         }
     },
-    {"--rotateX", 
+    {"-rotateX", 
         { .processor = rotate_x_arg, 
             .help = "Rotates the input in the X-direction. (degrees)" 
         }
     },
-    {"--rotateY", 
+    {"-rotateY", 
         { .processor = rotate_y_arg, 
             .help = "Rotates the input in the Y-direction. (degrees)" 
         }
     },
-    {"--rotateZ", 
+    {"-rotateZ", 
         { .processor = rotate_z_arg, 
             .help = "Rotates the input in the Z-direction. (degrees)" 
         }
     },
-    {"--scale", 
+    {"-scale", 
         { .processor = scale_arg, 
             .help = "Scales the input uninformly." 
         }
     },
-    {"--in", 
+    {"-in", 
         { .processor = input_arg, 
             .help = "Where to read input file." 
         }
     },
-    {"--out", 
+    {"-out", 
         { .processor = output_arg, 
             .help = "Where to write output." 
         }
     },
-    {"--spacing", 
+    {"-spacing", 
         { .processor = spacing_arg, 
             .help = "Spacing to use when generating particle cloud." 
         }
     },
-    {"--preview", 
+    {"-preview", 
         { .processor = preview_arg, 
             .help = "Use Graphy to preview the point cloud." 
         }
@@ -210,13 +260,65 @@ void PreviewParticles(SphParticleSet3 *sphSet, config_opts *opts){
     delete[] col;
 }
 
+void GenerateData(config_opts *opts){
+    printf("===== Generating Data\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+    // For this case input is a Bubbles simulation file
+    ParticleSetBuilder3 builder;
+    Float h = 0.02;
+    std::vector<int> boundary;
+    int ok = 0;
+    int flagsIn  = SerializerFlagsFromString(opts->informArgs.c_str());
+    int flagsOut = SerializerFlagsFromString(opts->outformArgs.c_str());
+    int toGen    = SerializerFlagsFromString(opts->dataArgs.c_str());
+    if(!(flagsIn == -1 || flagsOut == -1 || toGen == -1)){
+        int count = SerializerLoadSphDataSet3(&builder, opts->input.c_str(),
+                                              flagsIn, &boundary);
+        
+        SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(&builder);
+        ParticleSet3 *pSet = sphpSet->GetParticleSet();
+        Bounds3f bounds = UtilComputeParticleSetBounds(pSet);
+        Grid3 *grid = UtilBuildGridForDomain(bounds, h, 2.0);
+        
+        SphSolver3 solver;
+        solver.Initialize(DefaultSphSolverData3());
+        solver.Setup(WaterDensity, h, 2.0, grid, sphpSet);
+        
+        UpdateGridDistributionGPU(solver.solverData);
+        if((toGen & SERIALIZER_NORMAL) || (toGen & SERIALIZER_DENSITY)){
+            printf("Generating Density ... "); fflush(stdout);
+            ComputeDensityGPU(solver.solverData);
+            printf("OK\n");
+        }
+        
+        if(toGen & SERIALIZER_NORMAL){
+            printf("Generating Normals ... "); fflush(stdout);
+            ComputeNormalGPU(solver.solverData);
+            printf("OK\n");
+        }
+        
+        printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout); 
+        SerializerSaveSphDataSet3(solver.solverData, opts->output.c_str(),
+                                  flagsOut, &boundary);
+        printf("OK\n");
+        ok = 1;
+    }
+    
+    CudaMemoryManagerClearCurrent();
+    
+    if(ok){
+        printf("===== OK\n");
+    }else{
+        printf("===== FAILED\n");
+    }
+}
+
 void MeshToParticles(const char *name, const Transform &transform,
                      Float spacing, SphSolverData3 **data)
 {
     SphParticleSet3 *sphSet = nullptr;
     printf("===== Emitting particles from mesh\n");
     
-    UseDefaultAllocatorFor(AllocatorType::CPU);
     ParsedMesh *mesh = LoadObj(name);
     
     Shape *shape = MakeMesh(mesh, transform);
@@ -239,12 +341,15 @@ void convert_command(int argc, char **argv){
     argument_process(argument_map, argc, argv, &g_opts);
     print_configs(&g_opts);
     
-    MeshToParticles(g_opts.input.c_str(), g_opts.transform, 
-                    g_opts.spacing, &data);
-    
-    if(g_opts.preview){
-        PreviewParticles(data->sphpSet, &g_opts);
+    if(!g_opts.gen_data){
+        MeshToParticles(g_opts.input.c_str(), g_opts.transform, 
+                        g_opts.spacing, &data);
+        if(g_opts.preview){
+            PreviewParticles(data->sphpSet, &g_opts);
+        }
+        
+        SerializerSaveSphDataSet3(data, g_opts.output.c_str(), SERIALIZER_POSITION);
+    }else{
+        GenerateData(&g_opts);
     }
-    
-    SerializerSaveSphDataSet3(data, g_opts.output.c_str(), SERIALIZER_POSITION);
 }

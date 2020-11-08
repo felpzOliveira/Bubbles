@@ -77,6 +77,8 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
     
     TimerList timers;
     SphSolverData3 *data = solverData;
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    Float h = data->sphpSet->GetKernelRadius();
     timers.Start();
     while(remainingTime > Epsilon){
         SphParticleSet3 *sphpSet = solverData->sphpSet;
@@ -89,9 +91,10 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
     }
     
     CNMInvalidateCells(data->domain);
+    pSet->ClearDataBuffer(&pSet->v0s);
     
     timers.StopAndNext();
-    CNMClassifyLazyGPU(data->domain);
+    CNMBoundary(pSet, data->domain, h, 1);
     timers.Stop();
     
 #ifdef PRINT_TIMER
@@ -120,8 +123,8 @@ __host__ void SphSolver3::Setup(Float targetDensity, Float targetSpacing,
     Float mass = pData->GetMass();
     int pCount = pData->GetParticleCount();
     
-    printf("Radius : %g  Mass: %g  Density: %g  Spacing: %g, Particle Count: %d\n", 
-           rad, mass, targetDensity, targetSpacing, pCount);
+    printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n", 
+           rad, targetSpacing, pCount);
     
     // TODO: Add multi-cell neighbor querying
     vec3f len = solverData->domain->GetCellSize();

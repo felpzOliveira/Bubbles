@@ -61,7 +61,12 @@ __bidevice__ int BccLatticePointGeneratorDevice::Generate(const Bounds3f &domain
             for(int i = 0; i * spacing + offset <= width && !shouldStop; i++){
                 pos.x = i * spacing + offset + domain.pMin.x;
                 AssertA(pi < maxn, "Not enough memory for BCCLattice point generation");
-                points[pi++] = pos;
+                if(pi < maxn){
+                    points[pi++] = pos;
+                }else{
+                    shouldStop = true;
+                    break;
+                }
             }
         }
         

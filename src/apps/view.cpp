@@ -48,19 +48,19 @@ void print_view_configs(view_opts *opts){
 
 ARGUMENT_PROCESS(view_basename_arg){
     view_opts *opts = (view_opts *)config;
-    opts->basename = ParseNext(argc, argv, i, "--basename");
+    opts->basename = ParseNext(argc, argv, i, "-basename");
     return 0;
 }
 
 ARGUMENT_PROCESS(view_start_arg){
     view_opts *opts = (view_opts *)config;
-    opts->start = (int)ParseNextFloat(argc, argv, i, "--start");
+    opts->start = (int)ParseNextFloat(argc, argv, i, "-start");
     return 0;
 }
 
 ARGUMENT_PROCESS(view_end_arg){
     view_opts *opts = (view_opts *)config;
-    opts->end = (int)ParseNextFloat(argc, argv, i, "--end");
+    opts->end = (int)ParseNextFloat(argc, argv, i, "-end");
     return 0;
 }
 
@@ -72,13 +72,13 @@ ARGUMENT_PROCESS(view_noloop_arg){
 
 ARGUMENT_PROCESS(view_radius_arg){
     view_opts *opts = (view_opts *)config;
-    opts->radius = ParseNextFloat(argc, argv, i, "--radius");
+    opts->radius = ParseNextFloat(argc, argv, i, "-radius");
     return 0;
 }
 
 ARGUMENT_PROCESS(view_origin_arg){
     view_opts *opts = (view_opts *)config;
-    std::string strdist = ParseNext(argc, argv, i, "--origin", 3);
+    std::string strdist = ParseNext(argc, argv, i, "-origin", 3);
     const char *ptr = strdist.c_str();
     ParseV3(&opts->origin, &ptr);
     opts->origin_configured = 1;
@@ -87,7 +87,7 @@ ARGUMENT_PROCESS(view_origin_arg){
 
 ARGUMENT_PROCESS(view_target_arg){
     view_opts *opts = (view_opts *)config;
-    std::string strdist = ParseNext(argc, argv, i, "--target", 3);
+    std::string strdist = ParseNext(argc, argv, i, "-target", 3);
     const char *ptr = strdist.c_str();
     ParseV3(&opts->target, &ptr);
     opts->target_configured = 1;
@@ -96,14 +96,14 @@ ARGUMENT_PROCESS(view_target_arg){
 
 ARGUMENT_PROCESS(view_with_sdf_arg){
     view_opts *opts = (view_opts *)config;
-    opts->meshObj = ParseNext(argc, argv, i, "--with-sdf");
+    opts->meshObj = ParseNext(argc, argv, i, "-with-sdf");
     return 0;
 }
 
 ARGUMENT_PROCESS(view_sdf_translate_arg){
     view_opts *opts = (view_opts *)config;
     vec3f delta;
-    std::string strdist = ParseNext(argc, argv, i, "--sdf-translate", 3);
+    std::string strdist = ParseNext(argc, argv, i, "-sdf-translate", 3);
     const char *ptr = strdist.c_str();
     ParseV3(&delta, &ptr);
     opts->transform = Translate(delta) * opts->transform;
@@ -113,7 +113,7 @@ ARGUMENT_PROCESS(view_sdf_translate_arg){
 ARGUMENT_PROCESS(view_translate_arg){
     view_opts *opts = (view_opts *)config;
     vec3f delta;
-    std::string strdist = ParseNext(argc, argv, i, "--translate", 3);
+    std::string strdist = ParseNext(argc, argv, i, "-translate", 3);
     const char *ptr = strdist.c_str();
     ParseV3(&delta, &ptr);
     opts->pTransform = Translate(delta) * opts->pTransform;
@@ -122,89 +122,89 @@ ARGUMENT_PROCESS(view_translate_arg){
 
 ARGUMENT_PROCESS(view_sdf_scale_arg){
     view_opts *opts = (view_opts *)config;
-    Float scale = ParseNextFloat(argc, argv, i, "--sdf-scale");
+    Float scale = ParseNextFloat(argc, argv, i, "-sdf-scale");
     opts->transform = Scale(scale) * opts->transform;
     return 0;
 }
 
 ARGUMENT_PROCESS(view_sdf_rotate_arg){
     view_opts *opts = (view_opts *)config;
-    Float angle = ParseNextFloat(argc, argv, i, "--sdf-rotate");
+    Float angle = ParseNextFloat(argc, argv, i, "-sdf-rotate");
     opts->transform = RotateY(angle) * opts->transform;
     return 0;
 }
 
 std::map<const char *, arg_desc> view_arg_map = {
-    {"--basename",
+    {"-basename",
         {
             .processor = view_basename_arg,
             .help = "Configures the basename of the simulation to load."
         }
     },
-    {"--radius",
+    {"-radius",
         {
             .processor = view_radius_arg,
             .help = "Configures the radius value to use. (default: 0.012)"
         }
     },
-    {"--noloop",
+    {"-noloop",
         {
             .processor = view_noloop_arg,
             .help = "Configures to not loop simulation."
         }
     },
-    {"--origin",
+    {"-origin",
         {
             .processor = view_origin_arg,
             .help = "Sets the origin of the view point."
         }
     },
-    {"--target",
+    {"-target",
         {
             .processor = view_target_arg,
             .help = "Sets the target of the view point."
         }
     },
-    {"--start",
+    {"-start",
         {
             .processor = view_start_arg,
             .help = "Sets the initial index to load the simulation."
         }
     },
-    {"--end",
+    {"-end",
         {
             .processor = view_end_arg,
             .help = "Sets the final index to load the simulation."
         }
     },
-    {"--with-sdf",
+    {"-with-sdf",
         {
             .processor = view_with_sdf_arg,
             .help = "Adds a obj file as SDF for visualization."
         }
     },
-    {"--sdf-translate",
+    {"-sdf-translate",
         {
             .processor = view_sdf_translate_arg,
-            .help = "Translates the SDF. (requires: --with-sdf)"
+            .help = "Translates the SDF. (requires: -with-sdf)"
         }
     },
-    {"--translate",
+    {"-translate",
         {
             .processor = view_translate_arg,
             .help = "Translates the particle set."
         }
     },
-    {"--sdf-scale",
+    {"-sdf-scale",
         {
             .processor = view_sdf_scale_arg,
-            .help = "Scales the SDF. (requires: --with-sdf)"
+            .help = "Scales the SDF. (requires: -with-sdf)"
         }
     },
-    {"--sdf-rotate",
+    {"-sdf-rotate",
         {
             .processor = view_sdf_rotate_arg,
-            .help = "Rotates the SDF around the Y-axis. (requires: --with-sdf)"
+            .help = "Rotates the SDF around the Y-axis. (requires: -with-sdf)"
         }
     }
 };

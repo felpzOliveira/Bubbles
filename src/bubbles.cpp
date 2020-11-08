@@ -111,17 +111,17 @@ int main(int argc, char **argv){
     cudaInitEx();
     
     //test();
-    test_pcisph2_marching_squares();
-    
+    //test_pcisph2_marching_squares();
     //test_pcisph3_box_many_emission();
-    //test_pcisph3_double_dam_break();
-    
+    //test_pcisph2_water_block_cnm();
+    test_pcisph3_double_dam_break();
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else
     
 #endif
     CudaMemoryManagerClearAll();
+    graphy_close_display();
     cudaSafeExit();
     return 0;
 }

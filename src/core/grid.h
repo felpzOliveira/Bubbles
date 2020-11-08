@@ -552,7 +552,7 @@ __host__ void Grid<T, U, Q>::Build(const U &resolution, const T &dp0, const T &d
     printf("Building acceleration query list [%d] ... ", total);
     fflush(stdout);
     
-    GPULaunch(total, BuildNeighborListKernel, this);
+    GPULaunch(total, GPUKernel(BuildNeighborListKernel<T, U, Q>), this);
     
     printf("OK\n");
 }

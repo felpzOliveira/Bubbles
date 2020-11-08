@@ -33,7 +33,7 @@ void test_sph3_double_dam_break(){
     Float boxLen = 1.5;
     Float boxFluidLen = 0.5;
     Float boxFluidYLen = 0.9;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     
     /* Build shapes */
     Float xof = (boxLen - boxFluidLen)/2.0; xof -= spacing;
@@ -124,7 +124,7 @@ void test_sph3_water_block(){
     ColliderSetBuilder3 colliderBuilder;
     
     SphSolver3 solver;
-    int reso = (int)std::floor(bHeight / (spacing * 1.8));
+    int reso = (int)std::floor(bHeight / (spacing * 2.0));
     printf("Using grid with resolution %d x %d x %d\n", reso, reso, reso);
     vec3ui res(reso);
     
@@ -146,7 +146,7 @@ void test_sph3_water_block(){
     colliderBuilder.AddCollider3(container);
     ColliderSet3 *collider = colliderBuilder.GetColliderSet();
     
-    solver.Setup(WaterDensity, spacing, 1.8, grid, sphSet);
+    solver.Setup(WaterDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
     Float targetInterval = 1.0 / 240.0;
@@ -184,7 +184,7 @@ void test_sph3_water_sphere(){
     ColliderSetBuilder3 colliderBuilder;
     
     SphSolver3 solver;
-    int reso = (int)std::floor(2 * 1 / (spacing * 1.8));
+    int reso = (int)std::floor(2 * 1 / (spacing * 2.0));
     printf("Using grid with resolution %d x %d x %d\n", reso, reso, reso);
     vec3ui res(reso);
     
@@ -207,7 +207,7 @@ void test_sph3_water_sphere(){
     colliderBuilder.AddCollider3(container);
     ColliderSet3 *collider = colliderBuilder.GetColliderSet();
     
-    solver.Setup(WaterDensity, spacing, 1.8, grid, sphSet);
+    solver.Setup(WaterDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
     Float targetInterval = 1.0 / 240.0;

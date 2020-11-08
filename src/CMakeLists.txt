@@ -6,18 +6,18 @@ file(GLOB BUBBLES_CORE boundaries/*.cpp
 					   shapes/*.cpp 
 					   solvers/*.cpp 
 					   tests/*.cpp 
-					   third/*.cpp 
-					   apps/*.cpp)
+					   third/*.cpp)
 
 file(GLOB BUBBLES_SRCS bubbles.cpp)
-file(GLOB BBTOOL_SRCS bbtool.cpp)
-list(APPEND BUBBLES_SRCS ${BUBBLES_CORE})
-list(APPEND BBTOOL_SRCS ${BUBBLES_CORE})
+file(GLOB BBTOOL_SRCS bbtool.cpp apps/*.cpp)
 
-add_executable(${BUBBLES} ${BUBBLES_SRCS})
+add_library(corelib OBJECT ${BUBBLES_CORE})
+set_target_properties(corelib PROPERTIES COMPILE_FLAGS "${BB_COMPILE}" LINK_FLAGS "${BB_FLAGS}")
+
+add_executable(${BUBBLES} ${BUBBLES_SRCS} $<TARGET_OBJECTS:corelib>)
 target_link_libraries(${BUBBLES} "dl")
 set_target_properties(${BUBBLES} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}" LINK_FLAGS "${BB_FLAGS}")
 
-add_executable(${BBTOOL} ${BBTOOL_SRCS})
+add_executable(${BBTOOL} ${BBTOOL_SRCS} $<TARGET_OBJECTS:corelib>)
 target_link_libraries(${BBTOOL} "dl")
 set_target_properties(${BBTOOL} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}" LINK_FLAGS "${BB_FLAGS}")

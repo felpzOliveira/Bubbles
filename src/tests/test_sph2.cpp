@@ -102,48 +102,80 @@ void set_colors_pressure(float *col, SphSolverData2 *data){
     }
 }
 
-
-void set_colors_cnm(float *col, SphSolverData2 *data, int is_first){
-    if(is_first){
-        UpdateGridDistributionGPU(data);
+void set_colors_cnm(float *col, SphSolverData2 *data, int is_first, int classify){
+    if(classify){
+        if(is_first){
+            UpdateGridDistributionGPU(data);
+        }
+        
+        int level = CNMClassifyLazyGPU(data->domain);
+        printf("Domain #levels: %d\n", level);
     }
-    
-    int level = CNMClassifyLazyGPU(data->domain);
-    printf("Domain #levels: %d\n", level);
     
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     for(int i = 0; i < pSet->GetParticleCount(); i++){
-        vec2f pi = pSet->GetParticlePosition(i);
-        unsigned int id = data->domain->GetLinearHashedPosition(pi);
-        Cell2 *cell = data->domain->GetCell(id);
-        vec3f color = get_color_level(cell->GetLevel());
+        int level = 0;
+        if(classify){
+            vec2f pi = pSet->GetParticlePosition(i);
+            unsigned int id = data->domain->GetLinearHashedPosition(pi);
+            Cell2 *cell = data->domain->GetCell(id);
+            level = cell->GetLevel();
+        }else{
+            level = pSet->GetParticleV0(i);
+        }
+        
+        vec3f color = get_color_level(level);
         col[3 * i + 0] = color[0];
         col[3 * i + 1] = color[1];
         col[3 * i + 2] = color[2];
     }
 }
 
-void set_poscol_cnm(float *col, float *pos, SphSolverData3 *data, int is_first){
-    if(is_first){
-        UpdateGridDistributionGPU(data);
-        (void)CNMClassifyLazyGPU(data->domain);
+int set_poscol_cnm(float *col, float *pos, SphSolverData3 *data, 
+                   int is_first, int classify)
+{
+    int level = 0;
+    int it = 0;
+    if(classify){
+        if(is_first){
+            UpdateGridDistributionGPU(data);
+            (void)CNMClassifyLazyGPU(data->domain);
+        }
+        
+        level = data->domain->GetCNMMaxLevel();
     }
-    
-    int level = data->domain->GetCNMMaxLevel();
     
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         vec3f pi = pSet->GetParticlePosition(i);
-        unsigned int id = data->domain->GetLinearHashedPosition(pi);
-        Cell3 *cell = data->domain->GetCell(id);
-        vec3f color = get_color_level(cell->GetLevel());
-        pos[3 * i + 0] = pi.x;
-        pos[3 * i + 1] = pi.y;
-        pos[3 * i + 2] = pi.z;
-        col[3 * i + 0] = color[0];
-        col[3 * i + 1] = color[1];
-        col[3 * i + 2] = color[2];
+        level = 0;
+        if(classify){
+            unsigned int id = data->domain->GetLinearHashedPosition(pi);
+            Cell3 *cell = data->domain->GetCell(id);
+            level = cell->GetLevel();
+        }else{
+            level = pSet->GetParticleV0(i);
+        }
+        
+        
+        vec3f color = get_color_level(level);
+        if(!(level == 1 || level == 2)){
+            color = vec3f(0.7);
+        }
+        
+        //if(pi.z < -0.65) continue;
+        
+        pos[3 * it + 0] = pi.x;
+        pos[3 * it + 1] = pi.y;
+        pos[3 * it + 2] = pi.z;
+        col[3 * it + 0] = color[0];
+        col[3 * it + 1] = color[1];
+        col[3 * it + 2] = color[2];
+        it += 1;
+        
     }
+    
+    return it;
 }
 
 void test_sph2_double_dam_break(){
@@ -161,7 +193,7 @@ void test_sph2_double_dam_break(){
     Grid2 *grid = cudaAllocateVx(Grid2, 1);
     SphSolver2 *solver = cudaAllocateVx(SphSolver2, 1);
     
-    int reso = (int)std::floor(lenc / (spacing * 1.8));
+    int reso = (int)std::floor(lenc / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -198,7 +230,7 @@ void test_sph2_double_dam_break(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver->Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver->Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver->SetColliders(collider);
     
     Float targetInterval = 1.0 / 240.0;
@@ -235,7 +267,7 @@ void test_sph2_water_drop(){
     Grid2 *grid = cudaAllocateVx(Grid2, 1);
     SphSolver2 *solver = cudaAllocateVx(SphSolver2, 1);
     
-    int reso = (int)std::floor(lenc / (spacing * 1.8));
+    int reso = (int)std::floor(lenc / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -268,7 +300,7 @@ void test_sph2_water_drop(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver->Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver->Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver->SetColliders(collider);
     
     Float targetInterval = 1.0 / 240.0;
@@ -303,7 +335,7 @@ void test_sph2_water_block(){
     Grid2 *grid = cudaAllocateVx(Grid2, 1);
     SphSolver2 *solver = cudaAllocateVx(SphSolver2, 1);
     
-    int reso = (int)std::floor(lenc / (spacing * 1.8));
+    int reso = (int)std::floor(lenc / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -329,7 +361,7 @@ void test_sph2_water_block(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver->Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver->Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver->SetColliders(collider);
     
     Float targetInterval = 1.0 / 240.0;
@@ -363,7 +395,7 @@ void test_sph2_water_sphere(){
     Grid2 *grid = cudaAllocateVx(Grid2, 1);
     SphSolver2 *solver = cudaAllocateVx(SphSolver2, 1);
     
-    int reso = (int)std::floor(2 * r2 / (spacing * 1.8));
+    int reso = (int)std::floor(2 * r2 / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -388,7 +420,7 @@ void test_sph2_water_sphere(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver->Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver->Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver->SetColliders(collider);
     
     Float targetInterval = 1.0 / 248.0;
@@ -425,7 +457,7 @@ void test_sph2_gas_sphere(){
     // NOTE: The higher the resolution the better for us
     //       since we can better explore GPU and our partitioning
     //       does not rely on sorting.
-    int reso = (int)std::floor(2 * r2 / (spacing * 1.8));
+    int reso = (int)std::floor(2 * r2 / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
     vec2ui res(reso, reso);
     
@@ -449,7 +481,7 @@ void test_sph2_gas_sphere(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver->Setup(targetDensity, spacing, 1.8, grid, sphSet);
+    solver->Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver->SetColliders(collider);
     
     Float targetInterval = 1.0 / 2048.0;

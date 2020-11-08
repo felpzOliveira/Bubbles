@@ -95,6 +95,8 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     Float remainingTime = timeIntervalInSeconds;
     
     SphSolverData2 *data = solverData->sphData;
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    Float h = data->sphpSet->GetKernelRadius();
     
     advanceTimer.Reset();
     advanceTimer.Start();
@@ -111,10 +113,11 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     advanceTimer.Stop();
     
     CNMInvalidateCells(data->domain);
+    pSet->ClearDataBuffer(&pSet->v0s);
     
     Float elapsed = advanceTimer.GetElapsedCPU(0);
     cnmTimer.Start();
-    CNMClassifyLazyGPU(data->domain);
+    CNMBoundary(pSet, data->domain, h, 1);
     cnmTimer.Stop();
     
     Float cnm = cnmTimer.GetElapsedGPU(0);
@@ -156,8 +159,8 @@ __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
     massOverTargetDensitySquared *= massOverTargetDensitySquared;
     deltaDenom = ComputeDeltaDenom();
     
-    printf("Radius : %g  Mass: %g  Density: %g  Spacing: %g, Particle Count: %d, Delta: %g\n", 
-           rad, mass, targetDensity, targetSpacing, actualCount, deltaDenom);
+    printf("[PCISPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d, Delta: %g\n", 
+           rad, targetSpacing, actualCount, deltaDenom);
     
     // Perform a particle distribution so that distribution
     // during simulation can be optmized

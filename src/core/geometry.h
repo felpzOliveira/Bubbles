@@ -70,8 +70,8 @@ Float rand_float();
 
 /*
 * NOTE: The Inside routines for BoundsN<T> are considering Epsilons 
-* to get the idea of a particle that lies on a edge. This is not correct
-* this particle should be marked as outside however Inside is only used
+* to get the idea of a particle that lies on a edge. This is not correct,
+* this particle should be marked as outside, however Inside is only used for
 * hash sanitizing to check particle hashing is working and the hash
 * must choose a bound for a edge particle so re-use Inside with care.
 */
@@ -859,6 +859,10 @@ template<typename T> inline __bidevice__ vec3<T> Sin(const vec3<T> &v){
 
 template<typename T> inline __bidevice__ vec4<T> Sin(const vec4<T> &v){
     return vec4<T>(std::sin(v.x), std::sin(v.y), std::sin(v.z), std::sin(v.w));
+}
+
+template<typename T> inline __bidevice__ T MinComponent(const vec2<T> &v){
+    return Min(v.x, v.y);
 }
 
 template<typename T> inline __bidevice__ T MinComponent(const vec3<T> &v){

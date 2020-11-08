@@ -33,13 +33,13 @@ ARGUMENT_PROCESS(sdf_view_arg){
 
 ARGUMENT_PROCESS(sdf_in_arg){
     sdf_opts *opts = (sdf_opts *)config;
-    opts->input = ParseNext(argc, argv, i, "--in");
+    opts->input = ParseNext(argc, argv, i, "-in");
     return 0;
 }
 
 ARGUMENT_PROCESS(sdf_scale_arg){
     sdf_opts *opts = (sdf_opts *)config;
-    Float scale = ParseNextFloat(argc, argv, i, "--scale");
+    Float scale = ParseNextFloat(argc, argv, i, "-scale");
     opts->scale = scale;
     opts->transform = Scale(scale) * opts->transform;
     return 0;
@@ -47,7 +47,7 @@ ARGUMENT_PROCESS(sdf_scale_arg){
 
 ARGUMENT_PROCESS(sdf_origin_arg){
     sdf_opts *opts = (sdf_opts *)config;
-    std::string strdist = ParseNext(argc, argv, i, "--origin", 3);
+    std::string strdist = ParseNext(argc, argv, i, "-origin", 3);
     const char *ptr = strdist.c_str();
     ParseV3(&opts->camEye, &ptr);
     return 0;
@@ -55,38 +55,38 @@ ARGUMENT_PROCESS(sdf_origin_arg){
 
 ARGUMENT_PROCESS(sdf_target_arg){
     sdf_opts *opts = (sdf_opts *)config;
-    std::string strdist = ParseNext(argc, argv, i, "--target", 3);
+    std::string strdist = ParseNext(argc, argv, i, "-target", 3);
     const char *ptr = strdist.c_str();
     ParseV3(&opts->camAt, &ptr);
     return 0;
 }
 
 std::map<const char *, arg_desc> sdf_arg_map = {
-    {"--view",
+    {"-view",
         {
             .processor = sdf_view_arg,
             .help = "Use Graphy to view the generated SDF."
         }
     },
-    {"--in",
+    {"-in",
         {
             .processor = sdf_in_arg,
             .help = "Where to read input geometry."
         }
     },
-    {"--scale",
+    {"-scale",
         {
             .processor = sdf_scale_arg,
             .help = "Scale the input geometry uniformly."
         }
     },
-    {"--origin",
+    {"-origin",
         {
             .processor = sdf_origin_arg,
             .help = "When viewing, set the origin of the view point."
         }
     },
-    {"--target",
+    {"-target",
         {
             .processor = sdf_target_arg,
             .help = "When viewing, set the target of the view point."

@@ -36,19 +36,19 @@ const std::string ColorsString[] = {
 
 ARGUMENT_PROCESS(pbrt_input_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
-    opts->input = ParseNext(argc, argv, i, "--in");
+    opts->input = ParseNext(argc, argv, i, "-in");
     return 0;
 }
 
 ARGUMENT_PROCESS(pbrt_output_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
-    opts->output = ParseNext(argc, argv, i, "--out");
+    opts->output = ParseNext(argc, argv, i, "-out");
     return 0;
 }
 
 ARGUMENT_PROCESS(pbrt_radius_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
-    Float radius = ParseNextFloat(argc, argv, i, "--radius");
+    Float radius = ParseNextFloat(argc, argv, i, "-radius");
     opts->radius = radius;
     return 0;
 }
@@ -79,7 +79,7 @@ ARGUMENT_PROCESS(pbrt_filtered_arg){
 
 ARGUMENT_PROCESS(pbrt_level_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
-    std::string value = ParseNext(argc, argv, i, "--level");
+    std::string value = ParseNext(argc, argv, i, "-level");
     const char *token = value.c_str();
     opts->level = (int)ParseFloat(&token);
     opts->mode = RenderMode::LEVEL;
@@ -88,7 +88,7 @@ ARGUMENT_PROCESS(pbrt_level_arg){
 
 ARGUMENT_PROCESS(pbrt_rotate_y_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
-    std::string value = ParseNext(argc, argv, i, "--rotateY");
+    std::string value = ParseNext(argc, argv, i, "-rotateY");
     const char *token = value.c_str();
     Float rotate = ParseFloat(&token);
     opts->transform = RotateY(rotate) * opts->transform;
@@ -97,7 +97,7 @@ ARGUMENT_PROCESS(pbrt_rotate_y_arg){
 
 ARGUMENT_PROCESS(pbrt_rotate_z_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
-    std::string value = ParseNext(argc, argv, i, "--rotateZ");
+    std::string value = ParseNext(argc, argv, i, "-rotateZ");
     const char *token = value.c_str();
     Float rotate = ParseFloat(&token);
     opts->transform = RotateZ(rotate) * opts->transform;
@@ -106,7 +106,7 @@ ARGUMENT_PROCESS(pbrt_rotate_z_arg){
 
 ARGUMENT_PROCESS(pbrt_rotate_x_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
-    std::string value = ParseNext(argc, argv, i, "--rotateX");
+    std::string value = ParseNext(argc, argv, i, "-rotateX");
     const char *token = value.c_str();
     Float rotate = ParseFloat(&token);
     opts->transform = RotateX(rotate) * opts->transform;
@@ -116,7 +116,7 @@ ARGUMENT_PROCESS(pbrt_rotate_x_arg){
 ARGUMENT_PROCESS(pbrt_translate_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
     vec3f delta;
-    std::string value = ParseNext(argc, argv, i, "--translate", 3);
+    std::string value = ParseNext(argc, argv, i, "-translate", 3);
     const char *token = value.c_str();
     ParseV3(&delta, &token);
     opts->transform = Translate(delta) * opts->transform;
@@ -126,7 +126,7 @@ ARGUMENT_PROCESS(pbrt_translate_arg){
 ARGUMENT_PROCESS(pbrt_clip_arg){
     vec3f data;
     pbrt_opts *opts = (pbrt_opts *)config;
-    std::string value = ParseNext(argc, argv, i, "--clip-plane", 3);
+    std::string value = ParseNext(argc, argv, i, "-clip-plane", 3);
     const char *token = value.c_str();
     ParseV3(&data, &token);
     opts->cutSource = data[0];
@@ -137,67 +137,67 @@ ARGUMENT_PROCESS(pbrt_clip_arg){
 }
 
 std::map<const char *, arg_desc> pbrt_argument_map = {
-    {"--in", 
+    {"-in", 
         { .processor = pbrt_input_arg, 
             .help = "Where to read input file." 
         }
     },
-    {"--out", 
+    {"-out", 
         { .processor = pbrt_output_arg, 
             .help = "Where to write output." 
         }
     },
-    {"--radius", 
+    {"-radius", 
         { .processor = pbrt_radius_arg, 
             .help = "Radius to use for particle cloud. (default: 0.012)" 
         }
     },
-    {"--ppos", 
+    {"-ppos", 
         { .processor = pbrt_serializer_pos_arg, 
             .help = "Input format contains position. (default)" 
         }
     },
-    {"--pbod", 
+    {"-pbod", 
         { .processor = pbrt_serializer_bod_arg, 
             .help = "Input format contains boundary." 
         }
     },
-    {"--layered", 
+    {"-layered", 
         { .processor = pbrt_layered_arg, 
             .help = "Generates geometry containing only CNM-based layered boundary particles." 
         }
     },
-    {"--filtered", 
+    {"-filtered", 
         { .processor = pbrt_filtered_arg, 
             .help = "Generates geometry containing CNM-based layer and interior particles as gray." 
         }
     },
-    {"--level", 
+    {"-level", 
         { .processor = pbrt_level_arg, 
             .help = "Generates geometry containing only a specific level of CNM classification." 
         }
     },
-    {"--rotateY", 
+    {"-rotateY", 
         { .processor = pbrt_rotate_y_arg, 
             .help = "Rotate input in the Y direction. (degrees)" 
         }
     },
-    {"--rotateZ", 
+    {"-rotateZ", 
         { .processor = pbrt_rotate_z_arg, 
             .help = "Rotate input in the Z direction. (degrees)" 
         }
     },
-    {"--rotateX", 
+    {"-rotateX", 
         { .processor = pbrt_rotate_x_arg, 
             .help = "Rotate input in the X direction. (degrees)" 
         }
     },
-    {"--translate", 
+    {"-translate", 
         { .processor = pbrt_translate_arg, 
             .help = "Translate input set. (degrees)" 
         }
     },
-    {"--clip-plane", 
+    {"-clip-plane", 
         { .processor = pbrt_clip_arg, 
             .help = "Specify parameters to perform plane clip, <source> <distance> <axis>." 
         }

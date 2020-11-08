@@ -134,6 +134,7 @@ __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particl
 // Perform computation on CPU {easy debug}
 __bidevice__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure = 1);
 __bidevice__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure = 1);
+__bidevice__ void ComputeNormalCPU(SphSolverData3 *data);
 __bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep);
 __bidevice__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
 __bidevice__ void ComputeNonPressureForceCPU(SphSolverData3 *data);
@@ -145,6 +146,7 @@ __bidevice__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tm
 // Perform computation on GPU
 __host__ void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure = 1);
 __host__ void ComputeDensityGPU(SphSolverData3 *data, int compute_pressure = 1);
+__host__ void ComputeNormalGPU(SphSolverData3 *data);
 __host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep);
 __host__ void ComputePressureForceGPU(SphSolverData3 *data, Float timeStep);
 __host__ void ComputeNonPressureForceGPU(SphSolverData2 *data);

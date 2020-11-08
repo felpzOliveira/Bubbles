@@ -229,7 +229,7 @@ __host__ void SphGasSolver2::Advance(Float timeIntervalInSeconds){
         numberOfIntervalsRunned += 1;
     }
     
-    CNMComputeBoundary(data->domain);
+    CNMClassifyLazyGPU(data->domain);
 }
 
 
@@ -249,7 +249,7 @@ __host__ void SphGasSolver2::Setup(Float targetDensity, Float targetSpacing,
     else
         UpdateGridDistributionGPU(data);
     
-    maxLevel = CNMComputeBoundary(data->domain);
+    maxLevel = CNMClassifyLazyGPU(data->domain);
     
     if(use_cpu)
         ComputeInitialTemperatureMapCPU(data, data->Tmin, data->Tmax, maxLevel);

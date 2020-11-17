@@ -105,6 +105,7 @@ void test_pcisph2_double_dam_break();
 void test_pcisph2_water_drop();
 void test_pcisph2_water_block_cnm();
 
+// As you can see, I'm having a lot fun with the pcisph3 solver
 void test_pcisph3_water_sphere();
 void test_pcisph3_double_dam_break();
 void test_pcisph3_dragon();
@@ -117,6 +118,7 @@ void test_pcisph3_multiple_emission();
 void test_pcisph3_dragon_shower();
 void test_pcisph3_ball_many_emission();
 void test_pcisph3_box_many_emission();
+void test_pcisph3_water_drop();
 
 void test_espic_1D();
 void test_espic_particles_2D();

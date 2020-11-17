@@ -206,3 +206,6 @@ __host__ void CreateShapeSDFCPU(FieldGrid3f *grid, ParsedMesh *mesh, Shape *shap
 */
 __bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
                                     const Bounds3f &bounds);
+
+__bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p, 
+                                         Float radius, Float offset=0.0f);

@@ -106,6 +106,8 @@ void test(){
     delete[] pos;
 }
 
+void test_cnm_happy_whale();
+void test_pcisph3_dragon_pool();
 int main(int argc, char **argv){
     printf("* Bubbles Fluid Simulator - Built %s at %s *\n", __DATE__, __TIME__);
     cudaInitEx();
@@ -114,7 +116,13 @@ int main(int argc, char **argv){
     //test_pcisph2_marching_squares();
     //test_pcisph3_box_many_emission();
     //test_pcisph2_water_block_cnm();
-    test_pcisph3_double_dam_break();
+	//test_pcisph3_quadruple_dam();
+    //test_pcisph3_double_dam_break();
+    //test_pcisph3_water_drop();
+    //test_pcisph3_happy_whale();
+    //test_cnm_happy_whale();
+    //test_pcisph2_water_block_cnm();
+    test_pcisph3_dragon_pool();
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else

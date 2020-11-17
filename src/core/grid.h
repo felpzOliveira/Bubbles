@@ -209,6 +209,8 @@ class Grid{
     int maxLevels; // in case CNM was executed, mark the max level value {unsafe}
     int indicator; // flag for GPU-domain based operations
     int *neighborListPtr; // address of the first neighborList
+    int *activeCells; // list of cells that actually have particle in them
+    int activeCellsCount; // amount of active cells at any given moment
     
     __bidevice__ Grid(){ SetDimension(T(0)); }
     __bidevice__ void SetDimension(const Float &u){ (void)u; dimensions = 1; }
@@ -220,6 +222,7 @@ class Grid{
     __bidevice__ T GetCellSize(){ return cellsLen; }
     __bidevice__ int GetDimensions(){ return dimensions; }
     __bidevice__ unsigned int GetCellCount(){ return total; }
+    __bidevice__ int GetActiveCellCount(){ return activeCellsCount; }
     __bidevice__ U GetIndexCount(){ return usizes; }
     __bidevice__ Float GetCellSizeOn(int axis){
         AssertA(axis >= 0 && axis < dimensions, "Invalid axis given for CellSizeOn");
@@ -234,6 +237,19 @@ class Grid{
         AssertA(cellId >= 0 && cellId < total, "Invalid cellId for GetCellLevel");
         Cell<Q> *cell = &cells[cellId];
         return cell->GetLevel();
+    }
+    
+    __bidevice__ int GetActiveCellId(int qid){
+        if(!(qid >= 0 && qid < activeCellsCount)){
+            printf("Got query for %d but have only %d\n", qid, activeCellsCount);
+        }
+        AssertA(qid >= 0 && qid < activeCellsCount, "Invalid cellId for GetActiveCellId");
+        return activeCells[qid];
+    }
+    
+    __bidevice__ Cell<Q> *GetActiveCell(int qid){
+        AssertA(qid >= 0 && qid < activeCellsCount, "Invalid cellId for GetActiveCell");
+        return &cells[activeCells[qid]];
     }
     
     __bidevice__ Cell<Q> *GetCell(int cellId){
@@ -389,7 +405,7 @@ class Grid{
     
     template<typename ParticleType = ParticleSet<T>>
         __bidevice__ void DistributeToCellOpt(ParticleType **ppSet, int n, 
-                                              unsigned int cellId)
+                                              unsigned int cellId, int repeat=1)
     {
         AssertA(cellId < total, "Invalid distribution cell id");
         int *neighbors = nullptr;
@@ -401,7 +417,7 @@ class Grid{
             int size = neighbor->GetChainLength();
             ParticleChain *pChain = neighbor->GetChain();
             for(int j = 0; j < size; j++){
-                AssertA(pChain, "Unstabble simulation, not a valid chain configuration");
+                AssertA(pChain != NULL, "Unstabble simulation, not a valid chain configuration");
                 ParticleType *pSet = NULL;
                 for(int i = 0; i < n; i++){
                     pSet = ppSet[i];
@@ -491,6 +507,9 @@ class Grid{
     
     /* Computes and allocates the cells for this grid */
     __host__ void Build(const U &resolution, const T &dp0, const T &dp1);
+    
+    /* Sets and compute grid usage */
+    __host__ void UpdateQueryState();
 };
 
 template<typename T, typename U, typename Q>
@@ -548,6 +567,8 @@ __host__ void Grid<T, U, Q>::Build(const U &resolution, const T &dp0, const T &d
     
     cells = cudaAllocateVx(Cell<Q>, total);
     neighborListPtr = cudaAllocateVx(int, total * 27);
+    activeCells = cudaAllocateVx(int, total);
+    activeCellsCount = 0;
     
     printf("Building acceleration query list [%d] ... ", total);
     fflush(stdout);
@@ -557,10 +578,36 @@ __host__ void Grid<T, U, Q>::Build(const U &resolution, const T &dp0, const T &d
     printf("OK\n");
 }
 
+template<typename T, typename U, typename Q>
+__host__ void Grid<T, U, Q>::UpdateQueryState(){
+    int it = 0;
+    for(int i = 0; i < total; i++){
+        Cell<Q> *cell = &cells[i];
+        if(cell->GetChainLength() > 0){
+            activeCells[it++] = i;
+        }else{
+            cell->SetLevel(0);
+        }
+    }
+    
+    activeCellsCount = it;
+}
 
 typedef Grid<vec1f, vec1ui, Bounds1f> Grid1;
 typedef Grid<vec2f, vec2ui, Bounds2f> Grid2;
 typedef Grid<vec3f, vec3ui, Bounds3f> Grid3;
+
+
+template<typename T, typename U, typename Q>
+__host__ void ResetAndDistribute(Grid<T, U, Q> *grid, ParticleSet<T> *pSet){
+    if(grid && pSet){
+        for(int i = 0; i < grid->GetCellCount(); i++){
+            grid->DistributeResetCell(i);
+        }
+        
+        grid->DistributeByParticle(pSet);
+    }
+}
 
 inline __host__ Grid2 *MakeGrid(const vec2ui &size, const vec2f &pMin, const vec2f &pMax){
     Grid2 *grid = cudaAllocateVx(Grid2, 1);
@@ -942,15 +989,15 @@ class FieldGrid{
         
         if(dimensions == 3){
             return Trilerp(
-                GetValueAt(ii), // (i,j,k)
-                GetValueAt(U(jj[0], ii[1], ii[2])), // (i+1,j,k)
-                GetValueAt(U(ii[0], jj[1], ii[2])), // (i,j+1,k)
-                GetValueAt(U(jj[0], jj[1], ii[2])), // (i+1,j+1,k)
-                GetValueAt(U(ii[0], ii[1], jj[2])), // (i,j,k+1)
-                GetValueAt(U(jj[0], ii[1], jj[2])), // (i+1,j,k+1)
-                GetValueAt(U(ii[0], jj[1], jj[2])), // (i,j+1,k+1)
-                GetValueAt(jj),  // (i+1,j+1,k+1)
-                weight[0], weight[1], weight[2]);
+                           GetValueAt(ii), // (i,j,k)
+                           GetValueAt(U(jj[0], ii[1], ii[2])), // (i+1,j,k)
+                           GetValueAt(U(ii[0], jj[1], ii[2])), // (i,j+1,k)
+                           GetValueAt(U(jj[0], jj[1], ii[2])), // (i+1,j+1,k)
+                           GetValueAt(U(ii[0], ii[1], jj[2])), // (i,j,k+1)
+                           GetValueAt(U(jj[0], ii[1], jj[2])), // (i+1,j,k+1)
+                           GetValueAt(U(ii[0], jj[1], jj[2])), // (i,j+1,k+1)
+                           GetValueAt(jj),  // (i+1,j+1,k+1)
+                           weight[0], weight[1], weight[2]);
         }else{
             printf("TODO: Implement interpolation for %d dimension\n", dimensions);
             return F(0);
@@ -1103,6 +1150,7 @@ class ContinuousParticleSetBuilder{
                 Cell<Q> *cell = grid->GetCell(h);
                 ParticleChain *pChain = cell->GetChain();
                 int size = cell->GetChainLength();
+                AssureA(size > 0, "Called for MapGrid but grid is inconsistent, missing first distribution?");
                 
                 for(int j = 0; j < size; j++){
                     T pj = particleSet->GetParticlePosition(pChain->pId);
@@ -1112,6 +1160,15 @@ class ContinuousParticleSetBuilder{
                 
                 mappedPositions[h] = pos;
             }
+        }
+        
+        std::set<unsigned int>::iterator it;
+        for(it = mappedCellSet.begin(); it != mappedCellSet.end(); it++){
+            unsigned int h = *it;
+            std::vector<T> pos = mappedPositions[h];
+            Cell<Q> *cell = mappedDomain->GetCell(h);
+            AssureA(pos.size() == cell->GetChainLength(),
+                    "Inconsistent grid mapping detected, invalid first distribution?");
         }
     }
     
@@ -1140,14 +1197,14 @@ class ContinuousParticleSetBuilder{
                     if(AddParticle(pi, velocity(pi))){
                         numNewParticles++;
                     }else{
-                        Commit(1);
+                        Commit();
                         return;
                     }
                 }
             }
         }
         
-        if(numNewParticles > 0) Commit(1);
+        if(numNewParticles > 0) Commit();
     }
     
     __host__ int AddParticle(const T &pos, const T &vel = T(0),
@@ -1168,12 +1225,12 @@ class ContinuousParticleSetBuilder{
         return ok;
     }
     
-    __host__ void Commit(int distribute=0){
+    __host__ void Commit(){
         if(positions.size() > 0){
             int startId = particleSet->GetParticleCount();
             particleSet->AppendData(positions.data(), velocities.data(),
                                     forces.data(), positions.size());
-            if(distribute)
+            if(mappedDomain != nullptr)
                 mappedDomain->DistributeByParticleList(particleSet, positions.data(), 
                                                        positions.size(), startId);
             positions.clear();

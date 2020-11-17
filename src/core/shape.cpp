@@ -295,6 +295,16 @@ __host__ void CreateShapeSDFCPU(FieldGrid3f *grid, ParsedMesh *mesh, Shape *shap
     }
 }
 
+__bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p, 
+                                         Float radius, Float offset)
+{
+    if(meshShape == nullptr) return false;
+    if(meshShape->grid == nullptr) return false;
+    ClosestPointQuery colliderPoint;
+    meshShape->ClosestPoint(p, &colliderPoint);
+    return Absf(colliderPoint.signedDistance) < radius + offset;
+}
+
 __host__ void GenerateMeshShapeSDF(Shape *shape, Float dx, Float margin){
     if(shape->type != ShapeType::ShapeMesh){
         printf("Warning: Called for SDF generation on non-mesh shape\n");

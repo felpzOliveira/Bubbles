@@ -1258,6 +1258,11 @@ class Bounds2 {
         pMax += vec2<T>(Absf(d));
     }
     
+    __bidevice__ void Reduce(Float d){
+        pMin += vec2<T>(Absf(d));
+        pMax -= vec2<T>(Absf(d));
+    }
+    
     __bidevice__ T LengthAt(int i, int axis) const{
         Assert(axis == 0 || axis == 1);
         return (i == 0) ? pMin[axis] : pMax[axis];
@@ -1365,6 +1370,11 @@ class Bounds3 {
     __bidevice__ void Expand(Float d){
         pMin -= vec3<T>(Absf(d));
         pMax += vec3<T>(Absf(d));
+    }
+    
+    __bidevice__ void Reduce(Float d){
+        pMin += vec3<T>(Absf(d));
+        pMax -= vec3<T>(Absf(d));
     }
     
     __bidevice__ vec3<T> Corner(int corner) const{

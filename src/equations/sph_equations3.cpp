@@ -54,7 +54,7 @@ __bidevice__ void ComputeDensityFor(SphSolverData3 *data, int particleId,
         ComputePressureFor(data, particleId, di);
     }
     
-    if(IsZero(di) && debug != 1){
+    if(IsZero(di) && debug == 1){
         printf("Count = %d (%d), Id = %d {%g}\n", scount, count, particleId, di);
     }
     
@@ -336,6 +336,7 @@ __bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId,
     pi += timeStep * vi;
     
     vec3f opi = pi;
+    
     data->collider->ResolveCollision(pSet->GetRadius(), 0.6, &pi, &vi);
     
     if(!Inside(pi, data->domain->bounds)){
@@ -460,7 +461,9 @@ __host__ void UpdateGridDistributionGPU(SphSolverData3 *data){
     Grid3 *grid = data->domain;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver3 has no domain for UpdateGridDistribution");
-    if(data->sphpSet->requiresHigherLevelUpdate){
+    
+    //TODO(Felipe): This is a bug - debug with dragon pool with spacing 0.05!
+    if(data->sphpSet->requiresHigherLevelUpdate || 1){
         //printf("Performing full distribution by excessive delta\n");
         for(int i = 0; i < data->domain->GetCellCount(); i++){
             data->domain->DistributeResetCell(i);

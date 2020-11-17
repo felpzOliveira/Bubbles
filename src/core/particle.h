@@ -149,6 +149,8 @@ class ParticleSet{
         densities.SetSize(n);
         pressures.SetSize(n);
         forces.SetSize(n);
+        normals.SetSize(n);
+        v0s.SetSize(n);
         radius = 1e-3;
         mass = 1e-3;
         familyId = 0;

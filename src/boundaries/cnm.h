@@ -76,8 +76,9 @@ template<typename T, typename U, typename Q>
 __global__ void CNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, 
                                     Float preDelta, Float h, int algorithm)
 {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < domain->GetCellCount()){
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    if(id < domain->GetActiveCellCount()){
+        int i = domain->GetActiveCellId(id);
         Cell<Q> *self = domain->GetCell(i);
         if(self->GetChainLength() > 0 && self->GetLevel() != 1){
             int *neighbors = nullptr;
@@ -103,28 +104,25 @@ __global__ void CNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 
 template<typename T, typename U, typename Q>
 __global__ void CNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < domain->GetCellCount()){
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    if(id < domain->GetActiveCellCount()){
         const int dim = domain->dimensions;
         int threshold = (dim == 3) ? 27 : 9;
+        int i = domain->GetActiveCellId(id);
         Cell<Q> *self = domain->GetCell(i);
         self->SetLevel(-1);
-        if(self->GetChainLength() == 0){
-            self->SetLevel(0);
+        int *neighbors = nullptr;
+        int count = domain->GetNeighborsOf(i, &neighbors);
+        if(count != threshold){
+            self->SetLevel(1);
+            CNMBoundaryLNSet(pSet, self, 1);
         }else{
-            int *neighbors = nullptr;
-            int count = domain->GetNeighborsOf(i, &neighbors);
-            if(count != threshold){
-                self->SetLevel(1);
-                CNMBoundaryLNSet(pSet, self, 1);
-            }else{
-                for(int i = 0; i < count; i++){
-                    Cell<Q> *cell = domain->GetCell(neighbors[i]);
-                    if(cell->GetChainLength() == 0){
-                        self->SetLevel(1);
-                        CNMBoundaryLNSet(pSet, self, 1);
-                        break;
-                    }
+            for(int i = 0; i < count; i++){
+                Cell<Q> *cell = domain->GetCell(neighbors[i]);
+                if(cell->GetChainLength() == 0){
+                    self->SetLevel(1);
+                    CNMBoundaryLNSet(pSet, self, 1);
+                    break;
                 }
             }
         }
@@ -139,14 +137,16 @@ __host__ void CNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                           Float h, int algorithm=0)
 {
     T len = domain->GetCellSize();
-    Float mind = MinComponent(len);
-    Float delta = std::pow((mind / h), (Float)domain->dimensions); // eq 3.14
+    Float maxd = MaxComponent(len);
+    Float delta = 0.5 * std::pow((maxd / h * 0.5), (Float)domain->dimensions); // eq 3.14
+    printf("Delta is %g\n", delta);
     
     /* Classify L1 */
-    GPULaunch(domain->total, GPUKernel(CNMBoundaryL1Kernel<T, U, Q>), pSet, domain);
+    GPULaunch(domain->GetActiveCellCount(), 
+              GPUKernel(CNMBoundaryL1Kernel<T, U, Q>), pSet, domain);
     
     /* Filter L2 */
-    GPULaunch(domain->total, GPUKernel(CNMBoundaryL2Kernel<T, U, Q>), 
+    GPULaunch(domain->GetActiveCellCount(), GPUKernel(CNMBoundaryL2Kernel<T, U, Q>), 
               pSet, domain, delta, h, algorithm);
 }
 

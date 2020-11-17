@@ -206,9 +206,9 @@ isOneShot(isOneShot), allowOverlapping(allowOverlapping)
 {
     (void)seed;
     generator = new BccLatticePointGenerator();
+    withValidator = 0;
     emittedParticles = 0;
 }
-
 __host__ VolumeParticleEmitter3::VolumeParticleEmitter3(Shape *_shape, Float spacing, 
                                                         const vec3f &initialVel,
                                                         const vec3f &linearVel,
@@ -222,7 +222,15 @@ isOneShot(isOneShot), allowOverlapping(allowOverlapping)
     (void)seed;
     generator = new BccLatticePointGenerator();
     emittedParticles = 0;
+    withValidator = 0;
 }
+
+__host__ void
+VolumeParticleEmitter3::SetValidator(std::function<int(const vec3f &)> gValidator){
+    withValidator = 1;
+    validatorFunc = gValidator;
+}
+
 
 __host__ void VolumeParticleEmitter3::SetJitter(Float jit){
     jitter = Clamp(jit, 0.0, 1.0);
@@ -240,6 +248,10 @@ __host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
     
     if(emitter->isOneShot){
         auto Accept = [&](const vec3f &point) -> bool{
+            if(emitter->withValidator){
+                if(!emitter->validatorFunc(point)) return true;
+            }
+            
             vec2f u(rand_float(), rand_float());
             vec3f randomDir = SampleSphere(u);
             vec3f offset = maxJitter * randomDir;
@@ -335,6 +347,13 @@ __host__ void VolumeParticleEmitterSet3::AddEmitter(Shape *shape, const Bounds3f
     emitters.push_back(new VolumeParticleEmitter3(shape, bounds, spacing, initialVel,
                                                   linearVel, angularVel, maxParticles,
                                                   jitter, isOneShot, allowOverlapping, seed));
+}
+
+__host__ void
+VolumeParticleEmitterSet3::SetValidator(std::function<int(const vec3f &)> gValidator){
+    for(VolumeParticleEmitter3 *emitter : emitters){
+        emitter->SetValidator(gValidator);
+    }
 }
 
 __host__ void VolumeParticleEmitterSet3::SetJitter(Float jitter){

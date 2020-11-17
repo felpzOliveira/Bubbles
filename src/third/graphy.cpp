@@ -99,11 +99,13 @@ static void graphy_initialize(int width, int height){
 }
 
 void graphy_close_display(){
-    graphy_display_close(display);
-    display = nullptr;
-    graphy_ok = 0;
-    if(colors) delete[] colors;
-    colors = nullptr;
+    if(display){
+        graphy_display_close(display);
+        display = nullptr;
+        graphy_ok = 0;
+        if(colors) delete[] colors;
+        colors = nullptr;
+    }
 }
 
 static void set_colors_by_rgb(float rgb[3], int num){

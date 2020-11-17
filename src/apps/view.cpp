@@ -127,10 +127,24 @@ ARGUMENT_PROCESS(view_sdf_scale_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(view_sdf_rotate_arg){
+ARGUMENT_PROCESS(view_sdf_rotate_y_arg){
     view_opts *opts = (view_opts *)config;
-    Float angle = ParseNextFloat(argc, argv, i, "-sdf-rotate");
+    Float angle = ParseNextFloat(argc, argv, i, "-sdf-rotate-y");
     opts->transform = RotateY(angle) * opts->transform;
+    return 0;
+}
+
+ARGUMENT_PROCESS(view_sdf_rotate_x_arg){
+    view_opts *opts = (view_opts *)config;
+    Float angle = ParseNextFloat(argc, argv, i, "-sdf-rotate-x");
+    opts->transform = RotateX(angle) * opts->transform;
+    return 0;
+}
+
+ARGUMENT_PROCESS(view_sdf_rotate_z_arg){
+    view_opts *opts = (view_opts *)config;
+    Float angle = ParseNextFloat(argc, argv, i, "-sdf-rotate-z");
+    opts->transform = RotateZ(angle) * opts->transform;
     return 0;
 }
 
@@ -201,10 +215,22 @@ std::map<const char *, arg_desc> view_arg_map = {
             .help = "Scales the SDF. (requires: -with-sdf)"
         }
     },
-    {"-sdf-rotate",
+    {"-sdf-rotate-y",
         {
-            .processor = view_sdf_rotate_arg,
+            .processor = view_sdf_rotate_y_arg,
             .help = "Rotates the SDF around the Y-axis. (requires: -with-sdf)"
+        }
+    },
+    {"-sdf-rotate-x",
+        {
+            .processor = view_sdf_rotate_x_arg,
+            .help = "Rotates the SDF around the X-axis. (requires: -with-sdf)"
+        }
+    },
+    {"-sdf-rotate-z",
+        {
+            .processor = view_sdf_rotate_z_arg,
+            .help = "Rotates the SDF around the Z-axis. (requires: -with-sdf)"
         }
     }
 };
@@ -221,8 +247,8 @@ void ViewDisplaySimulation(view_opts *opts){
     
     if(opts->meshObj.size() > 0){ // with-sdf
         sdfShape = MakeMesh(opts->meshObj.c_str(), opts->transform);
-        GenerateMeshShapeSDF(sdfShape, opts->radius/2.0);
-        UtilGetSDFParticles(sdfShape->grid, &sdfParticles, 0, opts->radius/2.0);
+        GenerateMeshShapeSDF(sdfShape, opts->radius);
+        UtilGetSDFParticles(sdfShape->grid, &sdfParticles, 0, opts->radius);
     }
     
     int bufferSize = partCount + sdfParticles.size();

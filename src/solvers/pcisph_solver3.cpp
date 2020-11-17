@@ -88,12 +88,13 @@ __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
     
     advanceTimer.Stop();
     
+    data->domain->UpdateQueryState();
     CNMInvalidateCells(data->domain);
     pSet->ClearDataBuffer(&pSet->v0s);
     
     Float elapsed = advanceTimer.GetElapsedCPU(0);
     cnmTimer.Start();
-    CNMBoundary(pSet, data->domain, h, 1);
+    CNMBoundary(pSet, data->domain, h, 0);
     cnmTimer.Stop();
     
     Float cnm = cnmTimer.GetElapsedGPU(0);

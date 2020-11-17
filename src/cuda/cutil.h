@@ -186,15 +186,15 @@ inline int GetBlockSize(F kernel, const char *fname){
 #define GPUKernel(...) (__VA_ARGS__)
 #define GPULaunchItens(nItems, __blockSize, call, ...)\
 {\
-    int __gridSize = (nItems + __blockSize - 1) / __blockSize;\
-    call<<<__gridSize, __blockSize>>>(__VA_ARGS__);\
-    cudaDeviceAssert(#call);\
+int __gridSize = (nItems + __blockSize - 1) / __blockSize;\
+call<<<__gridSize, __blockSize>>>(__VA_ARGS__);\
+cudaDeviceAssert(#call);\
 }
 
 #define GPULaunch(nItems, call, ...)\
 {\
-    int __blockSize = GetBlockSize(call, #call);\
-    GPULaunchItens(nItems, __blockSize, call, __VA_ARGS__);\
+int __blockSize = GetBlockSize(call, #call);\
+GPULaunchItens(nItems, __blockSize, call, __VA_ARGS__);\
 }
 
 #endif

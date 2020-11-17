@@ -92,9 +92,10 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
     
     CNMInvalidateCells(data->domain);
     pSet->ClearDataBuffer(&pSet->v0s);
+    data->domain->UpdateQueryState();
     
     timers.StopAndNext();
-    CNMBoundary(pSet, data->domain, h, 1);
+    CNMBoundary(pSet, data->domain, h, 0);
     timers.Stop();
     
 #ifdef PRINT_TIMER

@@ -81,6 +81,42 @@ __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBui
 */
 __host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *field);
 
+
+inline
+__host__ int UtilIsDomainContaining(Bounds3f domainBounds, std::vector<Bounds3f> testBounds)
+{
+    vec3f center = domainBounds.Center();
+    for(int i = 0; i < testBounds.size(); i++){
+        Bounds3f bound = testBounds[i];
+        vec3f otherCenter = bound.Center();
+        int rv = -1;
+        for(int i = 0; i < 3; i++){
+            Float S = 0, s = 0;
+            S = center[i] + domainBounds.ExtentOn(i) * 0.5;
+            s = otherCenter[i] + bound.ExtentOn(i) * 0.5;
+            if(S < s) { rv = i; break; }
+            
+            S = center[i] - domainBounds.ExtentOn(i) * 0.5;
+            s = otherCenter[i] - bound.ExtentOn(i) * 0.5;
+            if(S > s) { rv = i; break; }
+        }
+        
+        if(rv != -1){
+            vec3f p0 = domainBounds.pMin;
+            vec3f p1 = domainBounds.pMax;
+            vec3f v0 = bound.pMin;
+            vec3f v1 = bound.pMax;
+            printf("Warning: Domain {%g %g %g} x {%g %g %g} does not contain:\n" 
+                   "\t{%g %g %g} x {%g %g %g}\n", p0.x, p0.y, p0.z, p1.x, p1.y, p1.z,
+                   v0.x, v0.y, v0.z, v1.x, v1.y, v1.z);
+            printf("Offending axis: %d\n", rv);
+            return 0;
+        }
+    }
+    
+    return 1;
+}
+
 /*
 * Compute the bounds of a given particle set.
 */
@@ -95,6 +131,38 @@ __host__ Bounds3f UtilComputeParticleSetBounds(ParticleSet3 *pSet){
     }
     
     return bounds;
+}
+
+template<typename DataAccessor>
+inline __host__ Float UtilComputeMedium(DataAccessor *accessor, int size){
+    double value = 0;
+    for(int i = 0; i < size; i++){
+        value += accessor[i];
+    }
+    
+    value /= (double)size;
+    return (Float)value;
+}
+
+template<typename ParticleAccessor>
+inline __host__ int UtilFillBoundaryParticles(ParticleAccessor *pSet,
+                                              std::vector<int> *boundaries)
+{
+    int bCount = 0;
+    int pCount = pSet->GetParticleCount();
+    boundaries->clear();
+    
+    for(int i = 0; i < pCount; i++){
+        int L = pSet->GetParticleV0(i);
+        if(L > 0){
+            boundaries->push_back(L);
+            bCount ++;
+        }else{
+            boundaries->push_back(0);
+        }
+    }
+    
+    return bCount;
 }
 
 /*
@@ -185,7 +253,7 @@ inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
     }
     
     printf("\rStep (%d) : %d ms - Particles: %d - (CNM: %g ms %g%%) (Slower: %g ms %g%%) (Faster: %g ms %g%%)    ",
-           step, (int)advTime, pCount, last.timeTaken, last.simPercentage,
+           step, (int)advTime, pCount, average.timeTaken, average.simPercentage,
            slower.timeTaken, slower.simPercentage, faster.timeTaken, faster.simPercentage);
     if(takeFrame) printf("\n");
 }

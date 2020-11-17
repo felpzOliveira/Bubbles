@@ -19,11 +19,11 @@ __bidevice__ int ParticleBySDF(const vec3f &p, FieldGrid3f *sdf, Float sdfThresh
 __host__ int UtilGetSDFParticles(FieldGrid3f *sdf, std::vector<vec3f> *particles,
                                  Float sdfThreshold, Float spacing, int absolute)
 {
-    vec3f p0 = sdf->bounds.pMin;
-    vec3f p1 = sdf->bounds.pMax;
     Float h = spacing;
     int added = 0;
     if(sdf){
+        vec3f p0 = sdf->bounds.pMin;
+        vec3f p1 = sdf->bounds.pMax;
         for(Float x = p0.x; x < p1.x; x += h){
             for(Float y = p0.y; y < p1.y; y += h){
                 for(Float z = p0.z; z < p1.z; z += h){

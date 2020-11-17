@@ -162,7 +162,7 @@ void test_pcisph2_water_block(){
 
 void test_pcisph2_water_block_cnm(){
     printf("===== SPH Solver 2D -- Water Block CNM\n");
-    Float spacing = 0.02;
+    Float spacing = 0.01;
     Float targetDensity = WaterDensity;
     vec2f center(0,0);
     Float lenc = 2;

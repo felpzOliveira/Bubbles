@@ -53,16 +53,11 @@ ARGUMENT_PROCESS(pbrt_radius_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_serializer_pos_arg){
+ARGUMENT_PROCESS(pbrt_serializer_inform_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
-    opts->flags |= SERIALIZER_POSITION;
-    return 0;
-}
-
-ARGUMENT_PROCESS(pbrt_serializer_bod_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
-    opts->flags |= SERIALIZER_BOUNDARY;
-    return 0;
+    std::string format = ParseNext(argc, argv, i, "-inform", 1);
+    opts->flags = SerializerFlagsFromString(format.c_str());
+    return opts->flags < 0 ? -1 : 0;
 }
 
 ARGUMENT_PROCESS(pbrt_layered_arg){
@@ -152,14 +147,9 @@ std::map<const char *, arg_desc> pbrt_argument_map = {
             .help = "Radius to use for particle cloud. (default: 0.012)" 
         }
     },
-    {"-ppos", 
-        { .processor = pbrt_serializer_pos_arg, 
-            .help = "Input format contains position. (default)" 
-        }
-    },
-    {"-pbod", 
-        { .processor = pbrt_serializer_bod_arg, 
-            .help = "Input format contains boundary." 
+    {"-inform", 
+        { .processor = pbrt_serializer_inform_arg, 
+            .help = "Input data format. (<p><n><m><b><d><o>)" 
         }
     },
     {"-layered", 

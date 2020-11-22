@@ -6,6 +6,10 @@ __host__ TimerList::TimerList(){
     active = 0;
 }
 
+__host__ int TimerList::Active(){
+    return active;
+}
+
 __host__ void TimerList::Start(){
     if(!gpuTimer || !cpuTimer){
         GPUTimer *gTimer = new GPUTimer;
@@ -67,12 +71,12 @@ __host__ Float TimerList::GetElapsedCPU(int i){
     return t;
 }
 
-__host__ void CNMStats::Add(CNMData data){
-    rawCNMData.push_back(data);
+__host__ void LNMStats::Add(LNMData data){
+    rawLNMData.push_back(data);
 }
 
-__host__ CNMData CNMStats::Average(CNMData *faster, CNMData *slower){
-    CNMData res;
+__host__ LNMData LNMStats::Average(LNMData *faster, LNMData *slower){
+    LNMData res;
     Float fastTime = FLT_MAX;
     Float slowTime = -FLT_MAX;
     int fastId = 0;
@@ -81,8 +85,8 @@ __host__ CNMData CNMStats::Average(CNMData *faster, CNMData *slower){
     
     res.timeTaken = 0;
     res.simPercentage = 0;
-    if(rawCNMData.size() > 0){
-        for(CNMData &data : rawCNMData){
+    if(rawLNMData.size() > 0){
+        for(LNMData &data : rawLNMData){
             if(data.timeTaken > slowTime){
                 slowTime = data.timeTaken;
                 slowId = it;
@@ -99,11 +103,11 @@ __host__ CNMData CNMStats::Average(CNMData *faster, CNMData *slower){
         }
         
         if(faster){
-            *faster = rawCNMData[fastId];
+            *faster = rawLNMData[fastId];
         }
         
         if(slower){
-            *slower = rawCNMData[slowId];
+            *slower = rawLNMData[slowId];
         }
         
         res.timeTaken /= (Float)it;

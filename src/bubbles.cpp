@@ -118,11 +118,11 @@ int main(int argc, char **argv){
     //test_pcisph2_water_block_cnm();
 	//test_pcisph3_quadruple_dam();
     //test_pcisph3_double_dam_break();
-    //test_pcisph3_water_drop();
+    test_pcisph3_water_drop();
     //test_pcisph3_happy_whale();
     //test_cnm_happy_whale();
     //test_pcisph2_water_block_cnm();
-    test_pcisph3_dragon_pool();
+    //test_pcisph3_dragon_pool();
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else

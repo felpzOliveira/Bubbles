@@ -81,6 +81,7 @@ void test_pcisph3_water_drop(){
         if(step == 0) return 1;
         UtilPrintStepStandard(&solver, step-1, {0, 16, 31, 74, 151, 235, 
                                   256, 278, 361, 420});
+        ProfilerReport();
         return step > 450 ? 0 : 1;
     };
     
@@ -626,7 +627,7 @@ void test_pcisph3_rock_dam(){
 }
 
 void test_cnm_happy_whale(){
-    printf("===== CNM 3D -- Happy Whale\n");
+    printf("===== LNM 3D -- Happy Whale\n");
     const char *pFile = "output.txt";
     Bounds3f meshBounds;
     Float spacingScale = 2.0;
@@ -697,7 +698,7 @@ void test_cnm_happy_whale(){
     
     TimerList timers;
     timers.Start();
-    CNMBoundary(pSet, grid, spacing, 0);
+    LNMBoundary(pSet, grid, spacing, 0);
     timers.Stop();
     
     std::cout << "Time taken " << timers.GetElapsedGPU(0) << " ms" << std::endl;
@@ -885,7 +886,7 @@ void test_pcisph3_double_dam_break(){
     TimerList timers;
     timers.Start();
     
-    CNMBoundary(pSet, grid, spacing, 0);
+    LNMBoundary(pSet, grid, spacing, 0);
     
     timers.Stop();
     Float val = timers.GetElapsedGPU(0);

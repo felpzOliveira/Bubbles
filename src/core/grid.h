@@ -206,7 +206,7 @@ class Grid{
     T minPoint; // grid minimal point for hashing
     int dimensions; // checker for dimension
     Q bounds; // the bounds of this grid after construction
-    int maxLevels; // in case CNM was executed, mark the max level value {unsafe}
+    int maxLevels; // in case LNM was executed, mark the max level value {unsafe}
     int indicator; // flag for GPU-domain based operations
     int *neighborListPtr; // address of the first neighborList
     int *activeCells; // list of cells that actually have particle in them
@@ -216,8 +216,8 @@ class Grid{
     __bidevice__ void SetDimension(const Float &u){ (void)u; dimensions = 1; }
     __bidevice__ void SetDimension(const vec2f &u){ (void)u; dimensions = 2; }
     __bidevice__ void SetDimension(const vec3f &u){ (void)u; dimensions = 3; }
-    __bidevice__ void SetCNMMaxLevel(const int &level){ maxLevels = level; }
-    __bidevice__ int GetCNMMaxLevel() { return maxLevels; }
+    __bidevice__ void SetLNMMaxLevel(const int &level){ maxLevels = level; }
+    __bidevice__ int GetLNMMaxLevel() { return maxLevels; }
     __bidevice__ Q GetBounds(){ return bounds; }
     __bidevice__ T GetCellSize(){ return cellsLen; }
     __bidevice__ int GetDimensions(){ return dimensions; }

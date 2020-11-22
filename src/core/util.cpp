@@ -73,8 +73,37 @@ __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
     Float length = domain.ExtentOn(axis);
     vec3f pMin = domain.pMin - vec3f(spacing);
     vec3f pMax = domain.pMax + vec3f(spacing);
-    int resolution = (int)std::floor(length / (spacing * spacingScale));
-    return MakeGrid(vec3ui(resolution), pMin, pMax);
+    int resolution = (int)std::ceil(length / (spacing * spacingScale));
+    return MakeGrid(vec3ui(resolution), pMin, pMax);;
+}
+
+//TODO: Test me!
+__host__ Grid3 *UtilBuildLNMGridForDomain(Bounds3f domain, Float spacing, 
+                                          Float spacingScale)
+{
+    vec3f pMin, pMax, half;
+    Float lenght = spacing * spacingScale; // ideal size for LNM
+    Float invLength = 1.0 / lenght;
+    Float hlen = lenght * 0.5f;
+    int mx = (int)std::ceil(domain.ExtentOn(0) * invLength);
+    int my = (int)std::ceil(domain.ExtentOn(1) * invLength);
+    int mz = (int)std::ceil(domain.ExtentOn(2) * invLength);
+    
+    mx += (mx % 2) * lenght;
+    my += (my % 2) * lenght;
+    mz += (mz % 2) * lenght;
+    
+    half = vec3f(mx * hlen, my * hlen, mz * hlen);
+    
+    pMin = domain.Center() - half;
+    pMax = domain.Center() + half;
+    vec3ui resolution(mx, my, mz);
+    
+    Grid3 *grid = MakeGrid(resolution, pMin, pMax);
+    printf("Generating gid: {%d x %d x %d}\n", resolution.x, resolution.y, resolution.z);
+    grid->bounds.PrintSelf();
+    printf("\n");
+    return grid;
 }
 
 __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBuilder3 *builder,

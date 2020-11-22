@@ -72,7 +72,7 @@ __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
     Float remainingTime = timeIntervalInSeconds;
     SphSolverData3 *data = solverData->sphData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
-    Float h = data->sphpSet->GetKernelRadius();
+    Float h = data->sphpSet->GetTargetSpacing();
     
     advanceTimer.Reset();
     advanceTimer.Start();
@@ -89,24 +89,24 @@ __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
     advanceTimer.Stop();
     
     data->domain->UpdateQueryState();
-    CNMInvalidateCells(data->domain);
+    LNMInvalidateCells(data->domain);
     pSet->ClearDataBuffer(&pSet->v0s);
     
     Float elapsed = advanceTimer.GetElapsedCPU(0);
     cnmTimer.Start();
-    CNMBoundary(pSet, data->domain, h, 0);
+    LNMBoundary(pSet, data->domain, h, 0);
     cnmTimer.Stop();
     
     Float cnm = cnmTimer.GetElapsedGPU(0);
     Float pct = cnm * 100.0 / elapsed;
-    cnmStats.Add(CNMData(cnm, pct));
+    cnmStats.Add(LNMData(cnm, pct));
 }
 
 __host__ Float PciSphSolver3::GetAdvanceTime(){
     return advanceTimer.GetElapsedCPU(0);
 }
 
-__host__ CNMStats PciSphSolver3::GetCNMStats(){
+__host__ LNMStats PciSphSolver3::GetLNMStats(){
     return cnmStats;
 }
 

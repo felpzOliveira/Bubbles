@@ -3,7 +3,7 @@
 #include <cutil.h>
 
 /**************************************************************/
-//      C L O S E S T   N E I G H B O R   M E T H O D         //
+//      L A Y E R E D   N E I G H B O R   M E T H O D         //
 //                      Trivial version                       //
 /**************************************************************/
 
@@ -15,7 +15,7 @@
 
 // going to classify on v0 buffer as simulation step should already be resolved
 template<typename T, typename Q>
-__bidevice__ void CNMBoundaryLNSet(ParticleSet<T> *pSet, Cell<Q> *self, int L){
+__bidevice__ void LNMBoundaryLNSet(ParticleSet<T> *pSet, Cell<Q> *self, int L){
     int count = self->GetChainLength();
     ParticleChain *pChain = self->GetChain();
     for(int i = 0; i < count; i++){
@@ -25,7 +25,7 @@ __bidevice__ void CNMBoundaryLNSet(ParticleSet<T> *pSet, Cell<Q> *self, int L){
 }
 
 template<typename T, typename U, typename Q>
-__bidevice__ void CNMBoundaryL2Asymmetry(ParticleSet<T> *pSet, Cell<Q> *self, Float h,
+__bidevice__ void LNMBoundaryL2Asymmetry(ParticleSet<T> *pSet, Cell<Q> *self, Float h,
                                          Grid<T, U, Q> *domain, int *neighbors, int nCount)
 {
     SphStdKernel2 kernel2(h);
@@ -73,7 +73,7 @@ __bidevice__ void CNMBoundaryL2Asymmetry(ParticleSet<T> *pSet, Cell<Q> *self, Fl
 }
 
 template<typename T, typename U, typename Q>
-__global__ void CNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, 
+__global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, 
                                     Float preDelta, Float h, int algorithm)
 {
     int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -88,9 +88,9 @@ __global__ void CNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                 if(cell->GetLevel() == 1 && cell->GetChainLength() < preDelta){
                     self->SetLevel(2);
                     if(algorithm == 0){ // fast
-                        CNMBoundaryLNSet(pSet, self, 2);
+                        LNMBoundaryLNSet(pSet, self, 2);
                     }else if(algorithm == 1){ // asymmetry
-                        CNMBoundaryL2Asymmetry(pSet, self, h, domain, 
+                        LNMBoundaryL2Asymmetry(pSet, self, h, domain, 
                                                neighbors, count);
                     }
                     
@@ -103,7 +103,7 @@ __global__ void CNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 
 
 template<typename T, typename U, typename Q>
-__global__ void CNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
+__global__ void LNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
     int id = threadIdx.x + blockIdx.x * blockDim.x;
     if(id < domain->GetActiveCellCount()){
         const int dim = domain->dimensions;
@@ -115,13 +115,13 @@ __global__ void CNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain)
         int count = domain->GetNeighborsOf(i, &neighbors);
         if(count != threshold){
             self->SetLevel(1);
-            CNMBoundaryLNSet(pSet, self, 1);
+            LNMBoundaryLNSet(pSet, self, 1);
         }else{
             for(int i = 0; i < count; i++){
                 Cell<Q> *cell = domain->GetCell(neighbors[i]);
                 if(cell->GetChainLength() == 0){
                     self->SetLevel(1);
-                    CNMBoundaryLNSet(pSet, self, 1);
+                    LNMBoundaryLNSet(pSet, self, 1);
                     break;
                 }
             }
@@ -133,20 +133,19 @@ __global__ void CNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain)
 * Actual boundary routine.
 */
 template<typename T, typename U, typename Q>
-__host__ void CNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, 
+__host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, 
                           Float h, int algorithm=0)
 {
     T len = domain->GetCellSize();
-    Float maxd = MaxComponent(len);
-    Float delta = 0.5 * std::pow((maxd / h * 0.5), (Float)domain->dimensions); // eq 3.14
-    printf("Delta is %g\n", delta);
+    Float maxd = MinComponent(len);
+    Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
     
     /* Classify L1 */
     GPULaunch(domain->GetActiveCellCount(), 
-              GPUKernel(CNMBoundaryL1Kernel<T, U, Q>), pSet, domain);
+              GPUKernel(LNMBoundaryL1Kernel<T, U, Q>), pSet, domain);
     
     /* Filter L2 */
-    GPULaunch(domain->GetActiveCellCount(), GPUKernel(CNMBoundaryL2Kernel<T, U, Q>), 
+    GPULaunch(domain->GetActiveCellCount(), GPUKernel(LNMBoundaryL2Kernel<T, U, Q>), 
               pSet, domain, delta, h, algorithm);
 }
 
@@ -155,7 +154,7 @@ __host__ void CNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 //                 V O X E L   C L A S S I F I E R            */
 /**************************************************************/
 template<typename T, typename U, typename Q>
-__bidevice__ bool CNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned int cellId){
+__bidevice__ bool LNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned int cellId){
     int *neighbors = nullptr;
     int count = domain->GetNeighborsOf(cellId, &neighbors);
     Cell<Q> *self = domain->GetCell(cellId);
@@ -184,10 +183,10 @@ __bidevice__ bool CNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned i
 }
 
 template<typename T, typename U, typename Q>
-__global__ void CNMOnceKernel(Grid<T, U, Q> *domain, int level){
+__global__ void LNMOnceKernel(Grid<T, U, Q> *domain, int level){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < domain->GetCellCount()){
-        if(CNMComputeOnce(domain, level, i)){
+        if(LNMComputeOnce(domain, level, i)){
             domain->indicator = 1; // NOTE: Concurrency
         }
     }
@@ -195,7 +194,7 @@ __global__ void CNMOnceKernel(Grid<T, U, Q> *domain, int level){
 
 
 template<typename T, typename U, typename Q>
-__host__ void CNMInvalidateCells(Grid<T, U, Q> *domain){
+__host__ void LNMInvalidateCells(Grid<T, U, Q> *domain){
     int total = domain->GetCellCount();
     for(int i = 0; i < total; i++){
         Cell<Q> *cell = domain->GetCell(i);
@@ -205,20 +204,20 @@ __host__ void CNMInvalidateCells(Grid<T, U, Q> *domain){
 
 // Lazy implementation
 template<typename T, typename U, typename Q>
-__host__ int CNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1){
+__host__ int LNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1){
     bool done = false;
     int level = 0;
     int N = domain->GetCellCount();
     
     while(!done){
         domain->indicator = 0;
-        GPULaunch(N, GPUKernel(CNMOnceKernel<T, U, Q>), domain, level);
+        GPULaunch(N, GPUKernel(LNMOnceKernel<T, U, Q>), domain, level);
         
         level++;
         done = (domain->indicator == 0 || (levels > 0 && level > levels));
     }
     
-    domain->SetCNMMaxLevel(level);
+    domain->SetLNMMaxLevel(level);
     
     return level;
 }

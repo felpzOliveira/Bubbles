@@ -121,10 +121,10 @@ void test_volume_particle_emitter3_mesh(){
     printf("Distributing particles\n");
     grid->DistributeByParticle(pSet);
     
-    CNMInvalidateCells(grid);
+    LNMInvalidateCells(grid);
     TimerList timers;
     timers.Start();
-    int size = CNMClassifyLazyGPU(grid);
+    int size = LNMClassifyLazyGPU(grid);
     timers.Stop();
     printf("Size: %d <=> %g\n", size, timers.GetElapsedGPU(0));
     
@@ -186,11 +186,11 @@ void test_volume_particle_emitter3(){
     printf("Distributing particles\n");
     grid->DistributeByParticle(pSet);
     
-    CNMInvalidateCells(grid);
+    LNMInvalidateCells(grid);
     
     TimerList timers;
     timers.Start();
-    int size = CNMClassifyLazyGPU(grid);
+    int size = LNMClassifyLazyGPU(grid);
     timers.Stop();
     printf("Size: %d <=> %g\n", size, timers.GetElapsedGPU(0));
     

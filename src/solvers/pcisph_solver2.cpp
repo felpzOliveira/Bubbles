@@ -76,7 +76,7 @@ __host__ int PciSphSolver2::GetParticleCount(){
     return solverData->sphData->sphpSet->GetParticleSet()->GetParticleCount();
 }
 
-__host__ CNMStats PciSphSolver2::GetCNMStats(){
+__host__ LNMStats PciSphSolver2::GetLNMStats(){
     return cnmStats;
 }
 
@@ -96,7 +96,7 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     
     SphSolverData2 *data = solverData->sphData;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
-    Float h = data->sphpSet->GetKernelRadius();
+    Float h = data->sphpSet->GetTargetSpacing();
     
     advanceTimer.Reset();
     advanceTimer.Start();
@@ -112,18 +112,18 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     
     advanceTimer.Stop();
     
-    CNMInvalidateCells(data->domain);
+    LNMInvalidateCells(data->domain);
     pSet->ClearDataBuffer(&pSet->v0s);
     data->domain->UpdateQueryState();
     
     Float elapsed = advanceTimer.GetElapsedCPU(0);
     cnmTimer.Start();
-    CNMBoundary(pSet, data->domain, h, 0);
+    LNMBoundary(pSet, data->domain, h, 0);
     cnmTimer.Stop();
     
     Float cnm = cnmTimer.GetElapsedGPU(0);
     Float pct = cnm * 100.0 / elapsed;
-    cnmStats.Add(CNMData(cnm, pct));
+    cnmStats.Add(LNMData(cnm, pct));
 }
 
 __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,

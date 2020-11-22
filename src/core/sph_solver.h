@@ -5,7 +5,7 @@
 #include <grid.h>
 #include <collider.h>
 #include <statics.h>
-#include <cnm.h>
+#include <lnm.h>
 
 typedef struct{
     SphParticleSet2 *sphpSet;

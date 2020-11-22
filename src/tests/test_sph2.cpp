@@ -47,7 +47,7 @@ void set_colors_temperature(float *col, SphSolverData2 *data){
     int count = pSet->GetParticleCount();
     Float Tmin = data->Tmin;
     Float Tmax = data->Tmax;
-    int maxLevel = data->domain->GetCNMMaxLevel();
+    int maxLevel = data->domain->GetLNMMaxLevel();
     for(int i = 0; i < count; i++){
         Float Ti = pSet->GetParticleTemperature(i);
         int level = (int)Floor((Tmax - Tmin) * (Ti - Tmin) / (Float)maxLevel);
@@ -108,7 +108,7 @@ void set_colors_cnm(float *col, SphSolverData2 *data, int is_first, int classify
             UpdateGridDistributionGPU(data);
         }
         
-        int level = CNMClassifyLazyGPU(data->domain);
+        int level = LNMClassifyLazyGPU(data->domain);
         printf("Domain #levels: %d\n", level);
     }
     
@@ -139,10 +139,10 @@ int set_poscol_cnm(float *col, float *pos, SphSolverData3 *data,
     if(classify){
         if(is_first){
             UpdateGridDistributionGPU(data);
-            (void)CNMClassifyLazyGPU(data->domain);
+            (void)LNMClassifyLazyGPU(data->domain);
         }
         
-        level = data->domain->GetCNMMaxLevel();
+        level = data->domain->GetLNMMaxLevel();
     }
     
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();

@@ -78,7 +78,7 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
     TimerList timers;
     SphSolverData3 *data = solverData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
-    Float h = data->sphpSet->GetKernelRadius();
+    Float h = data->sphpSet->GetTargetSpacing();
     timers.Start();
     while(remainingTime > Epsilon){
         SphParticleSet3 *sphpSet = solverData->sphpSet;
@@ -90,19 +90,19 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
         numberOfIntervalsRunned += 1;
     }
     
-    CNMInvalidateCells(data->domain);
+    LNMInvalidateCells(data->domain);
     pSet->ClearDataBuffer(&pSet->v0s);
     data->domain->UpdateQueryState();
     
     timers.StopAndNext();
-    CNMBoundary(pSet, data->domain, h, 0);
+    LNMBoundary(pSet, data->domain, h, 0);
     timers.Stop();
     
 #ifdef PRINT_TIMER
     Float adv = timers.GetElapsedCPU(0);
     Float cnm = timers.GetElapsedCPU(1);
     Float pct = cnm * 100.0 / adv;
-    printf("\nAdvance [%d] {%g} CNM {%g} [%g%%]\n", numberOfIntervalsRunned, adv, cnm, pct);
+    printf("\nAdvance [%d] {%g} LNM {%g} [%g%%]\n", numberOfIntervalsRunned, adv, cnm, pct);
     fflush(stdout);
 #endif
     

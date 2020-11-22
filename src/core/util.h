@@ -44,10 +44,19 @@ __host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform);
 
 /*
 * Generates a acceleration Grid3 for a domain given its bounds, the target spacing
-* of the simulation and the spacing scale to be used.
+* of the simulation and the spacing scale to be used. This grid is uniform.
 */
 __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing, 
                                        Float spacingScale = 2.0);
+
+/*
+* Generates a acceleration Grid3 for a domain given its bounds, however this
+* method makes it accelerated for LNM allowing kernel queries to not be optmized,
+* grid might not be uniform.
+*/
+//TODO: Test me!
+__host__ Grid3 *UtilBuildLNMGridForDomain(Bounds3f domain, Float spacing, 
+                                          Float spacingScale = 2.0);
 
 /*
 * Checks if emitting from any of the emitters in VolumeParticleEmitterSet3 
@@ -238,8 +247,8 @@ template<typename Solver>
 inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
                                            std::vector<int> refFrames={})
 {
-    CNMData faster, slower, last, average;
-    CNMStats stats = solver->GetCNMStats();
+    LNMData faster, slower, last, average;
+    LNMStats stats = solver->GetLNMStats();
     Float advTime = solver->GetAdvanceTime();
     average = stats.Average(&faster, &slower);
     last = stats.Last();
@@ -252,7 +261,7 @@ inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
         }
     }
     
-    printf("\rStep (%d) : %d ms - Particles: %d - (CNM: %g ms %g%%) (Slower: %g ms %g%%) (Faster: %g ms %g%%)    ",
+    printf("\rStep (%d) : %d ms - Particles: %d - (LNM: %g ms %g%%) (Slower: %g ms %g%%) (Faster: %g ms %g%%)    ",
            step, (int)advTime, pCount, average.timeTaken, average.simPercentage,
            slower.timeTaken, slower.simPercentage, faster.timeTaken, faster.simPercentage);
     if(takeFrame) printf("\n");

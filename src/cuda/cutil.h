@@ -6,6 +6,7 @@
 #include <iostream>
 #include <map>
 #include <typeindex>
+#include <profiler.h>
 
 /*
 * CUDA UTILITIES
@@ -187,8 +188,10 @@ inline int GetBlockSize(F kernel, const char *fname){
 #define GPULaunchItens(nItems, __blockSize, call, ...)\
 {\
 int __gridSize = (nItems + __blockSize - 1) / __blockSize;\
+ProfilerPrepare(#call);\
 call<<<__gridSize, __blockSize>>>(__VA_ARGS__);\
 cudaDeviceAssert(#call);\
+ProfilerFinish();\
 }
 
 #define GPULaunch(nItems, call, ...)\

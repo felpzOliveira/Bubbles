@@ -38,25 +38,25 @@ class GPUTimer{
     }
 };
 
-class CNMData{
+class LNMData{
     public:
     Float timeTaken;
     Float simPercentage;
-    __bidevice__ CNMData(): timeTaken(0), simPercentage(0){}
-    __bidevice__ CNMData(Float ttaken, Float percentage) : timeTaken(ttaken), 
+    __bidevice__ LNMData(): timeTaken(0), simPercentage(0){}
+    __bidevice__ LNMData(Float ttaken, Float percentage) : timeTaken(ttaken), 
     simPercentage(percentage){}
 };
 
-class CNMStats{
+class LNMStats{
     public:
-    std::vector<CNMData> rawCNMData;
-    __host__ CNMStats(){}
-    __host__ void Add(CNMData data);
-    __host__ CNMData Average(CNMData *faster=nullptr, CNMData *slower=nullptr);
-    __host__ CNMData Last(){
-        CNMData data(0,0);
-        if(rawCNMData.size() > 0){
-            data = rawCNMData[rawCNMData.size()-1];
+    std::vector<LNMData> rawLNMData;
+    __host__ LNMStats(){}
+    __host__ void Add(LNMData data);
+    __host__ LNMData Average(LNMData *faster=nullptr, LNMData *slower=nullptr);
+    __host__ LNMData Last(){
+        LNMData data(0,0);
+        if(rawLNMData.size() > 0){
+            data = rawLNMData[rawLNMData.size()-1];
         }
         
         return data;
@@ -75,6 +75,7 @@ class TimerList{
     __host__ void Stop();
     __host__ void StopAndNext();
     __host__ void Reset();
+    __host__ int Active();
     __host__ Float GetElapsedCPU(int i);
     __host__ Float GetElapsedGPU(int i);
 };

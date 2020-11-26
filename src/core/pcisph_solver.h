@@ -33,7 +33,7 @@ class PciSphSolver2{
     PciSphSolverData2 *solverData;
     TimerList advanceTimer;
     TimerList stepTimer;
-    LNMStats cnmStats;
+    LNMStats lnmStats;
     
     __host__ PciSphSolver2();
     __host__ void Initialize(SphSolverData2 *data);
@@ -62,7 +62,7 @@ class PciSphSolver3{
     PciSphSolverData3 *solverData;
     TimerList advanceTimer;
     TimerList stepTimer;
-    LNMStats cnmStats;
+    LNMStats lnmStats;
     
     __host__ PciSphSolver3();
     __host__ void Initialize(SphSolverData3 *data);

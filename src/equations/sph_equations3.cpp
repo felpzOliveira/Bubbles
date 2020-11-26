@@ -1,4 +1,5 @@
 #include <sph_solver.h>
+#include <profiler.h>
 
 /**************************************************************/
 //      D E N S I T Y     A N D    P R E S S U R E            //
@@ -22,31 +23,27 @@ __bidevice__ void ComputePressureFor(SphSolverData3 *data, int particleId, Float
 }
 
 __bidevice__ void ComputeDensityFor(SphSolverData3 *data, int particleId,
-                                    int compute_pressure, int debug=0)
+                                    int compute_pressure)
 {
-    int *neighbors = nullptr;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     vec3f pi = pSet->GetParticlePosition(particleId);
-    unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
+    AssertA(bucket != nullptr, "Invalid bucket received");
     
-    int count = data->domain->GetNeighborsOf(cellId, &neighbors);
     Float sphRadius = data->sphpSet->GetKernelRadius();
     SphStdKernel3 kernel(sphRadius);
     
     Float sum = 0;
+    
+    /* profiler interactions statics */
     int scount = 0;
-    for(int i = 0; i < count; i++){
-        Cell<Bounds3f> *cell = data->domain->GetCell(neighbors[i]);
-        ParticleChain *pChain = cell->GetChain();
-        int size = cell->GetChainLength();
-        
-        for(int j = 0; j < size; j++){
-            vec3f pj = pSet->GetParticlePosition(pChain->pId);
-            Float distance = Distance(pi, pj);
-            sum += kernel.W(distance);
-            pChain = pChain->next;
-            scount ++;
-        }
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        AssertA(j < pSet->GetParticleCount(), "Invalid id returned by bucket");
+        vec3f pj = pSet->GetParticlePosition(j);
+        Float distance = Distance(pi, pj);
+        sum += kernel.W(distance);
+        scount ++;
     }
     
     Float di = sum * pSet->GetMass();
@@ -54,10 +51,7 @@ __bidevice__ void ComputeDensityFor(SphSolverData3 *data, int particleId,
         ComputePressureFor(data, particleId, di);
     }
     
-    if(IsZero(di) && debug == 1){
-        printf("Count = %d (%d), Id = %d {%g}\n", scount, count, particleId, di);
-    }
-    
+    ProfilerUpdate(scount, particleId);
     AssertA(!IsZero(di), "Zero density");
     
     pSet->SetParticleDensity(particleId, di);
@@ -67,13 +61,11 @@ __bidevice__ void ComputeDensityFor(SphSolverData3 *data, int particleId,
 //            F O R C E S    C O M P U T A T I O N            //
 /**************************************************************/
 __bidevice__ void ComputeNonPressureForceFor(SphSolverData3 *data, int particleId){
-    int *neighbors = nullptr;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     vec3f pi = pSet->GetParticlePosition(particleId);
     vec3f vi = pSet->GetParticleVelocity(particleId);
     
-    unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
-    int count = data->domain->GetNeighborsOf(cellId, &neighbors);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
     
     Float mass = pSet->GetMass();
     Float mass2 = mass * mass;
@@ -85,32 +77,24 @@ __bidevice__ void ComputeNonPressureForceFor(SphSolverData3 *data, int particleI
     fi += mass * Gravity3D;
     fi += -data->dragCoefficient * vi;
     
-    for(int i = 0; i < count; i++){
-        Cell<Bounds3f> *cell = data->domain->GetCell(neighbors[i]);
-        ParticleChain *pChain = cell->GetChain();
-        int size = cell->GetChainLength();
-        for(int j = 0; j < size; j++){
-            vec3f pj = pSet->GetParticlePosition(pChain->pId);
-            vec3f vj = pSet->GetParticleVelocity(pChain->pId);
-            Float dj = pSet->GetParticleDensity(pChain->pId);
-            
-            Float dist = Distance(pi, pj);
-            fi += data->viscosity * mass2 * (vj - vi) * kernel.d2W(dist) / dj;
-            
-            pChain = pChain->next;
-        }
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        
+        vec3f pj = pSet->GetParticlePosition(j);
+        vec3f vj = pSet->GetParticleVelocity(j);
+        Float dj = pSet->GetParticleDensity(j);
+        
+        Float dist = Distance(pi, pj);
+        fi += data->viscosity * mass2 * (vj - vi) * kernel.d2W(dist) / dj;
     }
     
     pSet->SetParticleForce(particleId, fi);
 }
 
 __bidevice__ void ComputePressureForceFor(SphSolverData3 *data, int particleId){
-    int *neighbors = nullptr;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
-    
     vec3f pi = pSet->GetParticlePosition(particleId);
-    unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
-    int count = data->domain->GetNeighborsOf(cellId, &neighbors);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
     
     Float mass = pSet->GetMass();
     Float mass2 = pSet->GetMass() * pSet->GetMass();
@@ -124,32 +108,25 @@ __bidevice__ void ComputePressureForceFor(SphSolverData3 *data, int particleId){
     
     AssertA(!IsZero(di2), "Zero source density {ComputePressureForceFor}");
     vec3f ti(0);
-    for(int i = 0; i < count; i++){
-        Cell<Bounds3f> *cell = data->domain->GetCell(neighbors[i]);
-        ParticleChain *pChain = cell->GetChain();
-        int size = cell->GetChainLength();
-        
-        for(int j = 0; j < size; j++){
-            if(particleId != pChain->pId){
-                vec3f pj = pSet->GetParticlePosition(pChain->pId);
-                Float dj = pSet->GetParticleDensity(pChain->pId);
-                Float dj2 = dj * dj;
-                Float poj = pSet->GetParticlePressure(pChain->pId);
-                
-                Float dist = Distance(pi, pj);
-                bool valid = IsWithinSpiky(dist, sphRadius);
-                
-                if(valid){
-                    AssertA(!IsZero(dj2), "Zero neighbor density {ComputePressureForceFor}");
-                    if(dist > 0 && !IsZero(dist)){
-                        vec3f dir = (pj - pi) / dist;
-                        vec3f gradij = kernel.gradW(dist, dir);
-                        ti += mass2 * (poi / di2 + poj / dj2) * gradij;
-                    }
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        if(particleId != j){
+            vec3f pj = pSet->GetParticlePosition(j);
+            Float dj = pSet->GetParticleDensity(j);
+            Float dj2 = dj * dj;
+            Float poj = pSet->GetParticlePressure(j);
+            
+            Float dist = Distance(pi, pj);
+            bool valid = IsWithinSpiky(dist, sphRadius);
+            
+            if(valid){
+                AssertA(!IsZero(dj2), "Zero neighbor density {ComputePressureForceFor}");
+                if(dist > 0 && !IsZero(dist)){
+                    vec3f dir = (pj - pi) / dist;
+                    vec3f gradij = kernel.gradW(dist, dir);
+                    ti += mass2 * (poi / di2 + poj / dj2) * gradij;
                 }
             }
-            
-            pChain = pChain->next;
         }
     }
     
@@ -158,39 +135,28 @@ __bidevice__ void ComputePressureForceFor(SphSolverData3 *data, int particleId){
 }
 
 __bidevice__ void ComputeNormalFor(SphSolverData3 *data, int particleId){
-    int *neighbors = nullptr;
     vec3f ni(0);
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
-    
     vec3f pi = pSet->GetParticlePosition(particleId);
-    unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
-    int count = data->domain->GetNeighborsOf(cellId, &neighbors);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
+    
     Float mass = pSet->GetMass();
     Float sphRadius = data->sphpSet->GetKernelRadius();
     
     SphSpikyKernel3 kernel(sphRadius);
     
-    for(int i = 0; i < count; i++){
-        Cell3 *cell = data->domain->GetCell(neighbors[i]);
-        int size = cell->GetChainLength();
-        ParticleChain *pChain = cell->GetChain();
-        
-        for(int j = 0; j < size; j++){
-            if(particleId != pChain->pId){
-                vec3f pj = pSet->GetParticlePosition(pChain->pId);
-                Float dj = pSet->GetParticleDensity(pChain->pId);
-                Float dist = Distance(pi, pj);
-                bool valid = IsWithinSpiky(dist, sphRadius);
-                if(valid){
-                    if(dist > 0 && !IsZero(dist)){
-                        vec3f dir = (pj - pi) / dist;
-                        vec3f gradij = kernel.gradW(dist, dir);
-                        ni += (mass / dj) * gradij;
-                    }
-                }
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        vec3f pj = pSet->GetParticlePosition(j);
+        Float dj = pSet->GetParticleDensity(j);
+        Float dist = Distance(pi, pj);
+        bool valid = IsWithinSpiky(dist, sphRadius);
+        if(valid){
+            if(dist > 0 && !IsZero(dist)){
+                vec3f dir = (pj - pi) / dist;
+                vec3f gradij = kernel.gradW(dist, dir);
+                ni += (mass / dj) * gradij;
             }
-            
-            pChain = pChain->next;
         }
     }
     
@@ -204,12 +170,9 @@ __bidevice__ void ComputeNormalFor(SphSolverData3 *data, int particleId){
 __bidevice__ void ComputeAllForcesFor(SphSolverData3 *data, int particleId, 
                                       Float timeStep, int extended)
 {
-    int *neighbors = nullptr;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
-    
     vec3f pi = pSet->GetParticlePosition(particleId);
-    unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
-    int count = data->domain->GetNeighborsOf(cellId, &neighbors);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
     
     Float mass = pSet->GetMass();
     Float mass2 = pSet->GetMass() * pSet->GetMass();
@@ -235,45 +198,38 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData3 *data, int particleId,
     vec3f ni(0);
     Float Tidt = 0;
     Float Dc = 0.15; // Helium
-    for(int i = 0; i < count; i++){
-        Cell<Bounds3f> *cell = data->domain->GetCell(neighbors[i]);
-        ParticleChain *pChain = cell->GetChain();
-        int size = cell->GetChainLength();
-        
-        for(int j = 0; j < size; j++){
-            if(particleId != pChain->pId){
-                vec3f pj = pSet->GetParticlePosition(pChain->pId);
-                Float dj = pSet->GetParticleDensity(pChain->pId);
-                Float dj2 = dj * dj;
-                vec3f vj = pSet->GetParticleVelocity(pChain->pId);
-                Float poj = pSet->GetParticlePressure(pChain->pId);
-                Float Tj = 0;
-                if(extended) Tj = pSet->GetParticleTemperature(pChain->pId);
-                
-                Float dist = Distance(pi, pj);
-                bool valid = IsWithinSpiky(dist, sphRadius);
-                
-                if(valid){
-                    AssertA(!IsZero(dj2), "Zero neighbor density {ComputePressureForceFor}");
-                    if(dist > 0 && !IsZero(dist)){
-                        vec3f dir = (pj - pi) / dist;
-                        vec3f gradij = kernel.gradW(dist, dir);
-                        ti += mass2 * (poi / di2 + poj / dj2) * gradij;
-                        ni += (mass / dj) * gradij;
-                        
-                        if(extended){
-                            Float pdotgrad = Dot(pi - pj, gradij);
-                            pdotgrad /= (dist * dist + 0.0001);
-                            Float dt = mass2 / (di * dj) * Dc * (Ti - Tj) * pdotgrad;
-                            Tidt += dt;
-                        }
-                    }
-                    
-                    fi += data->viscosity * mass2 * (vj - vi) * kernel.d2W(dist) / dj;
-                }
-            }
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        if(particleId != j){
+            vec3f pj = pSet->GetParticlePosition(j);
+            Float dj = pSet->GetParticleDensity(j);
+            Float dj2 = dj * dj;
+            vec3f vj = pSet->GetParticleVelocity(j);
+            Float poj = pSet->GetParticlePressure(j);
+            Float Tj = 0;
+            if(extended) Tj = pSet->GetParticleTemperature(j);
             
-            pChain = pChain->next;
+            Float dist = Distance(pi, pj);
+            bool valid = IsWithinSpiky(dist, sphRadius);
+            
+            if(valid){
+                AssertA(!IsZero(dj2), "Zero neighbor density {ComputePressureForceFor}");
+                if(dist > 0 && !IsZero(dist)){
+                    vec3f dir = (pj - pi) / dist;
+                    vec3f gradij = kernel.gradW(dist, dir);
+                    ti += mass2 * (poi / di2 + poj / dj2) * gradij;
+                    ni += (mass / dj) * gradij;
+                    
+                    if(extended){
+                        Float pdotgrad = Dot(pi - pj, gradij);
+                        pdotgrad /= (dist * dist + 0.0001);
+                        Float dt = mass2 / (di * dj) * Dc * (Ti - Tj) * pdotgrad;
+                        Tidt += dt;
+                    }
+                }
+                
+                fi += data->viscosity * mass2 * (vj - vi) * kernel.d2W(dist) / dj;
+            }
         }
     }
     
@@ -390,6 +346,12 @@ __host__ void UpdateGridDistributionCPU(SphSolverData3 *data){
         }
     }
     
+    int pCount = pSet->GetParticleCount();
+    Float kernelRadius = data->sphpSet->GetKernelRadius();
+    for(int i = 0; i < pCount; i++){
+        grid->DistributeParticleBucket(pSet, i, kernelRadius);
+    }
+    
     data->frame_index = 1;
 }
 
@@ -457,6 +419,13 @@ __global__ void SwapGridStatesKernel(Grid3 *grid){
     }
 }
 
+__global__ void UpdateParticlesBuckets(Grid3 *grid, ParticleSet3 *pSet, Float kernelRadius){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < pSet->GetParticleCount()){
+        grid->DistributeParticleBucket(pSet, i, kernelRadius);
+    }
+}
+
 __host__ void UpdateGridDistributionGPU(SphSolverData3 *data){
     Grid3 *grid = data->domain;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
@@ -478,6 +447,10 @@ __host__ void UpdateGridDistributionGPU(SphSolverData3 *data){
             GPULaunch(N, SwapGridStatesKernel, grid);
         }
     }
+    
+    int pCount = pSet->GetParticleCount();
+    Float kernelRadius = data->sphpSet->GetKernelRadius();
+    GPULaunch(pCount, UpdateParticlesBuckets, grid, pSet, kernelRadius);
     
     data->frame_index = 1;
 }

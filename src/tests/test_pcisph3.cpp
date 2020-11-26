@@ -63,19 +63,26 @@ void test_pcisph3_water_drop(){
     solver.SetColliders(colliders);
     
     Float targetInterval =  1.0 / 240.0;
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    
+    ProfilerInitKernel(pSet->GetParticleCount());
 #if 0
+    std::vector<int> boundaries;
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;
         std::string respath("/home/felipe/Documents/Bubbles/simulations/water_drop/output_");
         respath += std::to_string(step-1);
         respath += ".txt";
-        int flags = (SERIALIZER_POSITION | SERIALIZER_DENSITY | SERIALIZER_MASS);
-        SerializerSaveSphDataSet3(solver.GetSphSolverData(), respath.c_str(), flags);
+        
+        UtilGetBoundaryState(pSet, &boundaries);
+        int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
+        SerializerSaveSphDataSet3(solver.GetSphSolverData(),
+                                  respath.c_str(), flags, &boundaries);
         
         UtilPrintStepStandard(&solver, step-1);
         return step > 500 ? 0 : 1;
     };
-#endif
+#else
     
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;
@@ -84,6 +91,7 @@ void test_pcisph3_water_drop(){
         ProfilerReport();
         return step > 450 ? 0 : 1;
     };
+#endif
     
     PciSphRunSimulation3(&solver, spacing, origin, target, 
                          targetInterval, {}, onStepUpdate);
@@ -138,6 +146,8 @@ void test_pcisph3_box_many_emission(){
         vec3f vel(0, -1, 0);
         return vel * u1 * intensity;
     };
+    
+    pBuilder.SetKernelRadius(spacing * spacingScale);
     
     emitterSet.Emit(&pBuilder, velocityField);
     SphParticleSet3 *sphSet = SphParticleSet3FromContinuousBuilder(&pBuilder);
@@ -212,6 +222,7 @@ void test_pcisph3_ball_many_emission(){
     emitterSet.AddEmitter(upShape, spacing);
     
     ContinuousParticleSetBuilder3 pBuilder;
+    pBuilder.SetKernelRadius(spacing * spacingScale);
     
     ColliderSet3 *colliders = cBuilder.GetColliderSet();
     Assure(UtilIsEmitterOverlapping(&emitterSet, colliders) == 0);
@@ -290,6 +301,8 @@ void test_pcisph3_dragon_pool(){
     Shape *baseWaterShape = MakeBox(Translate(0, -yof, 0), waterBox);
     
     ContinuousParticleSetBuilder3 pBuilder;
+    pBuilder.SetKernelRadius(spacing * spacingScale);
+    
     VolumeParticleEmitterSet3 emitter;
     VolumeParticleEmitter3 boxEmitter(baseWaterShape, spacing);
     emitter.AddEmitter(shower, spacing);
@@ -422,6 +435,7 @@ void test_pcisph3_dragon_shower(){
     Shape *shower2 = MakeSphere(Translate(-0.3, 1, 0), emitRadius);
     
     ContinuousParticleSetBuilder3 pBuilder;
+    pBuilder.SetKernelRadius(spacing * spacingScale);
     VolumeParticleEmitterSet3 emitter;
     emitter.AddEmitter(shower, spacing);
     emitter.AddEmitter(shower2, spacing);
@@ -535,6 +549,7 @@ void test_pcisph3_multiple_emission(){
     Shape *container = MakeSphere(Transform(), 1.0, true);
     
     ContinuousParticleSetBuilder3 pBuilder(50000);
+    pBuilder.SetKernelRadius(spacing * spacingScale);
     VolumeParticleEmitterSet3 emitter;
     emitter.AddEmitter(shape, spacing);
     
@@ -626,7 +641,7 @@ void test_pcisph3_rock_dam(){
     printf("===== OK\n");
 }
 
-void test_cnm_happy_whale(){
+void test_lnm_happy_whale(){
     printf("===== LNM 3D -- Happy Whale\n");
     const char *pFile = "output.txt";
     Bounds3f meshBounds;
@@ -840,13 +855,8 @@ void test_pcisph3_double_dam_break(){
     //emitterSet.SetJitter(0.001);
     emitterSet.Emit(&pBuilder);
     
-    /* Build domain and colliders */
-    Bounds3f containerBounds = container->GetBounds();
-    vec3f pMin = containerBounds.pMin - vec3f(spacing);
-    vec3f pMax = containerBounds.pMax + vec3f(spacing);
-    
-    int resolution = (int)std::floor(boxLen / (spacing * spacingScale));
-    Grid3 *grid = MakeGrid(vec3ui(resolution), pMin, pMax);
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(), spacing,
+                                               spacingScale);
     
     ColliderSetBuilder3 cBuilder;
     cBuilder.AddCollider3(container);
@@ -856,57 +866,26 @@ void test_pcisph3_double_dam_break(){
     /* Setup solver */
     PciSphSolver3 solver;
     SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    sphSet->SetRelativeKernelRadius(spacingScale);
     
     solver.Initialize(DefaultSphSolverData3());
-    solver.Setup(WaterDensity, spacing, spacingScale, grid, sphSet);
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
     solver.SetColliders(colliders);
     
-    /* Set timestep and view stuff */
-    sphSet->SetRelativeKernelRadius(spacingScale);
     ParticleSet3 *pSet = sphSet->GetParticleSet();
     
-    int count = pSet->GetParticleCount();
-    Float targetInterval = 1.0 / 240.0;
-    float *pos = new float[count * 3];
-    float *col = new float[count * 3];
+    auto callback = [&](int step) -> int{
+        if(step == 0) return 1;
+        UtilPrintStepStandard(&solver, step-1, {0, 16, 31, 74, 151, 235, 
+                                  256, 278, 361, 420});
+        ProfilerReport();
+        return step > 450 ? 0 : 1;
+    };
     
-    memset(col, 0, sizeof(float) * 3 * count);
-    graphy_vector_set(origin, target);
+    Float targetInterval =  1.0 / 240.0;
+    PciSphRunSimulation3(&solver, spacing, origin, target, 
+                         targetInterval, {}, callback);
     
-    //simple_color(pos, col, pSet);
-    //graphy_render_points3f(pos, col, count, spacing/2.0);
-    
-    vec3ui res = grid->GetIndexCount();
-    Bounds3f bound = grid->GetBounds();
-    pMin = bound.pMin;
-    pMax = bound.pMax;
-    vec3f c = grid->GetCellSize();
-    
-    
-    TimerList timers;
-    timers.Start();
-    
-    LNMBoundary(pSet, grid, spacing, 0);
-    
-    timers.Stop();
-    Float val = timers.GetElapsedGPU(0);
-    std::cout << "GPU Time > " << val << std::endl;
-    
-    int ii = set_poscol_cnm(col, pos, solver.GetSphSolverData(), 0, 0);
-    printf("Size > %d\n", ii);
-    graphy_render_points3f(pos, col, ii, spacing/2.0);
-    getchar();
-    
-    for(int i = 0; i < 20 * 26 * 20; i++){
-        solver.Advance(targetInterval);
-        simple_color(pos, col, pSet);
-        graphy_render_points3f(pos, col, count, spacing/2.0);
-        printf("Step: %d            \n", i+1);
-    }
-    
-    
-    delete[] pos;
-    delete[] col;
     printf("===== OK\n");
 }
 
@@ -957,6 +936,8 @@ void test_pcisph3_quadruple_dam(){
     solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
     solver.SetColliders(colliders);
     
+    ProfilerInitKernel(sphSet->GetParticleSet()->GetParticleCount());
+    
 #if 0
     auto callback = [&](int step) -> int{
         if(step <= 0) return 1;
@@ -974,6 +955,7 @@ void test_pcisph3_quadruple_dam(){
         if(step == 0) return 1;
         UtilPrintStepStandard(&solver, step-1, {0, 16, 31, 74, 151, 235, 
                                   256, 278, 361, 420});
+        ProfilerReport();
         return step > 450 ? 0 : 1;
     };
     

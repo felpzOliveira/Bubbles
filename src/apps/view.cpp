@@ -322,7 +322,7 @@ void ViewDisplaySimulation(view_opts *opts){
 void view_command(int argc, char **argv){
     view_opts opts;
     default_view_opts(&opts);
-    argument_process(view_arg_map, argc, argv, &opts);
+    argument_process(view_arg_map, argc, argv, "view", &opts);
     print_view_configs(&opts);
     
     if(opts.basename.size() == 0){

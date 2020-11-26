@@ -7,12 +7,56 @@
 
 #define TimeStepLimitSpeedFactor 0.40
 #define TimeStepLimitForceFactor 0.25
+#define MaximumParticlesPerBucket 100
 
 struct ParticleChain{
     unsigned int pId; // particle Id
     unsigned int cId; // cell Id
     unsigned int sId; // specie Id
     struct ParticleChain *next;
+};
+
+/*
+* Buckets are the second degree optimization for cells.
+*/
+struct Bucket{
+    int *pids;
+    int size;
+    int count;
+    
+    __host__ void SetSize(int n){
+        size = n;
+        pids = cudaAllocateVx(int, size);
+    }
+    
+    __host__ void SetPointer(int *ptr, int n){
+        pids = ptr;
+        size = n;
+        count = 0;
+    }
+    
+    __bidevice__ int Count(){ return count; }
+    
+    __bidevice__ void Reset(){
+        count = 0;
+    }
+    
+    __bidevice__ void Insert(int pid){
+        if(count < size){
+            pids[count++] = pid;
+        }else{
+            printf("Tried to insert without space\n");
+        }
+    }
+    
+    __bidevice__ int Get(int where){
+        int r = -1;
+        if(where < count){
+            r = pids[where];
+        }
+        
+        return r;
+    }
 };
 
 /*
@@ -117,6 +161,7 @@ class ParticleSet{
     DataBuffer<Float> pressures;
     DataBuffer<Float> densities;
     DataBuffer<T> normals;
+    DataBuffer<Bucket> buckets;
     
     // Extended data for gaseous stuff
     DataBuffer<Float> temperature;
@@ -151,6 +196,7 @@ class ParticleSet{
         forces.SetSize(n);
         normals.SetSize(n);
         v0s.SetSize(n);
+        buckets.SetSize(n);
         radius = 1e-3;
         mass = 1e-3;
         familyId = 0;
@@ -173,7 +219,7 @@ class ParticleSet{
         forces.SetData(force, n); densities.SetSize(n);
         pressures.SetSize(n); chainNodes.SetSize(n);
         chainAuxNodes.SetSize(n); v0s.SetSize(n);
-        normals.SetSize(n);
+        normals.SetSize(n); buckets.SetSize(n);
         count = n;
         radius = 1e-3;
         mass = 1e-3;
@@ -197,6 +243,11 @@ class ParticleSet{
     __bidevice__ bool HasNormal(){ return normals.size > 0; }
     __bidevice__ void SetFamilyId(unsigned int id){ familyId = id; }
     __bidevice__ unsigned int GetFamilyId(){ return familyId; }
+    
+    __bidevice__ Bucket *GetParticleBucket(int pId){
+        AssertA(pId < count && pId >= 0, "Invalid set for particle bucket");
+        return buckets.Get(pId);
+    }
     
     __bidevice__ ParticleChain *GetParticleAuxChainNode(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle aux chain node");
@@ -591,6 +642,15 @@ class ParticleSetBuilder{
         
         ParticleSet<T> *pSet = cudaAllocateVx(ParticleSet<T>, 1);
         pSet->SetData(positions.data(), velocities.data(), forces.data(), cp);
+        
+        int pSize = MaximumParticlesPerBucket;
+        int *ids = cudaAllocateVx(int, pSize * cp);
+        
+        int *ref = ids;
+        for(int i = 0; i < cp; i++){
+            Bucket *bucket = pSet->GetParticleBucket(i);
+            bucket->SetPointer(&ref[i * pSize], pSize);
+        }
         
         positions.clear();
         velocities.clear();

@@ -43,6 +43,7 @@ int SerializerFlagsFromString(const char *spec){
         else if(c == 'b' || c == 'B') flags |= SERIALIZER_BOUNDARY;
         else if(c == 'v' || c == 'V') flags |= SERIALIZER_VELOCITY;
         else if(c == 'm' || c == 'M') flags |= SERIALIZER_MASS;
+        else if(c == 'l' || c == 'L') flags |= SERIALIZER_LAYERS;
         else if(c == 'o' || c == 'O') flags |= SERIALIZER_RULE_BOUNDARY_EXCLUSIVE;
         else{
             printf("Unknown flag argument %c\n", c);

@@ -9,6 +9,7 @@
 #define SERIALIZER_BOUNDARY  0x08
 #define SERIALIZER_NORMAL    0x10
 #define SERIALIZER_MASS      0x20
+#define SERIALIZER_LAYERS    0x40 // NOTE: This is not processed by serializer
 
 /* Rules for writting */
 #define SERIALIZER_RULE_BOUNDARY_EXCLUSIVE 0x100

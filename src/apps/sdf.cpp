@@ -241,7 +241,7 @@ void SDFView(Shape *shape, sdf_opts *opts){
 
 void sdf_command(int argc, char **argv){
     default_opts(&g_opts);
-    argument_process(sdf_arg_map, argc, argv, &g_opts);
+    argument_process(sdf_arg_map, argc, argv, "sdf", &g_opts);
     sdf_print_configs(&g_opts);
     Shape *shape = GenerateMeshSDF(&g_opts);
     

@@ -16,7 +16,7 @@
 #define cudaAllocate(bytes) _cudaAllocate(bytes, __LINE__, __FILE__, true)
 #define cudaAllocateEx(bytes, abort) _cudaAllocate(bytes, __LINE__, __FILE__, abort)
 #define cudaAllocateVx(type, n) (type *)_cudaAllocate(sizeof(type)*n, __LINE__, __FILE__, true)
-#define cudaDeviceAssert(fname) if(cudaSynchronize()){ printf("Failure for %s\n", fname); cudaSafeExit(); }
+#define cudaDeviceAssert(fname) if(cudaKernelSynchronize()){ printf("Failure for %s\n", fname); cudaSafeExit(); }
 
 #define __bidevice__ __host__ __device__ 
 #define MAX(a, b) a > b ? a : b
@@ -53,7 +53,7 @@ void cudaInitEx(void);
 * Synchronizes the device so host access is not asynchronous,
 * also checks devices for errors in recent kernel launches.
 */
-int cudaSynchronize(void);
+int cudaKernelSynchronize(void);
 
 /*
 * Get information about memory usage from the device.
@@ -180,6 +180,7 @@ inline int GetBlockSize(F kernel, const char *fname){
     int minGridSize, blockSize;
     CUCHECK(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize,
                                                kernel, 0, 0));
+    
     kernelBlockSizes[index] = blockSize;
     return blockSize;
 }

@@ -57,29 +57,22 @@ __host__ void PredictVelocityAndPositionGPU(PciSphSolverData3 *data,
 
 // NOTE: Potential error as tmpPi was not reditributed in the grid
 //       neighbor querying might not be correct
-__bidevice__ void PredictPressureFor(PciSphSolverData3 *pciData, Float delta, int particleId){
-    int *neighbors = nullptr;
+__bidevice__ void PredictPressureFor(PciSphSolverData3 *pciData, Float delta, int particleId)
+{
     SphSolverData3 *data = pciData->sphData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     vec3f pi = pciData->tempPositions[particleId];
     Float ppi = pSet->GetParticlePressure(particleId);
-    
-    unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
-    int count = data->domain->GetNeighborsOf(cellId, &neighbors);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
     
     SphStdKernel3 kernel(data->sphpSet->GetKernelRadius());
     
     Float weightSum = 0;
-    for(int i = 0; i < count; i++){
-        Cell<Bounds3f> *cell = data->domain->GetCell(neighbors[i]);
-        ParticleChain *pChain = cell->GetChain();
-        int size = cell->GetChainLength();
-        for(int j = 0; j < size; j++){
-            vec3f pj = pciData->tempPositions[pChain->pId];
-            Float dist = Distance(pi, pj);
-            weightSum += kernel.W(dist);
-            pChain = pChain->next;
-        }
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        vec3f pj = pciData->tempPositions[j];
+        Float dist = Distance(pi, pj);
+        weightSum += kernel.W(dist);
     }
     
     Float density = weightSum * pSet->GetMass();
@@ -119,13 +112,10 @@ __host__ void PredictPressureGPU(PciSphSolverData3 *data, Float delta){
 }
 
 __bidevice__ void PredictPressureForceFor(PciSphSolverData3 *pciData, int particleId){
-    int *neighbors = nullptr;
     SphSolverData3 *data = pciData->sphData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
-    
     vec3f pi = pSet->GetParticlePosition(particleId);
-    unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
-    int count = data->domain->GetNeighborsOf(cellId, &neighbors);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
     
     Float mass = pSet->GetMass();
     Float mass2 = pSet->GetMass() * pSet->GetMass();
@@ -138,32 +128,25 @@ __bidevice__ void PredictPressureForceFor(PciSphSolverData3 *pciData, int partic
     
     vec3f fi(0);
     vec3f ti(0);
-    for(int i = 0; i < count; i++){
-        Cell<Bounds3f> *cell = data->domain->GetCell(neighbors[i]);
-        ParticleChain *pChain = cell->GetChain();
-        int size = cell->GetChainLength();
-        
-        for(int j = 0; j < size; j++){
-            if(particleId != pChain->pId){
-                vec3f pj = pSet->GetParticlePosition(pChain->pId);
-                Float dj = pciData->densityPredicted[pChain->pId];
-                Float dj2 = dj * dj;
-                Float poj = pSet->GetParticlePressure(pChain->pId);
-                
-                Float dist = Distance(pi, pj);
-                bool valid = IsWithinSpiky(dist, sphRadius);
-                
-                if(valid){
-                    AssertA(!IsZero(dj2), "Zero neighbor density {ComputePressureForceFor}");
-                    if(dist > 0 && !IsZero(dist)){
-                        vec3f dir = (pj - pi) / dist;
-                        vec3f gradij = kernel.gradW(dist, dir);
-                        ti += mass2 * (poi / di2 + poj / dj2) * gradij;
-                    }
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        if(particleId != j){
+            vec3f pj = pSet->GetParticlePosition(j);
+            Float dj = pciData->densityPredicted[j];
+            Float dj2 = dj * dj;
+            Float poj = pSet->GetParticlePressure(j);
+            
+            Float dist = Distance(pi, pj);
+            bool valid = IsWithinSpiky(dist, sphRadius);
+            
+            if(valid){
+                AssertA(!IsZero(dj2), "Zero neighbor density {ComputePressureForceFor}");
+                if(dist > 0 && !IsZero(dist)){
+                    vec3f dir = (pj - pi) / dist;
+                    vec3f gradij = kernel.gradW(dist, dir);
+                    ti += mass2 * (poi / di2 + poj / dj2) * gradij;
                 }
             }
-            
-            pChain = pChain->next;
         }
     }
     

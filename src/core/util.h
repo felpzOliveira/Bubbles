@@ -50,15 +50,6 @@ __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
                                        Float spacingScale = 2.0);
 
 /*
-* Generates a acceleration Grid3 for a domain given its bounds, however this
-* method makes it accelerated for LNM allowing kernel queries to not be optmized,
-* grid might not be uniform.
-*/
-//TODO: Test me!
-__host__ Grid3 *UtilBuildLNMGridForDomain(Bounds3f domain, Float spacing, 
-                                          Float spacingScale = 2.0);
-
-/*
 * Checks if emitting from any of the emitters in VolumeParticleEmitterSet3 
 * will overlaps any of the colliders given in the ColliderSet3. This is important
 * as distributing inside a collider that doesn't have reverseOrientation=true will
@@ -243,6 +234,9 @@ inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
     delete[] ptr;
 }
 
+/*
+* Print LNM stats after a step of simulation.
+*/
 template<typename Solver> 
 inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
                                            std::vector<int> refFrames={})
@@ -267,10 +261,31 @@ inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
     if(takeFrame) printf("\n");
 }
 
-
+/*
+* Dumps the basic position of the current simulator step into disk.
+*/
 inline __host__ void UtilSaveSph3Frame(const char *basedir, int step, SphSolverData3 *data){
     std::string path(basedir);
     path += std::to_string(step);
     path += ".txt";
     SerializerSaveSphDataSet3(data, path.c_str(), SERIALIZER_POSITION);
+}
+
+
+/*
+* Fetch the current boundary of the particle set.
+*/
+template<typename ParticleSetAccessor> inline __host__
+void UtilGetBoundaryState(ParticleSetAccessor *pSet, std::vector<int> *boundaries){
+    int count = pSet->GetParticleCount();
+    boundaries->clear();
+    for(int i = 0; i < count; i++){
+        int b = 0;
+        int v0 = pSet->GetParticleV0(i);
+        if(v0 > 0){
+            b = v0;
+        }
+        
+        boundaries->push_back(b);
+    }
 }

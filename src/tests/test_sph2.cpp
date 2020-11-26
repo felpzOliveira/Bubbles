@@ -58,7 +58,7 @@ void set_colors_temperature(float *col, SphSolverData2 *data){
     }
 }
 
-void update_colors_cnm(float *col, SphSolverData2 *data){
+void update_colors_lnm(float *col, SphSolverData2 *data){
     Grid2 *grid = data->domain;
     int count = grid->GetCellCount();
     for(int i = 0; i < count; i++){
@@ -102,7 +102,7 @@ void set_colors_pressure(float *col, SphSolverData2 *data){
     }
 }
 
-void set_colors_cnm(float *col, SphSolverData2 *data, int is_first, int classify){
+void set_colors_lnm(float *col, SphSolverData2 *data, int is_first, int classify){
     if(classify){
         if(is_first){
             UpdateGridDistributionGPU(data);
@@ -131,7 +131,7 @@ void set_colors_cnm(float *col, SphSolverData2 *data, int is_first, int classify
     }
 }
 
-int set_poscol_cnm(float *col, float *pos, SphSolverData3 *data, 
+int set_poscol_lnm(float *col, float *pos, SphSolverData3 *data, 
                    int is_first, int classify)
 {
     int level = 0;
@@ -239,7 +239,7 @@ void test_sph2_double_dam_break(){
     
     memset(col, 0x00, sizeof(float) * 3 * count);
     SphSolverData2 *data = solver->GetSphSolverData();
-    set_colors_cnm(col, data);
+    set_colors_lnm(col, data);
     
     for(int i = 0; i < 20 * 26; i++){
         solver->Advance(targetInterval);
@@ -308,7 +308,7 @@ void test_sph2_water_drop(){
     float *col = new float[count * 3];
     
     SphSolverData2 *data = solver->GetSphSolverData();
-    set_colors_cnm(col, data);
+    set_colors_lnm(col, data);
     
     for(int i = 0; i < 20 * 26; i++){
         solver->Advance(targetInterval);
@@ -369,7 +369,7 @@ void test_sph2_water_block(){
     float *col = new float[count * 3];
     
     SphSolverData2 *data = solver->GetSphSolverData();
-    set_colors_cnm(col, data);
+    set_colors_lnm(col, data);
     
     for(int i = 0; i < 20 * 26; i++){
         solver->Advance(targetInterval);
@@ -428,7 +428,7 @@ void test_sph2_water_sphere(){
     float *col = new float[count * 3];
     
     SphSolverData2 *data = solver->GetSphSolverData();
-    set_colors_cnm(col, data);
+    set_colors_lnm(col, data);
     for(int i = 0; i < 20 * 26 * 20; i++){
         solver->Advance(targetInterval);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
@@ -489,7 +489,7 @@ void test_sph2_gas_sphere(){
     float *col = new float[count * 3];
     
     SphSolverData2 *data = solver->GetSphSolverData();
-    //set_colors_cnm(col, data);
+    //set_colors_lnm(col, data);
     set_colors_temperature(col, data);
     for(int i = 0; i < 20 * 26 * 20; i++){
         solver->Advance(targetInterval);

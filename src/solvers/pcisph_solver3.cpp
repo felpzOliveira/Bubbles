@@ -67,7 +67,7 @@ __host__ void AdvanceTimeStep(PciSphSolver3 *solver, Float timeStep,
 }
 
 __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
-    TimerList cnmTimer;
+    TimerList lnmTimer;
     unsigned int numberOfIntervals = 0;
     Float remainingTime = timeIntervalInSeconds;
     SphSolverData3 *data = solverData->sphData;
@@ -93,13 +93,13 @@ __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
     pSet->ClearDataBuffer(&pSet->v0s);
     
     Float elapsed = advanceTimer.GetElapsedCPU(0);
-    cnmTimer.Start();
+    lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h, 0);
-    cnmTimer.Stop();
+    lnmTimer.Stop();
     
-    Float cnm = cnmTimer.GetElapsedGPU(0);
-    Float pct = cnm * 100.0 / elapsed;
-    cnmStats.Add(LNMData(cnm, pct));
+    Float lnm = lnmTimer.GetElapsedGPU(0);
+    Float pct = lnm * 100.0 / elapsed;
+    lnmStats.Add(LNMData(lnm, pct));
 }
 
 __host__ Float PciSphSolver3::GetAdvanceTime(){
@@ -107,7 +107,7 @@ __host__ Float PciSphSolver3::GetAdvanceTime(){
 }
 
 __host__ LNMStats PciSphSolver3::GetLNMStats(){
-    return cnmStats;
+    return lnmStats;
 }
 
 __host__ int PciSphSolver3::GetParticleCount(){
@@ -131,11 +131,6 @@ __host__ void PciSphSolver3::Setup(Float targetDensity, Float targetSpacing,
     Float mass = pData->GetMass();
     int pCount = pData->GetReservedSize();
     int actualCount = pData->GetParticleCount();
-    
-    vec3f len = sphData->domain->GetCellSize();
-    Float minLen = Min(len[0], Min(len[1], len[2]));
-    AssertA(minLen > sphData->sphpSet->GetKernelRadius(),
-            "Spacing is too large for single neighbor querying");
     
     solverData->refMemory = cudaAllocateVx(vec3f, 3 * pCount);
     solverData->densityErrors    = cudaAllocateVx(Float, 2 * pCount);

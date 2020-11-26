@@ -111,9 +111,9 @@ __host__ void SphSolver2::Advance(Float timeIntervalInSeconds){
     
 #ifdef PRINT_TIMER
     Float adv = timers.GetElapsedCPU(0);
-    Float cnm = timers.GetElapsedCPU(1);
-    Float pct = cnm * 100.0 / adv;
-    printf("\nAdvance [%d] {%g} LNM {%g} [%g%%]\n", numberOfIntervalsRunned, adv, cnm, pct);
+    Float lnm = timers.GetElapsedCPU(1);
+    Float pct = lnm * 100.0 / adv;
+    printf("\nAdvance [%d] {%g} LNM {%g} [%g%%]\n", numberOfIntervalsRunned, adv, lnm, pct);
     fflush(stdout);
 #endif
     
@@ -138,12 +138,6 @@ __host__ void SphSolver2::Setup(Float targetDensity, Float targetSpacing,
     
     printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n", 
            rad, targetSpacing, pCount);
-    
-    // TODO: Add multi-cell neighbor querying
-    vec2f len = solverData->domain->GetCellSize();
-    Float minLen = Min(len[0], len[1]);
-    AssertA(minLen > solverData->sphpSet->GetKernelRadius(),
-            "Spacing is too large for single neighbor querying");
     
     // Perform a particle distribution so that distribution
     // during simulation can be optmized

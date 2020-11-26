@@ -77,7 +77,7 @@ __host__ int PciSphSolver2::GetParticleCount(){
 }
 
 __host__ LNMStats PciSphSolver2::GetLNMStats(){
-    return cnmStats;
+    return lnmStats;
 }
 
 __host__ Float PciSphSolver2::GetAdvanceTime(){
@@ -90,7 +90,7 @@ __host__ void PciSphSolver2::UpdateDensity(){
 }
 
 __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
-    TimerList cnmTimer;
+    TimerList lnmTimer;
     unsigned int numberOfIntervals = 0;
     Float remainingTime = timeIntervalInSeconds;
     
@@ -117,13 +117,13 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     data->domain->UpdateQueryState();
     
     Float elapsed = advanceTimer.GetElapsedCPU(0);
-    cnmTimer.Start();
+    lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h, 0);
-    cnmTimer.Stop();
+    lnmTimer.Stop();
     
-    Float cnm = cnmTimer.GetElapsedGPU(0);
-    Float pct = cnm * 100.0 / elapsed;
-    cnmStats.Add(LNMData(cnm, pct));
+    Float lnm = lnmTimer.GetElapsedGPU(0);
+    Float pct = lnm * 100.0 / elapsed;
+    lnmStats.Add(LNMData(lnm, pct));
 }
 
 __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
@@ -143,11 +143,6 @@ __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
     Float mass = pData->GetMass();
     int pCount = pData->GetReservedSize();
     int actualCount = pData->GetParticleCount();
-    
-    vec2f len = sphData->domain->GetCellSize();
-    Float minLen = Min(len[0], len[1]);
-    AssertA(minLen > sphData->sphpSet->GetKernelRadius(),
-            "Spacing is too large for single neighbor querying");
     
     solverData->refMemory = cudaAllocateVx(vec2f, 3 * pCount);
     solverData->densityErrors    = cudaAllocateVx(Float, 2 * pCount);

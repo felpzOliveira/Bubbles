@@ -145,7 +145,7 @@ void test_pcisph2_water_block(){
     float *col = new float[count * 3];
     
     SphSolverData2 *data = solver.GetSphSolverData();
-    //set_colors_cnm(col, data);
+    //set_colors_lnm(col, data);
     set_colors_pressure(col, data);
     
     for(int i = 0; i < 20 * 26; i++){
@@ -160,8 +160,8 @@ void test_pcisph2_water_block(){
 }
 
 
-void test_pcisph2_water_block_cnm(){
-    printf("===== SPH Solver 2D -- Water Block CNM\n");
+void test_pcisph2_water_block_lnm(){
+    printf("===== SPH Solver 2D -- Water Block LNM\n");
     Float spacing = 0.01;
     Float targetDensity = WaterDensity;
     vec2f center(0,0);
@@ -209,14 +209,15 @@ void test_pcisph2_water_block_cnm(){
     float *col = new float[count * 3];
     
     SphSolverData2 *data = solver.GetSphSolverData();
-    //set_colors_cnm(col, data);
+    //set_colors_lnm(col, data);
     //set_colors_pressure(col, data);
     Float targetInterval = 1.0 / 240.0;
     for(int i = 0; i < 200 * 10; i++){
         solver.Advance(targetInterval);
-        set_colors_cnm(col, data, 0, 0);
+        set_colors_lnm(col, data, 0, 0);
         //set_colors_pressure(col, data);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
+        ProfilerReport();
     }
     
     getchar();

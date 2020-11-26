@@ -266,6 +266,7 @@ void GenerateData(config_opts *opts){
     // For this case input is a Bubbles simulation file
     ParticleSetBuilder3 builder;
     Float h = 0.02;
+    //int chosenBoundaryAlgorithm = 0; // TODO
     std::vector<int> boundary;
     int ok = 0;
     int flagsIn  = SerializerFlagsFromString(opts->informArgs.c_str());
@@ -294,6 +295,28 @@ void GenerateData(config_opts *opts){
         if(toGen & SERIALIZER_NORMAL){
             printf("Generating Normals ... "); fflush(stdout);
             ComputeNormalGPU(solver.solverData);
+            printf("OK\n");
+        }
+        
+        if((toGen & SERIALIZER_LAYERS) || (toGen & SERIALIZER_BOUNDARY)){
+            grid->UpdateQueryState();
+            LNMInvalidateCells(grid);
+            pSet->ClearDataBuffer(&pSet->v0s);
+            if(toGen & SERIALIZER_BOUNDARY){
+                printf("Classifying boundary particles ... "); fflush(stdout);
+                
+                LNMBoundary(pSet, grid, h, 0);
+                
+                //(void)chosenBoundaryAlgorithm; //TODO
+            }else{
+                printf("Classifying layers ... "); fflush(stdout);
+                int max_level = 4; // TODO
+                LNMClassifyLazyGPU(grid, max_level);
+                LNMAssignParticlesAttributesGPU(grid, pSet);
+            }
+            
+            boundary.clear();
+            UtilGetBoundaryState(pSet, &boundary);
             printf("OK\n");
         }
         
@@ -338,7 +361,7 @@ void MeshToParticles(const char *name, const Transform &transform,
 void convert_command(int argc, char **argv){
     SphSolverData3 *data = nullptr;
     default_opts(&g_opts);
-    argument_process(argument_map, argc, argv, &g_opts);
+    argument_process(argument_map, argc, argv, "convert", &g_opts);
     print_configs(&g_opts);
     
     if(!g_opts.gen_data){

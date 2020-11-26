@@ -154,17 +154,17 @@ std::map<const char *, arg_desc> pbrt_argument_map = {
     },
     {"-layered", 
         { .processor = pbrt_layered_arg, 
-            .help = "Generates geometry containing only CNM-based layered boundary particles." 
+            .help = "Generates geometry containing only LNM-based layered boundary particles." 
         }
     },
     {"-filtered", 
         { .processor = pbrt_filtered_arg, 
-            .help = "Generates geometry containing CNM-based layer and interior particles as gray." 
+            .help = "Generates geometry containing LNM-based layer and interior particles as gray." 
         }
     },
     {"-level", 
         { .processor = pbrt_level_arg, 
-            .help = "Generates geometry containing only a specific level of CNM classification." 
+            .help = "Generates geometry containing only a specific level of LNM classification." 
         }
     },
     {"-rotateY", 
@@ -327,7 +327,7 @@ void pbrt_command(int argc, char **argv){
     std::string radiusString;
     
     default_pbrt_opts(&opts);
-    argument_process(pbrt_argument_map, argc, argv, &opts);
+    argument_process(pbrt_argument_map, argc, argv, "pbrt", &opts);
     print_configs(&opts);
     
     if(opts.input.size() == 0){
@@ -336,7 +336,7 @@ void pbrt_command(int argc, char **argv){
     }
     
     if(opts.mode != RenderMode::ALL && !(opts.flags & SERIALIZER_BOUNDARY)){
-        printf("This mode requires CNM-based boundary output from Bubbles\n");
+        printf("This mode requires LNM-based boundary output from Bubbles\n");
         return;
     }
     

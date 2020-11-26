@@ -13,9 +13,11 @@ typedef struct{
     std::string help;
 }arg_desc;
 
-inline void print_help_and_quit(std::map<const char *, arg_desc> argument_map){
+inline void print_help_and_quit(const char *caller, 
+                                std::map<const char *, arg_desc> argument_map)
+{
     std::map<const char *, arg_desc>::iterator it;
-    printf("Help:\n");
+    printf("[ %s ] Help:\n", caller);
     for(it = argument_map.begin(); it != argument_map.end(); it++){
         arg_desc desc = it->second;
         printf("  %s : %s\n", it->first, desc.help.c_str());
@@ -24,7 +26,7 @@ inline void print_help_and_quit(std::map<const char *, arg_desc> argument_map){
 }
 
 inline void argument_process(std::map<const char *, arg_desc> argument_map,
-                             int argc, char **argv, void *config, 
+                             int argc, char **argv, const char *caller, void *config, 
                              int enforce=1, int start=1)
 {
     int argCount = argc - start;
@@ -34,7 +36,7 @@ inline void argument_process(std::map<const char *, arg_desc> argument_map,
             std::string arg(argv[i]);
             std::map<const char *, arg_desc>::iterator it;
             if(arg == "--help" || arg == "help"){
-                print_help_and_quit(argument_map);
+                print_help_and_quit(caller, argument_map);
             }
             for(it = argument_map.begin(); it != argument_map.end(); it++){
                 if(arg == it->first){
@@ -54,7 +56,7 @@ inline void argument_process(std::map<const char *, arg_desc> argument_map,
         }
     }else if(enforce){
         std::cout << "Missing argument." << std::endl;
-        print_help_and_quit(argument_map);
+        print_help_and_quit(caller, argument_map);
     }
 }
 

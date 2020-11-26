@@ -147,7 +147,7 @@ void test_volume_particle_emitter3_mesh(){
     }
     
     count = pCount;
-    //count = set_poscol_cnm(pos, col, pSet, grid, accept_call);
+    //count = set_poscol_lnm(pos, col, pSet, grid, accept_call);
     
     printf(" * Graphy interation\n");
     graphy_vector_set(origin, target);
@@ -209,7 +209,7 @@ void test_volume_particle_emitter3(){
         return false;
     };
     
-    count = set_poscol_cnm(pos, col, pSet, grid, accept_call);
+    count = set_poscol_lnm(pos, col, pSet, grid, accept_call);
     
     printf(" * Graphy interation\n");
     graphy_vector_set(origin, target);

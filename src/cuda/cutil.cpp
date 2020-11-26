@@ -162,16 +162,16 @@ void cudaPrintMemoryTaken(){
     std::cout << "Took " << amount << " " << unity << " of GPU memory" << std::endl;
 }
 
-int cudaSynchronize(){
+int cudaKernelSynchronize(){
     int rv = 0;
+    cudaError_t errAsync = cudaDeviceSynchronize();
     cudaError_t errSync = cudaGetLastError();
-	cudaError_t errAsync = cudaDeviceSynchronize();
 	if(errSync != cudaSuccess){
         std::cout << "Sync kernel error: " << cudaGetErrorString(errSync) << std::endl;
 		rv = 1;
     }
 	if(errAsync != cudaSuccess){
-        std::cout << "Sync kernel error: " << cudaGetErrorString(errAsync) << std::endl;
+        std::cout << "Async kernel error: " << cudaGetErrorString(errAsync) << std::endl;
 		rv = 1;
     }
     

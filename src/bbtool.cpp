@@ -1,15 +1,4 @@
 #include <args.h>
-/*
-* Happy Whale cmd: ./bbmesh convert --in HappyWhale.obj --scale 0.3 --spacing 0.02
-*/
-
-
-#if 0
-MeshToParticles("/home/felpz/Documents/models/dragon_aligned.obj",
-                Scale(0.7) * RotateY(-90), 0.02, "output.txt");
-MeshToParticles("/home/felpz/Downloads/happy_whale.obj",
-                Scale(0.3), 0.02, "output.txt");
-#endif
 
 ARGUMENT_PROCESS(convert_cmd){
     convert_command(argc-1, &argv[1]);
@@ -52,6 +41,6 @@ std::map<const char *, arg_desc> command_map = {
 
 int main(int argc, char **argv){
     printf("* BubblesTool - Built %s at %s *\n", __DATE__, __TIME__);
-    argument_process(command_map, argc, argv, nullptr);
+    argument_process(command_map, argc, argv, "BubblesTool", nullptr);
     return 0;
 }

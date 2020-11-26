@@ -110,6 +110,8 @@ class SphGasSolver2{
 // pressure in a single pass increasing performance.
 __bidevice__ void ComputeDensityFor(SphSolverData2 *data, int particleId,
                                     int compute_pressure = 1);
+__bidevice__ void ComputeDensityFor(SphSolverData3 *data, int particleId,
+                                    int compute_pressure = 1);
 // Compute pressure for a given particle with density di
 __bidevice__ void ComputePressureFor(SphSolverData2 *data, int particleId, Float di);
 __bidevice__ void ComputePressureFor(SphSolverData3 *data, int particleId, Float di);

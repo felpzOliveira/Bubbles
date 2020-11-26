@@ -352,7 +352,8 @@ class Grid{
  */
     template<typename ParticleType = ParticleSet<T>>
         __host__ void DistributeByParticleList(ParticleType *pSet, T *pList, 
-                                               int pCount, int startId)
+                                               int pCount, int startId,
+                                               Float kernelRadius)
     {
         for(int i = 0; i < pCount; i++){
             T p = pList[i];
@@ -367,6 +368,10 @@ class Grid{
             pChain->pId = startId+i;
             pChain->sId = pSet->GetFamilyId();
             cell->AddToChain(pChain);
+        }
+        
+        for(int i = 0; i < pCount; i++){
+            DistributeParticleBucket(pSet, startId+i, kernelRadius);
         }
     }
     
@@ -401,6 +406,33 @@ class Grid{
         __bidevice__ void DistributeToCell(ParticleType *pSet, unsigned int cellId){
         DistributeResetCell(cellId);
         DistributeAddToCell(pSet, cellId);
+    }
+    
+    template<typename ParticleType = ParticleSet<T>>
+        __bidevice__ void DistributeParticleBucket(ParticleType *pSet, int pid,
+                                                   Float kernelRadius)
+    {
+        T pi = pSet->GetParticlePosition(pid);
+        unsigned int cellId = GetLinearHashedPosition(pi);
+        int *neighbors = nullptr;
+        int count = GetNeighborsOf(cellId, &neighbors);
+        Bucket *bucket = pSet->GetParticleBucket(pid);
+        bucket->Reset();
+        for(int i = 0; i < count; i++){
+            Cell<Q> *cell = GetCell(neighbors[i]);
+            ParticleChain *pChain = cell->GetChain();
+            int size = cell->GetChainLength();
+            
+            for(int j = 0; j < size; j++){
+                T pj = pSet->GetParticlePosition(pChain->pId);
+                Float distance = Distance(pi, pj);
+                if(IsWithinStd(distance, kernelRadius)){
+                    bucket->Insert(pChain->pId);
+                }
+                
+                pChain = pChain->next;
+            }
+        }
     }
     
     template<typename ParticleType = ParticleSet<T>>
@@ -463,6 +495,7 @@ class Grid{
         *neighbors = cell->neighborList;
         return cell->neighborListCount;
     }
+    
     
     /* Get neighbors from a cell with a depth 'depth' */
     __bidevice__ int GetNeighborListFor(int id, int depth, int *neighbors){
@@ -1123,6 +1156,7 @@ class ContinuousParticleSetBuilder{
     std::vector<T> velocities;
     std::vector<T> forces;
     ParticleSet<T> *particleSet;
+    Float kernelRadius;
     int maxNumOfParticles;
     bool warned;
     Grid<T, U, Q> *mappedDomain;
@@ -1133,8 +1167,21 @@ class ContinuousParticleSetBuilder{
         maxNumOfParticles = Max(1, maxParticles);
         particleSet = cudaAllocateVx(ParticleSet<T>, 1);
         particleSet->SetSize(maxNumOfParticles);
+        int pSize = MaximumParticlesPerBucket;
+        int *ids = cudaAllocateVx(int, pSize * maxParticles);
+        int *ref = ids;
+        for(int i = 0; i < maxParticles; i++){
+            Bucket *bucket = particleSet->GetParticleBucket(i);
+            bucket->SetPointer(&ref[i * pSize], pSize);
+        }
+        
+        kernelRadius = 2.0 * 0.02; // TODO: default for now
         mappedDomain = nullptr;
         warned = false;
+    }
+    
+    __host__ void SetKernelRadius(Float radius){
+        kernelRadius = radius;
     }
     
     __host__ void MapGrid(Grid<T, U, Q> *grid){
@@ -1230,9 +1277,11 @@ class ContinuousParticleSetBuilder{
             int startId = particleSet->GetParticleCount();
             particleSet->AppendData(positions.data(), velocities.data(),
                                     forces.data(), positions.size());
-            if(mappedDomain != nullptr)
+            if(mappedDomain != nullptr){
                 mappedDomain->DistributeByParticleList(particleSet, positions.data(), 
-                                                       positions.size(), startId);
+                                                       positions.size(), startId,
+                                                       kernelRadius);
+            }
             positions.clear();
             velocities.clear();
             forces.clear();

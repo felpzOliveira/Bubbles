@@ -136,8 +136,10 @@ template<typename T, typename U, typename Q>
 __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, 
                           Float h, int algorithm=0)
 {
+    /* Get the minimum in case its not a regular grid */
     T len = domain->GetCellSize();
     Float maxd = MinComponent(len);
+    
     Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
     
     /* Classify L1 */
@@ -220,4 +222,27 @@ __host__ int LNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1){
     domain->SetLNMMaxLevel(level);
     
     return level;
+}
+
+
+template<typename T, typename U, typename Q>
+__global__ void LNMParticleAttributesKernel(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < pSet->GetParticleCount()){
+        T pi = pSet->GetParticlePosition(i);
+        unsigned int cellId = domain->GetLinearHashedPosition(pi);
+        Cell<Q> *cell = domain->GetCell(cellId);
+        int level = cell->GetLevel();
+        if(level > 0){
+            pSet->SetParticleV0(i, level);
+        }else{
+            pSet->SetParticleV0(i, 0);
+        }
+    }
+}
+
+template<typename T, typename U, typename Q> __host__ 
+void LNMAssignParticlesAttributesGPU(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
+    int N = pSet->GetParticleCount();
+    GPULaunch(N, GPUKernel(LNMParticleAttributesKernel<T, U, Q>), domain, pSet);
 }

@@ -29,6 +29,11 @@ __host__ void PciSphSolver3::SetColliders(ColliderSet3 *colliders){
     solverData->sphData->collider = colliders;
 }
 
+__host__ void PciSphSolver3::SetViscosityCoefficient(Float viscosityCoefficient){
+    AssertA(solverData, "Invalid solverData for {SetViscosityCoefficient}");
+    solverData->sphData->viscosity = Max(0, viscosityCoefficient);
+}
+
 __host__ void PrintPciSphTimers(TimerList *timers);
 
 __host__ void AdvanceTimeStep(PciSphSolver3 *solver, Float timeStep, 

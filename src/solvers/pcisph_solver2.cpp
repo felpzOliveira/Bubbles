@@ -1,6 +1,7 @@
 #include <pcisph_solver.h>
 #include <shape.h>
 #include <point_generator.h>
+#include <util.h>
 
 Float kDefaultTimeStepLimitScale = 5.0;
 
@@ -28,6 +29,11 @@ __host__ void PciSphSolver2::SetColliders(ColliderSet2 *colliders){
     AssertA(solverData, "Invalid solverData for {SetColliders}");
     AssertA(solverData->sphData, "Invalid solverData for {SetColliders}");
     solverData->sphData->collider = colliders;
+}
+
+__host__ void PciSphSolver2::SetViscosityCoefficient(Float viscosityCoefficient){
+    AssertA(solverData, "Invalid solverData for {SetViscosityCoefficient}");
+    solverData->sphData->viscosity = Max(0, viscosityCoefficient);
 }
 
 __host__ void PrintPciSphTimers(TimerList *timers){
@@ -60,8 +66,10 @@ __host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep,
         ComputeDensityGPU(data);
     solver->stepTimer.StopAndNext();
     
-    //TODO: Implement CPU version for 2D?
-    ComputeNonPressureForceGPU(data);
+    if(use_cpu)
+        ComputeNonPressureForceCPU(data);
+    else
+        ComputeNonPressureForceGPU(data);
     
     solver->stepTimer.StopAndNext();
     
@@ -209,4 +217,15 @@ __host__ Float PciSphSolver2::ComputeDelta(Float timeIntervalInSeconds){
 __host__ Float PciSphSolver2::ComputeBeta(Float timeIntervalInSeconds){
     Float timeStepSquare = timeIntervalInSeconds * timeIntervalInSeconds;
     return 2.0 * massOverTargetDensitySquared * timeStepSquare;
+}
+
+__host__ void PciSphRunSimulation2(PciSphSolver2 *solver, Float spacing,
+                                   vec2f lower, vec2f upper, Float targetInterval,
+                                   const std::function<int(int )> &callback)
+{
+    SphParticleSet2 *sphSet = solver->GetSphParticleSet();
+    ParticleSet2 *pSet = sphSet->GetParticleSet();
+    return UtilRunSimulation2<PciSphSolver2, ParticleSet2>(solver, pSet, spacing,
+                                                           lower, upper, targetInterval,
+                                                           callback);
 }

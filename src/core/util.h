@@ -43,10 +43,13 @@ __host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform);
 
 
 /*
-* Generates a acceleration Grid3 for a domain given its bounds, the target spacing
+* Generates a acceleration Grid for a domain given its bounds, the target spacing
 * of the simulation and the spacing scale to be used. This grid is uniform.
 */
 __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing, 
+                                       Float spacingScale = 2.0);
+
+__host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
                                        Float spacingScale = 2.0);
 
 /*
@@ -166,7 +169,117 @@ inline __host__ int UtilFillBoundaryParticles(ParticleAccessor *pSet,
 }
 
 /*
-* Run a simulation. Perform several updates on the given solver and display results
+* Run a 2D simulation. Perform several updates on the given solver and display results
+* interactivily using graphy. View setup is made by the vectors 'lower' and 'upper'.
+* You can save a frame or update emitors and calliders from the callback function which
+* is called at the begining of every step.
+* Callback should return 0 if simulation should stop or != 0 to continue.
+*/
+template<typename Solver, typename ParticleAccessor>
+inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
+                                        Float spacing, vec2f lower, vec2f upper,
+                                        Float targetInterval,
+                                        const std::function<int(int )> &callback)
+{
+    float *ptr = nullptr;
+    float *pos = nullptr;
+    float *col = nullptr;
+    float pSize = 2.0f;
+    int visible = 0;
+    int total = pSet->GetReservedSize();
+    ptr = new float[2 * 3 * total];
+    pos = &ptr[0];
+    col = &ptr[3 * total];
+    
+    memset(col, 0, sizeof(float) * 3 * total);
+    visible = pSet->GetParticleCount();
+    for(int j = 0; j < visible; j++){
+        vec2f pi = pSet->GetParticlePosition(j);
+        pos[3 * j + 0] = pi.x; pos[3 * j + 1] = pi.y;
+        pos[3 * j + 2] = 0;    col[3 * j + 0] = 1;
+    }
+    
+    
+    graphy_render_points_size(pos, col, pSize, visible,
+                              lower.x, upper.x, upper.y, lower.y);
+    int frame = 0;
+    while(callback(frame) != 0){
+        solver->Advance(targetInterval);
+        visible = pSet->GetParticleCount();
+        for(int j = 0; j < visible; j++){
+            vec2f pi = pSet->GetParticlePosition(j);
+            pos[3 * j + 0] = pi.x; pos[3 * j + 1] = pi.y;
+            pos[3 * j + 2] = 0;    col[3 * j + 0] = 1;
+        }
+        graphy_render_points_size(pos, col, pSize, visible,
+                                  lower.x, upper.x, upper.y, lower.y);
+        frame++;
+    }
+    
+    graphy_close_display();
+    delete[] ptr;
+}
+
+/*
+* Run a 2D simulation. Perform several updates on the given solver and display results
+* interactivily using graphy. View setup is made by the vectors 'lower' and 'upper'.
+* You can save a frame or update emitors and calliders from the callback function which
+* is called at the begining of every step. This call receives a color function to
+* configure the display.
+* Callback should return 0 if simulation should stop or != 0 to continue.
+*/
+template<typename Solver, typename ParticleAccessor>
+inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
+                                        Float spacing, vec2f lower, vec2f upper,
+                                        Float targetInterval,
+                                        const std::function<int(int )> &callback,
+                                        const std::function<void(float *colBuffer,
+                                                                 int pCount)> &setCol)
+{
+    float *ptr = nullptr;
+    float *pos = nullptr;
+    float *col = nullptr;
+    float pSize = 2.0f;
+    int visible = 0;
+    int total = pSet->GetReservedSize();
+    ptr = new float[2 * 3 * total];
+    pos = &ptr[0];
+    col = &ptr[3 * total];
+    
+    memset(col, 0, sizeof(float) * 3 * total);
+    visible = pSet->GetParticleCount();
+    for(int j = 0; j < visible; j++){
+        vec2f pi = pSet->GetParticlePosition(j);
+        pos[3 * j + 0] = pi.x; pos[3 * j + 1] = pi.y;
+        pos[3 * j + 2] = 0;
+    }
+    
+    setCol(col, visible);
+    
+    graphy_render_points_size(pos, col, pSize, visible,
+                              lower.x, upper.x, upper.y, lower.y);
+    int frame = 0;
+    while(callback(frame) != 0){
+        solver->Advance(targetInterval);
+        visible = pSet->GetParticleCount();
+        for(int j = 0; j < visible; j++){
+            vec2f pi = pSet->GetParticlePosition(j);
+            pos[3 * j + 0] = pi.x; pos[3 * j + 1] = pi.y;
+            pos[3 * j + 2] = 0;
+        }
+        
+        setCol(col, visible);
+        graphy_render_points_size(pos, col, pSize, visible,
+                                  lower.x, upper.x, upper.y, lower.y);
+        frame++;
+    }
+    
+    graphy_close_display();
+    delete[] ptr;
+}
+
+/*
+* Run a 3D simulation. Perform several updates on the given solver and display results
 * interactivily using graphy. Camera setup is made by the vectors 'origin' and 'target'.
 * You can save a frame or update emitors and calliders from the callback function which
 * is called at the begining of every step.

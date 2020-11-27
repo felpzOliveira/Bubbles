@@ -5,9 +5,9 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define DEBUG
+//#define DEBUG
 //#define ASSERT_ENABLE
-#define PRINT_TIMER
+//#define PRINT_TIMER
 
 #ifdef DEBUG
 #define DBG_PRINT(...) printf(__VA_ARGS__)

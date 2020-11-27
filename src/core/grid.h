@@ -356,6 +356,7 @@ class Grid{
                                                Float kernelRadius)
     {
         for(int i = 0; i < pCount; i++){
+            ParticleChain *pChain;
             T p = pList[i];
             U u = GetHashedPosition(p);
             unsigned int h = GetLinearCellIndex(u);
@@ -363,7 +364,12 @@ class Grid{
             Cell<Q> *cell = &cells[h];
             AssertA(Inside(p, cell->bounds), "Invalid particle computation {Inside}");
             
-            ParticleChain *pChain = pSet->GetParticleChainNode(startId+i);
+            if(cell->IsActive()){
+                pChain = pSet->GetParticleAuxChainNode(startId+i);
+            }else{
+                pChain = pSet->GetParticleChainNode(startId+i);
+            }
+            
             pChain->cId = h;
             pChain->pId = startId+i;
             pChain->sId = pSet->GetFamilyId();
@@ -437,7 +443,7 @@ class Grid{
     
     template<typename ParticleType = ParticleSet<T>>
         __bidevice__ void DistributeToCellOpt(ParticleType **ppSet, int n, 
-                                              unsigned int cellId, int repeat=1)
+                                              unsigned int cellId)
     {
         AssertA(cellId < total, "Invalid distribution cell id");
         int *neighbors = nullptr;
@@ -1171,7 +1177,7 @@ class ContinuousParticleSetBuilder{
         int *ids = cudaAllocateVx(int, pSize * maxParticles);
         int *ref = ids;
         for(int i = 0; i < maxParticles; i++){
-            Bucket *bucket = particleSet->GetParticleBucket(i);
+            Bucket *bucket = particleSet->GetRawData(particleSet->buckets, i);
             bucket->SetPointer(&ref[i * pSize], pSize);
         }
         

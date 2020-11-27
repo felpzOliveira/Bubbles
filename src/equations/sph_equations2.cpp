@@ -355,11 +355,19 @@ __host__ void UpdateGridDistributionGPU(SphSolverData2 *data){
     Grid2 *grid = data->domain;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver2 has no domain for UpdateGridDistribution");
-    int N = grid->GetCellCount();
-    int index = data->frame_index;
-    GPULaunch(N, UpdateGridDistributionKernel, grid, pSet, index);
-    if(data->frame_index == 1){
-        GPULaunch(N, SwapGridStatesKernel, grid);
+    if(data->sphpSet->requiresHigherLevelUpdate){
+        for(int i = 0; i < data->domain->GetCellCount(); i++){
+            data->domain->DistributeResetCell(i);
+        }
+        data->domain->DistributeByParticle(pSet);
+    }else{
+        int N = grid->GetCellCount();
+        int index = data->frame_index;
+        GPULaunch(N, UpdateGridDistributionKernel, grid, pSet, index);
+        
+        if(data->frame_index == 1){
+            GPULaunch(N, SwapGridStatesKernel, grid);
+        }
     }
     
     int pCount = pSet->GetParticleCount();
@@ -399,6 +407,16 @@ __bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep){
             "SphSolver2 has no particles for ComputePressureForce");
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         ComputeAllForcesFor(data, i, timeStep);
+    }
+}
+
+__bidevice__ void ComputeNonPressureForceCPU(SphSolverData2 *data){
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    AssertA(pSet, "SphSolver2 has no valid particle set for ComputeNonPressureForce");
+    AssertA(pSet->GetParticleCount() > 0,
+            "SphSolver2 has no particles for ComputeNonPressureForce");
+    for(int i = 0; i < pSet->GetParticleCount(); i++){
+        ComputeNonPressureForceFor(data, i);
     }
 }
 

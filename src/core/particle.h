@@ -203,6 +203,11 @@ class ParticleSet{
         count = 0;
     }
     
+    template<typename S> __host__ S *GetRawData(DataBuffer<S> buffer, int where){
+        AssertA(where >= 0 && where < buffer.GetSize(), "Invalid raw data index");
+        return buffer.Get(where);
+    }
+    
     __host__ void AppendData(T *pos, T *vel, T *force, int n){
         int rv = 0;
         rv |= positions.SetDataAt(pos, n, count);

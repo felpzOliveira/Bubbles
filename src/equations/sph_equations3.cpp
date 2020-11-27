@@ -431,8 +431,7 @@ __host__ void UpdateGridDistributionGPU(SphSolverData3 *data){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver3 has no domain for UpdateGridDistribution");
     
-    //TODO(Felipe): This is a bug - debug with dragon pool with spacing 0.05!
-    if(data->sphpSet->requiresHigherLevelUpdate || 0){
+    if(data->sphpSet->requiresHigherLevelUpdate){
         //printf("Performing full distribution by excessive delta\n");
         for(int i = 0; i < data->domain->GetCellCount(); i++){
             data->domain->DistributeResetCell(i);

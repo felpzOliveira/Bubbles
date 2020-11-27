@@ -87,6 +87,25 @@ __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
     return MakeGrid(resolution, pMin, pMax);
 }
 
+__host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
+                                       Float spacingScale)
+{
+    vec2f pMin(0), pMax(0), half(0);
+    Float length = spacing * spacingScale;
+    Float hlen = 0.5 * length;
+    Float invLen = 1.0f / length;
+    int mx = (int)std::ceil(domain.ExtentOn(0) * invLen);
+    int my = (int)std::ceil(domain.ExtentOn(1) * invLen);
+    mx += (mx % 2) * length;
+    my += (my % 2) * length;
+    
+    half = vec2f(mx * hlen, my * hlen);
+    pMin = domain.Center() - half;
+    pMax = domain.Center() + half;
+    vec2ui resolution(mx, my);
+    return MakeGrid(resolution, pMin, pMax);
+}
+
 __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBuilder3 *builder,
                                                 Transform transform, vec3f centerAt,
                                                 vec3f initialVelocity)

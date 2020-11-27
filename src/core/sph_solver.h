@@ -139,6 +139,7 @@ __bidevice__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure =
 __bidevice__ void ComputeNormalCPU(SphSolverData3 *data);
 __bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep);
 __bidevice__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
+__bidevice__ void ComputeNonPressureForceCPU(SphSolverData2 *data);
 __bidevice__ void ComputeNonPressureForceCPU(SphSolverData3 *data);
 __bidevice__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended=0);
 __bidevice__ void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended=0);

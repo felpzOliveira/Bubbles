@@ -7,7 +7,7 @@
 #include <marching_squares.h>
 
 void test_pcisph2_marching_squares(){
-    printf("===== SPH Solver 2D -- Marching Squares\n");
+    printf("===== PCISPH Solver 2D -- Marching Squares\n");
     Float spacing = 0.01;
     Float targetDensity = WaterDensity;
     vec2f center(0,0);
@@ -98,7 +98,7 @@ void test_pcisph2_marching_squares(){
 }
 
 void test_pcisph2_water_block(){
-    printf("===== SPH Solver 2D -- Water Block\n");
+    printf("===== PCISPH Solver 2D -- Water Block\n");
     Float spacing = 0.015;
     Float targetDensity = WaterDensity;
     vec2f center(0,0);
@@ -159,15 +159,84 @@ void test_pcisph2_water_block(){
     printf("===== OK\n");
 }
 
+void test_pcisph2_continuous_emitter(){
+    printf("===== PCISPH Solver 2D -- Continuous Emitter\n");
+    PciSphSolver2 solver;
+    Float spacing = 0.01;
+    Float spacingScale = 2.0;
+    Float targetDensity = WaterDensity;
+    Float lenc = 1.2;
+    
+    CudaMemoryManagerStart(__FUNCTION__);
+    Shape2 *rect   = MakeRectangle2(Transform2(), vec2f(lenc), true);
+    Shape2 *block  = MakeRectangle2(Translate2(-0.5, 0.5), 0.05);
+    Shape2 *block2 = MakeRectangle2(Translate2(0.3, 0.2), 0.05);
+    
+    Grid2 *grid = UtilBuildGridForDomain(rect->GetBounds(), spacing, spacingScale);
+    
+    ContinuousParticleSetBuilder2 builder(50000);
+    builder.SetKernelRadius(spacing * spacingScale);
+    
+    auto velocityField = [&](const vec2f &p) -> vec2f{
+        Float u1 = rand_float() * 10.0;
+        vec2f v(u1, 0);
+        if(p.x > 0) v *= -1.0;
+        return v;
+    };
+    
+    VolumeParticleEmitterSet2 emitter;
+    emitter.AddEmitter(block, block->GetBounds(), spacing);
+    emitter.AddEmitter(block2, block2->GetBounds(), spacing);
+    
+    emitter.Emit(&builder, velocityField);
+    
+    SphParticleSet2 *sphSet = SphParticleSet2FromContinuousBuilder(&builder);
+    ParticleSet2 *set2 = sphSet->GetParticleSet();
+    
+    ColliderSetBuilder2 colliderBuilder;
+    colliderBuilder.AddCollider2(rect);
+    ColliderSet2 *collider = colliderBuilder.GetColliderSet();
+    
+    solver.Initialize(DefaultSphSolverData2());
+    solver.SetViscosityCoefficient(0.02);
+    solver.Setup(targetDensity, spacing, spacingScale, grid, sphSet);
+    solver.SetColliders(collider);
+    
+    SphSolverData2 *data = solver.GetSphSolverData();
+    Float targetInterval = 1.0 / 240.0;
+    builder.MapGrid(grid);
+    
+    int maxframes = 1000;
+    
+    auto onStepUpdate = [&](int step) -> int{
+        if(step == 0) return 1;
+        if(step < maxframes){
+            builder.MapGridEmit(velocityField, spacing);
+        }
+        return step > maxframes ? 0 : 1;
+    };
+    
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        (void)pCount;
+        set_colors_lnm(colors, data, 0, 0);
+    };
+    
+    UtilRunSimulation2<PciSphSolver2, ParticleSet2>(&solver, set2, spacing,
+                                                    vec2f(-1, -1), vec2f(1, 1),
+                                                    targetInterval, onStepUpdate,
+                                                    colorFunction);
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
 
 void test_pcisph2_water_block_lnm(){
-    printf("===== SPH Solver 2D -- Water Block LNM\n");
+    printf("===== PCISPH Solver 2D -- Water Block LNM\n");
     Float spacing = 0.01;
+    Float spacingScale = 2.0;
     Float targetDensity = WaterDensity;
     vec2f center(0,0);
     Float lenc = 2;
     
-    vec2f pMin, pMax;
     Bounds2f containerBounds;
     ParticleSetBuilder2 builder;
     ColliderSetBuilder2 colliderBuilder;
@@ -176,55 +245,43 @@ void test_pcisph2_water_block_lnm(){
     
     CudaMemoryManagerStart(__FUNCTION__);
     
-    int reso = (int)std::floor(lenc / (spacing * 2.0));
-    printf("Using grid with resolution %d x %d\n", reso, reso);
-    vec2ui res(reso, reso);
-    
-    solver.Initialize(DefaultSphSolverData2());
     Shape2 *rect = MakeRectangle2(Translate2(center.x, center.y+0.45), vec2f(1));
     Shape2 *block = MakeSphere2(Translate2(center.x, center.y-0.3), 0.2);
     Shape2 *container = MakeRectangle2(Translate2(center.x, center.y), vec2f(lenc), true);
     
     containerBounds = container->GetBounds();
-    pMin = containerBounds.pMin - vec2f(spacing);
-    pMax = containerBounds.pMax + vec2f(spacing);
     
-    Grid2 *grid = MakeGrid(res, pMin, pMax);
+    solver.Initialize(DefaultSphSolverData2());
+    
+    Grid2 *grid = UtilBuildGridForDomain(containerBounds, spacing, spacingScale);
     
     VolumeParticleEmitter2 emitter(rect, rect->GetBounds(), spacing);
     
     emitter.Emit(&builder);
     SphParticleSet2 *sphSet = SphParticleSet2FromBuilder(&builder);
     ParticleSet2 *set2 = sphSet->GetParticleSet();
-    int count = set2->GetParticleCount();
     
     colliderBuilder.AddCollider2(block);
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
+    solver.Setup(targetDensity, spacing, spacingScale, grid, sphSet);
     solver.SetColliders(collider);
     
-    float *pos = new float[count * 3];
-    float *col = new float[count * 3];
-    
     SphSolverData2 *data = solver.GetSphSolverData();
-    //set_colors_lnm(col, data);
-    //set_colors_pressure(col, data);
     Float targetInterval = 1.0 / 240.0;
-    for(int i = 0; i < 200 * 10; i++){
-        solver.Advance(targetInterval);
-        set_colors_lnm(col, data, 0, 0);
-        //set_colors_pressure(col, data);
-        Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
-        ProfilerReport();
-    }
     
-    getchar();
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        (void)pCount;
+        set_colors_lnm(colors, data, 0, 0);
+    };
+    
+    UtilRunSimulation2<PciSphSolver2, ParticleSet2>(&solver, set2, spacing,
+                                                    vec2f(-1, -1), vec2f(1, 1),
+                                                    targetInterval, EmptyCallback,
+                                                    colorFunction);
     
     CudaMemoryManagerClearCurrent();
-    delete[] pos;
-    delete[] col;
     printf("===== OK\n");
 }
 

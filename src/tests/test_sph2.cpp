@@ -16,8 +16,10 @@ vec3f get_color_by_hex(unsigned int hex){
 
 vec3f get_color_level(int level){
     vec3f color_map[] = {
-        get_color_by_hex(0x08519c), get_color_by_hex(0x3182bd),
-        get_color_by_hex(0x6baed6),
+        //get_color_by_hex(0x08519c), get_color_by_hex(0x3182bd),
+        //get_color_by_hex(0x6baed6),
+        vec3f(0.97,0.00,0.10), vec3f(0.90,0.44,0.10),
+        vec3f(0.78,0.78,0.74),
     };
     
     level -= 1;

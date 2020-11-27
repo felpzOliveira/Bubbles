@@ -40,6 +40,7 @@ class PciSphSolver2{
     __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
                         Grid2 *domain, SphParticleSet2 *pSet);
     __host__ void SetColliders(ColliderSet2 *colliders);
+    __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
     __bidevice__ SphSolverData2 *GetSphSolverData();
     __bidevice__ SphParticleSet2 *GetSphParticleSet();
     __host__ void Advance(Float timeIntervalInSeconds);
@@ -69,6 +70,7 @@ class PciSphSolver3{
     __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
                         Grid3 *domain, SphParticleSet3 *pSet);
     __host__ void SetColliders(ColliderSet3 *colliders);
+    __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
     __bidevice__ SphSolverData3 *GetSphSolverData();
     __bidevice__ SphParticleSet3 *GetSphParticleSet();
     __host__ void Advance(Float timeIntervalInSeconds);
@@ -98,4 +100,8 @@ __host__ int EmptyCallback(int);
 __host__ void PciSphRunSimulation3(PciSphSolver3 *solver, Float spacing,
                                    vec3f origin, vec3f target, 
                                    Float targetInterval, std::vector<Shape*> sdfs={},
+                                   const std::function<int(int )> &callback=EmptyCallback);
+
+__host__ void PciSphRunSimulation2(PciSphSolver2 *solver, Float spacing,
+                                   vec2f lower, vec2f upper, Float targetInterval,
                                    const std::function<int(int )> &callback=EmptyCallback);

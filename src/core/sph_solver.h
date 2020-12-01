@@ -50,7 +50,7 @@ __host__ void SphSolverData3SetupFor(SphSolverData3 *solverData,
 class SphSolver2{
     public:
     SphSolverData2 *solverData;
-    
+    Float stepInterval;
     __bidevice__ SphSolver2();
     __bidevice__ void Initialize(SphSolverData2 *data);
     __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius, 
@@ -70,7 +70,7 @@ class SphSolver2{
 class SphSolver3{
     public:
     SphSolverData3 *solverData;
-    
+    Float stepInterval;
     __bidevice__ SphSolver3();
     __bidevice__ void Initialize(SphSolverData3 *data);
     __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius, 

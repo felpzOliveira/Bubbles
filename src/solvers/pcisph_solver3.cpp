@@ -34,20 +34,15 @@ __host__ void PciSphSolver3::SetViscosityCoefficient(Float viscosityCoefficient)
     solverData->sphData->viscosity = Max(0, viscosityCoefficient);
 }
 
-__host__ void PrintPciSphTimers(TimerList *timers);
-
 __host__ void AdvanceTimeStep(PciSphSolver3 *solver, Float timeStep, 
                               int use_cpu = 0)
 {
     SphSolverData3 *data = solver->solverData->sphData;
-    solver->stepTimer.Reset();
-    
-    solver->stepTimer.Start();
+    ProfilerManualStart("AdvanceTimeStep");
     if(use_cpu)
         UpdateGridDistributionCPU(data);
     else
         UpdateGridDistributionGPU(data);
-    solver->stepTimer.StopAndNext();
     
     data->sphpSet->ResetHigherLevel();
     
@@ -55,20 +50,16 @@ __host__ void AdvanceTimeStep(PciSphSolver3 *solver, Float timeStep,
         ComputeDensityCPU(data);
     else
         ComputeDensityGPU(data);
-    solver->stepTimer.StopAndNext();
     
     if(use_cpu)
         ComputeNonPressureForceCPU(data);
     else
         ComputeNonPressureForceGPU(data);
     
-    solver->stepTimer.StopAndNext();
-    
     Float delta = solver->ComputeDelta(timeStep);
     ComputePressureForceAndIntegrate(solver->solverData, timeStep, 
                                      0.01, delta, 5, use_cpu);
-    
-    solver->stepTimer.Stop();
+    ProfilerManualFinish();
 }
 
 __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
@@ -79,8 +70,7 @@ __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     Float h = data->sphpSet->GetTargetSpacing();
     
-    advanceTimer.Reset();
-    advanceTimer.Start();
+    ProfilerBeginStep();
     while(remainingTime > Epsilon){
         SphParticleSet3 *sphpSet = data->sphpSet;
         numberOfIntervals = sphpSet->ComputeNumberOfTimeSteps(remainingTime,
@@ -89,26 +79,26 @@ __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
         Float timeStep = remainingTime / (Float)numberOfIntervals;
         AdvanceTimeStep(this, timeStep);
         remainingTime -= timeStep;
+        ProfilerIncreaseStepIteration();
     }
     
-    advanceTimer.Stop();
+    ProfilerEndStep();
+    stepInterval = ProfilerGetStepInterval();
     
     data->domain->UpdateQueryState();
-    LNMInvalidateCells(data->domain);
     pSet->ClearDataBuffer(&pSet->v0s);
     
-    Float elapsed = advanceTimer.GetElapsedCPU(0);
     lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h, 0);
     lnmTimer.Stop();
     
     Float lnm = lnmTimer.GetElapsedGPU(0);
-    Float pct = lnm * 100.0 / elapsed;
+    Float pct = lnm * 100.0 / ProfilerGetEvaluation("AdvanceTimeStep");
     lnmStats.Add(LNMData(lnm, pct));
 }
 
 __host__ Float PciSphSolver3::GetAdvanceTime(){
-    return advanceTimer.GetElapsedCPU(0);
+    return stepInterval;
 }
 
 __host__ LNMStats PciSphSolver3::GetLNMStats(){

@@ -42,19 +42,14 @@ __bidevice__ SphParticleSet3 *SphSolver3::GetSphParticleSet(){
     return solverData->sphpSet;
 }
 
-
-__host__ void PrintSphTimers(TimerList *timers);
 __host__ void AdvanceTimeStep(SphSolver3 *solver, Float timeStep, 
                               int use_cpu = 0)
 {
-    TimerList timers;
     SphSolverData3 *data = solver->solverData;
-    timers.Start();
     if(use_cpu)
         UpdateGridDistributionCPU(data);
     else
         UpdateGridDistributionGPU(data);
-    timers.StopAndNext();
     
     data->sphpSet->ResetHigherLevel();
     
@@ -63,34 +58,28 @@ __host__ void AdvanceTimeStep(SphSolver3 *solver, Float timeStep,
     else
         ComputeDensityGPU(data);
     
-    timers.StopAndNext();
     if(use_cpu)
         ComputePressureForceCPU(data, timeStep);
     else
         ComputePressureForceGPU(data, timeStep);
-    timers.Stop();
     
     if(use_cpu)
         ComputePseudoViscosityInterpolationCPU(data, timeStep);
     else
         ComputePseudoViscosityInterpolationGPU(data, timeStep);
-    
-#if defined(PRINT_TIMER)
-    PrintSphTimers(&timers);
-#endif
-    timers.Reset();
 }
 
 __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
+    TimerList lnmTimer;
     unsigned int numberOfIntervals = 0;
     unsigned int numberOfIntervalsRunned = 0;
     Float remainingTime = timeIntervalInSeconds;
     
-    TimerList timers;
     SphSolverData3 *data = solverData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     Float h = data->sphpSet->GetTargetSpacing();
-    timers.Start();
+    
+    ProfilerBeginStep();
     while(remainingTime > Epsilon){
         SphParticleSet3 *sphpSet = solverData->sphpSet;
         numberOfIntervals = sphpSet->ComputeNumberOfTimeSteps(remainingTime,
@@ -99,25 +88,18 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
         AdvanceTimeStep(this, timeStep);
         remainingTime -= timeStep;
         numberOfIntervalsRunned += 1;
+        ProfilerIncreaseStepIteration();
     }
     
-    LNMInvalidateCells(data->domain);
+    ProfilerEndStep();
+    stepInterval = ProfilerGetStepInterval();
+    
     pSet->ClearDataBuffer(&pSet->v0s);
     data->domain->UpdateQueryState();
     
-    timers.StopAndNext();
+    lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h, 0);
-    timers.Stop();
-    
-#ifdef PRINT_TIMER
-    Float adv = timers.GetElapsedCPU(0);
-    Float lnm = timers.GetElapsedCPU(1);
-    Float pct = lnm * 100.0 / adv;
-    printf("\nAdvance [%d] {%g} LNM {%g} [%g%%]\n", numberOfIntervalsRunned, adv, lnm, pct);
-    fflush(stdout);
-#endif
-    
-    timers.Reset();
+    lnmTimer.Stop();
 }
 
 __host__ void SphSolver3::Setup(Float targetDensity, Float targetSpacing, 

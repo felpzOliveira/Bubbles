@@ -407,7 +407,7 @@ void test_pcisph2_double_dam_break(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver.SetViscosityCoefficient(0.02);
+    solver.SetViscosityCoefficient(0.01);
     solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     

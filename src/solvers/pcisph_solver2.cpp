@@ -51,33 +51,23 @@ __host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep,
                               int use_cpu = 0)
 {
     SphSolverData2 *data = solver->solverData->sphData;
-    solver->stepTimer.Reset();
-    
-    solver->stepTimer.Start();
     if(use_cpu)
         UpdateGridDistributionCPU(data);
     else
         UpdateGridDistributionGPU(data);
-    solver->stepTimer.StopAndNext();
     
     if(use_cpu)
         ComputeDensityCPU(data);
     else
         ComputeDensityGPU(data);
-    solver->stepTimer.StopAndNext();
     
     if(use_cpu)
         ComputeNonPressureForceCPU(data);
     else
         ComputeNonPressureForceGPU(data);
     
-    solver->stepTimer.StopAndNext();
-    
     Float delta = solver->ComputeDelta(timeStep);
     ComputePressureForceAndIntegrate(solver->solverData, timeStep, 0.01, delta, 5);
-    
-    solver->stepTimer.Stop();
-    
 }
 
 __host__ int PciSphSolver2::GetParticleCount(){
@@ -89,7 +79,7 @@ __host__ LNMStats PciSphSolver2::GetLNMStats(){
 }
 
 __host__ Float PciSphSolver2::GetAdvanceTime(){
-    return advanceTimer.GetElapsedCPU(0);
+    return stepInterval;
 }
 
 __host__ void PciSphSolver2::UpdateDensity(){
@@ -106,8 +96,7 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     Float h = data->sphpSet->GetTargetSpacing();
     
-    advanceTimer.Reset();
-    advanceTimer.Start();
+    ProfilerBeginStep();
     while(remainingTime > Epsilon){
         SphParticleSet2 *sphpSet = data->sphpSet;
         numberOfIntervals = sphpSet->ComputeNumberOfTimeSteps(remainingTime,
@@ -116,21 +105,21 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
         Float timeStep = remainingTime / (Float)numberOfIntervals;
         AdvanceTimeStep(this, timeStep);
         remainingTime -= timeStep;
+        ProfilerIncreaseStepIteration();
     }
     
-    advanceTimer.Stop();
+    ProfilerEndStep();
+    stepInterval = ProfilerGetStepInterval();
     
-    LNMInvalidateCells(data->domain);
     pSet->ClearDataBuffer(&pSet->v0s);
     data->domain->UpdateQueryState();
     
-    Float elapsed = advanceTimer.GetElapsedCPU(0);
     lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h, 0);
     lnmTimer.Stop();
     
     Float lnm = lnmTimer.GetElapsedGPU(0);
-    Float pct = lnm * 100.0 / elapsed;
+    Float pct = lnm * 100.0 / stepInterval;
     lnmStats.Add(LNMData(lnm, pct));
 }
 

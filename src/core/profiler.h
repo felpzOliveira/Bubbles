@@ -13,10 +13,18 @@
 
 #define ProfilerUpdate(v, i) ProfilerSetParticle(v, i)
 
-void ProfilerInitKernel(int pCount);
-void ProfilerPrepare(const char *funcname);
-void ProfilerFinish();
-void ProfilerReport();
+void   ProfilerInitKernel(int pCount);
+void   ProfilerPrepare(const char *funcname);
+void   ProfilerBeginStep();
+void   ProfilerIncreaseStepIteration();
+int    ProfilerGetIterationsPassed();
+double ProfilerGetStepInterval();
+double ProfilerGetEvaluation(const char *fname);
+void   ProfilerEndStep();
+void   ProfilerFinish();
+void   ProfilerReport();
+void   ProfilerManualStart(const char *funcname);
+void   ProfilerManualFinish();
 
 __host__ __device__ 
 void _ProfilerSetParticle(int value, int id);

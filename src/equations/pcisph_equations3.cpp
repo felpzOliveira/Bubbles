@@ -225,7 +225,6 @@ __host__ void ComputePressureForceAndIntegrate(PciSphSolverData3 *data,
     Float targetDensity = data->sphData->sphpSet->GetTargetDensity();
     int count = pSet->GetParticleCount();
     Float densityErrorRatio = 0;
-    unsigned int iterations = 0;
     
     for(int k = 0; k < maxIt; k++){
         if(use_cpu)
@@ -249,7 +248,6 @@ __host__ void ComputePressureForceAndIntegrate(PciSphSolverData3 *data,
         }
         
         densityErrorRatio = maxDensityError / targetDensity;
-        iterations++;
         if(Absf(densityErrorRatio) < maxDensityErrorRatio){
             break;
         }

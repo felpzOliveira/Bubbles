@@ -624,9 +624,9 @@ __host__ void Grid<T, U, Q>::UpdateQueryState(){
         Cell<Q> *cell = &cells[i];
         if(cell->GetChainLength() > 0){
             activeCells[it++] = i;
-        }else{
-            cell->SetLevel(0);
         }
+        
+        cell->SetLevel(-1);
     }
     
     activeCellsCount = it;

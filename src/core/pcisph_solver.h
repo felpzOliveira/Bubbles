@@ -31,8 +31,7 @@ class PciSphSolver2{
     Float massOverTargetDensitySquared;
     Float deltaDenom;
     PciSphSolverData2 *solverData;
-    TimerList advanceTimer;
-    TimerList stepTimer;
+    Float stepInterval;
     LNMStats lnmStats;
     
     __host__ PciSphSolver2();
@@ -61,8 +60,7 @@ class PciSphSolver3{
     Float massOverTargetDensitySquared;
     Float deltaDenom;
     PciSphSolverData3 *solverData;
-    TimerList advanceTimer;
-    TimerList stepTimer;
+    Float stepInterval;
     LNMStats lnmStats;
     
     __host__ PciSphSolver3();

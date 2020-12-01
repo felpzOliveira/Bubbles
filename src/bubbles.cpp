@@ -52,15 +52,22 @@ void run_self_tests(){
     test_pcisph2_water_sphere();
     test_pcisph2_water_drop();
     test_pcisph2_water_block();
+    test_pcisph2_water_block_lnm();
+    test_pcisph2_continuous_emitter();
     
     test_bcclattice_point_generator();
     test_pcisph3_water_sphere();
     test_pcisph3_double_dam_break();
     test_pcisph3_whale_obstacle();
+    test_pcisph3_water_drop();
     test_pcisph3_dragon();
     test_pcisph3_quadruple_dam();
     test_pcisph3_ball_many_emission();
     test_pcisph3_dragon_shower();
+    test_pcisph3_box_many_emission();
+    test_pcisph3_quadruple_dam();
+    test_pcisph3_happy_whale();
+    test_pcisph3_dragon_pool();
 }
 #endif
 void test_pcisph2_marching_squares();
@@ -106,25 +113,15 @@ void test(){
     delete[] pos;
 }
 
-void test_lnm_happy_whale();
-void test_pcisph3_dragon_pool();
-void test_pcisph2_continuous_emitter();
 int main(int argc, char **argv){
     printf("* Bubbles Fluid Simulator - Built %s at %s *\n", __DATE__, __TIME__);
     cudaInitEx();
     
-    //test();
     //test_pcisph2_marching_squares();
-    //test_pcisph3_box_many_emission();
-	//test_pcisph3_quadruple_dam();
-    //test_pcisph3_double_dam_break();
-    //test_pcisph3_water_drop();
-    //test_pcisph3_happy_whale();
-    //test_lnm_happy_whale();
-    //test_pcisph2_water_block_lnm();
-    //test_pcisph3_dragon_pool();
-    test_pcisph3_dragon_shower();
     //test_pcisph2_continuous_emitter();
+    //test_pcisph2_water_sphere();
+    test_pcisph2_double_dam_break();
+    //test_pcisph3_water_drop();
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else

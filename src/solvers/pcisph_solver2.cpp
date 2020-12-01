@@ -152,6 +152,8 @@ __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
     int pCount = pData->GetReservedSize();
     int actualCount = pData->GetParticleCount();
     
+    SphSolverData2SetupFor(sphData, pCount);
+    
     solverData->refMemory = cudaAllocateVx(vec2f, 3 * pCount);
     solverData->densityErrors    = cudaAllocateVx(Float, 2 * pCount);
     solverData->densityPredicted = &solverData->densityErrors[pCount];

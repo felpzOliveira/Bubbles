@@ -137,6 +137,8 @@ __host__ void PciSphSolver3::Setup(Float targetDensity, Float targetSpacing,
     int pCount = pData->GetReservedSize();
     int actualCount = pData->GetParticleCount();
     
+    SphSolverData3SetupFor(sphData, pCount);
+    
     solverData->refMemory = cudaAllocateVx(vec3f, 3 * pCount);
     solverData->densityErrors    = cudaAllocateVx(Float, 2 * pCount);
     solverData->densityPredicted = &solverData->densityErrors[pCount];

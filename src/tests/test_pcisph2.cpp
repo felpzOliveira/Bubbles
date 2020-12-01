@@ -198,7 +198,7 @@ void test_pcisph2_continuous_emitter(){
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
     solver.Initialize(DefaultSphSolverData2());
-    solver.SetViscosityCoefficient(0.02);
+    solver.SetViscosityCoefficient(0.04);
     solver.Setup(targetDensity, spacing, spacingScale, grid, sphSet);
     solver.SetColliders(collider);
     
@@ -407,6 +407,7 @@ void test_pcisph2_double_dam_break(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
+    solver.SetViscosityCoefficient(0.02);
     solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
@@ -469,7 +470,7 @@ void test_pcisph2_water_sphere(){
     solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     
-    Float targetInterval = 1.0 / 248.0;
+    Float targetInterval = 1.0 / 240.0;
     float *pos = new float[count * 3];
     float *col = new float[count * 3];
     

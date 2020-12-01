@@ -317,6 +317,51 @@ __bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId,
     pSet->SetParticleVelocity(particleId, vi);
 }
 
+__bidevice__ void ComputePseudoViscosityAggregationKernelFor(SphSolverData3 *data,
+                                                             int particleId)
+{
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    vec3f vi = pSet->GetParticleVelocity(particleId);
+    vec3f pi = pSet->GetParticlePosition(particleId);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
+    Float mass = pSet->GetMass();
+    Float sphRadius = data->sphpSet->GetKernelRadius();
+    SphSpikyKernel3 kernel(sphRadius);
+    
+    vec3f smoothedVi(0);
+    Float weightSum = 0;
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        vec3f pj = pSet->GetParticlePosition(j);
+        Float dj = pSet->GetParticleDensity(j);
+        vec3f vj = pSet->GetParticleVelocity(j);
+        Float dist = Distance(pi, pj);
+        Float wj = mass / dj * kernel.W(dist);
+        weightSum += wj;
+        
+        smoothedVi += wj * vj;
+    }
+    
+    if(weightSum > 0){
+        smoothedVi *= (1.0 / weightSum);
+    }
+    
+    data->smoothedVelocities[particleId] = smoothedVi;
+}
+
+__bidevice__ void ComputePseudoViscosityInterpolationKernelFor(SphSolverData3 *data,
+                                                               int particleId,
+                                                               Float timeStep)
+{
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    vec3f vi = pSet->GetParticleVelocity(particleId);
+    vec3f smoothedVi = data->smoothedVelocities[particleId];
+    Float smoothFactor = Clamp(timeStep * data->pseudoViscosity, 0.0, 1.0);
+    vi = Lerp(vi, smoothedVi, smoothFactor);
+    pSet->SetParticleVelocity(particleId, vi);
+}
+
+
 /**************************************************************/
 //                   C P U    W R A P P E R S                 //
 /**************************************************************/
@@ -396,6 +441,21 @@ __bidevice__ void ComputeNonPressureForceCPU(SphSolverData3 *data){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         ComputeNonPressureForceFor(data, i);
+    }
+}
+
+__host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData3 *data, Float timeStep){
+    Float scale = data->pseudoViscosity * timeStep;
+    if(scale > 0.1){
+        ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+        int N = pSet->GetParticleCount();
+        for(int i = 0; i < N; i++){
+            ComputePseudoViscosityAggregationKernelFor(data, i);
+        }
+        
+        for(int i = 0; i < N; i++){
+            ComputePseudoViscosityInterpolationKernelFor(data, i, timeStep);
+        }
     }
 }
 
@@ -525,4 +585,34 @@ __host__ void TimeIntegrationGPU(SphSolverData3 *data, Float timeStep, int exten
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, TimeIntegrationKernel, data, timeStep, extended);
+}
+
+__global__ void ComputePseudoViscosityAggregationKernel(SphSolverData3 *data)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    if(i < pSet->GetParticleCount()){
+        ComputePseudoViscosityAggregationKernelFor(data, i);
+    }
+}
+
+__global__ void ComputePseudoViscosityInterpolationKernel(SphSolverData3 *data,
+                                                          Float timeStep)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    if(i < pSet->GetParticleCount()){
+        ComputePseudoViscosityInterpolationKernelFor(data, i, timeStep);
+    }
+}
+
+__host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData3 *data, Float timeStep){
+    Float scale = data->pseudoViscosity * timeStep;
+    if(scale > 0.1){
+        ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+        int N = pSet->GetParticleCount();
+        GPULaunch(N, ComputePseudoViscosityAggregationKernel, data);
+        
+        GPULaunch(N, ComputePseudoViscosityInterpolationKernel, data, timeStep);
+    }
 }

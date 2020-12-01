@@ -1,5 +1,11 @@
 #include <sph_solver.h>
 
+__host__ void SphSolverData3SetupFor(SphSolverData3 *solverData,
+                                     int expectedParticleCount)
+{
+    solverData->smoothedVelocities = cudaAllocateVx(vec3f, expectedParticleCount);
+}
+
 __bidevice__ SphSolver3::SphSolver3(){ solverData = nullptr; }
 
 __bidevice__ void SphSolver3::Initialize(SphSolverData3 *data){
@@ -64,6 +70,11 @@ __host__ void AdvanceTimeStep(SphSolver3 *solver, Float timeStep,
         ComputePressureForceGPU(data, timeStep);
     timers.Stop();
     
+    if(use_cpu)
+        ComputePseudoViscosityInterpolationCPU(data, timeStep);
+    else
+        ComputePseudoViscosityInterpolationGPU(data, timeStep);
+    
 #if defined(PRINT_TIMER)
     PrintSphTimers(&timers);
 #endif
@@ -122,7 +133,8 @@ __host__ void SphSolver3::Setup(Float targetDensity, Float targetSpacing,
     
     Float rad  = pData->GetRadius();
     Float mass = pData->GetMass();
-    int pCount = pData->GetParticleCount();
+    int pCount = pData->GetReservedSize();
+    SphSolverData3SetupFor(solverData, pCount);
     
     printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n", 
            rad, targetSpacing, pCount);

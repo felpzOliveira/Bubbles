@@ -11,6 +11,7 @@ typedef struct{
     SphParticleSet2 *sphpSet;
     Grid2 *domain;
     ColliderSet2 *collider;
+    vec2f *smoothedVelocities;
     Float dragCoefficient;
     Float eosExponent;
     Float negativePressureScale;
@@ -27,6 +28,7 @@ typedef struct{
     SphParticleSet3 *sphpSet;
     Grid3 *domain;
     ColliderSet3 *collider;
+    vec3f *smoothedVelocities;
     Float dragCoefficient;
     Float eosExponent;
     Float negativePressureScale;
@@ -39,6 +41,11 @@ typedef struct{
     int frame_index;
 }SphSolverData3;
 
+
+__host__ void SphSolverData2SetupFor(SphSolverData2 *solverData, 
+                                     int expectedParticleCount);
+__host__ void SphSolverData3SetupFor(SphSolverData3 *solverData,
+                                     int expectedParticleCount);
 
 class SphSolver2{
     public:
@@ -145,6 +152,8 @@ __bidevice__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int e
 __bidevice__ void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended=0);
 __bidevice__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin, 
                                                   Float Tmax, int maxLevel);
+__host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float timeStep);
+__host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData3 *data, Float timeStep);
 
 // Perform computation on GPU
 __host__ void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure = 1);
@@ -158,6 +167,8 @@ __host__ void TimeIntegrationGPU(SphSolverData2 *data, Float timeStep, int exten
 __host__ void TimeIntegrationGPU(SphSolverData3 *data, Float timeStep, int extended=0);
 __host__ void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin, 
                                               Float Tmax, int maxLevel);
+__host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float timeStep);
+__host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData3 *data, Float timeStep);
 
 // Computes the average temperature of all particles
 __bidevice__ Float ComputeAverageTemperature(SphSolverData2 *data);

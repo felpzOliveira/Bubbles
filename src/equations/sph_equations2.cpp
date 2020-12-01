@@ -297,6 +297,50 @@ __bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
     pSet->SetParticleVelocity(particleId, vi);
 }
 
+__bidevice__ void ComputePseudoViscosityAggregationKernelFor(SphSolverData2 *data,
+                                                             int particleId)
+{
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    vec2f vi = pSet->GetParticleVelocity(particleId);
+    vec2f pi = pSet->GetParticlePosition(particleId);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
+    Float mass = pSet->GetMass();
+    Float sphRadius = data->sphpSet->GetKernelRadius();
+    SphSpikyKernel2 kernel(sphRadius);
+    
+    vec2f smoothedVi(0);
+    Float weightSum = 0;
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        vec2f pj = pSet->GetParticlePosition(j);
+        Float dj = pSet->GetParticleDensity(j);
+        vec2f vj = pSet->GetParticleVelocity(j);
+        Float dist = Distance(pi, pj);
+        Float wj = mass / dj * kernel.W(dist);
+        weightSum += wj;
+        
+        smoothedVi += wj * vj;
+    }
+    
+    if(weightSum > 0){
+        smoothedVi *= (1.0 / weightSum);
+    }
+    
+    data->smoothedVelocities[particleId] = smoothedVi;
+}
+
+__bidevice__ void ComputePseudoViscosityInterpolationKernelFor(SphSolverData2 *data,
+                                                               int particleId,
+                                                               Float timeStep)
+{
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    vec2f vi = pSet->GetParticleVelocity(particleId);
+    vec2f smoothedVi = data->smoothedVelocities[particleId];
+    Float smoothFactor = Clamp(timeStep * data->pseudoViscosity, 0.0, 1.0);
+    vi = Lerp(vi, smoothedVi, smoothFactor);
+    pSet->SetParticleVelocity(particleId, vi);
+}
+
 /**************************************************************/
 //                 G R I D     D I S T R I B U T I O N        //
 /**************************************************************/
@@ -398,6 +442,51 @@ __host__ void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeDensityKernel, data, compute_pressure);
+}
+
+__global__ void ComputePseudoViscosityAggregationKernel(SphSolverData2 *data)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    if(i < pSet->GetParticleCount()){
+        ComputePseudoViscosityAggregationKernelFor(data, i);
+    }
+}
+
+__global__ void ComputePseudoViscosityInterpolationKernel(SphSolverData2 *data,
+                                                          Float timeStep)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    if(i < pSet->GetParticleCount()){
+        ComputePseudoViscosityInterpolationKernelFor(data, i, timeStep);
+    }
+}
+
+__host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float timeStep){
+    Float scale = data->pseudoViscosity * timeStep;
+    if(scale > 0.1){
+        ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+        int N = pSet->GetParticleCount();
+        GPULaunch(N, ComputePseudoViscosityAggregationKernel, data);
+        
+        GPULaunch(N, ComputePseudoViscosityInterpolationKernel, data, timeStep);
+    }
+}
+
+__host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float timeStep){
+    Float scale = data->pseudoViscosity * timeStep;
+    if(scale > 0.1){
+        ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+        int N = pSet->GetParticleCount();
+        for(int i = 0; i < N; i++){
+            ComputePseudoViscosityAggregationKernelFor(data, i);
+        }
+        
+        for(int i = 0; i < N; i++){
+            ComputePseudoViscosityInterpolationKernelFor(data, i, timeStep);
+        }
+    }
 }
 
 __bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep){

@@ -260,4 +260,9 @@ __host__ void ComputePressureForceAndIntegrate(PciSphSolverData2 *data,
         AccumulateAndIntegrateCPU(data, timeIntervalInSeconds);
     else
         AccumulateAndIntegrateGPU(data, timeIntervalInSeconds);
+    
+    if(use_cpu)
+        ComputePseudoViscosityInterpolationCPU(data->sphData, timeIntervalInSeconds);
+    else
+        ComputePseudoViscosityInterpolationGPU(data->sphData, timeIntervalInSeconds);
 }

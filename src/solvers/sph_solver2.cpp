@@ -2,6 +2,12 @@
 #include <cutil.h>
 #include <shape.h>
 
+__host__ void SphSolverData2SetupFor(SphSolverData2 *solverData,
+                                     int expectedParticleCount)
+{
+    solverData->smoothedVelocities = cudaAllocateVx(vec2f, expectedParticleCount);
+}
+
 __bidevice__ SphSolver2::SphSolver2(){ solverData = nullptr; }
 
 __bidevice__ void SphSolver2::Initialize(SphSolverData2 *data){
@@ -73,6 +79,11 @@ __host__ void AdvanceTimeStep(SphSolver2 *solver, Float timeStep,
         ComputePressureForceGPU(data, timeStep);
     timers.Stop();
     
+    if(use_cpu)
+        ComputePseudoViscosityInterpolationCPU(data, timeStep);
+    else
+        ComputePseudoViscosityInterpolationGPU(data, timeStep);
+    
 #if defined(PRINT_TIMER)
     PrintSphTimers(&timers);
 #endif
@@ -134,7 +145,8 @@ __host__ void SphSolver2::Setup(Float targetDensity, Float targetSpacing,
     
     Float rad  = pData->GetRadius();
     Float mass = pData->GetMass();
-    int pCount = pData->GetParticleCount();
+    int pCount = pData->GetReservedSize();
+    SphSolverData2SetupFor(solverData, pCount);
     
     printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n", 
            rad, targetSpacing, pCount);

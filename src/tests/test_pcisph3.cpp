@@ -10,7 +10,6 @@
 #include <util.h>
 #include <memory.h>
 
-//NOTE: Using ContinuousParticleSetBuilder3 shows a issue??
 void test_pcisph3_water_drop(){
     printf("===== PCISPH Solver 3D -- Water Drop\n");
     vec3f origin(3);
@@ -56,6 +55,7 @@ void test_pcisph3_water_drop(){
     SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
     Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(), 
                                                spacing, spacingScale);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
     
     PciSphSolver3 solver;
     solver.Initialize(DefaultSphSolverData3());
@@ -63,7 +63,6 @@ void test_pcisph3_water_drop(){
     solver.SetColliders(colliders);
     
     Float targetInterval =  1.0 / 240.0;
-    ParticleSet3 *pSet = sphSet->GetParticleSet();
     
     ProfilerInitKernel(pSet->GetParticleCount());
 #if 0

@@ -11,6 +11,13 @@
 /*
 * CUDA UTILITIES
 */
+typedef enum{
+    MaxOccupancyBlockSize=0, CustomizedBlockSize
+}CudaLaunchStrategy;
+
+typedef enum{
+    GPU=0, CPU
+}AllocatorType;
 
 #define CUCHECK(r) _check((r), __LINE__, __FILE__)
 #define cudaAllocate(bytes) _cudaAllocate(bytes, __LINE__, __FILE__, true)
@@ -32,11 +39,13 @@ typedef struct{
     size_t allocated;
 }Memory;
 
-typedef enum{
-    GPU=0, CPU
-}AllocatorType;
+typedef struct{
+    CudaLaunchStrategy strategy;
+    int blockSize;
+}CudaExecutionStrategy;
 
 extern Memory global_memory;
+extern CudaExecutionStrategy global_cuda_strategy;
 
 /*
  * Sanity function to check for cuda* operations.
@@ -75,6 +84,11 @@ void cudaPrintMemoryTaken(void);
 * software execution.
 */
 void cudaSafeExit(void);
+
+/*
+* Sets the cuda strategy for kernel launch.
+*/
+void cudaSetLaunchStrategy(CudaLaunchStrategy strategy, int blockSize=0);
 
 /*
 * Returns the time passed between 'start' and 'end' in seconds.
@@ -171,17 +185,21 @@ template<typename F>
 inline int GetBlockSize(F kernel, const char *fname){
     static std::map<std::type_index, int> kernelBlockSizes;
     std::type_index index = std::type_index(typeid(F));
+    int blockSize = 0;
     
-    auto iter = kernelBlockSizes.find(index);
-    if(iter != kernelBlockSizes.end()){
-        return iter->second;
+    if(global_cuda_strategy.strategy == CudaLaunchStrategy::CustomizedBlockSize){
+        blockSize = global_cuda_strategy.blockSize;
+    }else if(global_cuda_strategy.strategy == CudaLaunchStrategy::MaxOccupancyBlockSize){
+        auto iter = kernelBlockSizes.find(index);
+        if(iter != kernelBlockSizes.end()){
+            blockSize = iter->second;
+        }else{
+            int minGridSize;
+            CUCHECK(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize,
+                                                       kernel, 0, 0));
+            kernelBlockSizes[index] = blockSize;
+        }
     }
-    
-    int minGridSize, blockSize;
-    CUCHECK(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize,
-                                               kernel, 0, 0));
-    
-    kernelBlockSizes[index] = blockSize;
     return blockSize;
 }
 

@@ -70,52 +70,14 @@ void run_self_tests(){
     test_pcisph3_dragon_pool();
 }
 #endif
-void test_pcisph2_marching_squares();
-void test(){
-    FieldGrid2f grid;
-    grid.Build(vec2ui(4, 4), vec2f(0.1), vec2f(-0.2, -0.2), VertexCentered);
-    
-    vec2ui res = grid.resolution;
-    for(int i = 0; i < res.x; i++){
-        for(int j = 0; j < res.y; j++){
-            if(i > 0 && j > 0 && i < res.x - 1 && j < res.y - 1){
-                grid.SetValueAt(-2, vec2ui(i, j));
-            }else{
-                grid.SetValueAt(2, vec2ui(i, j));
-            }
-        }
-    }
-    
-    std::vector<vec3f> triangles;
-    MarchingSquares(&grid, 0, &triangles);
-    int totalLines = triangles.size() * 3;
-    float *pos = new float[totalLines * 3];
-    
-    int it = 0;
-    for(int i = 0; i < triangles.size()/3; i++){
-        vec3f p0 = triangles[3 * i + 0];
-        vec3f p1 = triangles[3 * i + 1];
-        vec3f p2 = triangles[3 * i + 2];
-        
-        pos[it++] = p0.x; pos[it++] = p0.y; pos[it++] = p0.z;
-        pos[it++] = p1.x; pos[it++] = p1.y; pos[it++] = p1.z;
-        pos[it++] = p1.x; pos[it++] = p1.y; pos[it++] = p1.z;
-        pos[it++] = p2.x; pos[it++] = p2.y; pos[it++] = p2.z;
-        pos[it++] = p2.x; pos[it++] = p2.y; pos[it++] = p2.z;
-        pos[it++] = p0.x; pos[it++] = p0.y; pos[it++] = p0.z;
-    }
-    
-    float rgb[3] = {1, 0, 0};
-    graphy_set_orthographic(-0.2, 0.2, -0.2, 0.2);
-    graphy_render_lines(pos, rgb, totalLines);
-    getchar();
-    graphy_close_display();
-    delete[] pos;
-}
 
 int main(int argc, char **argv){
     printf("* Bubbles Fluid Simulator - Built %s at %s *\n", __DATE__, __TIME__);
+    /* Initialize cuda API */
     cudaInitEx();
+    
+    /* Sets the default kernel launching parameters, 16 is good for my notebook */
+    cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
     
     //test_pcisph2_marching_squares();
     //test_pcisph2_continuous_emitter();

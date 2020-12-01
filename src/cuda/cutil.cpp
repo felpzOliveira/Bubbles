@@ -7,6 +7,10 @@
 //#define PRINT_INIT
 
 Memory global_memory = {0};
+CudaExecutionStrategy global_cuda_strategy = {
+    .strategy = CudaLaunchStrategy::MaxOccupancyBlockSize,
+    .blockSize = 0,
+};
 
 void _check(cudaError_t err, int line, const char *filename){
     if(err != cudaSuccess){
@@ -190,6 +194,11 @@ DeviceMemoryStats cudaReportMemoryUsage(){
     }
     
     return memStats;
+}
+
+void cudaSetLaunchStrategy(CudaLaunchStrategy strategy, int blockSize){
+    global_cuda_strategy.strategy = strategy;
+    global_cuda_strategy.blockSize = blockSize;
 }
 
 int cudaHasMemory(size_t bytes){

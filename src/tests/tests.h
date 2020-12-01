@@ -105,6 +105,7 @@ void test_pcisph2_double_dam_break();
 void test_pcisph2_water_drop();
 void test_pcisph2_water_block_lnm();
 void test_pcisph2_continuous_emitter();
+void test_pcisph2_marching_squares();
 
 // As you can see, I'm having a lot fun with the pcisph3 solver
 void test_pcisph3_water_sphere();

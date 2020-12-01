@@ -404,6 +404,8 @@ void test_pcisph2_double_dam_break(){
     ParticleSet2 *set2 = sphSet->GetParticleSet();
     int count = set2->GetParticleCount();
     
+    ProfilerInitKernel(count);
+    
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
@@ -422,6 +424,7 @@ void test_pcisph2_double_dam_break(){
         solver.Advance(targetInterval);
         set_colors_pressure(col, data);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
+        ProfilerReport();
     }
     
     delete[] pos;

@@ -122,7 +122,7 @@ __host__ void PciSphSolver3::Setup(Float targetDensity, Float targetSpacing,
     sphData->sphpSet->SetRelativeKernelRadius(relativeRadius);
     
     ParticleSet3 *pData = sphData->sphpSet->GetParticleSet();
-    Float rad  = pData->GetRadius();
+    vec3ui res = domain->GetIndexCount();
     Float mass = pData->GetMass();
     int pCount = pData->GetReservedSize();
     int actualCount = pData->GetParticleCount();
@@ -140,8 +140,9 @@ __host__ void PciSphSolver3::Setup(Float targetDensity, Float targetSpacing,
     massOverTargetDensitySquared *= massOverTargetDensitySquared;
     deltaDenom = ComputeDeltaDenom();
     
-    printf("[PCISPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d, Delta: %g\n", 
-           rad, targetSpacing, actualCount, deltaDenom);
+    printf("[PCISPH SOLVER]Spacing: %g, Particle Count: %d, Delta: %g\n" 
+           "               Grid Resolution: %d x %d x %d\n", targetSpacing, 
+           actualCount, deltaDenom, res.x, res.y, res.z);
     
     // Perform a particle distribution so that distribution
     // during simulation can be optmized

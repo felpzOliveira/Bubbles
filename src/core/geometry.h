@@ -823,7 +823,15 @@ template<typename T> inline __bidevice__ T AbsDot(const vec4<T> &v1, const vec4<
     return Absf(Dot(v1, v2));
 }
 
-template<typename T> inline __bidevice__ vec3<T> Cross(const vec3<T> &v1, const vec3<T> &v2){
+template<typename T> inline __bidevice__ T Cross(const vec2<T> &v1,
+                                                 const vec2<T> &v2)
+{
+    return v1.x * v2.y - v1.y * v2.x;
+}
+
+template<typename T> inline __bidevice__ vec3<T> Cross(const vec3<T> &v1,
+                                                       const vec3<T> &v2)
+{
     double v1x = v1.x, v1y = v1.y, v1z = v1.z;
     double v2x = v2.x, v2y = v2.y, v2z = v2.z;
     return vec3<T>((v1y * v2z) - (v1z * v2y),

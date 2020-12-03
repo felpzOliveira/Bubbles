@@ -4,7 +4,9 @@
 #define PBF_SOLVER_H
 
 /*
-* I think it is working, but I don't like it. Very unstable, not gonna do a 3D.
+* I don't know if I did everything correctly but we are getting some interesting
+* results. I don't quite completely understand the paper, but the result is
+* decent, however it is way slower than PCISPH.
 */
 
 #include <vector>
@@ -19,6 +21,7 @@ typedef struct{
     Float *lambdas;
     Float *w;
     Float lambdaRelax;
+    Float vorticityStr;
     Float antiClustDenom;
     Float antiClustStr;
     Float antiClustExp;

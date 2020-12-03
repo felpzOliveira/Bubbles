@@ -8,6 +8,7 @@ __bidevice__ void ComputePredictedPositionsFor(PbfSolverData2 *data, int particl
 {
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
+    vec2f oi = pi;
     vec2f vi = pSet->GetParticleVelocity(particleId);
     vec2f fi = pSet->GetParticleForce(particleId);
     Float mass = pSet->GetMass();
@@ -21,6 +22,13 @@ __bidevice__ void ComputePredictedPositionsFor(PbfSolverData2 *data, int particl
     data->sphData->collider->ResolveCollision(pSet->GetRadius(), 0.75, &pi, &vi);
     pSet->SetParticlePosition(particleId, pi);
     pSet->SetParticleVelocity(particleId, vi);
+    
+    vec2f len = data->sphData->domain->GetCellSize();
+    Float minLen = MinComponent(len);
+    Float traveled = Distance(pi, oi);
+    if(traveled > minLen){
+        data->sphData->sphpSet->SetHigherLevel();
+    }
 }
 
 __host__ void ComputePredictedPositionsCPU(PbfSolverData2 *data,
@@ -145,13 +153,16 @@ __bidevice__ void ComputeDeltaPFor(PbfSolverData2 *data, Float timeIntervalInSec
     data->sphData->collider->ResolveCollision(pSet->GetRadius(), 0.75, &pi, &vi);
     
     vi = (pi - data->originalPositions[particleId]) / timeIntervalInSeconds;
-    if(particleId == 0 && 0){
-        vec2f oi = data->originalPositions[particleId];
-        printf("pi = [%g %g] oi = [%g %g] sum = [%g %g]\n", 
-               pi.x, pi.y, oi.x, oi.y, sum.x, sum.y);
-    }
+    
     pSet->SetParticlePosition(particleId, pi);
     pSet->SetParticleVelocity(particleId, vi);
+    
+    vec2f len = data->sphData->domain->GetCellSize();
+    Float minLen = MinComponent(len);
+    Float traveled = Distance(pi, data->originalPositions[particleId]);
+    if(traveled > minLen){
+        data->sphData->sphpSet->SetHigherLevel();
+    }
 }
 
 __host__ void ComputeDeltaPCPU(PbfSolverData2 *data, Float timeIntervalInSeconds){
@@ -175,23 +186,138 @@ __host__ void ComputeDeltaPGPU(PbfSolverData2 *data, Float timeIntervalInSeconds
     GPULaunch(N, ComputeDeltaPKernel, data, timeIntervalInSeconds);
 }
 
+/**************************************************************/
+//          V O R T I C I T Y  C O M P U T A T I O N          //
+/**************************************************************/
+__bidevice__ void ComputeVorticityFor(PbfSolverData2 *data, int particleId){
+    ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
+    vec2f vi = pSet->GetParticleVelocity(particleId);
+    vec2f pi = pSet->GetParticlePosition(particleId);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
+    Float sphRadius = data->sphData->sphpSet->GetKernelRadius();
+    Float pho0 = data->sphData->sphpSet->GetTargetDensity();
+    Float mass = pSet->GetMass();
+    
+    SphSpikyKernel2 spiky(sphRadius);
+    
+    Float wi = 0;
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        vec2f pj = pSet->GetParticlePosition(j);
+        Float distance = Distance(pj, pi);
+        if(distance > 0){
+            vec2f vj = pSet->GetParticleVelocity(j);
+            vec2f vij = (vj - vi);
+            vec2f dir = (pj - pi) / distance;
+            vec2f gradW = spiky.gradW(distance, dir);
+            wi += Cross(vij, gradW);
+        }
+    }
+    
+    wi *= mass / pho0; // ?
+    
+    data->w[particleId] = wi;
+}
+
+__bidevice__ void ComputeVorticityForceFor(PbfSolverData2 *data, int particleId){
+    ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
+    vec2f pi = pSet->GetParticlePosition(particleId);
+    Float pho0 = data->sphData->sphpSet->GetTargetDensity();
+    Float mass = pSet->GetMass();
+    Float sphRadius = data->sphData->sphpSet->GetKernelRadius();
+    SphSpikyKernel2 spiky(sphRadius);
+    
+    vec2f gradVorticity(0);
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        vec2f pj = pSet->GetParticlePosition(j);
+        Float distance = Distance(pj, pi);
+        if(distance > 0){
+            vec2f dir = (pj - pi) / distance;
+            vec2f gradW = spiky.gradW(distance, dir);
+            gradVorticity += Absf(data->w[j]) * gradW; // ?
+        }
+    }
+    
+    gradVorticity *= mass / pho0;
+    if(gradVorticity.LengthSquared() > 0){
+        vec2f fi = pSet->GetParticleForce(particleId);
+        Float d = 1.0 / gradVorticity.Length();
+        vec2f n = gradVorticity * d;
+        fi += data->vorticityStr * data->w[particleId] * vec2f(n.y, -n.x);
+        
+        pSet->SetParticleForce(particleId, fi);
+    }
+}
+
+__host__ void ComputeVorticityForceCPU(PbfSolverData2 *data){
+    ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
+    for(int i = 0; i < pSet->GetParticleCount(); i++){
+        ComputeVorticityForceFor(data, i);
+    }
+}
+
+__global__ void ComputeVorticityForceKernel(PbfSolverData2 *data){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
+    if(i < pSet->GetParticleCount()){
+        ComputeVorticityForceFor(data, i);
+    }
+}
+
+__host__ void ComputeVorticityForceGPU(PbfSolverData2 *data){
+    ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
+    int N = pSet->GetParticleCount();
+    GPULaunch(N, ComputeVorticityForceKernel, data);
+}
+
+__host__ void ComputeVorticityCPU(PbfSolverData2 *data){
+    ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
+    for(int i = 0; i < pSet->GetParticleCount(); i++){
+        ComputeVorticityFor(data, i);
+    }
+}
+
+__global__ void ComputeVorticityKernel(PbfSolverData2 *data){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
+    if(i < pSet->GetParticleCount()){
+        ComputeVorticityFor(data, i);
+    }
+}
+
+__host__ void ComputeVorticityGPU(PbfSolverData2 *data){
+    ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
+    int N = pSet->GetParticleCount();
+    GPULaunch(N, ComputeVorticityKernel, data);
+}
+
+
 __host__ void AdvancePBF(PbfSolverData2 *data, Float timeIntervalInSeconds,
                          unsigned int predictIterations, int use_cpu)
 {
-    if(use_cpu)
+    if(data->vorticityStr > 0){
+        if(use_cpu){
+            ComputeVorticityCPU(data);
+            ComputeVorticityForceCPU(data);
+        }else{
+            ComputeVorticityGPU(data);
+            ComputeVorticityForceGPU(data);
+        }
+    }
+    
+    if(use_cpu){
         ComputePredictedPositionsCPU(data, timeIntervalInSeconds);
-    else
-        ComputePredictedPositionsGPU(data, timeIntervalInSeconds);
-    
-    if(use_cpu)
         UpdateGridDistributionCPU(data->sphData);
-    else
+        //ComputeDensityCPU(data->sphData);
+    }else{
+        ComputePredictedPositionsGPU(data, timeIntervalInSeconds);
         UpdateGridDistributionGPU(data->sphData);
+        //ComputeDensityGPU(data->sphData);
+    }
     
-    if(use_cpu)
-        ComputeDensityCPU(data->sphData);
-    else
-        ComputeDensityGPU(data->sphData);
+    data->sphData->sphpSet->ResetHigherLevel();
     
     for(unsigned int i = 0; i < predictIterations; i++){
         if(use_cpu){
@@ -202,4 +328,9 @@ __host__ void AdvancePBF(PbfSolverData2 *data, Float timeIntervalInSeconds,
             ComputeDeltaPGPU(data, timeIntervalInSeconds);
         }
     }
+    
+    if(use_cpu)
+        ComputePseudoViscosityInterpolationCPU(data->sphData, timeIntervalInSeconds);
+    else
+        ComputePseudoViscosityInterpolationGPU(data->sphData, timeIntervalInSeconds);
 }

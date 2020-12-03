@@ -5,11 +5,14 @@
 #include <emitter.h>
 #include <graphy.h>
 #include <tests.h>
+#include <util.h>
+#include <memory.h>
 
+__host__ int EmptyCallback(int);
 
 void test_pbf2_double_dam_break(){
     printf("===== PBF Solver 2D -- Double Dam Break\n");
-    Float spacing = 0.02;
+    Float spacing = 0.015;
     Float targetDensity = WaterDensity;
     vec2f center(0,0);
     Float lenc = 2;
@@ -18,9 +21,11 @@ void test_pbf2_double_dam_break(){
     Bounds2f containerBounds;
     ParticleSetBuilder2 builder;
     ColliderSetBuilder2 colliderBuilder;
+    PbfSolver2 solver;
+    
+    CudaMemoryManagerStart(__FUNCTION__);
     
     Grid2 *grid = cudaAllocateVx(Grid2, 1);
-    PbfSolver2 *solver = cudaAllocateVx(PbfSolver2, 1);
     
     int reso = (int)std::floor(lenc / (spacing * 2.0));
     printf("Using grid with resolution %d x %d\n", reso, reso);
@@ -30,7 +35,7 @@ void test_pbf2_double_dam_break(){
     Float boxLeny = 1.0;
     vec2f boxDim(boxLenx, boxLeny);
     
-    solver->Initialize(DefaultSphSolverData2());
+    solver.Initialize(DefaultSphSolverData2());
     Shape2 *rect = MakeRectangle2(Translate2(-(lenc - boxLenx)/2.f + spacing, 
                                              -(boxLeny/2.f - spacing)), boxDim);
     
@@ -59,24 +64,21 @@ void test_pbf2_double_dam_break(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
-    solver->Setup(targetDensity, spacing, 2.0, grid, sphSet);
-    solver->SetColliders(collider);
+    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
+    solver.SetColliders(collider);
     
-    Float targetInterval = 1.0 / 800.0;
-    float *pos = new float[count * 3];
-    float *col = new float[count * 3];
+    Float targetInterval = 1.0 / 480.0;
     
-    memset(col, 0x00, sizeof(float) * 3 * count);
-    SphSolverData2 *data = solver->GetSphSolverData();
-    set_colors_lnm(col, data);
+    SphSolverData2 *data = solver.GetSphSolverData();
+    auto onColorUpdate = [&](float *colors, int pCount) -> void{
+        (void)pCount;
+        set_colors_lnm(colors, data, 0, 0);
+    };
     
-    for(int i = 0; i < 20 * 26 * 100; i++){
-        Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
-        solver->Advance(targetInterval);
-        ProfilerReport();
-    }
+    UtilRunSimulation2<PbfSolver2, ParticleSet2>(&solver, set2, spacing,
+                                                 vec2f(-1), vec2f(1), targetInterval,
+                                                 EmptyCallback, onColorUpdate);
     
-    delete[] pos;
-    delete[] col;
+    CudaMemoryManagerClearCurrent();
     printf("===== OK\n");
 }

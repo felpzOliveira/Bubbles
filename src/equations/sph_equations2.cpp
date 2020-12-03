@@ -400,7 +400,7 @@ __host__ void UpdateGridDistributionGPU(SphSolverData2 *data){
     Grid2 *grid = data->domain;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver2 has no domain for UpdateGridDistribution");
-    if(data->sphpSet->requiresHigherLevelUpdate || 1){
+    if(data->sphpSet->requiresHigherLevelUpdate){
         for(int i = 0; i < data->domain->GetCellCount(); i++){
             data->domain->DistributeResetCell(i);
         }
@@ -466,7 +466,7 @@ __global__ void ComputePseudoViscosityInterpolationKernel(SphSolverData2 *data,
 
 __host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float timeStep){
     Float scale = data->pseudoViscosity * timeStep;
-    if(scale > 0.1){
+    if(scale > 0.0){
         ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
         int N = pSet->GetParticleCount();
         GPULaunch(N, ComputePseudoViscosityAggregationKernel, data);

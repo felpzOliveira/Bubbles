@@ -6,10 +6,12 @@ __host__ void PbfSolver2::Initialize(SphSolverData2 *data){
     solverData = cudaAllocateVx(PbfSolverData2, 1);
     memset(solverData, 0x00, sizeof(PbfSolverData2));
     solverData->sphData = data;
+    data->pseudoViscosity = 1.0;
     solverData->lambdaRelax = 100.0;
     solverData->antiClustDenom = 0.2;
     solverData->antiClustStr = 1e-6;
     solverData->antiClustExp = 4.0;
+    solverData->vorticityStr = 6.0;
     predictIterations = 10;
 }
 
@@ -63,13 +65,15 @@ __host__ void PbfSolver2::Setup(Float targetDensity, Float targetSpacing,
     
     SphSolverData2SetupFor(sphData, pCount);
     
-    Float *mem = cudaAllocateVx(Float, 3 * pCount);
-    solverData->originalPositions = cudaAllocateVx(vec2f, pCount);
-    solverData->densities = &mem[0];
-    solverData->lambdas   = &mem[pCount];
-    solverData->w         = &mem[2 * pCount];
+    Float *mem  = cudaAllocateVx(Float, 3 * pCount);
+    vec2f *vmem = cudaAllocateVx(vec2f, pCount);
+    solverData->originalPositions = &vmem[0];
+    solverData->densities         = &mem[0];
+    solverData->lambdas           = &mem[pCount];
+    solverData->w                 = &mem[2 * pCount];
     
-    printf("[PBF SOLVER]Spacing: %g, Particle Count: %d,\n", targetSpacing, pCount);
+    printf("[PBF SOLVER]Spacing: %g, Particle Count: %d\n", targetSpacing, pCount);
+    
     for(int i = 0; i < sphData->domain->GetCellCount(); i++){
         sphData->domain->DistributeResetCell(i);
     }
@@ -88,6 +92,8 @@ __host__ void AdvanceTimeStep(PbfSolver2 *solver, Float timeStep,
         UpdateGridDistributionCPU(data);
     else
         UpdateGridDistributionGPU(data);
+    
+    data->sphpSet->ResetHigherLevel();
     
     if(use_cpu)
         ComputeDensityCPU(data);

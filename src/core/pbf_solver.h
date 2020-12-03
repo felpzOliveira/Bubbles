@@ -6,7 +6,9 @@
 /*
 * I don't know if I did everything correctly but we are getting some interesting
 * results. I don't quite completely understand the paper, but the result is
-* decent, however it is way slower than PCISPH.
+* decent, however it is way slower than PCISPH. The curl computation is very nice
+* maybe we can make a hybrid PCISPH + PBF to incorporate the curl in a PCISPH
+* simulation and get the look the PBF generates with the performance fo the PCISPH?
 */
 
 #include <vector>

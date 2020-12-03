@@ -7,11 +7,11 @@ __host__ void PbfSolver2::Initialize(SphSolverData2 *data){
     memset(solverData, 0x00, sizeof(PbfSolverData2));
     solverData->sphData = data;
     data->pseudoViscosity = 1.0;
-    solverData->lambdaRelax = 100.0;
+    solverData->lambdaRelax = 10.0;
     solverData->antiClustDenom = 0.2;
     solverData->antiClustStr = 1e-6;
     solverData->antiClustExp = 4.0;
-    solverData->vorticityStr = 6.0;
+    solverData->vorticityStr = 4.0;
     predictIterations = 10;
 }
 

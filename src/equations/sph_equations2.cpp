@@ -466,7 +466,7 @@ __global__ void ComputePseudoViscosityInterpolationKernel(SphSolverData2 *data,
 
 __host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float timeStep){
     Float scale = data->pseudoViscosity * timeStep;
-    if(scale > 0.0){
+    if(scale > 0.1){
         ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
         int N = pSet->GetParticleCount();
         GPULaunch(N, ComputePseudoViscosityAggregationKernel, data);

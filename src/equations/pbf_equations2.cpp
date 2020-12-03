@@ -214,7 +214,11 @@ __bidevice__ void ComputeVorticityFor(PbfSolverData2 *data, int particleId){
         }
     }
     
-    wi *= mass / pho0; // ?
+    /*
+* NOTE: Paper does not claim this is normalized, but not normalizing
+*       will simply break simulation.
+*/
+    wi *= mass / pho0;
     
     data->w[particleId] = wi;
 }
@@ -229,6 +233,7 @@ __bidevice__ void ComputeVorticityForceFor(PbfSolverData2 *data, int particleId)
     SphSpikyKernel2 spiky(sphRadius);
     
     vec2f gradVorticity(0);
+    Float wi = Absf(data->w[particleId]);
     for(int i = 0; i < bucket->Count(); i++){
         int j = bucket->Get(i);
         vec2f pj = pSet->GetParticlePosition(j);
@@ -236,7 +241,8 @@ __bidevice__ void ComputeVorticityForceFor(PbfSolverData2 *data, int particleId)
         if(distance > 0){
             vec2f dir = (pj - pi) / distance;
             vec2f gradW = spiky.gradW(distance, dir);
-            gradVorticity += Absf(data->w[j]) * gradW; // ?
+            // TODO: Should this be wi or wj? wi looks like a rotation so let it be
+            gradVorticity += wi * gradW;
         }
     }
     

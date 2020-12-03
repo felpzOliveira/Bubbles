@@ -123,6 +123,8 @@ void test_pcisph3_box_many_emission();
 void test_pcisph3_water_drop();
 void test_pcisph3_dragon_pool();
 
+void test_pbf2_double_dam_break();
+
 void test_lnm_happy_whale();
 
 void test_espic_1D();

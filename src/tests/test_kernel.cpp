@@ -7,18 +7,6 @@
 static bool IsClose(Float a){ return Absf(a) < 1e-3; }
 
 static int with_graphy = 1;
-static int inited = 0;
-void init_rand(){
-    if(!inited){
-        srand(time(0));
-        inited = 1;
-    }
-}
-
-Float rand_float(){
-    init_rand();
-    return rand() / (RAND_MAX+1.f);
-}
 
 /*
 * NOTE: How to do Monte-Carlo integration over a domain:

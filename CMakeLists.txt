@@ -25,7 +25,7 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
 	set(BB_FLAGS "-g -G --use_fast_math")
 else()
 	message(STATUS "Release build")
-	set(BB_FLAGS "-Xptxas -O3 --use_fast_math -maxrregcount 128")
+	set(BB_FLAGS "-Xptxas -O3 --use_fast_math -maxrregcount 64")
 endif()
 
 if(NOT ${CUDA_RETURN_CODE} EQUAL 0)

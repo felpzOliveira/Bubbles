@@ -4,7 +4,7 @@ __bidevice__ void PredictVelocityAndPositionFor(PciSphSolverData3 *data, int par
                                                 Float timeIntervalInSeconds, int is_first)
 {
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
-    vec3f vi = pSet->GetParticlePosition(particleId);
+    vec3f vi = pSet->GetParticleVelocity(particleId);
     vec3f pi = pSet->GetParticlePosition(particleId);
     vec3f fi = pSet->GetParticleForce(particleId);
     Float mass = pSet->GetMass();

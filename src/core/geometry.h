@@ -66,8 +66,6 @@
 typedef float Float;
 //typedef double Float;
 
-Float rand_float();
-
 /*
 * NOTE: The Inside routines for BoundsN<T> are considering Epsilons 
 * to get the idea of a particle that lies on a edge. This is not correct,
@@ -1698,6 +1696,10 @@ bool Bounds3<T>::Intersect(const Ray &ray, Float *tHit0, Float *tHit1) const{
     if(tHit0) *tHit0 = t0;
     if(tHit1) *tHit1 = t1;
     return true;
+}
+
+inline __host__ Float rand_float(){
+    return rand() / (RAND_MAX+1.f);
 }
 
 typedef struct{

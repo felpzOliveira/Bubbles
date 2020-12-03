@@ -5,7 +5,7 @@ __bidevice__ void PredictVelocityAndPositionFor(PciSphSolverData2 *data, int par
                                                 Float timeIntervalInSeconds, int is_first)
 {
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
-    vec2f vi = pSet->GetParticlePosition(particleId);
+    vec2f vi = pSet->GetParticleVelocity(particleId);
     vec2f pi = pSet->GetParticlePosition(particleId);
     vec2f fi = pSet->GetParticleForce(particleId);
     Float mass = pSet->GetMass();
@@ -56,8 +56,9 @@ __host__ void PredictVelocityAndPositionGPU(PciSphSolverData2 *data,
     GPULaunch(N, PredictVelocityAndPositionKernel, data, timeIntervalInSeconds, is_first);
 }
 
-// NOTE: Potential error as tmpPi was not reditributed in the grid
-//       neighbor querying might not be correct
+// NOTE: Potential error as tmpPi was not reditributed in the grid and
+//       neighbor querying might not be correct, to avoid having to
+//       reditribute we assume the bucket stays intact, which is incorrect.
 __bidevice__ void PredictPressureFor(PciSphSolverData2 *pciData, Float delta, int particleId)
 {
     SphSolverData2 *data = pciData->sphData;

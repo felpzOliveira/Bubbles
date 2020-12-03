@@ -128,7 +128,8 @@ __bidevice__ void ComputeNonPressureForceFor(SphSolverData2 *data, int particleI
 __bidevice__ void ComputeNonPressureForceFor(SphSolverData3 *data, int particleId);
 // Compute viscosity/gravity/drag/pressure forces in a single call
 __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
-                                      Float timeStep, int extended = 0);
+                                      Float timeStep, int extended = 0,
+                                      int integrate = 1);
 __bidevice__ void ComputeAllForcesFor(SphSolverData3 *data, int particleId,
                                       Float timeStep, int extended = 0);
 // Evolve particles
@@ -144,7 +145,8 @@ __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particl
 __bidevice__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure = 1);
 __bidevice__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure = 1);
 __bidevice__ void ComputeNormalCPU(SphSolverData3 *data);
-__bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep);
+__bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
+                                          int integrate=1);
 __bidevice__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
 __bidevice__ void ComputeNonPressureForceCPU(SphSolverData2 *data);
 __bidevice__ void ComputeNonPressureForceCPU(SphSolverData3 *data);
@@ -159,7 +161,8 @@ __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData3 *data, Float
 __host__ void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure = 1);
 __host__ void ComputeDensityGPU(SphSolverData3 *data, int compute_pressure = 1);
 __host__ void ComputeNormalGPU(SphSolverData3 *data);
-__host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep);
+__host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep,
+                                      int integrate=1);
 __host__ void ComputePressureForceGPU(SphSolverData3 *data, Float timeStep);
 __host__ void ComputeNonPressureForceGPU(SphSolverData2 *data);
 __host__ void ComputeNonPressureForceGPU(SphSolverData3 *data);

@@ -169,7 +169,7 @@ __bidevice__ void ComputePressureForceFor(SphSolverData2 *data, int particleId){
 }
 
 __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId, 
-                                      Float timeStep, int extended)
+                                      Float timeStep, int extended, int integrate)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
@@ -261,7 +261,8 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
     if(pSet->HasNormal())
         pSet->SetParticleNormal(particleId, ni);
     
-    TimeIntegrationFor(data, particleId, timeStep, extended);
+    if(integrate)
+        TimeIntegrationFor(data, particleId, timeStep, extended);
 }
 
 /**************************************************************/
@@ -399,7 +400,7 @@ __host__ void UpdateGridDistributionGPU(SphSolverData2 *data){
     Grid2 *grid = data->domain;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver2 has no domain for UpdateGridDistribution");
-    if(data->sphpSet->requiresHigherLevelUpdate){
+    if(data->sphpSet->requiresHigherLevelUpdate || 1){
         for(int i = 0; i < data->domain->GetCellCount(); i++){
             data->domain->DistributeResetCell(i);
         }
@@ -489,13 +490,15 @@ __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float
     }
 }
 
-__bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep){
+__bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
+                                          int integrate)
+{
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputePressureForce");
     AssertA(pSet->GetParticleCount() > 0,
             "SphSolver2 has no particles for ComputePressureForce");
     for(int i = 0; i < pSet->GetParticleCount(); i++){
-        ComputeAllForcesFor(data, i, timeStep);
+        ComputeAllForcesFor(data, i, timeStep, 0, integrate);
     }
 }
 
@@ -524,23 +527,23 @@ __host__ void ComputeNonPressureForceGPU(SphSolverData2 *data){
     GPULaunch(N, ComputeNonPressureForceKernel, data);
 }
 
-__global__ void ComputePressureForceKernel(SphSolverData2 *data, Float timeStep){
+__global__ void ComputePressureForceKernel(SphSolverData2 *data, Float timeStep,
+                                           int integrate)
+{
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
-        ComputeAllForcesFor(data, i, timeStep);
-        //ComputeNonPressureForceFor(data, i);
-        //ComputePressureForceFor(data, i);
+        ComputeAllForcesFor(data, i, timeStep, 0, integrate);
     }
 }
 
-__host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep){
+__host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep, int integrate){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputePressureForce");
     AssertA(pSet->GetParticleCount() > 0,
             "SphSolver2 has no particles for ComputePressureForce");
     int N = pSet->GetParticleCount();
-    GPULaunch(N, ComputePressureForceKernel, data, timeStep);
+    GPULaunch(N, ComputePressureForceKernel, data, timeStep, integrate);
 }
 
 __bidevice__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended){

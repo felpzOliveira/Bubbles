@@ -82,8 +82,9 @@ int main(int argc, char **argv){
     //test_pcisph2_marching_squares();
     //test_pcisph2_continuous_emitter();
     //test_pcisph2_water_sphere();
-    test_pcisph2_double_dam_break();
+    //test_pcisph2_double_dam_break();
     //test_pcisph3_water_drop();
+    test_pbf2_double_dam_break();
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else

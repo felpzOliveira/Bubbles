@@ -36,17 +36,6 @@ __host__ void PciSphSolver2::SetViscosityCoefficient(Float viscosityCoefficient)
     solverData->sphData->viscosity = Max(0, viscosityCoefficient);
 }
 
-__host__ void PrintPciSphTimers(TimerList *timers){
-    Float update      = timers->GetElapsedGPU(0);
-    Float density     = timers->GetElapsedGPU(1);
-    Float nonPressure = timers->GetElapsedGPU(2);
-    Float pressure    = timers->GetElapsedGPU(3);
-    
-    printf("\rUpdate {%g} Density {%g} NPress {%g} Press {%g}    ",
-           update, density, nonPressure, pressure);
-    fflush(stdout);
-}
-
 __host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep, 
                               int use_cpu = 0)
 {
@@ -155,7 +144,7 @@ __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
     deltaDenom = ComputeDeltaDenom();
     
     printf("[PCISPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d, Delta: %g\n", 
-           rad, targetSpacing, actualCount, deltaDenom);
+           rad, targetSpacing, pCount, deltaDenom);
     
     // Perform a particle distribution so that distribution
     // during simulation can be optmized

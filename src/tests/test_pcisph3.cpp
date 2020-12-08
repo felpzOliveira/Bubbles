@@ -366,11 +366,15 @@ void test_pcisph3_dragon_pool(){
     boundaries.resize(pSet->GetParticleCount());
     std::vector<int> targetSteps = {0, 16, 31, 74, 151, 235, 256, 278, 361};
     
+    ProfilerInitKernel(pSet->GetParticleCount());
+    
     const char *targetOutput =
         "/home/felipe/Documents/Bubbles/simulations/dragon_pool/output_";
     
     auto callback = [&](int step) -> int{
         if(step == 0) return 1;
+        ProfilerReport();
+#if 0
         std::string respath(targetOutput);
         respath += std::to_string(step-1);
         respath += ".txt";
@@ -392,6 +396,7 @@ void test_pcisph3_dragon_pool(){
                 printf("Boundary Average: %g\n", average);
             }
         }
+#endif
         
         if(step < 400){
             pBuilder.MapGridEmit(velocityField, spacing);

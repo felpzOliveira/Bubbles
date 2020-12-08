@@ -1720,3 +1720,8 @@ typedef struct{
     int nUvs, nNormals;
     AllocatorType allocator;
 }ParsedMesh;
+
+/* types of grid based on vertex location */
+typedef enum{
+    VertexCentered, CellCentered, FaceCentered
+}VertexType;

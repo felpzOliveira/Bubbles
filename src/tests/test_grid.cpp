@@ -7,8 +7,243 @@
 #include <obj_loader.h>
 #include <memory.h>
 #include <cutil.h>
+#include <explicit_grid.h>
 
 static int with_graphy = 1;
+
+void test_explicit_face_vector_grid_2D(){
+    printf("===== Test 2D Explicit Face Grid\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+    vec2f origin(-0.5);
+    vec2f endPoint(0.5);
+    vec2ui resolution(1, 1);
+    
+    Float sx = (endPoint.x - origin.x) / (Float)resolution.x;
+    Float sy = (endPoint.y - origin.y) / (Float)resolution.y;
+    vec2f spacing(sx, sy);
+    vec2f center = origin + spacing * 0.5;
+    
+    ExplicitFaceCenteredVectorGrid2 grid;
+    grid.Set(resolution, spacing, origin);
+    
+    TEST_CHECK(grid.usize == 2 && grid.vsize == 2, "Wrong grid data dimensions");
+    TEST_CHECK(grid.dataSizeU.x == 2 && grid.dataSizeU.y == 1 &&
+               grid.dataSizeV.x == 1 && grid.dataSizeV.y == 2,
+               "Wrong grid data dimensions");
+    
+    grid.U(0, 0) = 1; grid.U(1, 0) = 0; grid.U(0, 1) = 0; grid.U(1, 1) = 1;
+    grid.V(0, 0) = 0; grid.V(1, 0) = 1; grid.V(0, 1) = 1; grid.V(1, 1) = 0;
+    
+    Float curl = grid.Curl(center);
+    TEST_CHECK(IsZero(curl), "Wrong curl computation");
+    
+    Float div = grid.Divergent(center);
+    TEST_CHECK(IsZero(div), "Wrong divergent computation");
+    
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
+void test_explicit_vector_grid_build_2D(){
+    printf("===== Test 2D Explicit Vector Grid - Build\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+    
+    vec2f origin(-0.5);
+    vec2f endPoint(0.5);
+    vec2ui resolution(1, 1);
+    
+    Float sx = (endPoint.x - origin.x) / (Float)resolution.x;
+    Float sy = (endPoint.y - origin.y) / (Float)resolution.y;
+    vec2f spacing(sx, sy);
+    vec2f center = origin + spacing * 0.5;
+    
+    ExplicitCollocatedVectorGrid2 vgrid;
+    vgrid.Set(resolution, spacing, origin, VertexCentered);
+    
+    vec2ui cellResolution = vgrid.grid->GetResolution();
+    Bounds2f gridBounds = vgrid.grid->GetBounds();
+    vec2f dataOrigin = vgrid.dataOrigin;
+    vec2ui dataSize = vgrid.dataSize;
+    
+    vec2f pMin = gridBounds.pMin;
+    vec2f pMax = gridBounds.pMax;
+    
+    TEST_CHECK(vgrid.totalSize == 4, "Wrong data linear size");
+    TEST_CHECK(dataSize.x == 2 && dataSize.y == 2, "Wrong data size");
+    TEST_CHECK(IsZero(dataOrigin.x - origin.x) && IsZero(dataOrigin.y - origin.y),
+               "Wrong data origin");
+    TEST_CHECK(cellResolution.x == 1 && cellResolution.y == 1, "Wrong cell resolution");
+    TEST_CHECK(IsZero(pMin.x - origin.x) && IsZero(pMin.y - origin.y) && 
+               IsZero(pMax.x - endPoint.x) && IsZero(pMax.y - endPoint.y),
+               "Wrong bounds computed");
+    
+    vec2f f0 = vec2f(1, 0);
+    vec2f f1 = vec2f(0, 1);
+    vec2f f2 = vec2f(0, 1);
+    vec2f f3 = vec2f(1, 0);
+    vgrid(0, 0) = f0;
+    vgrid(1, 0) = f1;
+    vgrid(0, 1) = f2;
+    vgrid(1, 1) = f3;
+    
+    vec2f e0 = vgrid.grid->GetVertexCenteredPosition(0, 0);
+    vec2f e1 = vgrid.grid->GetVertexCenteredPosition(1, 0);
+    vec2f e2 = vgrid.grid->GetVertexCenteredPosition(0, 1);
+    vec2f e3 = vgrid.grid->GetVertexCenteredPosition(1, 1);
+    
+    vec2f e01 = Abs(e0 - e1);
+    vec2f e12 = Abs(e1 - e2);
+    vec2f e23 = Abs(e2 - e3);
+    
+    TEST_CHECK(IsZero(e01.x - sx) && IsZero(e01.y), "Wrong data position");
+    TEST_CHECK(IsZero(e12.x - sx) && IsZero(e12.y - sy), "Wrong data position");
+    TEST_CHECK(IsZero(e23.x - sx) && IsZero(e23.y), "Wrong data position");
+    
+    vec2f s0 = vgrid.Sample(e0);
+    vec2f s1 = vgrid.Sample(e1);
+    vec2f s2 = vgrid.Sample(e2);
+    vec2f s3 = vgrid.Sample(e3);
+    
+    TEST_CHECK((s0 - f0).IsZeroVector(), "Wrong sample for data point 0");
+    TEST_CHECK((s1 - f1).IsZeroVector(), "Wrong sample for data point 1");
+    TEST_CHECK((s2 - f2).IsZeroVector(), "Wrong sample for data point 2");
+    TEST_CHECK((s3 - f3).IsZeroVector(), "Wrong sample for data point 3");
+    
+    vec2f c0 = vgrid.Curl(center);
+    TEST_CHECK(c0.IsZeroVector(), "Wrong curl computation");
+    
+    Float d0 = vgrid.Divergent(center);
+    TEST_CHECK(IsZero(d0), "Wrong divergent computation");
+    
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
+void test_explicit_grid_build_2D(){
+    printf("===== Test 2D Explicit Grid - Build\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+    
+    vec2f origin(-0.5);
+    vec2f endPoint(0.5);
+    vec2ui resolution(2, 2);
+    
+    Float sx = (endPoint.x - origin.x) / (Float)resolution.x;
+    Float sy = (endPoint.y - origin.y) / (Float)resolution.y;
+    vec2f spacing(sx, sy);
+    vec2f dorigin = origin + spacing * 0.5;
+    
+    ExplicitScalarGrid2 egrid;
+    egrid.Set(resolution, spacing, origin, CellCentered);
+    
+    vec2ui cellResolution = egrid.grid->GetResolution();
+    Bounds2f gridBounds = egrid.grid->GetBounds();
+    vec2f dataOrigin = egrid.dataOrigin;
+    vec2ui dataSize = egrid.dataSize;
+    
+    vec2f pMin = gridBounds.pMin;
+    vec2f pMax = gridBounds.pMax;
+    
+    TEST_CHECK(egrid.totalSize == 4, "Wrong data linear size");
+    TEST_CHECK(dataSize.x == 2 && dataSize.y == 2, "Wrong data size");
+    TEST_CHECK(IsZero(dataOrigin.x - dorigin.x) && IsZero(dataOrigin.y - dorigin.y),
+               "Wrong data origin");
+    TEST_CHECK(cellResolution.x == 2 && cellResolution.y == 2, "Wrong cell resolution");
+    TEST_CHECK(IsZero(pMin.x - origin.x) && IsZero(pMin.y - origin.y) && 
+               IsZero(pMax.x - endPoint.x) && IsZero(pMax.y - endPoint.y),
+               "Wrong bounds computed");
+    
+    egrid(0, 0) = 1;
+    egrid(1, 0) = 1;
+    egrid(0, 1) = 0;
+    egrid(1, 1) = 0;
+    
+    vec2f e0 = egrid.grid->GetCellCenteredPosition(0, 0);
+    vec2f e1 = egrid.grid->GetCellCenteredPosition(1, 0);
+    vec2f e2 = egrid.grid->GetCellCenteredPosition(0, 1);
+    vec2f e3 = egrid.grid->GetCellCenteredPosition(1, 1);
+    
+    vec2f e01 = Abs(e0 - e1);
+    vec2f e12 = Abs(e1 - e2);
+    vec2f e23 = Abs(e2 - e3);
+    
+    TEST_CHECK(IsZero(e01.x - sx) && IsZero(e01.y), "Wrong data position");
+    TEST_CHECK(IsZero(e12.x - sx) && IsZero(e12.y - sy), "Wrong data position");
+    TEST_CHECK(IsZero(e23.x - sx) && IsZero(e23.y), "Wrong data position");
+    
+    vec2f g0 = egrid.GradientAtPoint(0, 0);
+    vec2f g1 = egrid.GradientAtPoint(1, 0);
+    vec2f g2 = egrid.GradientAtPoint(0, 1);
+    vec2f g3 = egrid.GradientAtPoint(1, 1);
+    
+    TEST_CHECK(IsZero(g0.x) && IsZero(g1.x) && IsZero(g2.x) && IsZero(g3.x),
+               "Wrong gradient at x direction");
+    TEST_CHECK(IsZero(g0.y + 1) && IsZero(g1.y + 1) && 
+               IsZero(g2.y + 1) && IsZero(g3.y + 1), "Wrong gradient at y direction");
+    
+    Float s0 = egrid.Sample(e0);
+    Float s1 = egrid.Sample(e1);
+    Float s2 = egrid.Sample(e2);
+    Float s3 = egrid.Sample(e3);
+    
+    TEST_CHECK(IsZero(s0 - 1), "Invalid sample for point 0");
+    TEST_CHECK(IsZero(s1 - 1), "Invalid sample for point 1");
+    TEST_CHECK(IsZero(s2), "Invalid sample for point 2");
+    TEST_CHECK(IsZero(s3), "Invalid sample for point 3");
+    
+    Float s = egrid.Sample(vec2f(0));
+    TEST_CHECK(IsZero(s - 0.5), "Invalid mid point sample");
+    
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
+void test_explicit_grid_minimal_build_2D(){
+    printf("===== Test 2D Explicit Grid - Minimal Build\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+    
+    ExplicitScalarGrid2 egrid;
+    vec2f origin(-0.5);
+    vec2f endPoint(0.5);
+    vec2f spacing(1);
+    egrid.Set(vec2ui(1, 1), spacing, origin, CellCentered);
+    vec2f dorigin = origin + spacing * 0.5;
+    
+    vec2ui cellResolution = egrid.grid->GetResolution();
+    Bounds2f gridBounds = egrid.grid->GetBounds();
+    vec2f dataOrigin = egrid.dataOrigin;
+    vec2ui dataSize = egrid.dataSize;
+    
+    vec2f pMin = gridBounds.pMin;
+    vec2f pMax = gridBounds.pMax;
+    
+    TEST_CHECK(egrid.totalSize == 1, "Wrong data linear size");
+    TEST_CHECK(dataSize.x == 1 && dataSize.y == 1, "Wrong data size");
+    TEST_CHECK(IsZero(dataOrigin.x - dorigin.x) && IsZero(dataOrigin.y - dorigin.y),
+               "Wrong data origin");
+    TEST_CHECK(cellResolution.x == 1 && cellResolution.y == 1, "Wrong cell resolution");
+    TEST_CHECK(IsZero(pMin.x - origin.x) && IsZero(pMin.y - origin.y) && 
+               IsZero(pMax.x - endPoint.x) && IsZero(pMax.y - endPoint.y),
+               "Wrong bounds computed");
+    
+    egrid(0, 0) = 1;
+    Float s = egrid(0, 0);
+    TEST_CHECK(IsZero(s - 1), "Wrong stored value");
+    
+    vec2f grad = egrid.GradientAtPoint(0, 0);
+    TEST_CHECK(IsZero(grad.x) && IsZero(grad.y), "Wrong gradient computed at data point");
+    
+    grad = egrid.Gradient(vec2f(0.25, -0.25));
+    TEST_CHECK(IsZero(grad.x) && IsZero(grad.y), "Wrong gradient at point");
+    
+    s = egrid.LaplacianAtPoint(0, 0);
+    TEST_CHECK(IsZero(s), "Wrong laplacian at data point");
+    
+    s = egrid.Laplacian(vec2f(0.25, -0.25));
+    TEST_CHECK(IsZero(s), "Wrong laplacian at point");
+    
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
 
 void test_grid_face_centered_3D(){
     printf("===== Test 3D Face Centered Grid - Build\n");

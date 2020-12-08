@@ -899,10 +899,6 @@ typedef NodeEdgeGrid<vec2f, vec2ui, Bounds2f, vec2f> NodeEdgeGrid2v;
 * components based on edge/center locations and allow interpolation. Enters FieldGrid.
 */
 
-typedef enum{
-    VertexCentered, CellCentered, FaceCentered
-}VertexType;
-
 // Vector computation  Dimension computation  Domain computation          Field Values
 // T = vec2f/vec3f,    U = vec2ui/vec3ui,     Q = Bounds2f/Bounds3f,  F = Float/vec2f/vec3f
 template<typename T, typename U, typename Q, typename F>

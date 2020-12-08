@@ -14,6 +14,9 @@
 
 void run_self_tests(){
     test_uniform_grid2D();
+    test_explicit_grid_minimal_build_2D();
+    test_explicit_grid_build_2D();
+    test_explicit_vector_grid_build_2D();
     test_uniform_grid3D();
     test_distribute_uniform_grid2D();
     test_distribute_uniform_grid3D();
@@ -79,12 +82,18 @@ int main(int argc, char **argv){
     /* Sets the default kernel launching parameters, 16 is good for my notebook */
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
     
+    //test_pcisph3_quadruple_dam();
+    //test_pcisph3_dragon_pool();
     //test_pcisph2_marching_squares();
     //test_pcisph2_continuous_emitter();
     //test_pcisph2_water_sphere();
     //test_pcisph2_double_dam_break();
     //test_pcisph3_water_drop();
-    test_pbf2_double_dam_break();
+    //test_pbf2_double_dam_break();
+    //test_explicit_vector_grid_build_2D();
+    //test_explicit_grid_minimal_build_2D();
+    //test_explicit_grid_build_2D();
+    test_explicit_face_vector_grid_2D();
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else

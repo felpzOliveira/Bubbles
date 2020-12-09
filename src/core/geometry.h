@@ -401,6 +401,11 @@ template<typename T> class vec2{
         return vec2<T>(x + v.x, y + v.y);
     }
     
+    __bidevice__ vec2<T> &operator-=(const vec2<T> &v){
+        x -= v.x; y -= v.y;
+        return *this;
+    }
+    
     __bidevice__ vec2<T> operator+=(const vec2<T> &v){
         x += v.x; y += v.y;
         return *this;
@@ -694,6 +699,11 @@ template<typename T> class vec4{
         printf("P = {x : %g, y :  %g, z : %g, w : %g}", x, y, z, w);
     }
 };
+
+template<typename T>
+inline __bidevice__ bool HasZero(const vec2<T> &v){ 
+    return (IsZero(v.x) || (IsZero(v.y)));
+}
 
 template<typename T>
 inline __bidevice__ bool HasZero(const vec3<T> &v){ 

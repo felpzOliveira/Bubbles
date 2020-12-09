@@ -996,8 +996,15 @@ class FieldGrid{
         field[h] = value;
     }
     
-    __bidevice__ F GetValueAt(const U &u){
-        unsigned int h = LinearIndex(u, resolution, dimensions);
+    __bidevice__ F GetValueAt(const vec3ui &u){
+        vec3ui r(resolution[0], resolution[1], resolution[2]);
+        unsigned int h = LinearIndex<vec3ui>(u, r, dimensions);
+        return field[h];
+    }
+    
+    __bidevice__ F GetValueAt(const vec2ui &u){
+        vec2ui r(resolution[0], resolution[1]);
+        unsigned int h = LinearIndex<vec2ui>(u, r, dimensions);
         return field[h];
     }
     
@@ -1025,17 +1032,21 @@ class FieldGrid{
         if(dimensions == 3){
             return Trilerp(
                            GetValueAt(ii), // (i,j,k)
-                           GetValueAt(U(jj[0], ii[1], ii[2])), // (i+1,j,k)
-                           GetValueAt(U(ii[0], jj[1], ii[2])), // (i,j+1,k)
-                           GetValueAt(U(jj[0], jj[1], ii[2])), // (i+1,j+1,k)
-                           GetValueAt(U(ii[0], ii[1], jj[2])), // (i,j,k+1)
-                           GetValueAt(U(jj[0], ii[1], jj[2])), // (i+1,j,k+1)
-                           GetValueAt(U(ii[0], jj[1], jj[2])), // (i,j+1,k+1)
+                           GetValueAt(vec3ui(jj[0], ii[1], ii[2])), // (i+1,j,k)
+                           GetValueAt(vec3ui(ii[0], jj[1], ii[2])), // (i,j+1,k)
+                           GetValueAt(vec3ui(jj[0], jj[1], ii[2])), // (i+1,j+1,k)
+                           GetValueAt(vec3ui(ii[0], ii[1], jj[2])), // (i,j,k+1)
+                           GetValueAt(vec3ui(jj[0], ii[1], jj[2])), // (i+1,j,k+1)
+                           GetValueAt(vec3ui(ii[0], jj[1], jj[2])), // (i,j+1,k+1)
                            GetValueAt(jj),  // (i+1,j+1,k+1)
                            weight[0], weight[1], weight[2]);
         }else{
-            printf("TODO: Implement interpolation for %d dimension\n", dimensions);
-            return F(0);
+            return Bilerp(
+                          GetValueAt(ii), // (i,j)
+                          GetValueAt(vec2ui(jj[0], ii[1])), // (i+1,j)
+                          GetValueAt(vec2ui(ii[0], jj[1])), // (i,j+1)
+                          GetValueAt(jj), // (i+1,j+1)
+                          weight[0], weight[1]);
         }
     }
     

@@ -37,6 +37,7 @@ class Collider2{
                                     const vec2f &position, Float radius);
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
                                        vec2f *position, vec2f *velocity);
+    __host__ void GenerateSDFs(void);
 };
 
 class Collider3{
@@ -61,6 +62,7 @@ class ColliderSet2{
     __bidevice__ void Initialize(Collider2 **colls, int count);
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
                                        vec2f *position, vec2f *velocity);
+    __host__ void GenerateSDFs();
 };
 
 class ColliderSet3{

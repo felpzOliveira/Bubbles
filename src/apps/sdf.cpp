@@ -205,7 +205,7 @@ Shape *GenerateMeshSDF(sdf_opts *opts){
         printf("%g\n", spacing);
     }
     
-    GenerateMeshShapeSDF(meshShape, spacing, spacing);
+    GenerateShapeSDF(meshShape, spacing, spacing);
     return meshShape;
 }
 

@@ -133,6 +133,15 @@ __bidevice__ bool ColliderSet2::ResolveCollision(Float radius, Float restitution
                                                        position, velocity);
 }
 
+__host__ void ColliderSet2::GenerateSDFs(){
+    AssertA(nColiders > 0, "No Colliders present for ColliderSet2::GenerateSDFs");
+    for(int i = 0; i < nColiders; i++){
+        if(colliders[i]->shape->grid == nullptr){
+            GenerateShapeSDF(colliders[i]->shape);
+        }
+    }
+}
+
 ////////////////////////
 // ColliderSet 
 ///////////////////////
@@ -233,7 +242,7 @@ __host__ Collider3 *MakeCollider3(Shape *shape, Float frictionCoef){
     collider->Initialize(shape, frictionCoef);
     if(shape->type == ShapeMesh){
         // make sure this mesh has SDF otherwise we can't collide
-        GenerateMeshShapeSDF(shape);
+        GenerateShapeSDF(shape);
     }
     return collider;
 }

@@ -11,6 +11,7 @@ __host__ Shape2 *MakeSphere2(const Transform2 &toWorld, Float radius,
 }
 
 __bidevice__ void Shape2::InitSphere2(const Transform2 &toWorld, Float rad, bool reverseOr){
+    grid = nullptr;
     ObjectToWorld = toWorld;
     WorldToObject = Inverse(toWorld);
     reverseOrientation = reverseOr;

@@ -247,7 +247,7 @@ void ViewDisplaySimulation(view_opts *opts){
     
     if(opts->meshObj.size() > 0){ // with-sdf
         sdfShape = MakeMesh(opts->meshObj.c_str(), opts->transform);
-        GenerateMeshShapeSDF(sdfShape, opts->radius);
+        GenerateShapeSDF(sdfShape, opts->radius);
         UtilGetSDFParticles(sdfShape->grid, &sdfParticles, 0, opts->radius);
     }
     

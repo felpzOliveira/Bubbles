@@ -83,7 +83,7 @@ __host__ void MakeNodeDistribution(NodeDistribution *dist, int nElements,
     mem /= (1024 * 1024);
     printf(" * Requsting %ld Mb for handles ...", mem);
     dist->handles = (PrimitiveHandle *)DefaultAllocatorMemory(
-        sizeof(PrimitiveHandle) * nElements);
+                                                              sizeof(PrimitiveHandle) * nElements);
     printf("OK\n");
     
     dist->length = c;
@@ -230,15 +230,15 @@ __bidevice__ Float DistanceTriangle(const vec3f &p, int triNum, ParsedMesh *mesh
     
     vec3f nor = Cross(ba, ac);
     return std::sqrt(
-        Sign(Dot(Cross(ba, nor), pa)) +
-        Sign(Dot(Cross(cb, nor), pb)) +
-        Sign(Dot(Cross(ac, nor), pc)) < 2.0 ?
-        Min(Min(
-        Dot2(ba * Clamp(Dot(ba, pa)/Dot2(ba), 0.0, 1.0) - pa),
-        Dot2(cb * Clamp(Dot(cb, pb)/Dot2(cb), 0.0, 1.0) - pb) ),
-            Dot2(ac * Clamp(Dot(ac, pc)/Dot2(ac), 0.0, 1.0) - pc) )
-        :
-        Dot(nor, pa) * Dot(nor, pa) / Dot2(nor) );
+                     Sign(Dot(Cross(ba, nor), pa)) +
+                     Sign(Dot(Cross(cb, nor), pb)) +
+                     Sign(Dot(Cross(ac, nor), pc)) < 2.0 ?
+                     Min(Min(
+                             Dot2(ba * Clamp(Dot(ba, pa)/Dot2(ba), 0.0, 1.0) - pa),
+                             Dot2(cb * Clamp(Dot(cb, pb)/Dot2(cb), 0.0, 1.0) - pb) ),
+                         Dot2(ac * Clamp(Dot(ac, pc)/Dot2(ac), 0.0, 1.0) - pc) )
+                     :
+                     Dot(nor, pa) * Dot(nor, pa) / Dot2(nor) );
 }
 
 __bidevice__ bool IntersectTriangle(const Ray &ray, SurfaceInteraction * isect,
@@ -540,6 +540,8 @@ __host__ void Shape::InitMesh(ParsedMesh *msh, bool reverseOr, int maxDepth){
     mesh = msh;
     grid = nullptr; // don't generate the sdf in case this is a emitter
     reverseOrientation = reverseOr;
+    WorldToObject = Transform();
+    ObjectToWorld = Transform();
     bvh = MakeBVH(msh, maxDepth);
     type = ShapeType::ShapeMesh;
 }
@@ -560,20 +562,20 @@ __bidevice__ Float Shape::MeshClosestDistance(const vec3f &point) const{
 }
 
 #define MAX_ITERATIONS_COUNT 5
-__bidevice__ void Shape::MeshClosestPoint(const vec3f &point, 
-                                          ClosestPointQuery *query) const
+__bidevice__ void Shape::ClosestPointBySDF(const vec3f &pWorld, 
+                                           ClosestPointQuery *query) const
 {
     vec3f targetNormal(0, 1, 0);
+    vec3f point = WorldToObject.Point(pWorld);
     vec3f targetPoint = point;
     int hasGradient = 0;
     if(grid == nullptr){
-        printf("Error: Query for closest point on mesh without SDF\n");
+        printf("Error: Query for closest point on shape without SDF\n");
         return;
     }
     
     for(int i = 0; i < MAX_ITERATIONS_COUNT; i++){
         Float sdf = grid->Sample(targetPoint);
-        if(reverseOrientation) sdf = -sdf;
         
         if(Absf(sdf) < 0.001){ break; }
         
@@ -582,8 +584,6 @@ __bidevice__ void Shape::MeshClosestPoint(const vec3f &point,
         if(length > 0){
             targetNormal = targetNormal / length;
         }
-        
-        if(reverseOrientation) targetNormal = -targetNormal;
         
         targetPoint = targetPoint - sdf * targetNormal;
         AssertA(!targetPoint.HasNaN(), "NaN in ray marching");
@@ -596,11 +596,53 @@ __bidevice__ void Shape::MeshClosestPoint(const vec3f &point,
         if(length > 0){
             targetNormal = targetNormal / length;
         }
-        
-        if(reverseOrientation) targetNormal = -targetNormal;
     }
     
     Float distance = Distance(point, targetPoint);
     Normal3f normal(targetNormal.x, targetNormal.y, targetNormal.z);
-    *query = ClosestPointQuery(targetPoint, normal, distance);
+    *query = ClosestPointQuery(ObjectToWorld.Point(targetPoint), 
+                               ObjectToWorld.Normal(normal), distance);
+}
+
+__bidevice__ void Shape2::ClosestPointBySDF(const vec2f &pWorld, 
+                                            ClosestPointQuery2 *query) const
+{
+    vec2f targetNormal(0, 1);
+    vec2f point = WorldToObject.Point(pWorld);
+    vec2f targetPoint = point;
+    int hasGradient = 0;
+    if(grid == nullptr){
+        printf("Error: Query for closest point on shape2 without SDF\n");
+        return;
+    }
+    
+    for(int i = 0; i < MAX_ITERATIONS_COUNT; i++){
+        Float sdf = grid->Sample(targetPoint);
+        
+        if(Absf(sdf) < 0.001){ break; }
+        
+        targetNormal = grid->Gradient(targetPoint);
+        
+        Float length = targetNormal.Length();
+        if(length > 0){
+            targetNormal = targetNormal / length;
+        }
+        
+        targetPoint = targetPoint - sdf * targetNormal;
+        AssertA(!targetPoint.HasNaN(), "NaN in ray marching");
+        hasGradient = 1;
+    }
+    
+    if(!hasGradient){
+        targetNormal = grid->Gradient(targetPoint);
+        Float length = targetNormal.Length();
+        if(length > 0){
+            targetNormal = targetNormal / length;
+        }
+    }
+    
+    Float distance = Distance(point, targetPoint);
+    vec2f normal(targetNormal.x, targetNormal.y);
+    *query = ClosestPointQuery2(ObjectToWorld.Point(targetPoint), 
+                                ObjectToWorld.Vector(normal), distance);
 }

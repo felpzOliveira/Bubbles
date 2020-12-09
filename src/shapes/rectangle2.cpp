@@ -14,6 +14,7 @@ __host__ Shape2 *MakeRectangle2(const Transform2 &toWorld, vec2f extension,
 __bidevice__ void Shape2::InitRectangle2(const Transform2 &toWorld, vec2f extension,
                                          bool reverseOr)
 {
+    grid = nullptr;
     vec2f half = extension * 0.5;
     ObjectToWorld = toWorld;
     WorldToObject = Inverse(toWorld);

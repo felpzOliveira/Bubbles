@@ -75,21 +75,24 @@ __bidevice__ Float Shape2::ClosestDistance(const vec2f &point) const{
 __bidevice__ void Shape2::ClosestPoint(const vec2f &point, 
                                        ClosestPointQuery2 *query) const
 {
-    switch(type){
-        case ShapeType::ShapeSphere2:{
-            return Sphere2ClosestPoint(point, query);
-        } break;
-        
-        case ShapeType::ShapeRectangle2:{
-            return Rectangle2ClosestPoint(point, query);
-        } break;
-        
-        default:{
-            printf("Unknown shape for Shape2::ClosestPoint\n");
+    if(grid){
+        ClosestPointBySDF(point, query);
+    }else{
+        switch(type){
+            case ShapeType::ShapeSphere2:{
+                return Sphere2ClosestPoint(point, query);
+            } break;
+            
+            case ShapeType::ShapeRectangle2:{
+                return Rectangle2ClosestPoint(point, query);
+            } break;
+            
+            default:{
+                printf("Unknown shape for Shape2::ClosestPoint\n");
+            }
         }
     }
 }
-
 
 /*************************************************************/
 //                   3 D    S H A P E S                      //
@@ -187,21 +190,21 @@ __bidevice__ Float Shape::ClosestDistance(const vec3f &point) const{
 __bidevice__ void Shape::ClosestPoint(const vec3f &point, 
                                       ClosestPointQuery *query) const
 {
-    switch(type){
-        case ShapeType::ShapeSphere:{
-            SphereClosestPoint(point, query);
-        } break;
-        
-        case ShapeType::ShapeBox:{
-            return BoxClosestPoint(point, query);
-        } break;
-        
-        case ShapeType::ShapeMesh:{
-            MeshClosestPoint(point, query);
-        } break;
-        
-        default:{
-            printf("Unknown shape for Shape::ClosestPoint\n");
+    if(grid){
+        ClosestPointBySDF(point, query);
+    }else{
+        switch(type){
+            case ShapeType::ShapeSphere:{
+                SphereClosestPoint(point, query);
+            } break;
+            
+            case ShapeType::ShapeBox:{
+                return BoxClosestPoint(point, query);
+            } break;
+            
+            default:{
+                printf("Unknown shape for Shape::ClosestPoint\n");
+            }
         }
     }
 }
@@ -271,27 +274,41 @@ __bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
     return (hits % 2 != 0 && hits > 0);
 }
 
-__bidevice__ void SetNodeSDFKernel(FieldGrid3f *grid, ParsedMesh *mesh, 
-                                   Shape *shape, int i)
-{
-    vec3ui u = DimensionalIndex(i, grid->resolution, 3);
-    vec3f p = grid->GetDataPosition(u);
-    Float d = shape->ClosestDistance(p);
-    bool interior = MeshIsPointInside(p, shape, shape->GetBounds()); 
+__bidevice__ void SetNodeSDFKernel(FieldGrid2f *grid, Shape2 *shape, int i){
+    vec2ui u = DimensionalIndex(i, grid->resolution, 2);
+    vec2f p = grid->GetDataPosition(u);
+    Float d = Absf(shape->ClosestDistance(p));
+    bool interior = shape->IsInside(p);
     Float sd = interior ? -d : d;
     grid->SetValueAt(sd, u);
 }
 
-__global__ void CreateShapeSDFGPU(FieldGrid3f *grid, ParsedMesh *mesh, Shape *shape){
+__bidevice__ void SetNodeSDFKernel(FieldGrid3f *grid, Shape *shape, int i){
+    vec3ui u = DimensionalIndex(i, grid->resolution, 3);
+    vec3f p = grid->GetDataPosition(u);
+    Float d = shape->ClosestDistance(p);
+    bool interior = false;
+    /* For meshes we need to perform a full BVH query, for others we can check orientation*/
+    if(shape->type == ShapeType::ShapeMesh)
+        interior = MeshIsPointInside(p, shape, shape->GetBounds()); 
+    else
+        interior = shape->IsInside(p);
+    
+    Float sd = interior ? -d : d;
+    grid->SetValueAt(sd, u);
+}
+
+__global__ void CreateShapeSDFGPU(Shape *shape){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < grid->total){
-        SetNodeSDFKernel(grid, mesh, shape, i);
+    if(i < shape->grid->total){
+        SetNodeSDFKernel(shape->grid, shape, i);
     }
 }
 
-__host__ void CreateShapeSDFCPU(FieldGrid3f *grid, ParsedMesh *mesh, Shape *shape){
-    for(int i = 0; i < grid->total; i++){
-        SetNodeSDFKernel(grid, mesh, shape, i);
+__global__ void CreateShapeSDFGPU2D(Shape2 *shape){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < shape->grid->total){
+        SetNodeSDFKernel(shape->grid, shape, i);
     }
 }
 
@@ -305,53 +322,61 @@ __bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p,
     return Absf(colliderPoint.signedDistance) < radius + offset;
 }
 
-__host__ void GenerateMeshShapeSDF(Shape *shape, Float dx, Float margin){
-    if(shape->type != ShapeType::ShapeMesh){
-        printf("Warning: Called for SDF generation on non-mesh shape\n");
-    }else{
-        //TODO: Update grid if already exists
-        
-        int resolution = 0;
-        Bounds3f bounds = shape->GetBounds();
-        vec3f scale(bounds.ExtentOn(0), bounds.ExtentOn(1), bounds.ExtentOn(2));
-        bounds.pMin -= margin * scale;
-        bounds.pMax += margin * scale;
-        
-        Float width = bounds.ExtentOn(0);
-        Float height = bounds.ExtentOn(1);
-        Float depth = bounds.ExtentOn(2);
-        
-        resolution = (int)std::ceil(width / dx);
-#if 0
-        if(resolution > 200){ // very high resolution reduce
-            resolution = 200;
-        }
-#endif
-        
-        dx = width / (Float)resolution;
-        int resolutionY = (int)std::ceil(resolution * height / width);
-        int resolutionZ = (int)std::ceil(resolution * depth / width);
-        
-        shape->grid = cudaAllocateVx(FieldGrid3f, 1);
-        shape->grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx), 
-                           bounds.pMin, VertexCentered);
-        
-        printf("Generating SDF for mesh: [%d x %d x %d] ... ",
-               resolution, resolutionY, resolutionZ);
-        
-        if(shape->mesh->allocator != AllocatorType::GPU){
-            static int warned = 0;
-            if(warned == 0){
-                printf("\nWarning: Requested for SDF with Mesh not bound to GPU.\n");
-                printf("         Make sure solvers are set to use CPU.\n");
-                warned++;
-            }
-            CreateShapeSDFCPU(shape->grid, shape->mesh, shape);
-        }else{
-            GPULaunch(shape->grid->total, CreateShapeSDFGPU, 
-                      shape->grid, shape->mesh, shape);
-        }
-        
-        printf("OK\n");
-    }
+__host__ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
+    //TODO: Update grid if already exists
+    
+    int resolution = 0;
+    Bounds2f bounds = shape->GetBounds();
+    vec2f scale(bounds.ExtentOn(0), bounds.ExtentOn(1));
+    bounds.pMin -= margin * scale;
+    bounds.pMax += margin * scale;
+    
+    Float width = bounds.ExtentOn(0);
+    Float height = bounds.ExtentOn(1);
+    
+    resolution = (int)std::ceil(width / dx);
+    dx = width / (Float)resolution;
+    int resolutionY = (int)std::ceil(resolution * height / width);
+    
+    shape->grid = cudaAllocateVx(FieldGrid2f, 1);
+    shape->grid->Build(vec2ui(resolution, resolutionY), vec2f(dx), 
+                       bounds.pMin, VertexCentered);
+    
+    printf("Generating SDF for shape: [%d x %d] ... ",
+           resolution, resolutionY);
+    
+    GPULaunch(shape->grid->total, CreateShapeSDFGPU2D, shape);
+    
+    printf("OK\n");
+}
+
+__host__ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
+    //TODO: Update grid if already exists
+    
+    int resolution = 0;
+    Bounds3f bounds = shape->GetBounds();
+    vec3f scale(bounds.ExtentOn(0), bounds.ExtentOn(1), bounds.ExtentOn(2));
+    bounds.pMin -= margin * scale;
+    bounds.pMax += margin * scale;
+    
+    Float width = bounds.ExtentOn(0);
+    Float height = bounds.ExtentOn(1);
+    Float depth = bounds.ExtentOn(2);
+    
+    resolution = (int)std::ceil(width / dx);
+    
+    dx = width / (Float)resolution;
+    int resolutionY = (int)std::ceil(resolution * height / width);
+    int resolutionZ = (int)std::ceil(resolution * depth / width);
+    
+    shape->grid = cudaAllocateVx(FieldGrid3f, 1);
+    shape->grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx), 
+                       bounds.pMin, VertexCentered);
+    
+    printf("Generating SDF for shape: [%d x %d x %d] ... ",
+           resolution, resolutionY, resolutionZ);
+    
+    GPULaunch(shape->grid->total, CreateShapeSDFGPU, shape);
+    
+    printf("OK\n");
 }

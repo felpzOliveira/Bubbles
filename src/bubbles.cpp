@@ -74,6 +74,7 @@ void run_self_tests(){
 }
 #endif
 
+void test_container_grid_sdf_2D();
 int main(int argc, char **argv){
     printf("* Bubbles Fluid Simulator - Built %s at %s *\n", __DATE__, __TIME__);
     /* Initialize cuda API */
@@ -86,14 +87,16 @@ int main(int argc, char **argv){
     //test_pcisph3_dragon_pool();
     //test_pcisph2_marching_squares();
     //test_pcisph2_continuous_emitter();
-    //test_pcisph2_water_sphere();
+    test_pcisph2_water_sphere();
+    //test_container_grid_sdf_2D();
+    
     //test_pcisph2_double_dam_break();
     //test_pcisph3_water_drop();
     //test_pbf2_double_dam_break();
     //test_explicit_vector_grid_build_2D();
     //test_explicit_grid_minimal_build_2D();
     //test_explicit_grid_build_2D();
-    test_explicit_face_vector_grid_2D();
+    //test_explicit_face_vector_grid_2D();
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else

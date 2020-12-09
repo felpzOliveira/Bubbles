@@ -49,6 +49,9 @@ class Shape2{
     // Rectangle
     Bounds2f rect;
     
+    // SDF
+    FieldGrid2f *grid;
+    
     __bidevice__ Shape2(){}
     __bidevice__ Shape2(const Transform2 &toWorld, bool reverseOrientation=false);
     __bidevice__ void InitSphere2(const Transform2 &toWorld, Float radius,
@@ -91,6 +94,9 @@ class Shape2{
     __bidevice__ Float Rectangle2ClosestDistance(const vec2f &point) const;
     __bidevice__ void Rectangle2ClosestPoint(const vec2f &point, 
                                              ClosestPointQuery2 *query) const;
+    
+    __bidevice__ void ClosestPointBySDF(const vec2f &point, 
+                                        ClosestPointQuery2 *query) const;
 };
 
 __host__ Shape2 *MakeSphere2(const Transform2 &toWorld, Float radius,
@@ -181,6 +187,10 @@ class Shape{
     __bidevice__ Float MeshClosestDistance(const vec3f &point) const;
     __bidevice__ void MeshClosestPoint(const vec3f &point, 
                                        ClosestPointQuery *query) const;
+    
+    __bidevice__ void ClosestPointBySDF(const vec3f &point, 
+                                        ClosestPointQuery *query) const;
+    
 };
 
 __host__ Shape *MakeSphere(const Transform &toWorld, Float radius,
@@ -192,13 +202,14 @@ __host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld,
 __host__ Shape *MakeMesh(const char *path, const Transform &toWorld,
                          bool reverseOrientation = false);
 
-__host__ void GenerateMeshShapeSDF(Shape *shape, Float dx=0.01, Float margin=0.1);
+__host__ void GenerateShapeSDF(Shape *shape, Float dx=0.01, Float margin=0.1);
+__host__ void GenerateShapeSDF(Shape2 *shape, Float dx=0.01, Float margin=0.1);
 
 /*
 * Expose also symbols for tests
 */
-__global__ void CreateShapeSDFGPU(FieldGrid3f *grid, ParsedMesh *mesh, Shape *shape);
-__host__ void CreateShapeSDFCPU(FieldGrid3f *grid, ParsedMesh *mesh, Shape *shape);
+__global__ void CreateShapeSDFGPU(Shape *shape);
+__host__ void CreateShapeSDFCPU(Shape *shape);
 
 /*
 * Performs Ray Tracing to find if point 'point' is inside the mesh

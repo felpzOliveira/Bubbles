@@ -470,6 +470,8 @@ void test_pcisph2_water_sphere(){
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
     
+    collider->GenerateSDFs();
+    
     solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
     solver.SetColliders(collider);
     

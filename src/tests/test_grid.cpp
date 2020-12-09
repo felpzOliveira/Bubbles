@@ -11,6 +11,25 @@
 
 static int with_graphy = 1;
 
+void test_container_grid_sdf_2D(){
+    printf("===== Test 2D Grid SDF\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+    
+    ClosestPointQuery2 query;
+    Shape2 *sphere = MakeSphere2(Transform2(), 1.0, true);
+    GenerateShapeSDF(sphere, 0.01, 0.2);
+    
+    vec2f p(0, 1.1);
+    
+    sphere->ClosestPoint(p, &query);
+    
+    printf("Normal: {%g %g}\n", query.normal.x, query.normal.y);
+    printf("Point: {%g %g}\n", query.point.x, query.point.y);
+    
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
 void test_explicit_face_vector_grid_2D(){
     printf("===== Test 2D Explicit Face Grid\n");
     CudaMemoryManagerStart(__FUNCTION__);
@@ -1039,7 +1058,7 @@ void test_field_grid(){
 #if 0
     CreateShapeSDFCPU(grid, mesh, shape);
 #else
-    GPULaunch(grid->total, CreateShapeSDFGPU, grid, mesh, shape);
+    GPULaunch(grid->total, CreateShapeSDFGPU, shape);
 #endif
     
     for(int i = 0; i < grid->resolution.x; i++){

@@ -68,6 +68,11 @@ __bidevice__ bool Collider2::ResolveCollision(Float radius, Float restitutionCoe
                                                                  position, velocity);
 }
 
+__host__ void Collider2::GenerateSDFs(){
+    AssertA(shape != nullptr, "Invalid shape pointer for SDF generation");
+    GenerateShapeSDF(shape);
+}
+
 ////////////////////////
 // Collider 
 ///////////////////////
@@ -100,6 +105,11 @@ __bidevice__ bool Collider3::ResolveCollision(Float radius, Float restitutionCoe
                                                                 restitutionCoefficient,
                                                                 frictionCoefficient,
                                                                 position, velocity);
+}
+
+__host__ void Collider3::GenerateSDFs(){
+    AssertA(shape != nullptr, "Invalid shape pointer for SDF generation");
+    GenerateShapeSDF(shape);
 }
 
 ////////////////////////
@@ -172,6 +182,16 @@ __bidevice__ bool ColliderSet3::ResolveCollision(Float radius, Float restitution
     return colliders[targetCollider]->ResolveCollision(radius, restitutionCoefficient, 
                                                        position, velocity);
 }
+
+__host__ void ColliderSet3::GenerateSDFs(){
+    AssertA(nColiders > 0, "No Colliders present for ColliderSet2::GenerateSDFs");
+    for(int i = 0; i < nColiders; i++){
+        if(colliders[i]->shape->grid == nullptr){
+            GenerateShapeSDF(colliders[i]->shape);
+        }
+    }
+}
+
 
 ////////////////////////
 // ColliderSet2 Builder

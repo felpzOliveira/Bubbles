@@ -86,14 +86,14 @@ int main(int argc, char **argv){
     //test_pcisph3_quadruple_dam();
     //test_pcisph3_dragon_pool();
     //test_pcisph3_dragon_shower();
+    test_pcisph3_water_drop();
     
     //test_pcisph2_marching_squares();
     //test_pcisph2_continuous_emitter();
-    test_pcisph2_water_sphere();
+    //test_pcisph2_water_sphere();
     //test_container_grid_sdf_2D();
     
     //test_pcisph2_double_dam_break();
-    //test_pcisph3_water_drop();
     //test_pbf2_double_dam_break();
     //test_explicit_vector_grid_build_2D();
     //test_explicit_grid_minimal_build_2D();

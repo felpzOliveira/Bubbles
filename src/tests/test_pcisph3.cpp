@@ -15,7 +15,7 @@ void test_pcisph3_water_drop(){
     vec3f origin(3);
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
-    Float spacing = 0.02;
+    Float spacing = 0.05;
     Float spacingScale = 2.0;
     Float sphereRadius = 0.3;
     vec3f waterBox(3.0-spacing, 0.3, 3.0-spacing);
@@ -37,6 +37,8 @@ void test_pcisph3_water_drop(){
     ColliderSet3 *colliders = cBuilder.GetColliderSet();
     
     Assure(UtilIsEmitterOverlapping(&emitters, colliders) == 0);
+    
+    //colliders->GenerateSDFs();
     
     ParticleSetBuilder3 pBuilder;
     Float intensity = 10.0;

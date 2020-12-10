@@ -85,6 +85,8 @@ int main(int argc, char **argv){
     
     //test_pcisph3_quadruple_dam();
     //test_pcisph3_dragon_pool();
+    //test_pcisph3_dragon_shower();
+    
     //test_pcisph2_marching_squares();
     //test_pcisph2_continuous_emitter();
     test_pcisph2_water_sphere();

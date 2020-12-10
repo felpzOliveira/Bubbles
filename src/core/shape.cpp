@@ -10,6 +10,11 @@ __bidevice__ Shape2::Shape2(const Transform2 &toWorld, bool reverseOrientation)
 reverseOrientation(reverseOrientation){}
 
 __bidevice__ bool Shape2::IsInside(const vec2f &point) const{
+    if(grid){
+        if(grid->Filled()){
+            return (grid->Sample(point) < 0);
+        }
+    }
     return reverseOrientation == !(ClosestDistance(point) < 0);
 }
 
@@ -210,12 +215,12 @@ __bidevice__ void Shape::ClosestPoint(const vec3f &point,
 }
 
 __bidevice__ bool Shape::IsInside(const vec3f &point) const{
-    if(type != ShapeType::ShapeMesh){
-        return reverseOrientation == !(ClosestDistance(point) < 0);
-    }else{
-        // prevent BVH query during simulation, it should use FieldGrid
-        return false;
+    if(grid){
+        if(grid->Filled()){
+            return (grid->Sample(point) < 0);
+        }
     }
+    return reverseOrientation == !(ClosestDistance(point) < 0);
 }
 
 __bidevice__ Float Shape::SignedDistance(const vec3f &point) const{
@@ -277,10 +282,10 @@ __bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
 __bidevice__ void SetNodeSDFKernel(FieldGrid2f *grid, Shape2 *shape, int i){
     vec2ui u = DimensionalIndex(i, grid->resolution, 2);
     vec2f p = grid->GetDataPosition(u);
-    Float d = Absf(shape->ClosestDistance(p));
-    bool interior = shape->IsInside(p);
-    Float sd = interior ? -d : d;
-    grid->SetValueAt(sd, u);
+    Float d = shape->ClosestDistance(p);
+    bool interior = shape->reverseOrientation == !(d < 0);
+    Float psd = Max(Absf(d), 0.00001);
+    grid->SetValueAt(interior ? -psd : psd, u);
 }
 
 __bidevice__ void SetNodeSDFKernel(FieldGrid3f *grid, Shape *shape, int i){
@@ -294,8 +299,8 @@ __bidevice__ void SetNodeSDFKernel(FieldGrid3f *grid, Shape *shape, int i){
     else
         interior = shape->IsInside(p);
     
-    Float sd = interior ? -d : d;
-    grid->SetValueAt(sd, u);
+    Float psd = Max(Absf(d), 0.00001);
+    grid->SetValueAt(interior ? -psd : psd, u);
 }
 
 __global__ void CreateShapeSDFGPU(Shape *shape){
@@ -346,7 +351,7 @@ __host__ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
            resolution, resolutionY);
     
     GPULaunch(shape->grid->total, CreateShapeSDFGPU2D, shape);
-    
+    shape->grid->MarkFilled();
     printf("OK\n");
 }
 
@@ -377,6 +382,6 @@ __host__ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
            resolution, resolutionY, resolutionZ);
     
     GPULaunch(shape->grid->total, CreateShapeSDFGPU, shape);
-    
+    shape->grid->MarkFilled();
     printf("OK\n");
 }

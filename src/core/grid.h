@@ -920,11 +920,13 @@ class FieldGrid{
     Q bounds; // bounds of the grid
     int dimensions; // number of dimensions of the grid
     VertexType type; // where should position hash to
-    
+    int filled; // flag indicating if this grid has values set
     __bidevice__ FieldGrid(){ SetDimension(T(0)); }
     __bidevice__ void SetDimension(const Float &u){ (void)u; dimensions = 1; }
     __bidevice__ void SetDimension(const vec2f &u){ (void)u; dimensions = 2; }
     __bidevice__ void SetDimension(const vec3f &u){ (void)u; dimensions = 3; }
+    __bidevice__ int Filled(){ return filled; }
+    __bidevice__ void MarkFilled(){ filled = 1; }
     
     __bidevice__ U GetComponentDimension(int component){
         AssertA(component < dimensions, "Invalid component dimension");
@@ -1015,7 +1017,8 @@ class FieldGrid{
         U ii(0);
         U jj(0);
         T weight(0);
-        T normalized = p - minPoint;
+        T origin = GetDataPosition(U(0));
+        T normalized = p - origin;
         for(int i = 0; i < dimensions; i++){
             int id;
             Float f;
@@ -1094,6 +1097,7 @@ class FieldGrid{
         perComponent[0] = 0, perComponent[1] = 0;
         perComponent[2] = 0;
         total = 0;
+        filled = 0;
         for(int i = 0; i < dimensions; i++){
             fres[i] = (Float)resolution[i];
             int n = resolution[i]+1;
@@ -1138,6 +1142,7 @@ class FieldGrid{
         minPoint = origin;
         spacing = space;
         type = vtype;
+        filled = 0;
         if(type == FaceCentered){
             BuildFaceCentered(initialValue);
         }else{

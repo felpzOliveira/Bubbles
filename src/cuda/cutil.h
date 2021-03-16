@@ -48,7 +48,7 @@ extern Memory global_memory;
 extern CudaExecutionStrategy global_cuda_strategy;
 
 /*
- * Sanity function to check for cuda* operations.
+* Sanity function to check for cuda* operations.
 */
 void _check(cudaError_t err, int line, const char *filename);
 
@@ -206,17 +206,17 @@ inline int GetBlockSize(F kernel, const char *fname){
 #define GPUKernel(...) (__VA_ARGS__)
 #define GPULaunchItens(nItems, __blockSize, call, ...)\
 {\
-int __gridSize = (nItems + __blockSize - 1) / __blockSize;\
-ProfilerPrepare(#call);\
-call<<<__gridSize, __blockSize>>>(__VA_ARGS__);\
-cudaDeviceAssert(#call);\
-ProfilerFinish();\
+    int __gridSize = (nItems + __blockSize - 1) / __blockSize;\
+    ProfilerPrepare(#call);\
+    call<<<__gridSize, __blockSize>>>(__VA_ARGS__);\
+    cudaDeviceAssert(#call);\
+    ProfilerFinish();\
 }
 
 #define GPULaunch(nItems, call, ...)\
 {\
-int __blockSize = GetBlockSize(call, #call);\
-GPULaunchItens(nItems, __blockSize, call, __VA_ARGS__);\
+    int __blockSize = GetBlockSize(call, #call);\
+    GPULaunchItens(nItems, __blockSize, call, __VA_ARGS__);\
 }
 
 #endif

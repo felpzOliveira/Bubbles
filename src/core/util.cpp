@@ -2,6 +2,82 @@
 #include <geometry.h>
 #include <util.h>
 
+__host__ int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f col,
+                                      Transform2 transform, vec2f len, int nPoints)
+{
+    int perSide = (int)Floor((Float)nPoints / 4);
+    vec2f hlen = 0.5 * len;
+    int it = 0;
+    Float xstep = len.x / (Float)perSide;
+    Float ystep = len.y / (Float)perSide;
+    Float x0 = -hlen.x;
+    Float x1 = hlen.x;
+    Float y0 = -hlen.y;
+    Float y1 = hlen.y;
+    for(int i = 0; i < perSide; i++){
+        Float y = -hlen.y + i * ystep;
+        vec2f p(x0, y);
+        vec2f q = transform.Point(p);
+        posBuffer[3 * it + 0] = q.x;
+        posBuffer[3 * it + 1] = q.y;
+        posBuffer[3 * it + 2] = 0;
+        colBuffer[3 * it + 0] = col.x;
+        colBuffer[3 * it + 1] = col.y;
+        colBuffer[3 * it + 2] = col.z;
+        it++;
+
+        p = vec2f(x1, y);
+        q = transform.Point(p);
+        posBuffer[3 * it + 0] = q.x;
+        posBuffer[3 * it + 1] = q.y;
+        posBuffer[3 * it + 2] = 0;
+        colBuffer[3 * it + 0] = col.x;
+        colBuffer[3 * it + 1] = col.y;
+        colBuffer[3 * it + 2] = col.z;
+        it++;
+
+        Float x = -hlen.x + i * xstep;
+        p = vec2f(x, y0);
+        q = transform.Point(p);
+        posBuffer[3 * it + 0] = q.x;
+        posBuffer[3 * it + 1] = q.y;
+        posBuffer[3 * it + 2] = 0;
+        colBuffer[3 * it + 0] = col.x;
+        colBuffer[3 * it + 1] = col.y;
+        colBuffer[3 * it + 2] = col.z;
+        it++;
+
+        p = vec2f(x, y1);
+        q = transform.Point(p);
+        posBuffer[3 * it + 0] = q.x;
+        posBuffer[3 * it + 1] = q.y;
+        posBuffer[3 * it + 2] = 0;
+        colBuffer[3 * it + 0] = col.x;
+        colBuffer[3 * it + 1] = col.y;
+        colBuffer[3 * it + 2] = col.z;
+        it++;
+    }
+
+    return it;
+}
+
+__host__ int UtilGenerateCirclePoints(float *posBuffer, float *colBuffer, vec3f col,
+                                      vec2f center, Float rad, int nPoints)
+{
+    Float step = 2.0 * Pi / (Float)nPoints;
+    Float alpha = 0;
+    for(int i = 0; i < nPoints; i++, alpha += step){
+        posBuffer[3 * i + 0] = rad * std::cos(alpha) + center.x;
+        posBuffer[3 * i + 1] = rad * std::sin(alpha) + center.y;
+        posBuffer[3 * i + 2] = 0;
+        colBuffer[3 * i + 0] = col.x;
+        colBuffer[3 * i + 1] = col.y;
+        colBuffer[3 * i + 2] = col.z;
+    }
+
+    return nPoints;
+}
+
 __bidevice__ int ParticleBySDF(const vec3f &p, FieldGrid3f *sdf, Float sdfThreshold,
                                int absolute=1)
 {

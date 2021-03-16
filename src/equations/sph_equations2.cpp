@@ -74,7 +74,12 @@ __bidevice__ Float ComputeDensityForParticle(SphSolverData2 *data, int particleI
         Float distance = Distance(pi, pj);
         sum += kernel.W(distance);
     }
-    
+
+    if(IsZero(sum)){
+        //printf("Zero summation for particle %d\n", particleId);
+        //sum = 1;
+    }
+
     Float di = sum * pSet->GetMass();
     return di;
 }
@@ -277,6 +282,7 @@ __bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
     vec2f pi = pSet->GetParticlePosition(particleId);
     Float di = pSet->GetParticleDensity(particleId);
     Float mass = pSet->GetMass();
+    vec2f oi = pi;
     
     Float Cb = 100.0;
     vec2f aTi(0,0);
@@ -291,6 +297,13 @@ __bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
     
     vi += timeStep * at;
     pi += timeStep * vi;
+
+    vec2f len = data->domain->GetCellSize();
+    Float dist = Distance(pi, oi);
+    Float minLen = Min(len[0], len[1]);
+    if(dist >= minLen * 0.5){
+        data->sphpSet->SetHigherLevel();
+    }
     
     //TODO: Figure out restitution coefficient
     data->collider->ResolveCollision(pSet->GetRadius(), 0.75, &pi, &vi);

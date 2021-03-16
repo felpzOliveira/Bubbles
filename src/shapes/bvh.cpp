@@ -82,8 +82,7 @@ __host__ void MakeNodeDistribution(NodeDistribution *dist, int nElements,
     mem = sizeof(PrimitiveHandle) * nElements;
     mem /= (1024 * 1024);
     printf(" * Requsting %ld Mb for handles ...", mem);
-    dist->handles = (PrimitiveHandle *)DefaultAllocatorMemory(
-                                                              sizeof(PrimitiveHandle) * nElements);
+    dist->handles = (PrimitiveHandle *)DefaultAllocatorMemory(sizeof(PrimitiveHandle) * nElements);
     printf("OK\n");
     
     dist->length = c;

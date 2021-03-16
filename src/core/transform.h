@@ -42,6 +42,10 @@ struct Matrix3x3{
             r.m[i][j] = m1.m[i][0]*m2.m[0][j]+m1.m[i][1]*m2.m[1][j]+m1.m[i][2]*m2.m[2][j];
         return r;
     }
+
+    __bidevice__ friend vec2f Translation(const Matrix3x3 &m1){
+        return vec2f(m1.m[0][2], m1.m[1][2]);
+    }
     
     __bidevice__ friend Matrix3x3 Inverse(const Matrix3x3 &o){
         Float det = (o.m[0][0] * (o.m[1][1] * o.m[2][2] - o.m[1][2] * o.m[2][1]) -
@@ -82,7 +86,17 @@ struct Matrix4x4{
         m[0][1] = m[0][2] = m[0][3] = m[1][0] = m[1][2] = m[1][3] = m[2][0] =
             m[2][1] = m[2][3] = m[3][0] = m[3][1] = m[3][2] = 0.f;
     }
-    
+
+    __bidevice__ Matrix4x4(const Matrix3x3 &mat){
+        for(int i = 0; i < 3; i++){
+            for(int j = 0; j < 3; j++){
+                m[i][j] = mat.m[i][j];
+            }
+        }
+
+        m[0][3] = 0; m[1][3] = 0; m[2][3] = 0; m[3][3] = 1;
+    }
+
     __bidevice__ Matrix4x4(Float mat[4][4]);
     __bidevice__ Matrix4x4(Float t00, Float t01, Float t02, Float t03, Float t10, Float t11,
                            Float t12, Float t13, Float t20, Float t21, Float t22, Float t23,
@@ -98,7 +112,11 @@ struct Matrix4x4{
             m1.m[i][2] * m2.m[2][j] + m1.m[i][3] * m2.m[3][j];
         return r;
     }
-    
+
+    __bidevice__ static vec3f Translation(const Matrix3x3 &m1){
+        return vec3f(m1.m[0][3], m1.m[1][3], m1.m[2][3]);
+    }
+
     __bidevice__ friend Matrix4x4 Inverse(const Matrix4x4 &);
     
     __bidevice__ void PrintSelf(){
@@ -201,12 +219,15 @@ class Transform2{
         ret.shape = si.shape;
         return ret;
     }
+
+    __bidevice__ Transform2 operator*(const Transform2 &t2) const;
 };
 
 __bidevice__ Transform2 Scale2(Float u);
 __bidevice__ Transform2 Scale2(Float x, Float y);
 __bidevice__ Transform2 Translate2(Float u);
 __bidevice__ Transform2 Translate2(Float x, Float y);
+__bidevice__ Transform2 Rotate2(Float alpha);
 
 class Transform{
     public:

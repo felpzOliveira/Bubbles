@@ -40,6 +40,8 @@ typedef enum{
 class Shape2{
     public:
     Transform2 WorldToObject, ObjectToWorld;
+    vec2f linearVelocity;
+    Float angularVelocity;
     bool reverseOrientation;
     ShapeType type;
     
@@ -61,7 +63,11 @@ class Shape2{
                                      bool reverseOrientation=false);
     
     __bidevice__ Bounds2f GetBounds();
-    
+
+    __host__ void Update(const Transform2 &toWorld);
+
+    __bidevice__ void SetVelocities(const vec2f &vel, const Float &angular);
+
     __bidevice__ bool Intersect(const Ray2 &ray, SurfaceInteraction2 *isect,
                                 Float *tShapeHit) const;
     
@@ -73,7 +79,9 @@ class Shape2{
     __bidevice__ bool IsInside(const vec2f &point) const;
     
     __bidevice__ Float SignedDistance(const vec2f &point) const;
-    
+
+    __bidevice__ vec2f VelocityAt(const vec2f &point) const;
+
     private:
     ///////////////////////
     // SPHERE 2D functions
@@ -123,6 +131,8 @@ class Plane3{
 class Shape{
     public:
     Transform WorldToObject, ObjectToWorld;
+    vec3f linearVelocity;
+    vec3f angularVelocity;
     bool reverseOrientation;
     ShapeType type;
     
@@ -153,7 +163,9 @@ class Shape{
     
     __bidevice__ void ClosestPoint(const vec3f &point, 
                                    ClosestPointQuery *query) const;
-    
+
+    __bidevice__ void SetVelocities(const vec3f &vel, const vec3f &angular);
+
     __bidevice__ bool IsInside(const vec3f &point) const;
     
     __bidevice__ Float SignedDistance(const vec3f &point) const;

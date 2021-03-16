@@ -45,7 +45,7 @@ struct Bucket{
         if(count < size){
             pids[count++] = pid;
         }else{
-            printf("Tried to insert without space\n");
+            //printf("Tried to insert without space (%d >= %d)\n", count, size);
         }
     }
     

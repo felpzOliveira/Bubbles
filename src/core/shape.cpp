@@ -7,7 +7,7 @@
 /*************************************************************/
 __bidevice__ Shape2::Shape2(const Transform2 &toWorld, bool reverseOrientation)
 : ObjectToWorld(toWorld), WorldToObject(Inverse(toWorld)), 
-reverseOrientation(reverseOrientation){}
+reverseOrientation(reverseOrientation), linearVelocity(vec2f(0)), angularVelocity(0){}
 
 __bidevice__ bool Shape2::IsInside(const vec2f &point) const{
     if(grid){
@@ -99,12 +99,24 @@ __bidevice__ void Shape2::ClosestPoint(const vec2f &point,
     }
 }
 
+__bidevice__ void Shape2::SetVelocities(const vec2f &vel, const Float &angular){
+    linearVelocity = vel;
+    angularVelocity = angular;
+}
+
+__bidevice__ vec2f Shape2::VelocityAt(const vec2f &point) const{
+    vec2f translation = Translation(ObjectToWorld.m);
+    vec2f p = point - translation;
+    vec2f angularVel = angularVelocity * vec2f(-p.y, p.x);
+    return linearVelocity + angularVel;
+}
+
 /*************************************************************/
 //                   3 D    S H A P E S                      //
 /*************************************************************/
 __bidevice__ Shape::Shape(const Transform &toWorld, bool reverseOrientation) :
 ObjectToWorld(toWorld), WorldToObject(Inverse(toWorld)),
-reverseOrientation(reverseOrientation){}
+reverseOrientation(reverseOrientation), linearVelocity(vec3f(0)), angularVelocity(vec3f(0)){}
 
 __bidevice__ bool Shape::CanSolveSdf() const{
     switch(type){
@@ -227,6 +239,11 @@ __bidevice__ Float Shape::SignedDistance(const vec3f &point) const{
     Float d = ClosestDistance(point);
     if(IsInside(point)) return -Absf(d);
     return Absf(d);
+}
+
+__bidevice__ void Shape::SetVelocities(const vec3f &vel, const vec3f &angular){
+    linearVelocity = vel;
+    angularVelocity = angular;
 }
 
 /*

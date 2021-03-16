@@ -78,6 +78,7 @@ __bidevice__ void Shape2::Rectangle2ClosestPoint(const vec2f &point,
     vec2f half = vec2f(rect.ExtentOn(0), rect.ExtentOn(1)) * 0.5;
     vec2f closest(0,0);
     vec2f normal(0,0);
+    vec2f p(0,0);
     if(Inside(pLocal, rect)){
         vec3f dd[4] = {
             vec3f(half.x - pLocal.x, 1, 0),
@@ -121,7 +122,7 @@ __bidevice__ void Shape2::Rectangle2ClosestPoint(const vec2f &point,
     if(reverseOrientation){
         normal *= -1;
     }
-    
-    *query = ClosestPointQuery2(ObjectToWorld.Point(closest),
-                                ObjectToWorld.Vector(normal), d);
+
+    p = ObjectToWorld.Point(closest);
+    *query = ClosestPointQuery2(p, ObjectToWorld.Vector(normal), d, VelocityAt(p));
 }

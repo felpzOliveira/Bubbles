@@ -276,7 +276,7 @@ void test_pcisph3_dragon_pool(){
     vec3f origin(2, 1, -4);
     vec3f target(0, 0, 0);
     Float spacingScale = 2.0;
-    Float spacing = 0.02;
+    Float spacing = 0.05;
     vec3f boxSize(2.0, 3.0, 2.0);
     Float xIntensity = 6.0;
     Float emitRadius = 0.15;
@@ -347,7 +347,7 @@ void test_pcisph3_dragon_pool(){
     auto validator = [&](const vec3f &p) -> int{
         if(Inside(p, bounds)){
             return MeshShapeIsPointInside(dragonShape, p, 
-                                          pSet->GetRadius(), spacing) ? 0 : 1;
+                                          pSet->GetRadius(), spacing * spacingScale) ? 0 : 1;
         }
         
         return 0;

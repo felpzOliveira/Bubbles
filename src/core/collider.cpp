@@ -12,7 +12,7 @@ __bidevice__ bool CollisionHandle(Collider *collider, Float radius,
     if(collider->IsPenetrating(colliderPoint, *position, radius)){
         T targetNormal = T(colliderPoint.normal);
         T targetPoint  = colliderPoint.point + radius * targetNormal;
-        T colliderVelocity = T(0); // TODO
+        T colliderVelocity = colliderPoint.velocity;
         T relativeVel = *velocity - colliderVelocity;
         
         Float normalDotRel = Dot(targetNormal, relativeVel);
@@ -42,12 +42,21 @@ __bidevice__ bool CollisionHandle(Collider *collider, Float radius,
 ////////////////////////
 // Collider2 
 ///////////////////////
-__bidevice__ Collider2::Collider2(){ shape = nullptr; frictionCoefficient = 0; }
-__bidevice__ Collider2::Collider2(Shape2 *shape) : shape(shape), frictionCoefficient(0){}
+__bidevice__ Collider2::Collider2(){ shape = nullptr; frictionCoefficient = 0; isActive = true; }
+__bidevice__ Collider2::Collider2(Shape2 *shape) : shape(shape), frictionCoefficient(0), isActive(true){}
+
+__host__ void Collider2::SetActive(bool active){
+    isActive = active;
+}
+
+__bidevice__ bool Collider2::IsActive(){
+    return isActive;
+}
 
 __bidevice__ void Collider2::Initialize(Shape2 *shp, Float frictionCoef){
     shape = shp;
     frictionCoefficient = frictionCoef;
+    isActive = true;
 }
 
 __bidevice__ bool Collider2::IsPenetrating(const ClosestPointQuery2 &colliderPoint,
@@ -60,8 +69,8 @@ __bidevice__ bool Collider2::IsPenetrating(const ClosestPointQuery2 &colliderPoi
 __bidevice__ bool Collider2::ResolveCollision(Float radius, Float restitutionCoefficient,
                                               vec2f *position, vec2f *velocity)
 {
-    // TODO: Massive Future TODO, need to consider shape movement for velocity collision
     AssertA(shape, "Invalid shape pointer for Collider2::ResolveCollision");
+    if(!isActive) return false;
     return CollisionHandle<Collider2, vec2f, ClosestPointQuery2>(this, radius,
                                                                  restitutionCoefficient,
                                                                  frictionCoefficient,
@@ -76,12 +85,21 @@ __host__ void Collider2::GenerateSDFs(){
 ////////////////////////
 // Collider 
 ///////////////////////
-__bidevice__ Collider3::Collider3(){ shape = nullptr; frictionCoefficient = 0; }
-__bidevice__ Collider3::Collider3(Shape *shape): shape(shape), frictionCoefficient(0){}
+__bidevice__ Collider3::Collider3(){ shape = nullptr; frictionCoefficient = 0; isActive = true; }
+__bidevice__ Collider3::Collider3(Shape *shape): shape(shape), frictionCoefficient(0), isActive(true){}
 
 __bidevice__ void Collider3::Initialize(Shape *shp, Float frictionCoef){
     shape = shp;
     frictionCoefficient = frictionCoef;
+    isActive = true;
+}
+
+__host__ void Collider3::SetActive(bool active){
+    isActive = active;
+}
+
+__bidevice__ bool Collider3::IsActive(){
+    return isActive;
 }
 
 __bidevice__ bool Collider3::IsPenetrating(const ClosestPointQuery &colliderPoint,
@@ -99,8 +117,8 @@ __bidevice__ bool Collider3::IsPenetrating(const ClosestPointQuery &colliderPoin
 __bidevice__ bool Collider3::ResolveCollision(Float radius, Float restitutionCoefficient,
                                               vec3f *position, vec3f *velocity)
 {
-    // TODO: Massive Future TODO, need to consider shape movement for velocity collision
     AssertA(shape, "Invalid shape pointer for Collider::ResolveCollision");
+    if(!isActive) return false;
     return CollisionHandle<Collider3, vec3f, ClosestPointQuery>(this, radius, 
                                                                 restitutionCoefficient,
                                                                 frictionCoefficient,
@@ -121,6 +139,20 @@ __bidevice__ ColliderSet2::ColliderSet2(){ nColiders = 0; colliders = nullptr; }
 __bidevice__ void ColliderSet2::Initialize(Collider2 **colls, int count){
     colliders = colls;
     nColiders = count;
+}
+
+__host__ void ColliderSet2::SetActive(int which, bool active){
+    if(which >= 0 && which < nColiders){
+        colliders[which]->SetActive(active);
+    }
+}
+
+__bidevice__ bool ColliderSet2::IsActive(int which){
+    if(which >= 0 && which < nColiders){
+        return colliders[which]->IsActive();
+    }
+
+    return false;
 }
 
 __bidevice__ bool ColliderSet2::ResolveCollision(Float radius, Float restitutionCoefficient,
@@ -161,6 +193,20 @@ __bidevice__ ColliderSet3::ColliderSet3(){ nColiders = 0; colliders = nullptr; }
 __bidevice__ void ColliderSet3::Initialize(Collider3 **colls, int count){
     colliders = colls;
     nColiders = count;
+}
+
+__bidevice__ bool ColliderSet3::IsActive(int which){
+    if(which >= 0 && which < nColiders){
+        return colliders[which]->IsActive();
+    }
+
+    return false;
+}
+
+__host__ void ColliderSet3::SetActive(int which, bool active){
+    if(which >= 0 && which < nColiders){
+        colliders[which]->SetActive(active);
+    }
 }
 
 __bidevice__ bool ColliderSet3::ResolveCollision(Float radius, Float restitutionCoefficient,

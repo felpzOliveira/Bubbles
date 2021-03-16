@@ -309,7 +309,7 @@ __bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId,
     vec3f len = data->domain->GetCellSize();
     Float dist = Distance(pi, oi);
     Float minLen = Min(len[0], Min(len[1], len[2]));
-    if(dist > minLen){
+    if(dist >= minLen * 0.9){
         data->sphpSet->SetHigherLevel();
     }
     

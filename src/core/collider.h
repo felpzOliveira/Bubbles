@@ -8,9 +8,13 @@ class ClosestPointQuery2{
     vec2f point;
     vec2f normal;
     Float signedDistance;
+    vec2f velocity;
     __bidevice__ ClosestPointQuery2(){}
     __bidevice__ ClosestPointQuery2(const vec2f &p, const vec2f &n, Float d){
-        point = p; normal = n; signedDistance = d;
+        point = p; normal = n; signedDistance = d; velocity = vec2f(0);
+    }
+    __bidevice__ ClosestPointQuery2(const vec2f &p, const vec2f &n, Float d, const vec2f &v){
+        point = p; normal = n; signedDistance = d; velocity = v;
     }
 };
 
@@ -19,9 +23,13 @@ class ClosestPointQuery{
     vec3f point;
     Normal3f normal;
     Float signedDistance;
+    vec3f velocity;
     __bidevice__ ClosestPointQuery(){}
     __bidevice__ ClosestPointQuery(const vec3f &p, const Normal3f &n, Float d){
-        point = p; normal = n; signedDistance = d;
+        point = p; normal = n; signedDistance = d; velocity = vec3f(0);
+    }
+    __bidevice__ ClosestPointQuery(const vec3f &p, const Normal3f &n, Float d, const vec3f &v){
+        point = p; normal = n; signedDistance = d; velocity = v;
     }
 };
 
@@ -29,6 +37,7 @@ class Collider2{
     public:
     Shape2 *shape;
     Float frictionCoefficient;
+    bool isActive;
     
     __bidevice__ Collider2();
     __bidevice__ Collider2(Shape2 *shape);
@@ -37,6 +46,8 @@ class Collider2{
                                     const vec2f &position, Float radius);
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
                                        vec2f *position, vec2f *velocity);
+    __bidevice__ bool IsActive();
+    __host__ void SetActive(bool active);
     __host__ void GenerateSDFs(void);
 };
 
@@ -44,6 +55,8 @@ class Collider3{
     public:
     Shape *shape;
     Float frictionCoefficient;
+    bool isActive;
+
     __bidevice__ Collider3();
     __bidevice__ Collider3(Shape *shape);
     __bidevice__ void Initialize(Shape *shape, Float frictionCoef=0);
@@ -51,6 +64,8 @@ class Collider3{
                                     const vec3f &position, Float radius);
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
                                        vec3f *position, vec3f *velocity);
+    __bidevice__ bool IsActive();
+    __host__ void SetActive(bool active);
     __host__ void GenerateSDFs(void);
 };
 
@@ -63,6 +78,8 @@ class ColliderSet2{
     __bidevice__ void Initialize(Collider2 **colls, int count);
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
                                        vec2f *position, vec2f *velocity);
+    __bidevice__ bool IsActive(int which);
+    __host__ void SetActive(int which, bool active);
     __host__ void GenerateSDFs();
 };
 
@@ -75,6 +92,8 @@ class ColliderSet3{
     __bidevice__ void Initialize(Collider3 **colls, int count);
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
                                        vec3f *position, vec3f *velocity);
+    __bidevice__ bool IsActive(int which);
+    __host__ void SetActive(int which, bool active);
     __host__ void GenerateSDFs(void);
 };
 

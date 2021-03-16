@@ -10,6 +10,11 @@ __host__ Shape2 *MakeSphere2(const Transform2 &toWorld, Float radius,
     return shape;
 }
 
+__host__ void Shape2::Update(const Transform2 &toWorld){
+    ObjectToWorld = toWorld;
+    WorldToObject = Inverse(toWorld);
+}
+
 __bidevice__ void Shape2::InitSphere2(const Transform2 &toWorld, Float rad, bool reverseOr){
     grid = nullptr;
     ObjectToWorld = toWorld;
@@ -67,6 +72,7 @@ __bidevice__ void Shape2::Sphere2ClosestPoint(const vec2f &point,
     Float d = Absf(Sphere2ClosestDistance(point));
     vec2f pLocal = WorldToObject.Point(point);
     vec2f N(0, 1);
+    vec2f p(0,0);
     if(!pLocal.IsZeroVector()){
         N = Normalize(pLocal);
     }
@@ -76,7 +82,8 @@ __bidevice__ void Shape2::Sphere2ClosestPoint(const vec2f &point,
     if(reverseOrientation){
         N *= -1;
     }
-    
-    *query = ClosestPointQuery2(ObjectToWorld.Point(pN), 
-                                ObjectToWorld.Vector(N), d);
+
+    p = ObjectToWorld.Point(pN);
+
+    *query = ClosestPointQuery2(p, ObjectToWorld.Vector(N), d, VelocityAt(p));
 }

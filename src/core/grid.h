@@ -1245,7 +1245,10 @@ class ContinuousParticleSetBuilder{
             std::vector<T> pos = mappedPositions[h];
             Cell<Q> *cell = mappedDomain->GetCell(h);
             int size = cell->GetChainLength();
-            for(int i = 0; i < pos.size(); i++){
+            if(size >= MaximumParticlesPerBucket) continue;
+            int toInsert = Min(MaximumParticlesPerBucket - size, pos.size());
+
+            for(int i = 0; i < toInsert; i++){
                 T pi = pos[i];
                 int can_add = 1;
                 ParticleChain *pChain = cell->GetChain();

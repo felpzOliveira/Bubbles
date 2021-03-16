@@ -229,6 +229,198 @@ void test_pcisph2_continuous_emitter(){
     printf("===== OK\n");
 }
 
+void test_pcisph2_water_square_dynamic(){
+    printf("===== PCISPH Solver 2D -- Water Block with movable square\n");
+    Float spacing = 0.01;
+    Float spacingScale = 2.0;
+    Float targetDensity = WaterDensity;
+    vec2f center(0,0);
+    Float lenc = 2;
+    vec2f direction(1.0);
+    Float circSphereRadius = 1.0 * std::sqrt(3) * 0.5;
+
+    Bounds2f containerBounds;
+    ParticleSetBuilder2 builder;
+    ColliderSetBuilder2 colliderBuilder;
+
+    PciSphSolver2 solver;
+
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    Shape2 *rect = MakeRectangle2(Translate2(center.x, center.y), vec2f(0.75));
+    Shape2 *block = MakeRectangle2(Translate2(center.x, center.y), vec2f(1.0), true);
+    //Shape2 *container = MakeRectangle2(Translate2(center.x, center.y), vec2f(lenc), true);
+    Shape2 *container = MakeSphere2(Translate2(center.x, center.y), circSphereRadius, true);
+
+    containerBounds = container->GetBounds();
+
+    solver.Initialize(DefaultSphSolverData2());
+
+    Grid2 *grid = UtilBuildGridForDomain(containerBounds, spacing, spacingScale);
+
+    VolumeParticleEmitter2 emitter(rect, rect->GetBounds(), spacing);
+
+    emitter.Emit(&builder);
+    SphParticleSet2 *sphSet = SphParticleSet2FromBuilder(&builder);
+    ParticleSet2 *set2 = sphSet->GetParticleSet();
+
+    colliderBuilder.AddCollider2(block);
+    colliderBuilder.AddCollider2(container);
+    ColliderSet2 *collider = colliderBuilder.GetColliderSet();
+
+    solver.Setup(targetDensity, spacing, spacingScale, grid, sphSet);
+    solver.SetColliders(collider);
+
+    SphSolverData2 *data = solver.GetSphSolverData();
+    Float targetInterval = 1.0 / 240.0;
+    Float alpha = 0.0;
+
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        (void)pCount;
+        set_colors_lnm(colors, data, 0, 0);
+    };
+
+    auto updateCallback = [&](int frame) -> int{
+        if(collider->IsActive(0)){
+            Float off = spacing;
+            Float y = center.y + direction.y * off;
+            Float x = center.x + direction.x * off;
+            Float v = off / targetInterval;
+            if(Absf(y) > 0.5){
+                direction.y = -direction.y;
+            }
+
+            if(Absf(x) > 0.5){
+                direction.x = -direction.x;
+            }
+
+            vec2f vel = direction * vec2f(v, v);
+            Transform2 transform = Translate2(center.x, center.y) * Rotate2(alpha);
+            alpha += 0.1;
+            if(alpha > 2.0 * Pi) alpha = 0;
+
+            block->Update(transform);
+            if(frame > 200){
+                collider->SetActive(0, false);
+            }
+        }
+        return 1;
+    };
+
+    int c = 160;
+    auto filler = [&](float *pos, float *col) -> int{
+        int n = 0;
+        if(collider->IsActive(0)){
+            n = UtilGenerateSquarePoints(pos, col, vec3f(1,1,0),
+                                         block->ObjectToWorld, vec2f(1.0), c);
+        }
+
+        n += UtilGenerateCirclePoints(&pos[3 * n], &col[3 * n], vec3f(1,1,0),
+                                      center, circSphereRadius, c);
+        return n;
+    };
+
+    UtilRunDynamicSimulation2<PciSphSolver2, ParticleSet2>(&solver, set2, spacing,
+                                                           vec2f(-1, -1), vec2f(1, 1),
+                                                           targetInterval, 2 * c, 
+                                                           updateCallback, colorFunction,
+                                                           filler);
+
+    CudaMemoryManagerClearCurrent();    
+    printf("===== OK\n");
+}
+
+void test_pcisph2_water_sphere_dynamic(){
+    printf("===== PCISPH Solver 2D -- Water Block with movable container\n");
+    Float spacing = 0.008;
+    Float spacingScale = 2.0;
+    Float targetDensity = WaterDensity;
+    vec2f center(0,0);
+    Float lenc = 2;
+    vec2f direction(1.0);
+
+    Bounds2f containerBounds;
+    ParticleSetBuilder2 builder;
+    ColliderSetBuilder2 colliderBuilder;
+
+    PciSphSolver2 solver;
+
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    Shape2 *rect = MakeRectangle2(Translate2(center.x, center.y+0.35), vec2f(0.4));
+    Shape2 *block = MakeSphere2(Translate2(center.x, center.y+0.2), 0.5, true);
+    Shape2 *container = MakeRectangle2(Translate2(center.x, center.y), vec2f(lenc), true);
+
+    center = vec2f(center.x, center.y+0.2);
+
+    containerBounds = container->GetBounds();
+
+    solver.Initialize(DefaultSphSolverData2());
+
+    Grid2 *grid = UtilBuildGridForDomain(containerBounds, spacing, spacingScale);
+
+    VolumeParticleEmitter2 emitter(rect, rect->GetBounds(), spacing);
+
+    emitter.Emit(&builder);
+    SphParticleSet2 *sphSet = SphParticleSet2FromBuilder(&builder);
+    ParticleSet2 *set2 = sphSet->GetParticleSet();
+
+    colliderBuilder.AddCollider2(block);
+    colliderBuilder.AddCollider2(container);
+    ColliderSet2 *collider = colliderBuilder.GetColliderSet();
+
+    solver.Setup(targetDensity, spacing, spacingScale, grid, sphSet);
+    solver.SetColliders(collider);
+
+    SphSolverData2 *data = solver.GetSphSolverData();
+    Float targetInterval = 1.0 / 240.0;
+
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        (void)pCount;
+        set_colors_lnm(colors, data, 0, 0);
+    };
+
+    auto updateCallback = [&](int frame) -> int{
+        Float off = spacing;
+        Float y = center.y + direction.y * off;
+        Float x = center.x + direction.x * off;
+        Float v = off / targetInterval;
+        if(Absf(y) > 0.5){
+            direction.y = -direction.y;
+        }
+
+        if(Absf(x) > 0.5){
+            direction.x = -direction.x;
+        }
+
+        center += direction * off;
+        vec2f vel = direction * vec2f(v, v);
+        block->Update(Translate2(center.x, center.y));
+        if(direction.y > 0){
+            block->SetVelocities(vel, -20.0);
+        }else{
+            block->SetVelocities(vel, 20.0);
+        }
+
+        return 1;
+    };
+
+    int c = 120;
+    auto filler = [&](float *pos, float *col) -> int{
+        vec2f pCenter = block->ObjectToWorld.Point(vec2f(0));
+        return UtilGenerateCirclePoints(pos, col, vec3f(1,1,0), pCenter, block->radius, c);
+    };
+
+    UtilRunDynamicSimulation2<PciSphSolver2, ParticleSet2>(&solver, set2, spacing,
+                                                           vec2f(-1, -1), vec2f(1, 1),
+                                                           targetInterval, c, 
+                                                           updateCallback, colorFunction,
+                                                           filler);
+
+    CudaMemoryManagerClearCurrent();    
+    printf("===== OK\n");
+}
+
 void test_pcisph2_water_block_lnm(){
     printf("===== PCISPH Solver 2D -- Water Block LNM\n");
     Float spacing = 0.01;
@@ -236,6 +428,7 @@ void test_pcisph2_water_block_lnm(){
     Float targetDensity = WaterDensity;
     vec2f center(0,0);
     Float lenc = 2;
+    vec2f direction(1.0);
     
     Bounds2f containerBounds;
     ParticleSetBuilder2 builder;
@@ -248,7 +441,10 @@ void test_pcisph2_water_block_lnm(){
     Shape2 *rect = MakeRectangle2(Translate2(center.x, center.y+0.45), vec2f(1));
     Shape2 *block = MakeSphere2(Translate2(center.x, center.y-0.3), 0.2);
     Shape2 *container = MakeRectangle2(Translate2(center.x, center.y), vec2f(lenc), true);
-    
+
+    // Copy the sphere center
+    center = vec2f(center.x, center.y - 0.3);
+
     containerBounds = container->GetBounds();
     
     solver.Initialize(DefaultSphSolverData2());
@@ -275,11 +471,44 @@ void test_pcisph2_water_block_lnm(){
         (void)pCount;
         set_colors_lnm(colors, data, 0, 0);
     };
+
+    auto updateCallback = [&](int frame) -> int{
+        Float off = spacing;
+        Float y = center.y + direction.y * off;
+        Float x = center.x + direction.x * off;
+        Float v = off / targetInterval;
+        if(Absf(y) > 0.5){
+            direction.y = -direction.y;
+        }
+
+        if(Absf(x) > 0.5){
+            direction.x = -direction.x;
+        }
+
+        center += direction * off;
+        vec2f vel = direction * vec2f(v, v);
+        block->Update(Translate2(center.x, center.y));
+        if(direction.y > 0){
+            block->SetVelocities(vel, -20.0);
+        }else{
+            block->SetVelocities(vel, 20.0);
+        }
+
+        return 1;
+    };
+
+    int c = 120;
+    auto filler = [&](float *pos, float *col) -> int{
+        vec2f pCenter = block->ObjectToWorld.Point(vec2f(0));
+        UtilGenerateCirclePoints(pos, col, vec3f(1,1,0), pCenter, block->radius, c);
+        return c;
+    };
     
-    UtilRunSimulation2<PciSphSolver2, ParticleSet2>(&solver, set2, spacing,
-                                                    vec2f(-1, -1), vec2f(1, 1),
-                                                    targetInterval, EmptyCallback,
-                                                    colorFunction);
+    UtilRunDynamicSimulation2<PciSphSolver2, ParticleSet2>(&solver, set2, spacing,
+                                                           vec2f(-1, -1), vec2f(1, 1),
+                                                           targetInterval, c, 
+                                                           updateCallback, colorFunction,
+                                                           filler);
     
     CudaMemoryManagerClearCurrent();
     printf("===== OK\n");

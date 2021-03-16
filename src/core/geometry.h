@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 //#define DEBUG
-//#define ASSERT_ENABLE
+#define ASSERT_ENABLE
 //#define PRINT_TIMER
 
 #ifdef DEBUG

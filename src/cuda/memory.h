@@ -6,9 +6,9 @@
 * CudaMemoryManagerStart, calls that use the cudaAllocate* family of functions
 * will persist the returned pointers in this context, calling 
 * CudaMemoryManagerClearCurrent will free all memory taken in the context and
- * CudaMemoryManagerClearAll will free all memory taken so far.
- * Clearing a memory destroy a context, a global context is provided automatiacally
- * to usage but custom contexts need to be recreated.
+* CudaMemoryManagerClearAll will free all memory taken so far.
+* Clearing a memory destroy a context, a global context is provided automatiacally
+* to usage but custom contexts need to be recreated.
 */
 
 /*

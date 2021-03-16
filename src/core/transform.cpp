@@ -111,6 +111,20 @@ __bidevice__ Transform2 Translate2(Float u){
     return Translate2(u, u);
 }
 
+__bidevice__ Transform2 Rotate2(Float alpha){
+    Float co = std::cos(alpha);
+    Float si = std::sin(alpha);
+    Float coi = std::cos(-alpha);
+    Float sii = std::sin(-alpha);
+    Matrix3x3 m(co, -si, 0, si, co, 0, 0, 0, 1);
+    Matrix3x3 minv(coi, -sii, 0, sii, coi, 0, 0, 0, 1);
+    return Transform2(m, minv);
+}
+
+__bidevice__ Transform2 Transform2::operator*(const Transform2 &t2) const{
+    return Transform2(Matrix3x3::Mul(m, t2.m), Matrix3x3::Mul(t2.mInv, mInv));
+}
+
 __bidevice__ Transform Translate(const vec3f &delta) {
     Matrix4x4 m(1, 0, 0, delta.x, 0, 1, 0, delta.y, 0, 0, 1, delta.z, 0, 0, 0,
                 1);

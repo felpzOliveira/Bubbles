@@ -117,8 +117,8 @@ __host__ void ComputeLambdaGPU(PbfSolverData2 *data){
 /**************************************************************/
 //              D E L T A P    C O M P U T A T I O N          //
 /**************************************************************/
-__bidevice__ void ComputeDeltaPFor(PbfSolverData2 *data, Float timeIntervalInSeconds, 
-                                   int particleId)
+__bidevice__ void ComputeDeltaPFor(PbfSolverData2 *data, int particleId,
+                                   Float timeIntervalInSeconds)
 {
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     Float sphRadius = data->sphData->sphpSet->GetKernelRadius();
@@ -133,7 +133,7 @@ __bidevice__ void ComputeDeltaPFor(PbfSolverData2 *data, Float timeIntervalInSec
     Float Wdq = kernel.W(data->antiClustDenom * h);
     Float lambdai = data->lambdas[particleId];
     vec2f sum(0);
-    
+
     for(int i = 0; i < bucket->Count(); i++){
         int j = bucket->Get(i);
         vec2f pj = pSet->GetParticlePosition(j);

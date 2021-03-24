@@ -169,6 +169,10 @@ class Shape{
     __bidevice__ bool IsInside(const vec3f &point) const;
     
     __bidevice__ Float SignedDistance(const vec3f &point) const;
+
+    __host__ void Update(const Transform &toWorld);
+
+    __bidevice__ vec3f VelocityAt(const vec3f &point) const;
     
     private:
     ///////////////////////

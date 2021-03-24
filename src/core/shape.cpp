@@ -104,6 +104,11 @@ __bidevice__ void Shape2::SetVelocities(const vec2f &vel, const Float &angular){
     angularVelocity = angular;
 }
 
+__host__ void Shape2::Update(const Transform2 &toWorld){
+    ObjectToWorld = toWorld;
+    WorldToObject = Inverse(toWorld);
+}
+
 __bidevice__ vec2f Shape2::VelocityAt(const vec2f &point) const{
     vec2f translation = Translation(ObjectToWorld.m);
     vec2f p = point - translation;
@@ -244,6 +249,18 @@ __bidevice__ Float Shape::SignedDistance(const vec3f &point) const{
 __bidevice__ void Shape::SetVelocities(const vec3f &vel, const vec3f &angular){
     linearVelocity = vel;
     angularVelocity = angular;
+}
+
+__host__ void Shape::Update(const Transform &toWorld){
+    ObjectToWorld = toWorld;
+    WorldToObject = Inverse(toWorld);
+}
+
+__bidevice__ vec3f Shape::VelocityAt(const vec3f &point) const{
+    vec3f translation = Translation(ObjectToWorld.m);
+    vec3f p = point - translation;
+    vec3f angularVel = Cross(angularVelocity, p);
+    return linearVelocity + angularVel;
 }
 
 /*

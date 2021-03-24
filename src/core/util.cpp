@@ -2,6 +2,90 @@
 #include <geometry.h>
 #include <util.h>
 
+#define PushPosition(p, c, pp, pc, id) do{\
+    pp[3 * id + 0] = p.x;\
+    pp[3 * id + 1] = p.y;\
+    pp[3 * id + 2] = p.z;\
+    pc[3 * id + 0] = c.x;\
+    pc[3 * id + 1] = c.y;\
+    pc[3 * id + 2] = c.z;\
+    id++;\
+}while(0)
+
+__host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
+                                   vec3f length, int nPoints, Transform transform)
+{
+    int perEdge = (int)Floor((Float)nPoints / 12);
+    vec3f hlen = 0.5 * length;
+    Float hx = length.x * (1.0 / (Float)perEdge);
+    Float hy = length.y * (1.0 / (Float)perEdge);
+    Float hz = length.z * (1.0 / (Float)perEdge);
+    vec3f f0, f1, p;
+
+    int it = 0;
+    f0 = vec3f(hlen.x, 0, 0);
+    f1 = vec3f(-hlen.x, 0, 0);
+    for(int i = 0; i <= perEdge; i++){ // depth
+        p = f0 + vec3f(0, -hlen.y, -hlen.z + i * hz);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+
+        p = f0 + vec3f(0, +hlen.y, -hlen.z + i * hz);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+
+        p = f1 + vec3f(0, -hlen.y, -hlen.z + i * hz);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+
+        p = f1 + vec3f(0, +hlen.y, -hlen.z + i * hz);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+    }
+
+    f0 = vec3f(0, hlen.y, 0);
+    f1 = vec3f(0, -hlen.y, 0);
+    for(int i = 0; i <= perEdge; i++){ // horizontal
+        p = f0 + vec3f(-hlen.x + i * hx, 0, -hlen.z);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+
+        p = f0 + vec3f(-hlen.x + i * hx, 0, +hlen.z);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+
+        p = f1 + vec3f(-hlen.x + i * hx, 0, -hlen.z);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+
+        p = f1 + vec3f(-hlen.x + i * hx, 0, +hlen.z);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+    }
+
+    f0 = vec3f(-hlen.x, 0, 0);
+    f1 = vec3f(hlen.x, 0, 0);
+    for(int i = 0; i <= perEdge; i++){ // vertical
+        p = f0 + vec3f(0, -hlen.y + i * hy, -hlen.z);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+
+        p = f0 + vec3f(0, -hlen.y + i * hy, +hlen.z);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+
+        p = f1 + vec3f(0, -hlen.y + i * hy, -hlen.z);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+
+        p = f1 + vec3f(0, -hlen.y + i * hy, +hlen.z);
+        p = transform.Point(p);
+        PushPosition(p, col, posBuffer, colBuffer, it);
+    }
+
+    return it;
+}
+
 __host__ int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f col,
                                       Transform2 transform, vec2f len, int nPoints)
 {
@@ -14,7 +98,7 @@ __host__ int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f 
     Float x1 = hlen.x;
     Float y0 = -hlen.y;
     Float y1 = hlen.y;
-    for(int i = 0; i < perSide; i++){
+    for(int i = 0; i <= perSide; i++){
         Float y = -hlen.y + i * ystep;
         vec2f p(x0, y);
         vec2f q = transform.Point(p);
@@ -56,6 +140,39 @@ __host__ int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f 
         colBuffer[3 * it + 1] = col.y;
         colBuffer[3 * it + 2] = col.z;
         it++;
+    }
+
+    return it;
+}
+
+__host__ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f col,
+                                      Float rad, int nPoints, Transform transform)
+{
+    int it = 0;
+    Float area = 4.0 * Pi * rad * rad / (Float)nPoints;
+    Float d = std::sqrt(area);
+    Float mtheta = std::round(Pi / d);
+    Float dtheta = Pi / mtheta;
+    Float dphi = area / dtheta;
+
+    for(Float m = 0; m < mtheta; m++){
+        Float theta = Pi * (m + 0.5) / mtheta;
+        Float mphi = std::round(2 * Pi * std::sin(theta) / dphi);
+        for(Float n = 0; n < mphi; n++){
+            Float phi = 2 * Pi * n / mphi;
+            Float x = rad * std::sin(theta) * std::cos(phi);
+            Float y = rad * std::sin(theta) * std::sin(phi);
+            Float z = rad * std::cos(theta);
+            vec3f p = transform.Point(vec3f(x, y, z));
+            posBuffer[3 * it + 0] = p.x;
+            posBuffer[3 * it + 1] = p.y;
+            posBuffer[3 * it + 2] = p.z;
+            colBuffer[3 * it + 0] = col.x;
+            colBuffer[3 * it + 1] = col.y;
+            colBuffer[3 * it + 2] = col.z;
+            if(it >= nPoints) return it-1;
+            it++;
+        }
     }
 
     return it;

@@ -85,8 +85,7 @@ __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBui
 __host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *field);
 
 /*
-* Generates points around a circle of radius 'rad' that is transformed by 'circleTransform'
-* with color 'col'.
+* Generates points around a circle of radius 'rad' uniformly settings color to 'col'.
 */
 __host__ int UtilGenerateCirclePoints(float *posBuffer, float *colBuffer, vec3f col,
                                       vec2f center, Float rad, int nPoints);
@@ -97,6 +96,18 @@ __host__ int UtilGenerateCirclePoints(float *posBuffer, float *colBuffer, vec3f 
 */
 __host__ int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f col,
                                       Transform2 transform, vec2f len, int nPoints);
+
+/*
+* Generates points around a sphere of radius 'rad' uniformly settings color to 'col'.
+*/
+__host__ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f col,
+                                      Float rad, int nPoints, Transform transform);
+
+/*
+* Generates points around a box of size 'length' settings colors to 'col'.
+*/
+__host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
+                                   vec3f length, int nPoints, Transform transform);
 
 inline
 __host__ int UtilIsDomainContaining(Bounds3f domainBounds, std::vector<Bounds3f> testBounds)
@@ -417,6 +428,88 @@ inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
         frame++;
     }
     
+    graphy_close_display();
+    delete[] ptr;
+}
+
+/*
+* Run a 3D simulation. Perform several updates on the given solver and display results
+* interactivily using graphy. Camera setup is made by the vectors 'origin' and 'target'.
+* You can save a frame or update emitors and calliders from the callback function which
+* is called at the begining of every step.
+* Callback should return 0 if simulation should stop or != 0 to continue.
+*/
+template<typename Solver, typename ParticleAccessor>
+inline __host__ void UtilRunDynamicSimulation3(Solver *solver, ParticleAccessor *pSet,
+                                               Float spacing, vec3f origin, vec3f target, 
+                                               Float targetInterval, int extraParts,
+                                               std::vector<Shape*> sdfs,
+                                               const std::function<int(int )> &callback,
+                                               const std::function<void(float*,int)> &setCol,
+                                               const std::function<int(float*,float*)> &filler)
+{
+    std::vector<vec3f> particles;
+    int total = pSet->GetReservedSize();
+    int sdfSize = 0;
+    float *ptr = nullptr;
+    float *pos = nullptr;
+    float *col = nullptr;
+    int extra = 0;
+    for(Shape *shape : sdfs){
+        UtilGetSDFParticles(shape->grid, &particles, 0, spacing);
+    }
+
+    sdfSize = particles.size();
+    total += particles.size();
+    total += extraParts;
+    ptr = new float[2 * 3 * total];
+    pos = &ptr[0];
+    col = &ptr[3 * total];
+
+    memset(col, 0, sizeof(float) * 3 * total);
+
+    int it = 0;
+    for(int i = 0; i < particles.size(); i++){
+        vec3f pi = particles[it++];
+        pos[3 * i + 0] = pi.x; pos[3 * i + 1] = pi.y;
+        pos[3 * i + 2] = pi.z; col[3 * i + 2] = 1;
+    }
+
+    int end = pSet->GetParticleCount();
+    for(int i = 0; i < end; i++){
+        vec3f pi = pSet->GetParticlePosition(i);
+        int j = i + sdfSize;
+        pos[3 * j + 0] = pi.x; pos[3 * j + 1] = pi.y;
+        pos[3 * j + 2] = pi.z;
+    }
+
+    setCol(&col[3 * sdfSize], end);
+    extra = filler(&pos[3 * (sdfSize + end)], &col[3 * (sdfSize + end)]);
+
+    graphy_set_3d(origin.x, origin.y, origin.z, target.x, target.y, target.z,
+                  45.0, 0.1f, 100.0f);
+    int visible = particles.size() + pSet->GetParticleCount() + extra;
+    graphy_render_points3f(pos, col, visible, spacing/2.0);
+    int frame = 0;
+
+    while(callback(frame) != 0){
+        solver->Advance(targetInterval);
+        end = pSet->GetParticleCount();
+        for(int j = 0; j < end; j++){
+            vec3f pi = pSet->GetParticlePosition(j);
+            int f = j + sdfSize;
+            pos[3 * f + 0] = pi.x; pos[3 * f + 1] = pi.y;
+            pos[3 * f + 2] = pi.z;
+        }
+
+        setCol(&col[3 * sdfSize], end);
+        extra = filler(&pos[3 * (sdfSize + end)], &col[3 * (sdfSize + end)]);
+
+        visible = particles.size() + end + extra;
+        graphy_render_points3f(pos, col, visible, spacing/2.0);
+        frame++;
+    }
+
     graphy_close_display();
     delete[] ptr;
 }

@@ -10,12 +10,119 @@
 #include <util.h>
 #include <memory.h>
 
+void test_pcisph3_water_sphere_movable(){
+    printf("===== PCISPH Solver 3D -- Water Sphere Movable\n");
+    vec3f origin(0, 0, 4.5);
+    vec3f target(0);
+    vec3f boxSize(4.0);
+    vec3f center = target;
+    Float spacing = 0.05;
+    Float spacingScale = 2.0;
+    Float waterSphereRadius = 0.6;
+    Float sphereContainerRadius = 1.0;
+
+    CudaMemoryManagerStart(__FUNCTION__);
+    Shape *domain = MakeBox(Transform(), boxSize, true);
+    Shape *waterSphere = MakeSphere(Transform(), waterSphereRadius);
+    Shape *sphereContainer = MakeSphere(Translate(center), sphereContainerRadius, true);
+
+    VolumeParticleEmitterSet3 emitters;
+    emitters.AddEmitter(waterSphere, spacing);
+
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(sphereContainer);
+    cBuilder.AddCollider3(domain);
+
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    Assure(UtilIsEmitterOverlapping(&emitters, colliders) == 0);
+
+    ParticleSetBuilder3 pBuilder;
+    emitters.Emit(&pBuilder);
+
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    Grid3 *domainGrid = UtilBuildGridForDomain(domain->GetBounds(), 
+                                               spacing, spacingScale);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+
+    Float targetInterval =  1.0 / 240.0;
+
+    //ProfilerInitKernel(pSet->GetParticleCount());
+
+    int extraParts = 100;
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        for(int i = 0; i < pCount; i++){
+            colors[3 * i + 0] = 1; colors[3 * i + 1] = 0;
+            colors[3 * i + 2] = 1;
+        }
+    };
+
+    vec3f direction(1,0,0);
+    std::vector<int> boundaries;
+    Float a = 0;
+    auto updateCallback = [&](int step) -> int{
+        if(step == 0) return 1;
+
+        Float off = spacing * 0.2;
+        vec3f d = off * direction + center;
+        Float v = off / targetInterval;
+        for(int i = 0; i < 3; i++){
+            if(Absf(d[i]) > 0.8){
+                direction[i] = -direction[i];
+            }
+        }
+
+        center = d;
+        vec3f vel = direction * vec3f(v);
+        a += 1;
+        if(a > 360) a = 0;
+        Transform transform = Translate(center) * RotateY(a);
+        //Transform transform = RotateZ(a);
+        sphereContainer->Update(transform);
+        sphereContainer->SetVelocities(vel, vec3f(0, Radians(1.0) / targetInterval, 0));
+
+        std::string respath("/home/felipe/Documents/Bubbles/simulations/move_sphere/output_");
+        respath += std::to_string(step-1);
+        respath += ".txt";
+
+        UtilGetBoundaryState(pSet, &boundaries);
+        int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
+        //SerializerSaveSphDataSet3(solver.GetSphSolverData(), respath.c_str(), flags, &boundaries);
+
+        UtilPrintStepStandard(&solver, step-1);
+        //ProfilerReport();
+        return 1;
+        //return step > 2000 ? 0 : 1;
+    };
+
+    auto filler = [&](float *pos, float *col) -> int{
+        int n = 0;
+        if(colliders->IsActive(0)){
+            n += UtilGenerateSpherePoints(pos, col, vec3f(1,1,0), sphereContainerRadius,
+                                          extraParts-10, sphereContainer->ObjectToWorld);
+        }
+        return n;
+    };
+
+    UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
+                                                           target, targetInterval, extraParts,
+                                                           {}, updateCallback, colorFunction,
+                                                           filler);
+
+    CudaMemoryManagerClearCurrent();
+    printf("\n===== OK\n");
+}
+
 void test_pcisph3_water_drop(){
     printf("===== PCISPH Solver 3D -- Water Drop\n");
-    vec3f origin(3);
+    vec3f origin(4);
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
-    Float spacing = 0.05;
+    Float spacing = 0.03;
     Float spacingScale = 2.0;
     Float sphereRadius = 0.3;
     vec3f waterBox(3.0-spacing, 0.3, 3.0-spacing);
@@ -67,6 +174,13 @@ void test_pcisph3_water_drop(){
     Float targetInterval =  1.0 / 240.0;
     
     ProfilerInitKernel(pSet->GetParticleCount());
+    int extraParts = 12 * 10 + 12;
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        for(int i = 0; i < pCount; i++){
+            colors[3 * i + 0] = 1; colors[3 * i + 1] = 0;
+            colors[3 * i + 2] = 1;
+        }
+    };
 #if 0
     std::vector<int> boundaries;
     auto onStepUpdate = [&](int step) -> int{
@@ -84,18 +198,25 @@ void test_pcisph3_water_drop(){
         return step > 500 ? 0 : 1;
     };
 #else
-    
+
+    auto filler = [&](float *pos, float *col) -> int{
+        return UtilGenerateBoxPoints(pos, col, vec3f(1,1,0), boxSize,
+                                     extraParts-12, container->ObjectToWorld);
+    };
+
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;
-        UtilPrintStepStandard(&solver, step-1, {0, 16, 31, 74, 151, 235, 
-                                  256, 278, 361, 420});
+        UtilPrintStepStandard(&solver,step-1,{0, 16, 31, 74, 151, 235, 256, 278, 361, 420});
         ProfilerReport();
         return step > 450 ? 0 : 1;
     };
 #endif
-    
-    PciSphRunSimulation3(&solver, spacing, origin, target, 
-                         targetInterval, {}, onStepUpdate);
+    UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
+                                                           target, targetInterval, extraParts,
+                                                           {}, onStepUpdate, colorFunction,
+                                                           filler);
+//    PciSphRunSimulation3(&solver, spacing, origin, target, 
+//                         targetInterval, {}, onStepUpdate);
     
     CudaMemoryManagerClearCurrent();
     printf("===== OK\n");
@@ -1254,7 +1375,7 @@ void test_pcisph3_whale_obstacle(){
         
         //simple_color(pos, col, pSet);
         graphy_render_points3f(pos, col, count, spacing/2.0);
-        printf("Step: %d            \n", i+1);
+        //printf("Step: %d            \n", i+1);
     }
     
     
@@ -1319,7 +1440,6 @@ void test_pcisph3_water_sphere(){
         solver.Advance(targetInterval);
         simple_color(pos, col, set2);
         graphy_render_points3f(pos, col, count, 0.01);
-        printf("Step: %d          \n", i+1);
     }
     
     delete[] pos;

@@ -113,7 +113,7 @@ struct Matrix4x4{
         return r;
     }
 
-    __bidevice__ static vec3f Translation(const Matrix3x3 &m1){
+    __bidevice__ friend vec3f Translation(const Matrix4x4 &m1){
         return vec3f(m1.m[0][3], m1.m[1][3], m1.m[2][3]);
     }
 

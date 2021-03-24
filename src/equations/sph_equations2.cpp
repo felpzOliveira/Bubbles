@@ -76,8 +76,8 @@ __bidevice__ Float ComputeDensityForParticle(SphSolverData2 *data, int particleI
     }
 
     if(IsZero(sum)){
-        //printf("Zero summation for particle %d\n", particleId);
-        //sum = 1;
+        printf("Zero summation for particle %d\n", particleId);
+        //sum = kernel.W(0);
     }
 
     Float di = sum * pSet->GetMass();

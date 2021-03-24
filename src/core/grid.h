@@ -277,6 +277,8 @@ class Grid{
         if(!Inside(p, bounds)){
             printf(" [ERROR] : Requested for hash on point outside domain ");
             p.PrintSelf();
+            printf(" , Bounds: ");
+            bounds.PrintSelf();
             printf("\n");
         }
         

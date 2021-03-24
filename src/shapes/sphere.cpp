@@ -34,6 +34,7 @@ __bidevice__ void Shape::SphereClosestPoint(const vec3f &point,
     Float d = SphereClosestDistance(point);
     vec3f pLocal = WorldToObject.Point(point);
     Normal3f N(0,1,0);
+    vec3f p;
     if(!pLocal.IsZeroVector()){
         N = Normalize(pLocal);
     }
@@ -42,9 +43,9 @@ __bidevice__ void Shape::SphereClosestPoint(const vec3f &point,
     if(reverseOrientation){
         N *= -1;
     }
-    
-    *query = ClosestPointQuery(ObjectToWorld.Point(pN),
-                               ObjectToWorld.Normal(N), d);
+
+    p = ObjectToWorld.Point(pN);
+    *query = ClosestPointQuery(p, ObjectToWorld.Normal(N), d, VelocityAt(p));
 }
 
 __bidevice__ bool Shape::SphereIntersect(const Ray &ray, SurfaceInteraction *isect,

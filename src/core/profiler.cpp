@@ -233,7 +233,7 @@ class Profiler{
             estimatedGpuTime << "ms" << std::endl;
         
         if(particleCount > 0){
-            std::cout << "Particle execution" << std::endl;
+            std::cout << "Particle execution [ " << particleCount << " ]" <<  std::endl;
             std::cout << " Maximum iteraction " << maxIteractions << std::endl;
             std::cout << " Minimum iteraction " << minIteractions << std::endl;
             std::cout << " Average iteraction " << averageIteractions << std::endl;

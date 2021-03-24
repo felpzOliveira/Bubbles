@@ -110,6 +110,9 @@ void test_pcisph2_water_drop();
 void test_pcisph2_water_block_lnm();
 void test_pcisph2_continuous_emitter();
 void test_pcisph2_marching_squares();
+void test_pcisph2_water_rotating_obstacles();
+void test_pcisph2_water_sphere_dynamic();
+void test_pcisph2_water_square_dynamic();
 
 // As you can see, I'm having a lot fun with the pcisph3 solver
 void test_pcisph3_water_sphere();
@@ -126,6 +129,7 @@ void test_pcisph3_ball_many_emission();
 void test_pcisph3_box_many_emission();
 void test_pcisph3_water_drop();
 void test_pcisph3_dragon_pool();
+void test_pcisph3_water_sphere_movable();
 
 void test_pbf2_double_dam_break();
 

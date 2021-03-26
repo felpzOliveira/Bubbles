@@ -23,8 +23,6 @@ __bidevice__ Quaternion::Quaternion(const Transform &t){
     const Matrix4x4 &m = t.m;
     Float trace = m.m[0][0] + m.m[1][1] + m.m[2][2];
     if (trace > 0.f){
-        // Compute w from matrix trace, then xyz
-        // 4w^2 = m[0][0] + m[1][1] + m[2][2] + m[3][3] (but m[3][3] == 1)
         Float s = std::sqrt(trace + 1.0f);
         w = s / 2.0f;
         s = 0.5f / s;
@@ -32,7 +30,6 @@ __bidevice__ Quaternion::Quaternion(const Transform &t){
         v.y = (m.m[0][2] - m.m[2][0]) * s;
         v.z = (m.m[1][0] - m.m[0][1]) * s;
     }else{
-        // Compute largest of $x$, $y$, or $z$, then remaining components
         const int nxt[3] = {1, 2, 0};
         Float q[3];
         int i = 0;
@@ -52,8 +49,14 @@ __bidevice__ Quaternion::Quaternion(const Transform &t){
     }
 }
 
+__bidevice__ Float Qangle(const Quaternion &q1, const Quaternion &q2){
+    Float cosTheta = Dot(q1, q2);
+    return std::acos(Clamp(cosTheta, -1, 1));
+}
+
 __bidevice__ Quaternion Qlerp(Float t, const Quaternion &q1, const Quaternion &q2){
     Float cosTheta = Dot(q1, q2);
+
     if(cosTheta > .9995f)
         return Normalize((1 - t) * q1 + t * q2);
     else{

@@ -9,6 +9,122 @@
 #include <obj_loader.h>
 #include <util.h>
 #include <memory.h>
+#include <quaternion.h>
+
+void test_pcisph3_rotating_water_box(){
+    printf("===== PCISPH Solver 3D -- Rotating Water Block\n");
+
+    CudaMemoryManagerStart(__FUNCTION__);
+    vec3f origin(4);
+    vec3f target(0);
+    vec3f boxSize(3.0, 2.0, 3.0);
+    Float spacing = 0.075;
+    Float spacingScale = 2.0;
+    int steps = 100;
+    vec3f waterBox(3.0-spacing, 0.5, 3.0-spacing);
+
+    Float yof = (boxSize.y - waterBox.y) * 0.5; yof -= spacing;
+    Shape *domain = MakeBox(Transform(), boxSize * 2.0, true);
+    Shape *container = MakeBox(Transform(), boxSize, true);
+    Shape *baseWaterShape = MakeBox(Translate(0, -yof, 0), waterBox);
+
+    VolumeParticleEmitterSet3 emitters;
+    emitters.AddEmitter(baseWaterShape, spacing);
+
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(container);
+    cBuilder.AddCollider3(domain);
+
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    Assure(UtilIsEmitterOverlapping(&emitters, colliders) == 0);
+
+    ParticleSetBuilder3 pBuilder;
+    emitters.Emit(&pBuilder);
+
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    Grid3 *domainGrid = UtilBuildGridForDomain(domain->GetBounds(), 
+                                               spacing, spacingScale);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+
+    Float targetInterval =  1.0 / 240.0;
+    Float invInterval = 1.0 / targetInterval;
+    //ProfilerInitKernel(pSet->GetParticleCount());
+
+    int extraParts = 12 * 10 + 12;
+    Transform rot180 = RotateZ(180);
+    Transform rot0 = RotateZ(0);
+
+    InterpolatedTransform iTrans(&rot0, &rot180, 0, 1);
+
+    Quaternion q180(rot180);
+    Quaternion q0(rot0);
+    Quaternion qlast = q0;
+
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        for(int i = 0; i < pCount; i++){
+            colors[3 * i + 0] = 1; colors[3 * i + 1] = 0;
+            colors[3 * i + 2] = 1;
+        }
+    };
+
+    auto filler = [&](float *pos, float *col) -> int{
+        return UtilGenerateBoxPoints(pos, col, vec3f(1,1,0), boxSize,
+                                     extraParts-12, container->ObjectToWorld);
+    };
+
+    auto onStepUpdate = [&](int step) -> int{
+        if(step == 0) return 1;
+        Float f = ((Float)(step % steps)) / (Float)steps;
+#if 1
+        Transform transform;
+        Interpolate(&iTrans, f, &transform);
+#else
+        Quaternion q = Qlerp(f, q0, q180);
+        Float dTheta = Qangle(q, qlast);
+        Float omega = dTheta * invInterval;
+
+        Transform transform = q.ToTransform();
+
+        qlast = q;
+#endif
+        //angle += 1;
+        //if(angle > 360) angle = 0;
+        //Transform transform = RotateZ(angle);
+
+        container->Update(transform);
+        //container->SetVelocities(vec3f(0), vec3f(0, 0, omega));
+        container->SetVelocities(vec3f(0), vec3f(0, 0, 0));
+
+#if 0
+        std::vector<int> boundaries;
+        std::string respath("/home/felipe/Documents/Bubbles/simulations/box_rotate/output_");
+        respath += std::to_string(step-1);
+        respath += ".txt";
+
+        UtilGetBoundaryState(pSet, &boundaries);
+        int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
+        SerializerSaveSphDataSet3(solver.GetSphSolverData(), respath.c_str(), flags, &boundaries);
+#endif
+
+        UtilPrintStepStandard(&solver,step-1);
+        //ProfilerReport();
+        return 1;
+        return step > 1000 ? 0 : 1;
+    };
+
+    UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
+                                                           target, targetInterval, extraParts,
+                                                           {}, onStepUpdate, colorFunction,
+                                                           filler);
+
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
 
 void test_pcisph3_water_sphere_movable(){
     printf("===== PCISPH Solver 3D -- Water Sphere Movable\n");
@@ -90,7 +206,7 @@ void test_pcisph3_water_sphere_movable(){
         respath += ".txt";
 
         UtilGetBoundaryState(pSet, &boundaries);
-        int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
+        //int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
         //SerializerSaveSphDataSet3(solver.GetSphSolverData(), respath.c_str(), flags, &boundaries);
 
         UtilPrintStepStandard(&solver, step-1);
@@ -491,8 +607,7 @@ void test_pcisph3_dragon_pool(){
     
     ProfilerInitKernel(pSet->GetParticleCount());
     
-    const char *targetOutput =
-        "/home/felipe/Documents/Bubbles/simulations/dragon_pool/output_";
+//    const char *targetOutput = "/home/felipe/Documents/Bubbles/simulations/dragon_pool/output_";
     
     auto callback = [&](int step) -> int{
         if(step == 0) return 1;

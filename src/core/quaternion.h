@@ -1,7 +1,7 @@
 #if !defined(QUATERNION_H)
 #define QUATERNION_H
-#include <transform.h>
 #include <geometry.h>
+#include <transform.h>
 
 class Quaternion{
     public:
@@ -71,6 +71,7 @@ class Quaternion{
     __bidevice__ Quaternion(const Transform &t);
 };
 
+__bidevice__ Float Qangle(const Quaternion &q1, const Quaternion &q2);
 __bidevice__ Quaternion Qlerp(Float t, const Quaternion &q1, const Quaternion &q2);
 
 __bidevice__ inline Quaternion operator*(Float f, const Quaternion &q){ return q * f; }
@@ -81,5 +82,20 @@ __bidevice__ inline Float Dot(const Quaternion &q1, const Quaternion &q2){
 __bidevice__ inline Quaternion Normalize(const Quaternion &q){
     return q / std::sqrt(Dot(q, q));
 }
+
+class InterpolatedTransform{
+    public:
+    Transform *tStart, *tEnd;
+    Float t0, t1;
+    vec3f T[2];
+    Quaternion R[2];
+    Matrix4x4 S[2];
+
+    __bidevice__ InterpolatedTransform(Transform *e0, Transform *e1, Float s0, Float s1);
+    __bidevice__ static void Decompose(const Matrix4x4 &m, vec3f *T, Quaternion *R, Matrix4x4 *S);
+    __bidevice__ void Interpolate(Float t, Transform *transform);
+};
+
+__bidevice__ void Interpolate(InterpolatedTransform *iTransform, Float t, Transform *transform);
 
 #endif // QUATERNION_H

@@ -74,7 +74,7 @@ void *_cudaAllocator(size_t bytes, int line, const char *filename, bool abort){
     return ptr;
 }
 
-void CudaMemoryManagerClearCurrent(){
+__host__ void CudaMemoryManagerClearCurrent(){
     if(manager.activeEntry){
         int size = manager.activeEntry->addresses.size();
 #if defined(PRINT_MEMORY)
@@ -97,7 +97,7 @@ void CudaMemoryManagerClearCurrent(){
     }
 }
 
-void CudaMemoryManagerStart(const char *key){
+__host__ void CudaMemoryManagerStart(const char *key){
     std::string strKey(key);
     if(!manager.activeEntry){
         initialized = 1;
@@ -124,7 +124,7 @@ void *_cudaAllocate(size_t bytes, int line, const char *filename, bool abort){
     return ptr;
 }
 
-void CudaMemoryManagerClearAll(){
+__host__ void CudaMemoryManagerClearAll(){
     std::map<std::string, Region *>::iterator it;
     size_t mem = 0;
     for(it = manager.globalMap.begin();

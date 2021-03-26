@@ -15,14 +15,14 @@
 * Start a new context with the label key, if key already exists switch to
 * that context.
 */
-void CudaMemoryManagerStart(const char *key);
+__host__ void CudaMemoryManagerStart(const char *key);
 
 /*
 * Clears all memory taken in the active context.
 */
-void CudaMemoryManagerClearCurrent();
+__host__ void CudaMemoryManagerClearCurrent();
 
 /*
 * Clears all memory taken so far in all contexts.
 */
-void CudaMemoryManagerClearAll();
+__host__ void CudaMemoryManagerClearAll();

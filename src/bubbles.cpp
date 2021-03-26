@@ -74,6 +74,7 @@ void run_self_tests(){
 }
 #endif
 
+void test_pcisph3_rotating_water_box();
 void test_container_grid_sdf_2D();
 int main(int argc, char **argv){
     printf("* Bubbles Fluid Simulator - Built %s at %s *\n", __DATE__, __TIME__);
@@ -97,9 +98,10 @@ int main(int argc, char **argv){
     //test_pcisph2_water_sphere_dynamic();
     //test_pcisph2_water_square_dynamic();
     //test_pcisph2_water_rotating_obstacles();
-    test_pcisph3_water_drop();
+    //test_pcisph3_water_drop();
     //test_pcisph3_water_sphere();
     //test_pcisph3_water_sphere_movable();
+    test_pcisph3_rotating_water_box();
     
     //test_pcisph2_double_dam_break();
     //test_pbf2_double_dam_break();

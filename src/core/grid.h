@@ -394,7 +394,7 @@ class Grid{
             AssertA(h < total, "Invalid particle position");
             Cell<Q> *cell = &cells[h];
             AssertA(Inside(p, cell->bounds), "Invalid particle computation {Inside}");
-            
+
             ParticleChain *pChain = pSet->GetParticleChainNode(i);
             pChain->cId = h;
             pChain->pId = i;

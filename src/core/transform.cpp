@@ -1,5 +1,106 @@
 #include <transform.h>
 #include <string.h>
+#include <quaternion.h>
+
+//PBRT is an freaking excellent reference!
+__bidevice__ void Interpolate(InterpolatedTransform *iTransform, Float t, Transform *transform){
+    iTransform->Interpolate(t, transform);
+}
+
+__bidevice__ void InterpolatedTransform::Interpolate(Float t, Transform *transform){
+    if(t <= t0){
+        *transform = *tStart;
+        return;
+    }
+
+    if(t >= t1){
+        *transform = *tEnd;
+        return;
+    }
+
+    // After decomposition the interpolated result can be computed by literally
+    // interpolating each property (translation, rotation, scale) and combining
+    // them in a single matrix given by TRS.
+
+    // Compute interpolation value (0, 1)
+    Float dt = (t - t0) / (t1 - t0);
+
+    // For translation perform Linear interpolation on the decomposed translation
+    vec3f translation = Lerp(T[0], T[1], dt);
+
+    // For rotation apply Quaternion interpolation
+    Quaternion quat = Qlerp(dt, R[0], R[1]);
+
+    // For scale perform Linear interpolation on each element
+    Matrix4x4 scale;
+    for(int i = 0; i < 3; i++){
+        for(int j = 0; j < 3; j++){
+            scale.m[i][j] = Lerp(S[0].m[i][j], S[1].m[i][j], dt);
+        }
+    }
+
+    // combine
+    *transform = Translate(translation) * quat.ToTransform() * Transform(scale);
+}
+
+__bidevice__ void InterpolatedTransform::Decompose(const Matrix4x4 &m, vec3f *T,
+                                                   Quaternion *Rquat, Matrix4x4 *S)
+{
+    // The decomposition works by attempting to solve M = TRS where M is affine
+    // and compute values for T (translation) R (rotation) S (scale) matrix.
+    // The translation is pretty easy to get by inspecting the last column of M.
+    // We than remove this component and obtain a matrix M* that contains only RS.
+    // Rotation can be computed by applying polar decomposition, i.e.: iterate:
+    //       Mi+1 = 0.5 * (Mi + (Mi^t)^-1)     with M0 = M*
+    // whenever (Mi+1 - Mi) becomes too small the matrix Mi contains the best
+    // approximation of the rotation in the original M*.
+    // Finally the scale matrix can be computed by reversing M* = RS => S = R^-1 * M*
+
+    T->x = m.m[0][3];
+    T->y = m.m[1][3];
+    T->z = m.m[2][3];
+
+    Matrix4x4 M = m;
+    for (int i = 0; i < 3; ++i) M.m[i][3] = M.m[3][i] = 0.f;
+    M.m[3][3] = 1.f;
+
+    Float norm;
+    int count = 0;
+    Matrix4x4 R = M;
+    do{
+        Matrix4x4 Rnext;
+        Matrix4x4 Rit = Inverse(Transpose(R));
+        for(int i = 0; i < 4; ++i)
+            for(int j = 0; j < 4; ++j)
+                Rnext.m[i][j] = 0.5f * (R.m[i][j] + Rit.m[i][j]);
+
+        norm = 0;
+        for(int i = 0; i < 3; ++i){
+            Float n = Absf(R.m[i][0] - Rnext.m[i][0]) +
+                      Absf(R.m[i][1] - Rnext.m[i][1]) +
+                      Absf(R.m[i][2] - Rnext.m[i][2]);
+
+            norm = Max(norm, n);
+        }
+        R = Rnext;
+    }while(++count < 100 && norm > .0001);
+
+    *Rquat = Quaternion(R);
+
+    *S = Matrix4x4::Mul(Inverse(R), M);
+}
+
+__bidevice__ InterpolatedTransform::InterpolatedTransform(Transform *e0, Transform *e1,
+                                                          Float s0, Float s1)
+: tStart(e0), tEnd(e1), t0(s0), t1(s1)
+{
+    Decompose(tStart->m, &T[0], &R[0], &S[0]);
+    Decompose(tEnd->m, &T[1], &R[1], &S[1]);
+    // Flip for choosing faster path on rotations
+    if(Dot(R[0], R[1]) < 0){
+        R[1] = -R[1];
+    }
+}
 
 __bidevice__ bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2], 
                                        Float *x0, Float *x1)

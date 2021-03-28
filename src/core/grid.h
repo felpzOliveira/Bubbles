@@ -348,10 +348,10 @@ class Grid{
     }
     
     /* 
-* Distribute a list of particles to the cell in CPU. In order to avoid
-* performing full distribution if a continuous emission is being used
-* allow for distributing a list of particles.
- */
+    * Distribute a list of particles to the cell in CPU. In order to avoid
+    * performing full distribution if a continuous emission is being used
+    * allow for distributing a list of particles.
+    */
     template<typename ParticleType = ParticleSet<T>>
         __host__ void DistributeByParticleList(ParticleType *pSet, T *pList, 
                                                int pCount, int startId,
@@ -676,7 +676,7 @@ class NodeEdgeGrid{
     Grid<T, U, Q> *grid; // the underlying grid structure for hashing
     /*
     * Field values
-*/
+    */
     F *data; // raw values
     U usizes; // node count in each direction
     int totalCount; // total count of nodes
@@ -700,9 +700,9 @@ class NodeEdgeGrid{
     }
     
     /* 
-* Initializes the NodeEdgeGrid with the underlying grid,
-* the grid needs to be already built.
-*/
+    * Initializes the NodeEdgeGrid with the underlying grid,
+    * the grid needs to be already built.
+    */
     __host__ void Build(Grid<T, U, Q> *gridPtr, F initialValue = F(0)){
         AssertA(gridPtr, "Invalid grid pointer given for {NodeEdgeGrid::Setup}");
         // Get grid properties

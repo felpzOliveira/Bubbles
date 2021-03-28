@@ -9,12 +9,12 @@ __bidevice__ void Interpolate(InterpolatedTransform *iTransform, Float t, Transf
 
 __bidevice__ void InterpolatedTransform::Interpolate(Float t, Transform *transform){
     if(t <= t0){
-        *transform = *tStart;
+        *transform = tStart;
         return;
     }
 
     if(t >= t1){
-        *transform = *tEnd;
+        *transform = tEnd;
         return;
     }
 
@@ -92,10 +92,10 @@ __bidevice__ void InterpolatedTransform::Decompose(const Matrix4x4 &m, vec3f *T,
 
 __bidevice__ InterpolatedTransform::InterpolatedTransform(Transform *e0, Transform *e1,
                                                           Float s0, Float s1)
-: tStart(e0), tEnd(e1), t0(s0), t1(s1)
+: tStart(*e0), tEnd(*e1), t0(s0), t1(s1)
 {
-    Decompose(tStart->m, &T[0], &R[0], &S[0]);
-    Decompose(tEnd->m, &T[1], &R[1], &S[1]);
+    Decompose(tStart.m, &T[0], &R[0], &S[0]);
+    Decompose(tEnd.m, &T[1], &R[1], &S[1]);
     // Flip for choosing faster path on rotations
     if(Dot(R[0], R[1]) < 0){
         R[1] = -R[1];
@@ -298,6 +298,11 @@ __bidevice__ Transform Rotate(Float theta, const vec3f &axis) {
     m.m[2][2] = a.z * a.z + (1 - a.z * a.z) * cosTheta;
     m.m[2][3] = 0;
     return Transform(m, Transpose(m));
+}
+
+// Rotate following the path around the sphere centered at point instead of origin
+__bidevice__ Transform RotateAround(Float theta, const vec3f &axis, const vec3f &point){
+    return Translate(point) * Rotate(theta, axis) * Translate(-point);
 }
 
 __bidevice__ Transform Transform::operator*(const Transform &t2) const{

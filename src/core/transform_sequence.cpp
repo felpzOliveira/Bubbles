@@ -1,0 +1,157 @@
+#include <transform_sequence.h>
+
+__host__ TransformSequence::TransformSequence() : scopeStart(0), scopeEnd(0){}
+
+__host__ void TransformSequence::ComputeInitialTransform(){
+    if(transforms.size() == 1){
+        Interpolate(scopeStart, &lastInterpolatedTransform);
+    }
+}
+
+__host__ void TransformSequence::UpdateInterval(Float start, Float end){
+    scopeStart = Min(scopeStart, start);
+    scopeEnd = Max(scopeEnd, end);
+}
+
+__host__ void TransformSequence::GetLastTransform(Transform *transform){
+    Interpolate(scopeEnd, transform);
+}
+
+__host__ void TransformSequence::AddRestore(Float s0, Float s1){
+    Transform firstTransform, lastTransform;
+    Interpolate(scopeStart, &firstTransform);
+    Interpolate(scopeEnd, &lastTransform);
+    // Create a new AggregatedTransform between lastTransform -> firstTransform
+    // so the animation can be looped
+    AddInterpolation(&lastTransform, &firstTransform, s0, s1);
+}
+
+__host__ void TransformSequence::AddInterpolation(Transform *t0, Transform *t1,
+                                                  Float s0, Float s1)
+{
+    Float start = Min(s0, s1);
+    Float end = Max(s0, s1);
+    UpdateInterval(start, end);
+
+    InterpolatedTransform *interpolated = new InterpolatedTransform(t0, t1, s0, s1);
+
+    AggregatedTransform aggTransform = {
+        .immutablePre  = Transform(),
+        .immutablePost = Transform(),
+        .interpolated = interpolated,
+        .start = start,
+        .end = end,
+        .owned = 1,
+    };
+
+    transforms.push_back(aggTransform);
+    ComputeInitialTransform();
+}
+
+__host__ void TransformSequence::AddInterpolation(InterpolatedTransform *inp){
+    AggregatedTransform aggTransform = {
+        .immutablePre = Transform(),
+        .immutablePost = Transform(),
+        .interpolated = inp,
+        .start = inp->t0,
+        .end = inp->t1,
+        .owned = 0,
+    };
+
+    UpdateInterval(aggTransform.start, aggTransform.end);
+    transforms.push_back(aggTransform);
+    ComputeInitialTransform();
+}
+
+__host__ void TransformSequence::AddInterpolation(AggregatedTransform *kTransform, Float s0, Float s1){
+    Float start = Min(s0, s1);
+    Float end = Max(s0, s1);
+    AggregatedTransform aggTransform = *kTransform;
+    aggTransform.start = start;
+    aggTransform.end = end;
+    aggTransform.owned = 0;
+
+    UpdateInterval(aggTransform.start, aggTransform.end);
+    transforms.push_back(aggTransform);
+    ComputeInitialTransform();
+}
+
+__host__ void TransformSequence::AddInterpolation(AggregatedTransform *kTransform){
+    AggregatedTransform aggTransform = *kTransform;
+    aggTransform.owned = 0;
+    UpdateInterval(aggTransform.start, aggTransform.end);
+    transforms.push_back(aggTransform);
+    ComputeInitialTransform();
+}
+
+__host__ void TransformSequence::Interpolate(Float t, Transform *outTransform,
+                                             vec3f *linear, vec3f *angular)
+{
+    AggregatedTransform *aggTransform = nullptr;
+    Transform interp;
+
+    if(t <= scopeStart){
+        aggTransform = &transforms[0];
+    }else if(t >= scopeEnd){
+        aggTransform = &transforms[transforms.size()-1];
+    }else{
+        for(int i = 0; i < transforms.size(); i++){
+            AggregatedTransform *agg = &transforms[i];
+            if(t >= agg->start && t <= agg->end){
+                aggTransform = agg;
+                break;
+            }
+        }
+    }
+
+    AssertA(aggTransform != nullptr, "Failed to located target intepolation");
+
+    if(aggTransform->interpolated){
+        aggTransform->interpolated->Interpolate(t, &interp);
+    }
+
+    *outTransform = aggTransform->immutablePost * interp * aggTransform->immutablePre;
+    if(angular || linear){
+        vec3f lastT, currT;
+        Quaternion lastR, currR;
+        Matrix4x4 lastS, currS;
+
+        InterpolatedTransform::Decompose(outTransform->m, &currT, &currR, &currS);
+        InterpolatedTransform::Decompose(lastInterpolatedTransform.m, &lastT, &lastR, &lastS);
+
+        if(linear){
+            *linear = currT - lastT;
+            //TODO: We should add scaling to this velocity but it is kinda
+            // hard without knowing how much we are actually scaling
+        }
+
+        if(angular){
+            // Ok so we need to compute the angular velocity from two quaternions
+            // going to use Lie algebra for this
+
+            // Given 2 quaternions because this is the minimum step of a simulation
+            // i'm going to assume that dq/dt = lim (q(t+h) - q(t))/h and that q(t+h) = q2
+            // and q(t) = q1, with h = simulation dt.
+
+            // but the inertial angular velocity can be used to show that:
+            // dq/dt = 0.5 * q(t) * (0, Wt) where Wt is the angular velocity
+            // so we can write that Wt = Im(2 * Conj(q(t)) * dq/dt) because
+            // this divide is directly we don't need to receive h or care
+            // about integration schemes, and can write that 
+            // Wt = 2 * Im(Conj(q(t)) * q(t+h)) {/ h}, with divide outside
+            Quaternion qtt = lastR.Conjugate() * currR;
+            *angular = 2.0 * qtt.Image();
+        }
+    }
+
+    lastInterpolatedTransform = *outTransform;
+}
+
+TransformSequence::~TransformSequence(){
+    for(AggregatedTransform agg : transforms){
+        if(agg.owned){
+            delete agg.interpolated;
+        }
+    }
+}
+

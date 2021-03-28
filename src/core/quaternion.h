@@ -45,10 +45,29 @@ class Quaternion{
         return *this;
     }
 
+    // Hamilton product
+    __bidevice__ Quaternion &operator*=(Quaternion q1){
+        Float w0 = w * q1.w - Dot(v, q1.v);
+        vec3f v0 = w * q1.v + q1.w * v + Cross(v, q1.v);
+        w = w0;
+        v = v0;
+        return *this;
+    }
+
     __bidevice__ Quaternion operator*(Float f) const{
         Quaternion ret = *this;
         ret.v *= f;
         ret.w *= f;
+        return ret;
+    }
+
+    // Hamilton product
+    __bidevice__ Quaternion operator*(Quaternion q1) const{
+        Quaternion ret = *this;
+        Float w0 = w * q1.w - Dot(v, q1.v);
+        vec3f v0 = w * q1.v + q1.w * v + Cross(v, q1.v);
+        ret.w = w;
+        ret.v = v;
         return ret;
     }
 
@@ -65,6 +84,16 @@ class Quaternion{
         ret.v *= inv;
         ret.w *= inv;
         return *this;
+    }
+
+    __bidevice__ Quaternion Conjugate() const{
+        Quaternion ret = *this;
+        ret.v = -ret.v;
+        return ret;
+    }
+
+    __bidevice__ vec3f Image() const{
+        return v;
     }
 
     __bidevice__ Transform ToTransform() const;
@@ -85,7 +114,7 @@ __bidevice__ inline Quaternion Normalize(const Quaternion &q){
 
 class InterpolatedTransform{
     public:
-    Transform *tStart, *tEnd;
+    Transform tStart, tEnd;
     Float t0, t1;
     vec3f T[2];
     Quaternion R[2];

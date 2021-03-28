@@ -76,6 +76,7 @@ void run_self_tests(){
 
 void test_pcisph3_rotating_water_box();
 void test_container_grid_sdf_2D();
+void test_pcisph3_water_box_forward();
 int main(int argc, char **argv){
     printf("* Bubbles Fluid Simulator - Built %s at %s *\n", __DATE__, __TIME__);
     /* Initialize cuda API */
@@ -101,7 +102,8 @@ int main(int argc, char **argv){
     //test_pcisph3_water_drop();
     //test_pcisph3_water_sphere();
     //test_pcisph3_water_sphere_movable();
-    test_pcisph3_rotating_water_box();
+    //test_pcisph3_rotating_water_box();
+    test_pcisph3_water_box_forward();
     
     //test_pcisph2_double_dam_break();
     //test_pbf2_double_dam_break();

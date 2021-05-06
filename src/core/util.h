@@ -10,6 +10,13 @@
 #include <statics.h>
 #include <serializer.h>
 #include <sph_solver.h>
+#include <sstream>
+
+#if defined(DEBUG)
+    #define BB_MSG(name) printf("* %s [DEBUG] - Built %s at %s *\n", name, __DATE__, __TIME__)
+#else
+    #define BB_MSG(name) printf("* %s - Built %s at %s *\n", name, __DATE__, __TIME__)
+#endif
 
 /*
 * So... our simulator is looking great! However is very hard to perform
@@ -161,7 +168,7 @@ __host__ Bounds3f UtilComputeParticleSetBounds(ParticleSet3 *pSet){
 }
 
 template<typename DataAccessor>
-inline __host__ Float UtilComputeMedium(DataAccessor *accessor, int size){
+inline __host__ Float UtilComputeMedian(DataAccessor *accessor, int size){
     double value = 0;
     for(int i = 0; i < size; i++){
         value += accessor[i];
@@ -190,6 +197,46 @@ inline __host__ int UtilFillBoundaryParticles(ParticleAccessor *pSet,
     }
     
     return bCount;
+}
+
+inline __host__ void UtilEraseFile(const char *filename){
+    remove(filename);
+}
+
+/*
+* Saves a 3D simulation. This routine assumes that the last collider present
+* in the solver is the domain and does not write it, only colliders that are
+* obstacles are written. TODO: Split coliders/domain from the collider set builder?
+*/
+template<typename Solver, typename ParticleAccessor>
+inline __host__ void UtilSaveSimulation3(Solver *solver, ParticleAccessor *pSet,
+                                         const char *filename, int flags)
+{
+    std::stringstream ss;
+    std::vector<int> boundaries;
+
+    UtilEraseFile(filename);
+
+    FILE *fp = fopen(filename, "a+");
+    if(!fp){
+        printf("Failed to open file %s\n", filename);
+        return;
+    }
+
+    ColliderSet3 *colSet3 = solver->GetColliders();
+    for(int i = 0; i < colSet3->nColiders-1; i++){
+        if(colSet3->IsActive(i)){
+            Collider3 *colider = colSet3->colliders[i];
+            ss << colider->shape->Serialize() << std::endl;
+        }
+    }
+
+    std::string str = ss.str();
+    fprintf(fp, "%s", str.c_str());
+    fclose(fp);
+
+    UtilGetBoundaryState(pSet, &boundaries);
+    SerializerSaveSphDataSet3(solver->GetSphSolverData(), filename, flags, &boundaries);
 }
 
 /*

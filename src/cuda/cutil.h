@@ -28,6 +28,8 @@ typedef enum{
 #define __bidevice__ __host__ __device__ 
 #define MAX(a, b) a > b ? a : b
 
+#define GPU_LAMBDA(...) [=] __device__(__VA_ARGS__)
+
 typedef struct{
     size_t free_bytes;
     size_t total_bytes;
@@ -201,6 +203,24 @@ inline int GetBlockSize(F kernel, const char *fname){
         }
     }
     return blockSize;
+}
+
+template<typename F> __global__ void GenericKernel(F fn, int items){
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tid >= items) return;
+
+    fn(tid);
+}
+
+template<typename F> inline
+__host__ void GPUParallelLambda(const char *desc, int nItems, F fn){
+    auto kernel = &GenericKernel<F>;
+    int blockSize = GetBlockSize(kernel, desc);
+    int gridSize = (nItems + blockSize - 1) / blockSize;
+    ProfilerPrepare(desc);
+    kernel<<<gridSize, blockSize>>>(fn, nItems);
+    cudaDeviceAssert(desc);
+    ProfilerFinish();
 }
 
 #define GPUKernel(...) (__VA_ARGS__)

@@ -10,6 +10,7 @@
 #include <util.h>
 #include <memory.h>
 #include <transform_sequence.h>
+#include <sdfs.h>
 
 void test_pcisph3_water_box_forward(){
     printf("===== PCISPH Solver 3D -- Rotating Water Block\n");
@@ -27,6 +28,15 @@ void test_pcisph3_water_box_forward(){
     Float yof = (boxSize.y - waterBox.y) * 0.5; yof -= spacing;
     Shape *container = MakeBox(Transform(), boxSize, true);
     Shape *baseWaterShape = MakeBox(Translate(0, -yof, 0), waterBox);
+
+    ///////////////////////////////////////////////////////////////////////
+    auto sdfCompute = GPU_LAMBDA(vec3f point, Shape *shape) -> Float{
+        return 1;
+    };
+
+    Bounds3f b(vec3f(1), vec3f(2));
+    Shape *tShape = MakeSDFShape(b, sdfCompute, 0.1, 0.1);
+    ////////////////////////////////////////////////////////////////////////
 
     vec3f diag = container->GetBounds().Diagonal();
     Float m = diag.Length();
@@ -63,14 +73,12 @@ void test_pcisph3_water_box_forward(){
     Transform rot0 = RotateZ(0);
     Transform rot180 = RotateZ(180);
 
-    InterpolatedTransform iTrans(&rot0, &rot180, 0, 1);
-
     TransformSequence sequence;
 
     AggregatedTransform key0 = {
         .immutablePre = Translate(-p),
         .immutablePost = Translate(p),
-        .interpolated = &iTrans,
+        .interpolated = InterpolatedTransform(&rot0, &rot180, 0, 1),
         .start = 0,
         .end = 1,
     };
@@ -82,11 +90,10 @@ void test_pcisph3_water_box_forward(){
 
     Transform moved = Translate(2.0, 0, 0) * lastTransform;
 
-    InterpolatedTransform itrans2(&lastTransform, &moved, 1, 2);
     AggregatedTransform key1 = {
         .immutablePre = Transform(),
         .immutablePost = Transform(),
-        .interpolated = &itrans2,
+        .interpolated = InterpolatedTransform(&lastTransform, &moved, 1, 2),
         .start = 1,
         .end = 2,
     };
@@ -136,6 +143,38 @@ void test_pcisph3_water_box_forward(){
     printf("===== OK\n");
 }
 
+void test_gen_sequence2(TransformSequence *sequence){
+    Transform rot180 = Rotate(180, vec3f(1,1,0));
+    Transform rot0 = RotateZ(0);
+    Transform rot1 = Rotate(359, vec3f(1,1,0));
+
+    sequence->AddInterpolation(&rot0, &rot180, 0, 1);
+
+    Transform lastTransform;
+    sequence->GetLastTransform(&lastTransform);
+
+    sequence->AddInterpolation(&lastTransform, &rot1, 1, 2);
+}
+
+void test_gen_sequence(TransformSequence *sequence){
+    Transform rot0 = RotateZ(0);
+    Transform rot180 = Rotate(180, vec3f(1,1,1));//RotateZ(180);
+    Transform rot1 = Rotate(359, vec3f(1,1,0));
+
+    sequence->AddInterpolation(&rot0, &rot180, 0, 1);
+
+    Transform lastTransform;
+    sequence->GetLastTransform(&lastTransform);
+
+    sequence->AddInterpolation(&lastTransform, &rot1, 1, 2);
+}
+
+void test_gen_quat_sequence(QuaternionSequence *sequence){
+    sequence->AddQuaternion(0, vec3f(1,0,0), 0);
+    sequence->AddQuaternion(180, vec3f(1,0,0), 1);
+    sequence->AddQuaternion(200, vec3f(1,0,0), 2);
+}
+
 void test_pcisph3_rotating_water_box(){
     printf("===== PCISPH Solver 3D -- Rotating Water Block\n");
 
@@ -143,9 +182,10 @@ void test_pcisph3_rotating_water_box(){
     vec3f origin(4);
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
-    Float spacing = 0.075;
+    Float spacing = 0.05;
     Float spacingScale = 2.0;
-    int steps = 100;
+    int steps = 500;
+    Float targetInterval =  1.0 / 240.0;
     vec3f waterBox(3.0-spacing, 0.5, 3.0-spacing);
 
     Float yof = (boxSize.y - waterBox.y) * 0.5; yof -= spacing;
@@ -176,20 +216,19 @@ void test_pcisph3_rotating_water_box(){
     solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
     solver.SetColliders(colliders);
 
-    Float targetInterval =  1.0 / 240.0;
     Float invInterval = 1.0 / targetInterval;
     //ProfilerInitKernel(pSet->GetParticleCount());
 
     int extraParts = 12 * 10 + 12;
-    Transform rot180 = RotateZ(180);
-    Transform rot0 = RotateZ(0);
 
-    InterpolatedTransform iTrans(&rot0, &rot180, 0, 1);
+    //TransformSequence sequence;
+    QuaternionSequence sequence;
+    test_gen_quat_sequence(&sequence);
 
     auto colorFunction = [&](float *colors, int pCount) -> void{
         for(int i = 0; i < pCount; i++){
             colors[3 * i + 0] = 1; colors[3 * i + 1] = 0;
-            colors[3 * i + 2] = 1;
+            colors[3 * i + 2] = 0;
         }
     };
 
@@ -202,26 +241,31 @@ void test_pcisph3_rotating_water_box(){
         if(step == 0) return 1;
         Float f = ((Float)(step % steps)) / (Float)steps;
         Transform transform;
-        Interpolate(&iTrans, f, &transform);
+        vec3f linear, angular;
+        //sequence.Interpolate(f, &transform, &linear, &angular);
+        //sequence.Interpolate(f, &transform, &angular);
 
-        container->Update(transform);
-        container->SetVelocities(vec3f(0), vec3f(0, 0, 0));
+        EuclideanInterpolate(0, 360, f, 0, 1, vec3f(1,1,0), &transform);
+
+        angular *= 1.0 / (targetInterval);
+        linear *= 1.0 / (targetInterval);
 
 #if 0
-        std::vector<int> boundaries;
         std::string respath("/home/felipe/Documents/Bubbles/simulations/box_rotate/output_");
         respath += std::to_string(step-1);
         respath += ".txt";
 
-        UtilGetBoundaryState(pSet, &boundaries);
         int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
-        SerializerSaveSphDataSet3(solver.GetSphSolverData(), respath.c_str(), flags, &boundaries);
+        UtilSaveSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet,
+                                                         respath.c_str(), flags);
 #endif
+        container->Update(transform);
+        container->SetVelocities(linear, angular * 50.0);
 
         UtilPrintStepStandard(&solver,step-1);
         //ProfilerReport();
-        return 1;
-        return step > 1000 ? 0 : 1;
+        //return 1;
+        return step > 2000 ? 0 : 1;
     };
 
     UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
@@ -736,7 +780,7 @@ void test_pcisph3_dragon_pool(){
         
         for(int i = 0; i < targetSteps.size(); i++){
             if(step == targetSteps[i]){
-                Float average = UtilComputeMedium(boundarySamples.data(), 
+                Float average = UtilComputeMedian(boundarySamples.data(),
                                                   boundarySamples.size());
                 printf("Boundary Average: %g\n", average);
             }
@@ -751,7 +795,7 @@ void test_pcisph3_dragon_pool(){
     
     PciSphRunSimulation3(&solver, spacing, origin, target, 
                          targetInterval, {dragonShape}, callback);
-    Float medium = UtilComputeMedium(boundarySamples.data(), 
+    Float medium = UtilComputeMedian(boundarySamples.data(),
                                      boundarySamples.size());
     printf("Final average: %g\n", medium);
     
@@ -1079,7 +1123,7 @@ void test_pcisph3_happy_whale(){
     Float spacingScale = 2.0;
     Float spacing = 0.02;
     int count = 0;
-    const char *pFile = "output.txt";
+    const char *pFile = "../resources/whale";
     
     CudaMemoryManagerStart(__FUNCTION__);
     
@@ -1169,6 +1213,75 @@ void test_pcisph3_happy_whale(){
     printf("===== OK\n");
 }
 
+void test_pcisph3_sdf(){
+    printf("===== PCISPH Solver 3D -- SDF\n");
+    vec3f origin(3.0, 0.0, 3.0);
+    vec3f target(0);
+    Float spacing = 0.07;
+    Float spacingScale = 1.8;
+    Float targetInterval =  1.0 / 240.0;
+
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    Shape *container = MakeSphere(Transform(), 2.0, true);
+
+    auto sdf2 = SDF_Sphere(vec3f(0, 1.0, 0), 0.6);
+    Bounds3f bound(vec3f(0,1,0)-vec3f(0.6), vec3f(0,1,0)+vec3f(0.6));
+    Shape *waterBall = MakeSDFShape(bound, sdf2);
+
+    //auto sdf = SDF_Sphere(vec3f(0, -0.5, 0), 0.5);
+    auto sdf = SDF_Torus(vec3f(0, -0.5, 0), vec2f(0.4, 0.3));
+    //auto sdf = SDF_RoundBox(vec3f(0, -0.5, 0), vec3f(0.15), 0.1);
+
+    Bounds3f bounds(vec3f(-1), vec3f(1));
+    Shape *sdfShape = MakeSDFShape(bounds, sdf);
+
+    VolumeParticleEmitterSet3 emitters;
+    emitters.AddEmitter(waterBall, spacing);
+
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(container);
+    cBuilder.AddCollider3(sdfShape);
+
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    //Assure(UtilIsEmitterOverlapping(&emitters, colliders) == 0);
+
+    ParticleSetBuilder3 pBuilder;
+    emitters.Emit(&pBuilder);
+
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(),
+                                               spacing, spacingScale);
+
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+
+    auto onStepUpdate = [&](int step) -> int{
+        if(step == 0) return 1;
+        UtilPrintStepStandard(&solver, step-1);
+        return 1;
+    };
+
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        for(int i = 0; i < pCount; i++){
+            colors[3 * i + 0] = 1; colors[3 * i + 1] = 0;
+            colors[3 * i + 2] = 1;
+        }
+    };
+
+    auto filler = [&](float *pos, float *col) -> int{ return 0; };
+
+    UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>
+    (&solver, pSet, spacing, origin, target, targetInterval, 0,
+     {sdfShape}, onStepUpdate, colorFunction, filler);
+
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
 
 void test_pcisph3_double_dam_break(){
     printf("===== PCISPH Solver 3D -- Double Dam Break\n");

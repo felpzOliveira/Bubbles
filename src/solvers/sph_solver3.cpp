@@ -37,6 +37,11 @@ __host__ void SphSolver3::SetColliders(ColliderSet3 *col){
     solverData->collider = col;
 }
 
+__host__ ColliderSet3 *SphSolver3::GetColliders(){
+    AssertA(solverData, "Invalid solverData for {GetColliders}");
+    return solverData->collider;
+}
+
 __bidevice__ SphParticleSet3 *SphSolver3::GetSphParticleSet(){
     AssertA(solverData, "Invalid solverData for {GetSphParticleSet}");
     return solverData->sphpSet;

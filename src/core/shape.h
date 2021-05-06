@@ -4,11 +4,6 @@
 #include <transform.h>
 #include <grid.h>
 
-/*
-* NOTE: Currently the Mesh shape is only supported for particle emitter
-*       and its not 100% OK yet.
-*/
-
 class SurfaceInteraction2;
 class ClosestPointQuery2;
 class SurfaceInteraction;
@@ -35,6 +30,7 @@ typedef enum{
     ShapeSphere,
     ShapeMesh,
     ShapeBox,
+    ShapeSDF,
 }ShapeType;
 
 class Shape2{
@@ -146,6 +142,9 @@ class Shape{
     ParsedMesh *mesh;
     FieldGrid3f *grid;
     Node *bvh;
+
+    // Sdf shape
+    Bounds3f bounds;
     
     __bidevice__ Shape(){}
     __bidevice__ Shape(const Transform &toWorld, bool reverseOrientation=false);
@@ -155,6 +154,7 @@ class Shape{
                           bool reverseOrientation=false);
     __host__ void InitMesh(ParsedMesh *mesh, bool reverseOrientation=false, 
                            int maxDepth=22);
+
     __bidevice__ bool CanSolveSdf(void) const;
     __bidevice__ Bounds3f GetBounds();
     __bidevice__ bool Intersect(const Ray &ray, SurfaceInteraction *isect,
@@ -173,7 +173,50 @@ class Shape{
     __host__ void Update(const Transform &toWorld);
 
     __bidevice__ vec3f VelocityAt(const vec3f &point) const;
-    
+
+    __host__ std::string Serialize() const;
+
+    template<typename F>
+    __host__ void UpdateSDF(F sdf){
+        GPUParallelLambda("Shape SDF", grid->total, GPU_LAMBDA(int index){
+            vec3ui u = DimensionalIndex(index, grid->resolution, 3);
+            vec3f p = grid->GetDataPosition(u);
+            Float distance = sdf(p, this);
+            grid->SetValueAt(distance, u);
+        });
+    }
+
+    template<typename F>
+    __host__ void InitSDFShape(const Bounds3f &maxBounds, Float dx, Float margin, F sdf){
+        bounds = maxBounds;
+        type = ShapeType::ShapeSDF;
+        WorldToObject = Transform();
+        ObjectToWorld = Transform();
+        vec3f scale(bounds.ExtentOn(0), bounds.ExtentOn(1), bounds.ExtentOn(2));
+        bounds.pMin -= margin * scale;
+        bounds.pMax += margin * scale;
+
+        Float width = bounds.ExtentOn(0);
+        Float height = bounds.ExtentOn(1);
+        Float depth = bounds.ExtentOn(2);
+        int resolution = (int)std::ceil(width / dx);
+        dx = width / (Float)resolution;
+        int resolutionY = (int)std::ceil(resolution * height / width);
+        int resolutionZ = (int)std::ceil(resolution * depth / width);
+
+        grid = cudaAllocateVx(FieldGrid3f, 1);
+        grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx), 
+                    bounds.pMin, VertexCentered);
+
+        printf("Generating SDF for shape: [%d x %d x %d] ... ",
+               resolution, resolutionY, resolutionZ);
+
+        UpdateSDF(sdf);
+
+        grid->MarkFilled();
+        printf("OK\n");
+    }
+
     private:
     ///////////////////////
     // SPHERE functions
@@ -184,7 +227,8 @@ class Shape{
     __bidevice__ Float SphereClosestDistance(const vec3f &point) const;
     __bidevice__ void SphereClosestPoint(const vec3f &point, 
                                          ClosestPointQuery *query) const;
-    
+    __host__ std::string SphereSerialize() const;
+
     ///////////////////////
     // BOX functions
     ///////////////////////
@@ -194,6 +238,7 @@ class Shape{
     __bidevice__ Float BoxClosestDistance(const vec3f &point) const;
     __bidevice__ void BoxClosestPoint(const vec3f &point, 
                                       ClosestPointQuery *query) const;
+    __host__ std::string BoxSerialize() const;
     ///////////////////////
     // MESH functions
     ///////////////////////
@@ -209,6 +254,9 @@ class Shape{
     
 };
 
+/*
+* Wrappers for easy shape constructors.
+*/
 __host__ Shape *MakeSphere(const Transform &toWorld, Float radius,
                            bool reverseOrientation = false);
 __host__ Shape *MakeBox(const Transform &toWorld, const vec3f &size, 
@@ -218,6 +266,18 @@ __host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld,
 __host__ Shape *MakeMesh(const char *path, const Transform &toWorld,
                          bool reverseOrientation = false);
 
+// Use this for custom SDF functions, the sdf function must have signature given by:
+//   GPU_LAMBDA(vec3f p, Shape *shape) -> Float{ .... return signedDistance; };
+// because shape SDF initialization is done in GPU code.
+template<typename F>
+__host__ inline Shape *MakeSDFShape(Bounds3f bounds, F sdf, Float dx=0.01, Float margin=0.1){
+    Shape *shape = cudaAllocateVx(Shape, 1);
+    shape->InitSDFShape(bounds, dx, margin, sdf);
+    return shape;
+}
+
+// These ones are called by the collider interface when it detects it needs a SDF
+// to solve collision, no need to call manually.
 __host__ void GenerateShapeSDF(Shape *shape, Float dx=0.01, Float margin=0.1);
 __host__ void GenerateShapeSDF(Shape2 *shape, Float dx=0.01, Float margin=0.1);
 

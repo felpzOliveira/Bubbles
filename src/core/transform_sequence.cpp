@@ -33,15 +33,13 @@ __host__ void TransformSequence::AddInterpolation(Transform *t0, Transform *t1,
     Float end = Max(s0, s1);
     UpdateInterval(start, end);
 
-    InterpolatedTransform *interpolated = new InterpolatedTransform(t0, t1, s0, s1);
-
     AggregatedTransform aggTransform = {
         .immutablePre  = Transform(),
         .immutablePost = Transform(),
-        .interpolated = interpolated,
+        .interpolated = InterpolatedTransform(t0, t1, s0, s1),
         .start = start,
         .end = end,
-        .owned = 1,
+        .owned = 0,
     };
 
     transforms.push_back(aggTransform);
@@ -52,7 +50,7 @@ __host__ void TransformSequence::AddInterpolation(InterpolatedTransform *inp){
     AggregatedTransform aggTransform = {
         .immutablePre = Transform(),
         .immutablePost = Transform(),
-        .interpolated = inp,
+        .interpolated = *inp,
         .start = inp->t0,
         .end = inp->t1,
         .owned = 0,
@@ -63,7 +61,9 @@ __host__ void TransformSequence::AddInterpolation(InterpolatedTransform *inp){
     ComputeInitialTransform();
 }
 
-__host__ void TransformSequence::AddInterpolation(AggregatedTransform *kTransform, Float s0, Float s1){
+__host__ void TransformSequence::AddInterpolation(AggregatedTransform *kTransform,
+                                                  Float s0, Float s1)
+{
     Float start = Min(s0, s1);
     Float end = Max(s0, s1);
     AggregatedTransform aggTransform = *kTransform;
@@ -104,11 +104,9 @@ __host__ void TransformSequence::Interpolate(Float t, Transform *outTransform,
         }
     }
 
-    AssertA(aggTransform != nullptr, "Failed to located target intepolation");
+    AssertA(aggTransform != nullptr, "Failed to locate target intepolation");
 
-    if(aggTransform->interpolated){
-        aggTransform->interpolated->Interpolate(t, &interp);
-    }
+    aggTransform->interpolated.Interpolate(t, &interp);
 
     *outTransform = aggTransform->immutablePost * interp * aggTransform->immutablePre;
     if(angular || linear){
@@ -117,7 +115,8 @@ __host__ void TransformSequence::Interpolate(Float t, Transform *outTransform,
         Matrix4x4 lastS, currS;
 
         InterpolatedTransform::Decompose(outTransform->m, &currT, &currR, &currS);
-        InterpolatedTransform::Decompose(lastInterpolatedTransform.m, &lastT, &lastR, &lastS);
+        InterpolatedTransform::Decompose(lastInterpolatedTransform.m,
+                                         &lastT, &lastR, &lastS);
 
         if(linear){
             *linear = currT - lastT;
@@ -150,8 +149,59 @@ __host__ void TransformSequence::Interpolate(Float t, Transform *outTransform,
 TransformSequence::~TransformSequence(){
     for(AggregatedTransform agg : transforms){
         if(agg.owned){
-            delete agg.interpolated;
+            //delete agg.interpolated;
         }
     }
 }
 
+__host__ QuaternionSequence::QuaternionSequence(){
+    scopeStart = Infinity;
+    scopeEnd = -Infinity;
+}
+
+__host__ void QuaternionSequence::AddQuaternion(const Quaternion &q1, const Float &t){
+    scopeStart = Min(scopeStart, t);
+    scopeEnd = Max(scopeEnd, t);
+    quaternions.push_back({.t = t, .q = q1});
+}
+
+__host__ void QuaternionSequence::AddQuaternion(const Float &angle, const vec3f &axis,
+                                                const Float &t)
+{
+    Transform rot = Rotate(angle, axis);
+    scopeStart = Min(scopeStart, t);
+    scopeEnd = Max(scopeEnd, t);
+    quaternions.push_back({.t = t, .q = Quaternion(rot)});
+}
+
+__host__ void QuaternionSequence::Interpolate(Float t, Transform *transform,
+                                              vec3f *angular)
+{
+    AggregatedQuaternion *aQ = nullptr, *laQ = nullptr;
+    for(int i = 0; i < quaternions.size(); i++){
+        AggregatedQuaternion *aggQ = &quaternions[i];
+        if(aggQ->t < t){
+            laQ = aggQ;
+        }else{
+            aQ = aggQ;
+            break;
+        }
+    }
+
+    if(laQ && aQ){
+        Float f = (t - laQ->t) / (aQ->t - laQ->t);
+        Quaternion q = Qlerp(f, laQ->q, aQ->q);
+        if(angular){
+            Quaternion qtt = laQ->q.Conjugate() * q;
+            *angular = 2.0 * qtt.Image();
+        }
+
+        *transform = q.ToTransform();
+    }else if(laQ){
+        *transform = laQ->q.ToTransform();
+        if(angular) *angular = vec3f(0);
+    }else if(aQ){
+        *transform = aQ->q.ToTransform();
+        if(angular) *angular = vec3f(0);
+    }
+}

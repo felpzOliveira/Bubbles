@@ -1,5 +1,6 @@
 #include <shape.h>
 #include <collider.h>
+#include <sstream>
 
 __host__ Shape *MakeSphere(const Transform &toWorld, Float radius,
                            bool reverseOrientation)
@@ -7,6 +8,28 @@ __host__ Shape *MakeSphere(const Transform &toWorld, Float radius,
     Shape *shape = cudaAllocateVx(Shape, 1);
     shape->InitSphere(toWorld, radius, reverseOrientation);
     return shape;
+}
+
+__host__ std::string Shape::SphereSerialize() const{
+    std::stringstream ss;
+
+    ss << "ShapeBegin\n";
+    ss << "\t\"Type\" sphere" << std::endl;
+    ss << "\t\"Radius\" " << radius << std::endl;
+    ss << "\t\"Transform\" ";
+    for(int i = 0; i < 4; i++){
+        for(int j = 0; j < 4; j++){
+            if(i == 3 && j == 3){
+                ss << ObjectToWorld.m.m[i][j];
+            }else{
+                ss << ObjectToWorld.m.m[i][j] << " ";
+            }
+        }
+    }
+
+    ss << std::endl;
+    ss << "ShapeEnd";
+    return ss.str();
 }
 
 __bidevice__ void Shape::InitSphere(const Transform &toWorld, Float rad,

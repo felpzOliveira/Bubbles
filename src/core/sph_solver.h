@@ -77,6 +77,8 @@ class SphSolver3{
                         Grid3 *domain, SphParticleSet3 *pSet);
     
     __host__ void SetColliders(ColliderSet3 *colliders);
+    __host__ ColliderSet3 *GetColliders();
+
     __bidevice__ SphSolverData3 *GetSphSolverData();
     __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
     __host__ void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);

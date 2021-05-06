@@ -72,6 +72,7 @@ class PciSphSolver3{
     __bidevice__ SphSolverData3 *GetSphSolverData();
     __bidevice__ SphParticleSet3 *GetSphParticleSet();
     __host__ void Advance(Float timeIntervalInSeconds);
+    __host__ ColliderSet3 *GetColliders();
     
     __host__ Float ComputeBeta(Float timeIntervalInSeconds);
     __host__ Float ComputeDelta(Float timeIntervalInSeconds);

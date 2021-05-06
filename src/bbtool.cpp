@@ -1,4 +1,5 @@
 #include <args.h>
+#include <util.h>
 
 ARGUMENT_PROCESS(convert_cmd){
     convert_command(argc-1, &argv[1]);
@@ -40,7 +41,7 @@ std::map<const char *, arg_desc> command_map = {
 };
 
 int main(int argc, char **argv){
-    printf("* BubblesTool - Built %s at %s *\n", __DATE__, __TIME__);
+    BB_MSG("BubblesTool");
     argument_process(command_map, argc, argv, "BubblesTool", nullptr);
     return 0;
 }

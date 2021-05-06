@@ -10,6 +10,7 @@ typedef struct{
     int start;
     int end;
     int loop;
+    int stepping;
     Float radius;
     int origin_configured;
     int target_configured;
@@ -23,6 +24,7 @@ void default_view_opts(view_opts *opts){
     opts->start = 0;
     opts->end = 1;
     opts->loop = 1;
+    opts->stepping = 1;
     opts->origin_configured = 0;
     opts->target_configured = 0;
     opts->radius = 0.012;
@@ -36,6 +38,7 @@ void print_view_configs(view_opts *opts){
     std::cout << "    * Radius : " << opts->radius << std::endl;
     std::cout << "    * Loop : " << opts->loop << std::endl;
     std::cout << "    * Start : " << opts->start << std::endl;
+    std::cout << "    * Step : " << opts->stepping << std::endl;
     std::cout << "    * End : " << opts->end << std::endl;
     std::cout << "    * Origin : " << opts->origin.x << " " <<
         opts->origin.y << " " << opts->origin.z << std::endl;
@@ -49,6 +52,12 @@ void print_view_configs(view_opts *opts){
 ARGUMENT_PROCESS(view_basename_arg){
     view_opts *opts = (view_opts *)config;
     opts->basename = ParseNext(argc, argv, i, "-basename");
+    return 0;
+}
+
+ARGUMENT_PROCESS(view_step_arg){
+    view_opts *opts = (view_opts *)config;
+    opts->stepping = (int)ParseNextFloat(argc, argv, i, "-step");
     return 0;
 }
 
@@ -153,6 +162,12 @@ std::map<const char *, arg_desc> view_arg_map = {
         {
             .processor = view_basename_arg,
             .help = "Configures the basename of the simulation to load."
+        }
+    },
+    {"-step",
+        {
+            .processor = view_step_arg,
+            .help = "The step to use to advance frames. (default: 1)"
         }
     },
     {"-radius",
@@ -295,7 +310,7 @@ void ViewDisplaySimulation(view_opts *opts){
     
     int count = opts->end - opts->start;
     do{
-        for(int i = 0; i < count; i++){
+        for(int i = 0; i < count; i += opts->stepping){
             for(int j = 0; j < frames[i]->size(); j++){
                 vec3f p = opts->pTransform.Point(frames[i]->at(j));
                 int it = sdfParticles.size() + j;

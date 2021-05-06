@@ -92,6 +92,7 @@ void test_rectangle_distance_outside();
 void test_rectangle_distance_inside();
 void test_box_distance();
 void test_rectangle_emit();
+void test_container_grid_sdf_2D();
 
 void test_sph2_water_block();
 void test_sph2_water_sphere();
@@ -130,6 +131,9 @@ void test_pcisph3_box_many_emission();
 void test_pcisph3_water_drop();
 void test_pcisph3_dragon_pool();
 void test_pcisph3_water_sphere_movable();
+void test_pcisph3_sdf();
+void test_pcisph3_rotating_water_box();
+void test_pcisph3_water_box_forward();
 
 void test_pbf2_double_dam_break();
 

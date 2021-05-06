@@ -40,3 +40,5 @@ int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
                              const char *filename, int flags);
 
 int SerializerFlagsFromString(const char *spec);
+
+std::string SerializerStringFromFlags(int flags);

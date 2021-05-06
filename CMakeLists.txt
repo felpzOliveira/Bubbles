@@ -5,6 +5,7 @@ set(BUBBLES "bubbles")
 set(BBTOOL "bbtool")
 set(CMAKE_CXX_COMPILER nvcc)
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/core"
+					"${CMAKE_CURRENT_SOURCE_DIR}/src/shapes"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/third"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/third/graphy"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/cuda"
@@ -22,10 +23,10 @@ execute_process(COMMAND ${CUDA_OUTPUT}
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
 	message(STATUS "Debug build")
-	set(BB_FLAGS "-g -G --use_fast_math")
+	set(BB_FLAGS "-g -G -DDEBUG --use_fast_math --extended-lambda")
 else()
 	message(STATUS "Release build")
-	set(BB_FLAGS "-Xptxas -O3 --use_fast_math -maxrregcount 64")
+	set(BB_FLAGS "-Xptxas -O3 -DRELEASE --use_fast_math -maxrregcount 64 --extended-lambda")
 endif()
 
 if(NOT ${CUDA_RETURN_CODE} EQUAL 0)

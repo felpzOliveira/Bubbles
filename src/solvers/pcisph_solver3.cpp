@@ -29,6 +29,10 @@ __host__ void PciSphSolver3::SetColliders(ColliderSet3 *colliders){
     solverData->sphData->collider = colliders;
 }
 
+__host__ ColliderSet3 *PciSphSolver3::GetColliders(){
+    return solverData->sphData->collider;
+}
+
 __host__ void PciSphSolver3::SetViscosityCoefficient(Float viscosityCoefficient){
     AssertA(solverData, "Invalid solverData for {SetViscosityCoefficient}");
     solverData->sphData->viscosity = Max(0, viscosityCoefficient);

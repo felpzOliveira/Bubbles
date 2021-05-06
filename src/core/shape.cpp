@@ -69,6 +69,12 @@ __bidevice__ Float Shape2::ClosestDistance(const vec2f &point) const{
         case ShapeType::ShapeRectangle2:{
             return Rectangle2ClosestDistance(point);
         } break;
+
+        case ShapeType::ShapeSDF:{
+            ClosestPointQuery2 query;
+            ClosestPointBySDF(point, &query);
+            return query.signedDistance;
+        } break;
         
         default:{
             printf("Unknown shape for Shape2::ClosestDistance\n");
@@ -136,6 +142,10 @@ __bidevice__ bool Shape::CanSolveSdf() const{
         case ShapeType::ShapeMesh:{
             return false;
         } break;
+
+        case ShapeType::ShapeSDF:{
+            return true;
+        } break;
         
         default:{
             printf("Unknown shape for Shape::CanSolveSdf\n");
@@ -156,6 +166,10 @@ __bidevice__ Bounds3f Shape::GetBounds(){
         
         case ShapeType::ShapeMesh:{
             return MeshGetBounds();
+        } break;
+
+        case ShapeType::ShapeSDF:{
+            return bounds;
         } break;
         
         default:{
@@ -201,6 +215,12 @@ __bidevice__ Float Shape::ClosestDistance(const vec3f &point) const{
         case ShapeType::ShapeMesh:{
             return MeshClosestDistance(point);
         } break;
+
+        case ShapeType::ShapeSDF:{
+            ClosestPointQuery query;
+            ClosestPointBySDF(point, &query);
+            return query.signedDistance;
+        } break;
         
         default:{
             printf("Unknown shape for Shape::ClosestDistance\n");
@@ -227,6 +247,22 @@ __bidevice__ void Shape::ClosestPoint(const vec3f &point,
             default:{
                 printf("Unknown shape for Shape::ClosestPoint\n");
             }
+        }
+    }
+}
+
+__host__ std::string Shape::Serialize() const{
+    switch(type){
+        case ShapeType::ShapeSphere:{
+            return SphereSerialize();
+        } break;
+        case ShapeType::ShapeBox:{
+            return BoxSerialize();
+        } break;
+
+        default:{
+            printf("Unsupported shape serialization\n");
+            return std::string();
         }
     }
 }
@@ -363,7 +399,7 @@ __bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p,
 
 __host__ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
     //TODO: Update grid if already exists
-    
+
     int resolution = 0;
     Bounds2f bounds = shape->GetBounds();
     vec2f scale(bounds.ExtentOn(0), bounds.ExtentOn(1));
@@ -391,7 +427,7 @@ __host__ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
 
 __host__ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
     //TODO: Update grid if already exists
-    
+
     int resolution = 0;
     Bounds3f bounds = shape->GetBounds();
     vec3f scale(bounds.ExtentOn(0), bounds.ExtentOn(1), bounds.ExtentOn(2));

@@ -982,7 +982,7 @@ class FieldGrid{
     /*
     * Returns the amount of data points required to represent a type of FieldGrid,
     * i.e.: VertexCentered for example requires n+1 points while CellCentered only n.
-*/
+    */
     //TODO: Implement other types
     __bidevice__ unsigned int Get1DLengthFor(int count){
         switch(type){
@@ -1014,7 +1014,7 @@ class FieldGrid{
     
     /*
     * Sample the field in the given point p.
-*/
+    */
     __bidevice__ F Sample(const T &p){
         U ii(0);
         U jj(0);

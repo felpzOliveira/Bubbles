@@ -1,6 +1,7 @@
 #include <shape.h>
 #include <transform.h>
 #include <collider.h>
+#include <sstream>
 
 __host__ Shape *MakeBox(const Transform &toWorld, const vec3f &size, 
                         bool reverseOrientation)
@@ -35,6 +36,28 @@ __host__ void Shape::InitBox(const Transform &toWorld, Float sx, Float sy,
     WorldToObject = Inverse(toWorld);
     reverseOrientation = reverseOr;
     sizex = sx; sizey = sy; sizez = sz;
+}
+
+__host__ std::string Shape::BoxSerialize() const{
+    std::stringstream ss;
+
+    ss << "ShapeBegin\n";
+    ss << "\t\"Type\" box" << std::endl;
+    ss << "\t\"Length\" " << sizex << " " << sizey << " " << sizez << std::endl;
+    ss << "\t\"Transform\" ";
+    for(int i = 0; i < 4; i++){
+        for(int j = 0; j < 4; j++){
+            if(i == 3 && j == 3){
+                ss << ObjectToWorld.m.m[i][j];
+            }else{
+                ss << ObjectToWorld.m.m[i][j] << " ";
+            }
+        }
+    }
+
+    ss << std::endl;
+    ss << "ShapeEnd";
+    return ss.str();
 }
 
 __bidevice__ Bounds3f Shape::BoxGetBounds(){

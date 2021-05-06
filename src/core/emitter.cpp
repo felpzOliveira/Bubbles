@@ -273,8 +273,8 @@ __host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
             }else{
                 /*
                 * If the Shape does not provide a SDF map, perform Ray Tracing
-                * for detecting interior points
-*/
+                * for detecting interior points, for meshes only.
+                */
                 if(MeshIsPointInside(target, emitter->shape, emitter->bound)){
                     if(emitter->emittedParticles < emitter->maxParticles){
                         vec3f vel = velocity(target) + emitter->initVel;

@@ -301,7 +301,6 @@ __bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId,
         printf("Point pi outside: {%g %g %g}, {%g %g %g} x {%g %g %g} [%g %g %g]\n",
                pi.x, pi.y, pi.z, pMin.x, pMin.y, pMin.z, 
                pMax.x, pMax.y, pMax.z, opi.x, opi.y, opi.z);
-        
     }
     
     AssertA(Inside(pi, data->domain->bounds), "Particle outside domain");

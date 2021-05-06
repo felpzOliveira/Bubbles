@@ -10,6 +10,9 @@
 #include <memory.h>
 #include <util.h>
 
+// To generate whale mesh use:
+//    ./bbtool convert -in HappyWhale.obj -scale 0.3 -spacing 0.02
+
 typedef struct{
     std::string input;
     std::string output;
@@ -351,6 +354,8 @@ void MeshToParticles(const char *name, const Transform &transform,
     emitter.Emit(&builder);
     
     sphSet = SphParticleSet3FromBuilder(&builder);
+    sphSet->SetTargetSpacing(spacing);
+
     *data = DefaultSphSolverData3();
     (*data)->sphpSet = sphSet;
     (*data)->domain = nullptr;

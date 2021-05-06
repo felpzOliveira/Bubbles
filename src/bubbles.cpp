@@ -7,6 +7,8 @@
 #include <memory.h>
 #include <marching_squares.h>
 #include <graphy.h>
+#include <util.h>
+
 #define RUN_TESTS
 
 #if defined(RUN_TESTS)
@@ -71,46 +73,22 @@ void run_self_tests(){
     test_pcisph3_quadruple_dam();
     test_pcisph3_happy_whale();
     test_pcisph3_dragon_pool();
+    test_pcisph3_sdf();
 }
 #endif
 
-void test_pcisph3_rotating_water_box();
-void test_container_grid_sdf_2D();
-void test_pcisph3_water_box_forward();
+
 int main(int argc, char **argv){
-    printf("* Bubbles Fluid Simulator - Built %s at %s *\n", __DATE__, __TIME__);
+    BB_MSG("Bubbles Fluid Simulator");
     /* Initialize cuda API */
     cudaInitEx();
     
     /* Sets the default kernel launching parameters, 16 is good for my notebook */
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
-    
-    //test_pcisph3_quadruple_dam();
-    //test_pcisph3_dragon_pool();
-    //test_pcisph3_ball_many_emission();
-    //test_pcisph3_dragon_shower();
-    //test_pcisph3_water_drop();
-    
-    //test_pcisph2_marching_squares();
-    //test_pcisph2_continuous_emitter();
-    //test_pcisph2_water_sphere();
-    //test_container_grid_sdf_2D();
-    //test_pcisph2_water_block_lnm();
-    //test_pcisph2_water_sphere_dynamic();
-    //test_pcisph2_water_square_dynamic();
-    //test_pcisph2_water_rotating_obstacles();
-    //test_pcisph3_water_drop();
-    //test_pcisph3_water_sphere();
-    //test_pcisph3_water_sphere_movable();
-    //test_pcisph3_rotating_water_box();
-    test_pcisph3_water_box_forward();
-    
-    //test_pcisph2_double_dam_break();
-    //test_pbf2_double_dam_break();
-    //test_explicit_vector_grid_build_2D();
-    //test_explicit_grid_minimal_build_2D();
-    //test_explicit_grid_build_2D();
-    //test_explicit_face_vector_grid_2D();
+
+    test_pcisph3_sdf();
+    //test_pcisph3_happy_whale();
+
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else

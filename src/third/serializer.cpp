@@ -1,6 +1,7 @@
 #include <serializer.h>
 #include <obj_loader.h>
 #include <string.h>
+#include <map>
 
 #define CAN_SKIP(x) (IS_SPACE(x) && !IS_NEW_LINE(x))
 
@@ -32,6 +33,19 @@ static void PrintToFile(FILE *fp, const vec2f &value, int spacing=0){
         fprintf(fp, "%g %g", value.x, value.y);
 }
 
+std::string SerializerStringFromFlags(int flags){
+    std::string str;
+    if(flags & SERIALIZER_POSITION) str += "p";
+    if(flags & SERIALIZER_DENSITY) str += "d";
+    if(flags & SERIALIZER_NORMAL) str += "n";
+    if(flags & SERIALIZER_BOUNDARY) str += "b";
+    if(flags & SERIALIZER_VELOCITY) str += "v";
+    if(flags & SERIALIZER_MASS) str += "m";
+    if(flags & SERIALIZER_LAYERS) str += "l";
+    if(flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) str += "o";
+    return str;
+}
+
 int SerializerFlagsFromString(const char *spec){
     int flags = 0;
     std::string str(spec);
@@ -54,16 +68,99 @@ int SerializerFlagsFromString(const char *spec){
     return flags;
 }
 
+int SerializerProcessToken(std::string &token, int &in_region,
+                           std::string &format, int &pCount,
+                           std::string linebuf, int i)
+{
+    int r = 0;
+    if(token.size() > 0){
+        if(in_region == 0){
+            if(token == "FluidBegin"){
+                in_region = 1;
+            }
+        }else{
+            if(token == "\"Count\""){
+                int j = 0;
+                std::string sub = linebuf.substr(i+1);
+                while(CAN_SKIP(sub[j])) j++;
+                sub = sub.substr(j);
+                const char *t = sub.c_str();
+                pCount = (int)ParseFloat(&t);
+            }else if(token == "\"Format\""){
+                int j = 0;
+                std::string sub = linebuf.substr(i+1);
+                while(CAN_SKIP(sub[j])) j++;
+                format = std::string();
+
+                while(!CAN_SKIP(sub[j])){
+                    format += sub[j];
+                    j++;
+                }
+            }else if(token == "DataBegin"){
+                // ???
+                r = 1;
+            }else if(token == "DataEnd"){
+                // ???
+            }else if(token == "FluidEnd"){
+                in_region = 0;
+            }
+        }
+
+        token.clear();
+    }
+
+    return r;
+}
+
+int SerializerFindFluidSection(std::istream &is, std::string &format){
+    std::string linebuf;
+    int pCount = 0;
+    int in_region = 0;
+    int r = 0;
+    while(is.peek() != -1){
+        GetLine(is, linebuf);
+        std::string token;
+        for(int i = 0; i < linebuf.size(); i++){
+            if(IS_SPACE(linebuf[i]) || IS_NEW_LINE(linebuf[i])){
+                r = SerializerProcessToken(token, in_region, format,
+                                           pCount, linebuf, i);
+                if(r){
+                    return pCount;
+                }
+
+                continue;
+            }
+
+            token += linebuf[i];
+        }
+
+        r = SerializerProcessToken(token, in_region, format,
+                                   pCount, linebuf, 0);
+        if(r) return pCount;
+    }
+
+    return pCount;
+}
+
 void SerializerLoadPoints3(std::vector<vec3f> *points,
                            const char *filename, int flags)
 {
     std::ifstream ifs(filename);
     if(ifs){
-        int start = 1;
+        std::string format;
         int pCount = 0;
         std::string linebuf;
         vec3f vel(0), nor(0);
         int boundary = 0;
+
+        pCount = SerializerFindFluidSection(ifs, format);
+        if(format.size() > 0){
+            flags = SerializerFlagsFromString(format.c_str());
+        }
+
+        points->clear();
+        points->reserve(pCount);
+
         while(ifs.peek() != -1){
             GetLine(ifs, linebuf);
             
@@ -74,24 +171,18 @@ void SerializerLoadPoints3(std::vector<vec3f> *points,
             if(linebuf.size() > 0){ //remove '\r'
                 if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
             }
-            
+
             // skip empty
             if(linebuf.empty()) continue;
             vec3f pos(0);
             const char *token = linebuf.c_str();
             token += strspn(token, " \t");
-            
-            if(start){ // particle count
-                pCount = (int)ParseFloat(&token);
-                start = 0;
-                if(pCount <= 0){
-                    printf("Invalid particle count %d\n", pCount);
-                    return;
-                }
-                
-                continue;
+
+            if(std::string(token).find("DataEnd") != std::string::npos){
+                // done
+                break;
             }
-            
+
             if(flags & SERIALIZER_POSITION){
                 ParseV3(&pos, &token);
                 while(CAN_SKIP(token[0])) token++;
@@ -129,7 +220,7 @@ int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
                              const char *filename, int flags)
 {
     std::string linebuf;
-    int start = 1;
+    std::string format;
     int pCount = 0;
     std::ifstream ifs(filename);
     if(!ifs){
@@ -138,6 +229,14 @@ int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
     }
     
     int size = 0;
+    pCount = SerializerFindFluidSection(ifs, format);
+    if(format.size() > 0){
+        flags = SerializerFlagsFromString(format.c_str());
+    }
+
+    pSet->clear();
+    pSet->reserve(pCount);
+
     while(ifs.peek() != -1){
         GetLine(ifs, linebuf);
         
@@ -158,22 +257,12 @@ int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
         Assert(token);
         if(token[0] == '\0') continue; //empty line
         if(token[0] == '#') continue; //comment line
-        
-        if(start){ // particle count
-            pCount = (int)ParseFloat(&token);
-            start = 0;
-            if(pCount > 0){
-                printf("Attempting to parse %d particles... ", pCount);
-                pSet->clear();
-                pSet->reserve(pCount);
-            }else{
-                printf("Invalid particle count %d\n", pCount);
-                return -1;
-            }
-            
-            continue;
+
+        if(std::string(token).find("DataEnd") != std::string::npos){
+            // done
+            break;
         }
-        
+
         // Parse a particle data
         /*
         * Order must be:
@@ -257,13 +346,15 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int fl
     std::string filename(basename);
     filename += std::to_string(start);
     filename += ".txt";
-    FILE *fp = fopen(filename.c_str(), "r");
+    std::ifstream ifs(filename);
+
     int pCount = 0;
-    if(fp){
+    std::string format;
+    if(ifs){
         *data = new std::vector<vec3f>*[end-start];
-        fscanf(fp, "%d\n", &pCount);
-        fclose(fp);
-        
+        pCount = SerializerFindFluidSection(ifs, format);
+        ifs.close();
+
         for(int i = 0; i < end-start; i++){
             std::string file(basename);
             file += std::to_string(i + start);
@@ -291,8 +382,10 @@ void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
                         std::vector<int> *boundary = nullptr)
 {
     ParticleSet *pSet = data->sphpSet->GetParticleSet();
-    FILE *fp = fopen(filename, "w+");
+    Float spacing = data->sphpSet->GetTargetSpacing();
+    FILE *fp = fopen(filename, "a+");
     int logged = 0;
+    std::string format = SerializerStringFromFlags(flags);
     if(fp){
         int pCount = pSet->GetParticleCount();
         if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && boundary){
@@ -304,8 +397,13 @@ void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
             printf("Invalid configuration for Serialized particles\n");
             return;
         }
-        
-        fprintf(fp, "%d\n", pCount);
+
+        fprintf(fp, "FluidBegin\n");
+        fprintf(fp, "\t\"Type\" particles\n");
+        fprintf(fp, "\t\"Count\" %d\n", pCount);
+        fprintf(fp, "\t\"Format\" %s\n", format.c_str());
+        fprintf(fp, "\t\"Spacing\" %g\n", spacing);
+        fprintf(fp, "\tDataBegin\n");
         for(int i = 0; i < pSet->GetParticleCount(); i++){
             int needs_space = 0;
             int boundary_value = 0;
@@ -316,7 +414,8 @@ void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
             if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && !boundary_value){
                 continue;
             }
-            
+
+            fprintf(fp, "\t\t");
             if(flags & SERIALIZER_POSITION){
                 PrintToFile(fp, pi);
                 needs_space = 1;
@@ -358,7 +457,8 @@ void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
             
             fprintf(fp, "\n");
         }
-        
+        fprintf(fp, "\tDataEnd\n");
+        fprintf(fp, "FluidEnd\n");
         fclose(fp);
     }else{
         printf("Error: Failed to open %s\n", filename);

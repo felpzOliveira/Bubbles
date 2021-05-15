@@ -268,6 +268,7 @@ void GenerateData(config_opts *opts){
     CudaMemoryManagerStart(__FUNCTION__);
     // For this case input is a Bubbles simulation file
     ParticleSetBuilder3 builder;
+    std::vector<SerializedShape> shapes;
     Float h = 0.02;
     //int chosenBoundaryAlgorithm = 0; // TODO
     std::vector<int> boundary;
@@ -276,8 +277,10 @@ void GenerateData(config_opts *opts){
     int flagsOut = SerializerFlagsFromString(opts->outformArgs.c_str());
     int toGen    = SerializerFlagsFromString(opts->dataArgs.c_str());
     if(!(flagsIn == -1 || flagsOut == -1 || toGen == -1)){
-        int count = SerializerLoadSphDataSet3(&builder, opts->input.c_str(),
-                                              flagsIn, &boundary);
+        SerializerLoadSystem3(&builder, &shapes, opts->input.c_str(),
+                              flagsIn, &boundary);
+        //int count = SerializerLoadSphDataSet3(&builder, opts->input.c_str(),
+                                             // flagsIn, &boundary);
         
         SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(&builder);
         ParticleSet3 *pSet = sphpSet->GetParticleSet();
@@ -305,25 +308,30 @@ void GenerateData(config_opts *opts){
             grid->UpdateQueryState();
             LNMInvalidateCells(grid);
             pSet->ClearDataBuffer(&pSet->v0s);
-            if(toGen & SERIALIZER_BOUNDARY){
-                printf("Classifying boundary particles ... "); fflush(stdout);
-                
-                LNMBoundary(pSet, grid, h, 0);
-                
+
+            if(toGen & SERIALIZER_LAYERS){
+                printf("Classifying layers ..."); fflush(stdout);
+                int max_level = 8;
+
+                LNMBoundaryExtended(pSet, grid, h, max_level, 0);
+
+                printf(" %d\n", grid->GetLNMMaxLevel());
                 //(void)chosenBoundaryAlgorithm; //TODO
             }else{
-                printf("Classifying layers ... "); fflush(stdout);
-                int max_level = 4; // TODO
-                LNMClassifyLazyGPU(grid, max_level);
-                LNMAssignParticlesAttributesGPU(grid, pSet);
+                printf("Classifying boundary particles ... "); fflush(stdout);
+                LNMBoundary(pSet, grid, h, 0);
+                printf("OK\n");
             }
-            
+
             boundary.clear();
             UtilGetBoundaryState(pSet, &boundary);
-            printf("OK\n");
         }
         
-        printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout); 
+        printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout);
+        UtilEraseFile(opts->output.c_str());
+
+        SerializerWriteShapes(&shapes, opts->output.c_str());
+
         SerializerSaveSphDataSet3(solver.solverData, opts->output.c_str(),
                                   flagsOut, &boundary);
         printf("OK\n");

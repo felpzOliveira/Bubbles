@@ -101,6 +101,45 @@ __global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     }
 }
 
+template<typename T, typename U, typename Q>
+__global__ void LNMBoundaryExtendL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    if(id < domain->GetActiveCellCount()){
+        int i = domain->GetActiveCellId(id);
+        Cell<Q> *self = domain->GetCell(i);
+        // promote unbounded L2 levels to L3
+        if(self->GetLevel() == 2){
+            LNMBoundaryLNSet(pSet, self, 3);
+        }
+    }
+}
+
+template<typename T, typename U, typename Q>
+__global__ void LNMBoundaryLKKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                                    Float preDelta, Float h)
+{
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    if(id < domain->GetActiveCellCount()){
+        int i = domain->GetActiveCellId(id);
+        Cell<Q> *self = domain->GetCell(i);
+        if(self->GetChainLength() > 0 && self->GetLevel() != 1){
+            int *neighbors = nullptr;
+            int count = domain->GetNeighborsOf(i, &neighbors);
+            for(int i = 0; i < count; i++){
+                Cell<Q> *cell = domain->GetCell(neighbors[i]);
+                if(cell->GetLevel() == 1 && cell->GetChainLength() < preDelta){
+                    self->SetLevel(-2);
+                    LNMBoundaryLNSet(pSet, self, 2);
+                    break;
+                }
+            }
+        }else if(self->GetLevel() == 1){
+            LNMBoundaryLNSet(pSet, self, 1);
+        }else if(self->GetLevel() > 2){
+            LNMBoundaryLNSet(pSet, self, self->GetLevel());
+        }
+    }
+}
 
 template<typename T, typename U, typename Q>
 __global__ void LNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
@@ -152,7 +191,6 @@ __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
               pSet, domain, delta, h, algorithm);
 }
 
-
 /**************************************************************/
 //                 V O X E L   C L A S S I F I E R            */
 /**************************************************************/
@@ -160,15 +198,23 @@ template<typename T, typename U, typename Q>
 __bidevice__ bool LNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned int cellId){
     int *neighbors = nullptr;
     int count = domain->GetNeighborsOf(cellId, &neighbors);
+    const int dim = domain->dimensions;
+    int threshold = (dim == 3) ? 27 : 9;
+
     Cell<Q> *self = domain->GetCell(cellId);
     int level = self->GetLevel();
     if(level > -1) return false;
-    
+
     if(self->GetChainLength() == 0){
         self->SetLevel(0);
         return true;
     }
-    
+
+    if(count != threshold){
+        self->SetLevel(1);
+        return true;
+    }
+
     if(refLevel > 0){
         for(int i = 0; i < count; i++){
             if(cellId != neighbors[i]){
@@ -207,24 +253,32 @@ __host__ void LNMInvalidateCells(Grid<T, U, Q> *domain){
 
 // Lazy implementation
 template<typename T, typename U, typename Q>
-__host__ int LNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1){
+__host__ int LNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1, int startLevel=0){
     bool done = false;
-    int level = 0;
+    int level = startLevel;
     int N = domain->GetCellCount();
     
     while(!done){
         domain->indicator = 0;
         GPULaunch(N, GPUKernel(LNMOnceKernel<T, U, Q>), domain, level);
         
-        level++;
-        done = (domain->indicator == 0 || (levels > 0 && level > levels));
+        if(domain->indicator == 0){
+            done = true;
+        }
+
+        if(levels > -1){
+            done = (level >= levels);
+        }
+
+        if(!done){
+            level++;
+        }
     }
     
     domain->SetLNMMaxLevel(level);
     
     return level;
 }
-
 
 template<typename T, typename U, typename Q>
 __global__ void LNMParticleAttributesKernel(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
@@ -247,3 +301,28 @@ void LNMAssignParticlesAttributesGPU(Grid<T, U, Q> *domain, ParticleSet<T> *pSet
     int N = pSet->GetParticleCount();
     GPULaunch(N, GPUKernel(LNMParticleAttributesKernel<T, U, Q>), domain, pSet);
 }
+
+template<typename T, typename U, typename Q>
+__host__ void LNMBoundaryExtended(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                                  Float h, int max_level, int algorithm=0)
+{
+    // classify voxels
+    LNMClassifyLazyGPU<T, U, Q>(domain, max_level);
+    LNMAssignParticlesAttributesGPU<T, U, Q>(domain, pSet);
+
+    /* Get the minimum in case its not a regular grid */
+    T len = domain->GetCellSize();
+    Float maxd = MinComponent(len);
+
+    Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
+    delta -= domain->dimensions > 2 ? 0 : 1;
+
+    /* Filter and Classify LK */
+    GPULaunch(domain->GetActiveCellCount(), GPUKernel(LNMBoundaryLKKernel<T, U, Q>),
+              pSet, domain, delta, h);
+
+    /* Promote L2 to L3 as the interface is compromised */
+    GPULaunch(domain->GetActiveCellCount(), GPUKernel(LNMBoundaryExtendL2Kernel<T, U, Q>),
+              pSet, domain);
+}
+

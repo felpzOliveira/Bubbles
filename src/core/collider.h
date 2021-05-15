@@ -47,6 +47,7 @@ class Collider2{
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
                                        vec2f *position, vec2f *velocity);
     __bidevice__ bool IsActive();
+    __bidevice__ bool OptmizedClosestPointCheck(const vec2f &position);
     __host__ void SetActive(bool active);
     __host__ void GenerateSDFs(void);
 };
@@ -65,6 +66,7 @@ class Collider3{
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
                                        vec3f *position, vec3f *velocity);
     __bidevice__ bool IsActive();
+    __bidevice__ bool OptmizedClosestPointCheck(const vec3f &position);
     __host__ void SetActive(bool active);
     __host__ void GenerateSDFs(void);
 };

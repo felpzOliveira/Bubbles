@@ -1720,17 +1720,6 @@ inline __host__ Float rand_float(){
     return rand() / (RAND_MAX+1.f);
 }
 
-typedef struct{
-    Point3f *p;
-    Normal3f *n;
-    vec3f *s;
-    Point2f *uv;
-    Point3i *indices;
-    int nTriangles, nVertices;
-    int nUvs, nNormals;
-    AllocatorType allocator;
-}ParsedMesh;
-
 /* types of grid based on vertex location */
 typedef enum{
     VertexCentered, CellCentered, FaceCentered

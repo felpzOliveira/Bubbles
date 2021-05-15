@@ -2,12 +2,14 @@
 #include <vector>
 #include <string.h>
 #include <fstream>
+#include <transform.h>
 
 /*
 * Must provide the symbol cudaAllocate(bytes) that returns GPU managed memory:
 * void *cudaAllocate(size_t bytes);
 */
 #include <cutil.h>
+#include <shape.h>
 
 /*
 * Defines data types to be used for components:
@@ -145,3 +147,8 @@ __host__ void ParseV2(vec2f *v, const char **token);
 * Parse a single vec3f and move token head.
 */
 __host__ void ParseV3(vec3f *v, const char **token);
+
+/*
+* Parses a transform and move token head.
+*/
+__host__ void ParseTransform(Transform *t, const char **token);

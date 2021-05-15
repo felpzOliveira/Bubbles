@@ -9,6 +9,19 @@ class ClosestPointQuery2;
 class SurfaceInteraction;
 class ClosestPointQuery;
 
+struct ParsedMesh{
+    Point3f *p;
+    Normal3f *n;
+    vec3f *s;
+    Point2f *uv;
+    Point3i *indices;
+    int nTriangles, nVertices;
+    int nUvs, nNormals;
+    AllocatorType allocator;
+    char name[256];
+    Transform transform;
+};
+
 typedef struct{
     Bounds3f bound;
     int handle;
@@ -251,6 +264,7 @@ class Shape{
     
     __bidevice__ void ClosestPointBySDF(const vec3f &point, 
                                         ClosestPointQuery *query) const;
+    __host__ std::string MeshSerialize() const;
     
 };
 

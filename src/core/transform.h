@@ -4,6 +4,8 @@
 #include <cutil.h>
 #include <interaction.h>
 
+struct ParsedMesh;
+
 struct Matrix3x3{
     Float m[3][3];
     

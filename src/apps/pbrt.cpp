@@ -5,6 +5,8 @@
 #include <obj_loader.h> // get parser utilities
 #include <transform.h>
 
+#define MESH_FOLDER "/home/felipe/Documents/CGStuff/models"
+
 #define __to_stringf __to_string<Float>
 #define __to_stringi __to_string<int>
 
@@ -21,18 +23,129 @@ typedef struct{
     RenderMode mode;
     Float radius;
     Transform transform;
+    std::string pickedMat;
     int level;
     int flags;
     int hasClipArgs;
+    vec3f mat_value;
+    std::map<std::string, std::string> meshMap;
+    int warn_ply_mesh;
+    std::string meshFolder;
 }pbrt_opts;
+
+typedef struct{
+    std::string name;
+    std::string mat;
+    int built;
+}pbrt_mat;
 
 const std::string ColorsString[] = {
     "0.78 0.78 0.78",
-    "0.87 0.0 0.1",
-    "0.8 0.34 0.1",
-    "0.85 0.66 0.30",
-    "0.35 0.60 0.84",
+    "0.866 0 0.301",
+    "0.670 0.368 0.286",
+    "0.666 0.815 0.588",
+    "0.00 0.89 1.0",
+    "0.019 0.682 1.0",
 };
+
+pbrt_mat Materials[] = {
+    {.name = "glass-BK7", .mat = "\"dielectric\" \"spectrum eta\" \"glass-BK7\"", .built=1},
+    {.name = "glass-thin", .mat = "\"dielectric\" \"float eta\" [ 1.1 ]", .built=1},
+    {.name = "diffuse", .mat = "\"diffuse\" \"rgb reflectance\"", .built=0}
+};
+
+std::string find_material(std::string name, int *ok){
+    int count = sizeof(Materials) / sizeof(Materials[0]);
+    *ok = -1;
+    for(int i = 0; i < count; i++){
+        if(name == Materials[i].name){
+            *ok = i;
+            return Materials[i].mat;
+        }
+    }
+
+    return std::string();
+}
+
+std::string mesh_base_name(std::string name){
+    int at = -1;
+    size_t size = name.size();
+    if(size < 2) return name;
+    for(int i = (int)size - 1; i >= 0; i--){
+        if(name[i] == '.'){
+            at = i;
+            break;
+        }
+    }
+
+    if(at < 0){
+        return name;
+    }
+
+    return name.substr(0, at);
+}
+
+std::string mesh_name_to_pbrt(std::string name, pbrt_opts *opts){
+    std::string ext;
+    std::string pbrt_name;
+    int at = -1;
+    size_t size = name.size();
+    if(size < 2) return name;
+    for(int i = (int)size - 1; i >= 0; i--){
+        if(name[i] == '.'){
+            at = i;
+            break;
+        }
+    }
+
+    if(at == -1){
+        printf("Warning: No extension found for \'%s\'\n", name.c_str());
+        return name;
+    }
+
+    ext = name.substr(at);
+    pbrt_name = name;
+    if(ext != ".ply"){
+        opts->warn_ply_mesh = 1;
+        pbrt_name = name.substr(0, at);
+        pbrt_name += ".ply";
+    }
+
+    return pbrt_name;
+}
+
+ARGUMENT_PROCESS(pbrt_material_arg){
+    int ok = -1;
+    pbrt_opts *opts = (pbrt_opts *)config;
+    opts->pickedMat = ParseNext(argc, argv, i, "-mat", 1);
+    std::string m = find_material(opts->pickedMat, &ok);
+    if(ok < 0){
+        printf("Failed to find material \'%s\'\n", opts->pickedMat.c_str());
+        return -1;
+    }
+
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_material_value){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "-mat-value", 3);
+    const char *token = value.c_str();
+    ParseV3(&opts->mat_value, &token);
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_list_mats){
+    int count = sizeof(Materials) / sizeof(Materials[0]);
+    printf("Available default materials:\n");
+    for(int i = 0; i < count; i++){
+        pbrt_mat mat = Materials[i];
+        printf("  * %s :  %s\n", mat.name.c_str(), mat.mat.c_str());
+    }
+
+    exit(0);
+    return 0;
+}
 
 ARGUMENT_PROCESS(pbrt_input_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
@@ -132,7 +245,7 @@ ARGUMENT_PROCESS(pbrt_clip_arg){
 }
 
 std::map<const char *, arg_desc> pbrt_argument_map = {
-    {"-in", 
+    {"-in",
         { .processor = pbrt_input_arg, 
             .help = "Where to read input file." 
         }
@@ -165,6 +278,21 @@ std::map<const char *, arg_desc> pbrt_argument_map = {
     {"-level", 
         { .processor = pbrt_level_arg, 
             .help = "Generates geometry containing only a specific level of LNM classification." 
+        }
+    },
+    {"-mat",
+        { .processor = pbrt_material_arg,
+            .help = "Sets a default material to be used instead of prompting for objects."
+        }
+    },
+    {"-list-mats",
+        { .processor = pbrt_list_mats,
+            .help = "List available default materials and stop execution."
+        }
+    },
+    {"-mat-value",
+        { .processor = pbrt_material_value,
+            .help = "Sets a 3 dimensional vector as argument for the chosen material."
         }
     },
     {"-rotateY", 
@@ -223,9 +351,9 @@ static std::string GetMaterialStringFiltered(int layer){
 * Follow color map
 */
 static std::string GetMaterialStringAll(int layer){
-    if(layer > 4){
-        printf("\nUnknown layer level (%d)\n", layer);
-        exit(0);
+    int max_layer = sizeof(ColorsString) / sizeof(ColorsString[0]);
+    if(layer > max_layer-1){
+        layer = max_layer-1;
     }
     return ColorsString[layer];
 }
@@ -235,6 +363,11 @@ static std::string GetMaterialStringAll(int layer){
 * anything other should not get here but return gray
 */
 static std::string GetMaterialStringLayered(int layer){
+    int max_layer = sizeof(ColorsString) / sizeof(ColorsString[0]);
+    if(layer > max_layer-1){
+        layer = max_layer-1;
+    }
+
     if(layer != 1 && layer != 2) return ColorsString[0];
     return ColorsString[layer];
 }
@@ -266,6 +399,7 @@ void default_pbrt_opts(pbrt_opts *opts){
     opts->cutAxis = -1;
     opts->cutDistance = FLT_MAX;
     opts->hasClipArgs = 0;
+    opts->warn_ply_mesh = 0;
 }
 
 void print_configs(pbrt_opts *opts){
@@ -283,6 +417,10 @@ void print_configs(pbrt_opts *opts){
         std::cout << "    * Clip distance : " << opts->cutDistance << std::endl;
         std::cout << "    * Clip axis : " << opts->cutAxis << std::endl;
     }
+
+    if(opts->pickedMat.size() > 0){
+        std::cout << "    * Material : " << opts->pickedMat << std::endl;
+    }
 }
 
 int SplitByLayer(std::vector<SerializedParticle> **renderflags, 
@@ -290,6 +428,7 @@ int SplitByLayer(std::vector<SerializedParticle> **renderflags,
                  pbrt_opts *opts)
 {
     int mCount = 0;
+    int max_layer = sizeof(ColorsString) / sizeof(ColorsString[0]);
     std::vector<SerializedParticle> *groups;
     
     for(int i = 0; i < pCount; i++){
@@ -297,7 +436,12 @@ int SplitByLayer(std::vector<SerializedParticle> **renderflags,
         if((p.boundary + 1) > mCount) mCount = p.boundary + 1;
     }
     
-    printf("Found %d layers\n", mCount);
+    if(mCount > max_layer){
+        printf("Warning: Found too many layers (%d > %d), result will be flattened\n",
+                mCount, max_layer);
+    }else{
+        printf("Found %d layers\n", mCount);
+    }
     
     groups = new std::vector<SerializedParticle>[mCount];
     for(int i = 0; i < pCount; i++){
@@ -318,9 +462,186 @@ int AcceptLayer(int layer, pbrt_opts *opts){
     exit(0);
 }
 
+void pbrt_insert_box(SerializedShape *shape, std::string &data, int depth, Float of=0){
+    char t[30];
+    vec3f points[8];
+    Transform transform;
+
+    std::string tab;
+    std::stringstream ss;
+    Float nx = -0.5 - of, px = 0.5 + of;
+    Float ny = -0.5 - of, py = 0.5 + of;
+    Float nz = -0.5 - of, pz = 0.5 + of;
+
+    memset(t, 0x00, sizeof(t));
+    memset(t, '\t', depth);
+
+    tab = std::string(t);
+
+    if(shape->numParameters.find("Length") != shape->numParameters.end()){
+        vec4f len = shape->numParameters["Length"];
+        vec4f hlen = len * 0.5;
+        nx = -hlen.x - of; px = hlen.x + of;
+        ny = -hlen.y - of; py = hlen.y + of;
+        nz = -hlen.z - of; pz = hlen.z + of;
+    }
+
+    if(shape->transfParameters.find("Transform") != shape->transfParameters.end()){
+        transform = shape->transfParameters["Transform"];
+    }
+
+    points[0] = vec3f(nx, ny, pz);
+    points[1] = vec3f(px, ny, pz);
+    points[2] = vec3f(px, py, pz);
+    points[3] = vec3f(nx, py, pz);
+
+    points[4] = vec3f(nx, ny, nz);
+    points[5] = vec3f(px, ny, nz);
+    points[6] = vec3f(px, py, nz);
+    points[7] = vec3f(nx, py, nz);
+
+    data += tab + "AttributeBegin\n";
+    data += tab + "\tShape \"trianglemesh\"\n";
+    data += tab + "\t\t\"point3 P\" [\n";
+
+    // NOTE: I think PBRT transform computation are a bit different from ours,
+    // lets transform the points here and give the geometry without transformations
+    for(int i = 0; i < 8; i++){
+        vec3f p = transform.Point(points[i]);
+        ss << tab << "\t\t\t" << p.x << " " << p.y << " " << p.z << "\n";
+    }
+
+    ss << tab << "\t\t]\n";
+
+    data += ss.str();
+    ss.str(std::string());
+
+    data += tab + "\t\t\"integer indices\" [\n";
+    ss << tab << "\t\t\t" << "0 1 2\n";
+    ss << tab << "\t\t\t" << "2 3 0\n";
+    ss << tab << "\t\t\t" << "1 5 6\n";
+    ss << tab << "\t\t\t" << "6 2 1\n";
+    ss << tab << "\t\t\t" << "7 6 5\n";
+    ss << tab << "\t\t\t" << "5 4 7\n";
+    ss << tab << "\t\t\t" << "4 0 3\n";
+    ss << tab << "\t\t\t" << "3 7 4\n";
+    ss << tab << "\t\t\t" << "4 5 1\n";
+    ss << tab << "\t\t\t" << "1 0 4\n";
+    ss << tab << "\t\t\t" << "3 2 6\n";
+    ss << tab << "\t\t\t" << "6 7 3\n";
+    ss << tab << "\t\t]\n";
+
+    data += ss.str();
+
+    data += tab + "AttributeEnd\n";
+}
+
+std::string pbrt_build_material(pbrt_mat *mat, pbrt_opts *opts){
+    std::stringstream ss;
+    vec3f v = opts->mat_value;
+    if(!mat){
+        printf("Material is null\n");
+        exit(0);
+    }
+
+    ss << mat->mat << " [ ";
+    ss << v.x << " " << v.y << " " << v.z << " ]";
+    return ss.str();
+}
+
+void pbrt_insert_dual_layer_box(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
+                                std::string strmat, std::string &data, int depth)
+{
+    data += "AttributeBegin\n\t";
+    if(mat == nullptr){
+        data += "Material " + strmat + "\n";
+    }else{
+        if(mat->built){
+            data += "Material " + mat->mat + "\n";
+        }else{
+            data += "Material " + pbrt_build_material(mat, opts) + " \n";
+        }
+    }
+
+    // insert the box with a small offset
+    pbrt_insert_box(shape, data, depth, 0.01);
+    data += "AttributeEnd\n";
+
+    // insert a second box inside, if the material contains dielectric
+    // properties it is nice for us to restore it so that thin properties
+    // are captured
+    data += "AttributeBegin\n\t";
+    data += "Material \"dielectric\" \"float eta\" [ 1.0 ] \n";
+    pbrt_insert_box(shape, data, depth);
+    data += "AttributeEnd\n";
+
+}
+
+void pbrt_insert_mesh(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
+                      std::string strmat, int depth, std::string refPath)
+{
+    std::string meshName = shape->strParameters["Name"];
+    std::string path = refPath + "/" + mesh_name_to_pbrt(meshName, opts);
+    std::string bname = mesh_base_name(meshName);
+    std::string data;
+
+    if(opts->meshMap.find(meshName) != opts->meshMap.end()){
+        data = opts->meshMap[meshName];
+    }else{
+        if(mat == nullptr){
+            data += "Material " + strmat + "\n";
+        }else{
+            if(mat->built){
+                data += "Material " + mat->mat + "\n";
+            }else{
+                data += "Material " + pbrt_build_material(mat, opts) + "\n";
+            }
+        }
+
+        data += "AttributeBegin\n";
+        data += "\tObjectBegin \"" + bname + "\"\n";
+        data += "\t\tShape \"plymesh\" \"string filename\" [ \"";
+        data += path + "\" ]\n";
+        data += "\tObjectEnd\n";
+        data += "AttributeEnd\n";
+    }
+
+    data += "AttributeBegin\n";
+
+    // In order to matrch PBRT rendering coordinates we need to transpose
+    // our transformations
+    if(shape->transfParameters.find("Transform") != shape->transfParameters.end()){
+        Transform transform = shape->transfParameters["Transform"];
+        Matrix4x4 m = Transpose(transform.m);
+        data += "\tTransform [ ";
+        for(int i = 0; i < 4; i++){
+            for(int j = 0; j < 4; j++){
+                data += std::to_string(m.m[i][j]);
+                data += " ";
+            }
+        }
+
+        data += "]\n";
+    }
+
+    data += "\tObjectInstance \"" + bname + "\"\n";
+
+    data += "AttributeEnd\n";
+    opts->meshMap[meshName] = data;
+}
+
+void pbrt_mesh_gather(pbrt_opts *opts, std::string &data){
+    for(auto it = opts->meshMap.begin(); it != opts->meshMap.end(); it++){
+        data += it->second;
+    }
+}
+
 void pbrt_command(int argc, char **argv){
     pbrt_opts opts;
     std::vector<SerializedParticle> particles;
+    std::vector<SerializedShape> shapes;
+    std::vector<int> boundaries;
+    ParticleSetBuilder3 builder;
     std::vector<SerializedParticle> *rendergroups = nullptr;
     int count = 0;
     int pAdded = 0;
@@ -334,15 +655,27 @@ void pbrt_command(int argc, char **argv){
         printf("No input given\n");
         return;
     }
-    
+
+    SerializerLoadSystem3(&builder, &shapes, opts.input.c_str(),
+                          opts.flags, &boundaries);
+
+    //TODO: Hacky implementation
+    for(int i = 0; i < boundaries.size(); i++){
+        SerializedParticle sp;
+        sp.position = builder.positions[i];
+        sp.boundary = boundaries[i];
+
+        particles.push_back(sp);
+    }
+
+    count = particles.size();
+
     if(opts.mode != RenderMode::ALL && !(opts.flags & SERIALIZER_BOUNDARY)){
         printf("This mode requires LNM-based boundary output from Bubbles\n");
         return;
     }
     
     radiusString = __to_stringf(opts.radius);
-    
-    count = SerializerLoadParticles3(&particles, opts.input.c_str(), opts.flags);
     
     if(count > 0){
         int total = count;
@@ -355,6 +688,47 @@ void pbrt_command(int argc, char **argv){
         }
         
         count = SplitByLayer(&rendergroups, &particles, total, &opts);
+
+        std::string refPath(MESH_FOLDER);
+        int has_mesh = 0;
+        // add objects first for easier manual configuration
+        for(SerializedShape &sh : shapes){
+            std::string mat;
+            const char *ptr = SerializerGetShapeName(sh.type);
+            pbrt_mat *pmat = nullptr;
+            if(opts.pickedMat.size() == 0){
+                printf("[Object] Please enter material for type \'%s\': ", ptr);
+                std::getline(std::cin, mat);
+            }else{
+                int ok = -1;
+                mat = find_material(opts.pickedMat, &ok);
+                if(ok < 0){
+                    printf("Failed to find material\n");
+                    exit(0);
+                }
+
+                pmat = &Materials[ok];
+            }
+
+            if(sh.type == ShapeBox){
+                pbrt_insert_dual_layer_box(&sh, pmat, &opts, mat, data, 1);
+                pAdded += 2;
+            }else if(sh.type == ShapeMesh){
+                has_mesh = 1;
+                if(refPath.size() == 0){
+                    printf("[Mesh] Simulation contains mesh objects, please specify reference path: ");
+                    std::getline(std::cin, refPath);
+                }
+
+                pbrt_insert_mesh(&sh, pmat, &opts, mat, 1, refPath);
+                pAdded += 1;
+            }
+        }
+
+        if(has_mesh){
+            pbrt_mesh_gather(&opts, data);
+        }
+
         for(int i = 0; i < count; i++){
             std::vector<SerializedParticle> *layer = &rendergroups[i];
             printf("\rProcessing layer %d / %d ... ", i+1, count);
@@ -364,7 +738,9 @@ void pbrt_command(int argc, char **argv){
                 if(AcceptLayer(i, &opts) == 0) continue;
                 
                 data += std::string("###### Layer ");
-                data += __to_stringi(i); data += "\n";
+                data += __to_stringi(i);
+                data += " ("; data += __to_stringi(layer->size());
+                data += ")\n";
                 data += GetMaterialString(i, &opts);
                 
                 for(SerializedParticle &p : *layer){
@@ -376,24 +752,32 @@ void pbrt_command(int argc, char **argv){
                         Float dist = Distance(ref, at);
                         if(dist < opts.cutDistance) continue;
                     }
-                    data += "TransformBegin\n\tTranslate ";
+                    data += "AttributeBegin\n\tTranslate ";
                     data += __to_stringf(p.position.x); data += " ";
                     data += __to_stringf(p.position.y); data += " ";
                     data += __to_stringf(p.position.z); data += "\n";
                     data += "\tShape \"sphere\" \"float radius\" [";
                     data += radiusString;
-                    data += "]\nTransformEnd\n";
+                    data += "]\nAttributeEnd\n";
                     pAdded += 1;
                 }
             }
         }
-        
+
+        std::cout << "Done" << std::endl;
+
+        std::cout << "Finished, created " << pAdded << " objects." << std::endl;
+
         ofs << data;
         ofs.close();
-        std::cout << "Done\nCreated " << pAdded << " objects." << std::endl;
     }else{
         std::cout << "Empty file" << std::endl;
     }
     
     if(rendergroups) delete[] rendergroups;
+
+    if(opts.warn_ply_mesh){
+        printf("* Warning: PBRT only supports ply objects but the given simulation contains\n");
+        printf("           alternative formats. Make sure to convert to ply before rendering.\n");
+    }
 }

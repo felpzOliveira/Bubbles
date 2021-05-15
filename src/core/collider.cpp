@@ -8,6 +8,10 @@ __bidevice__ bool CollisionHandle(Collider *collider, Float radius,
 {
     bool collided = false;
     PointQuery colliderPoint;
+    if(!collider->OptmizedClosestPointCheck(*position)){
+        return false;
+    }
+
     collider->shape->ClosestPoint(*position, &colliderPoint);
     if(collider->IsPenetrating(colliderPoint, *position, radius)){
         T targetNormal = T(colliderPoint.normal);
@@ -77,6 +81,10 @@ __bidevice__ bool Collider2::ResolveCollision(Float radius, Float restitutionCoe
                                                                  position, velocity);
 }
 
+__bidevice__ bool Collider2::OptmizedClosestPointCheck(const vec2f &position){
+    return true;
+}
+
 __host__ void Collider2::GenerateSDFs(){
     AssertA(shape != nullptr, "Invalid shape pointer for SDF generation");
     GenerateShapeSDF(shape);
@@ -100,6 +108,16 @@ __host__ void Collider3::SetActive(bool active){
 
 __bidevice__ bool Collider3::IsActive(){
     return isActive;
+}
+
+__bidevice__ bool Collider3::OptmizedClosestPointCheck(const vec3f &position){
+    if(shape->type == ShapeType::ShapeMesh){
+        if(!Inside(position, shape->GetBounds())){
+            return false;
+        }
+    }
+
+    return true;
 }
 
 __bidevice__ bool Collider3::IsPenetrating(const ClosestPointQuery &colliderPoint,
@@ -162,11 +180,19 @@ __bidevice__ bool ColliderSet2::ResolveCollision(Float radius, Float restitution
     int targetCollider = -1;
     Float minDistance = Infinity;
     for(int i = 0; i < nColiders; i++){
-        Float distance = Absf(colliders[i]->shape->ClosestDistance(*position));
-        if(distance < minDistance){
-            targetCollider = i;
-            minDistance = distance;
+        if(colliders[i]->OptmizedClosestPointCheck(*position)){
+            Float distance = Absf(colliders[i]->shape->ClosestDistance(*position));
+            if(distance < minDistance){
+                targetCollider = i;
+                minDistance = distance;
+            }
         }
+    }
+
+    // colliders were reject by optmization, this particle
+    // will not collide with anything
+    if(targetCollider < 0){
+        return false;
     }
     
     AssertA(targetCollider >= 0 && targetCollider < nColiders, 
@@ -216,13 +242,21 @@ __bidevice__ bool ColliderSet3::ResolveCollision(Float radius, Float restitution
     int targetCollider = -1;
     Float minDistance = Infinity;
     for(int i = 0; i < nColiders; i++){
-        Float distance = Absf(colliders[i]->shape->ClosestDistance(*position));
-        if(distance < minDistance){
-            targetCollider = i;
-            minDistance = distance;
+        if(colliders[i]->OptmizedClosestPointCheck(*position)){
+            Float distance = Absf(colliders[i]->shape->ClosestDistance(*position));
+            if(distance < minDistance){
+                targetCollider = i;
+                minDistance = distance;
+            }
         }
     }
-    
+
+    // colliders were reject by optmization, this particle
+    // will not collide with anything
+    if(targetCollider < 0){
+        return false;
+    }
+
     AssertA(targetCollider >= 0 && targetCollider < nColiders, 
             "Invalid collider id for ColliderSet2::ResolveCollision");
     return colliders[targetCollider]->ResolveCollision(radius, restitutionCoefficient, 

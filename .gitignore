@@ -6,3 +6,4 @@ fluid_engine_questions.txt
 *.pbrt
 *.o
 *.obj
+*.sh

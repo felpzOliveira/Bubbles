@@ -182,7 +182,7 @@ void test_pcisph3_rotating_water_box(){
     vec3f origin(4);
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
-    Float spacing = 0.05;
+    Float spacing = 0.08;
     Float spacingScale = 2.0;
     int steps = 500;
     Float targetInterval =  1.0 / 240.0;
@@ -482,7 +482,7 @@ void test_pcisph3_water_drop(){
                                                            target, targetInterval, extraParts,
                                                            {}, onStepUpdate, colorFunction,
                                                            filler);
-//    PciSphRunSimulation3(&solver, spacing, origin, target, 
+//    PciSphRunSimulation3(&solver, spacing, origin, target,
 //                         targetInterval, {}, onStepUpdate);
     
     CudaMemoryManagerClearCurrent();
@@ -1041,12 +1041,13 @@ void test_lnm_happy_whale(){
     Float spacingScale = 2.0;
     Float spacing = 0.02;
     int count = 0;
+    int flags = SERIALIZER_POSITION;
     CudaMemoryManagerStart(__FUNCTION__);
     
     /* Load particles, must have been previously generated, use MeshToParticles */
     ParticleSetBuilder3 builder;
     std::vector<vec3f> points;
-    SerializerLoadPoints3(&points, pFile, SERIALIZER_POSITION);
+    SerializerLoadPoints3(&points, pFile, flags);
     
     /* Get mesh bounds and define a view point */
     count = points.size();
@@ -1123,6 +1124,7 @@ void test_pcisph3_happy_whale(){
     Float spacingScale = 2.0;
     Float spacing = 0.02;
     int count = 0;
+    int flags = SERIALIZER_POSITION;
     const char *pFile = "../resources/whale";
     
     CudaMemoryManagerStart(__FUNCTION__);
@@ -1130,7 +1132,7 @@ void test_pcisph3_happy_whale(){
     /* Load particles, must have been previously generated, use MeshToParticles */
     ParticleSetBuilder3 builder;
     std::vector<vec3f> points;
-    SerializerLoadPoints3(&points, pFile, SERIALIZER_POSITION);
+    SerializerLoadPoints3(&points, pFile, flags);
     
     /* Get mesh bounds and define a view point */
     count = points.size();
@@ -1278,6 +1280,101 @@ void test_pcisph3_sdf(){
     UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>
     (&solver, pSet, spacing, origin, target, targetInterval, 0,
      {sdfShape}, onStepUpdate, colorFunction, filler);
+
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
+void test_pcisph3_double_dam_break_double_dragon(){
+    printf("===== PCISPH Solver 3D -- Double Dam Break Double Dragon\n");
+#define WITH_MESH
+    CudaMemoryManagerStart(__FUNCTION__);
+    vec3f origin(0.0, 0.0, 7.0);
+    vec3f target(0, -0.5, 0);
+
+    vec3f boxSize(3.5, 2.5, 2.0);
+    Float spacing = 0.02;
+    Float spacingScale = 2.0;
+
+    vec3f waterBox(0.55, 2.1, boxSize.z - 2.0 * spacing);
+    Float yof = (boxSize.y - waterBox.y) * 0.5; yof -= spacing;
+    Float xof = (boxSize.x - waterBox.x) * 0.5; xof -= spacing;
+
+#if defined(WITH_MESH)
+#define MODELS_PATH "/home/felipe/Documents/CGStuff/models/"
+    Float targetScale = 0;
+    ParsedMesh *mesh = LoadObj(MODELS_PATH "sssdragon.obj");
+
+    (void)UtilComputeFitTransform(mesh, boxSize.z, &targetScale);
+    Transform baseScale = Scale(targetScale * 0.8);
+
+    Bounds3f bounds = UtilComputeBoundsAfter(mesh, baseScale);
+    Float df = (boxSize.y - bounds.ExtentOn(1)) * 0.5;
+
+    ParsedMesh *meshCopy = DuplicateMesh(mesh);
+    Shape *dragon = MakeMesh(mesh, Translate(0.2, -df, 0) * RotateY(14) * baseScale);
+    Shape *dragonCopy = MakeMesh(meshCopy, Translate(-1.0, -df, 0) * baseScale);
+
+#undef MODELS_PATH
+#endif
+
+    Shape *domain   = MakeBox(Transform(), boxSize, true);
+    Shape *boxRight = MakeBox(Translate(+xof, -yof, 0), waterBox);
+
+    VolumeParticleEmitterSet3 emitters;
+    emitters.AddEmitter(boxRight, spacing);
+
+    ColliderSetBuilder3 cBuilder;
+#if defined(WITH_MESH)
+    cBuilder.AddCollider3(dragon);
+    cBuilder.AddCollider3(dragonCopy);
+#endif
+    cBuilder.AddCollider3(domain);
+
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    Assure(UtilIsEmitterOverlapping(&emitters, colliders) == 0);
+
+    ParticleSetBuilder3 pBuilder;
+    emitters.Emit(&pBuilder);
+
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    Grid3 *domainGrid = UtilBuildGridForDomain(domain->GetBounds(),
+                                               spacing, spacingScale);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+
+    Float targetInterval =  1.0 / 240.0;
+
+    ProfilerInitKernel(pSet->GetParticleCount());
+
+    auto onStepUpdate = [&](int step) -> int{
+        if(step == 0) return 1;
+        UtilPrintStepStandard(&solver,step-1);
+#if 0
+        const char *sim_folder = "/home/felipe/Documents/Bubbles/simulations/";
+        std::string path(sim_folder);
+        path += "two_dragons/output_";
+        path += std::to_string(step-1);
+        path += ".txt";
+        int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
+        UtilSaveSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet,
+                                                         path.c_str(), flags);
+#endif
+        ProfilerReport();
+        return step > 2000 ? 0 : 1;
+    };
+
+    std::vector<Shape*> sdfs;
+#if defined(WITH_MESH)
+    sdfs.push_back(dragon);
+    sdfs.push_back(dragonCopy);
+#endif
+
+    PciSphRunSimulation3(&solver, spacing, origin, target,
+                         targetInterval, sdfs, onStepUpdate);
 
     CudaMemoryManagerClearCurrent();
     printf("===== OK\n");

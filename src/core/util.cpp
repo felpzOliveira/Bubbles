@@ -305,7 +305,8 @@ __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBui
 {
     std::vector<vec3f> points;
     int size = 0;
-    SerializerLoadPoints3(&points, path, SERIALIZER_POSITION);
+    int flags = SERIALIZER_POSITION;
+    SerializerLoadPoints3(&points, path, flags);
     size = points.size();
     
     // compute bounds center and generates the transformed particles

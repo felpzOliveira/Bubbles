@@ -255,8 +255,9 @@ void ViewDisplaySimulation(view_opts *opts){
     Shape *sdfShape = nullptr;
     std::vector<vec3f> sdfParticles;
     int runningCount = 0;
+    int flags = SERIALIZER_POSITION;
     int partCount = SerializerLoadMany3(&frames, opts->basename.c_str(),
-                                        SERIALIZER_POSITION, opts->start, opts->end);
+                                        flags, opts->start, opts->end);
     vec3f origin = opts->origin;
     vec3f target = opts->target;
     

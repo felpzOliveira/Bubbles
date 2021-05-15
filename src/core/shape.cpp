@@ -1,6 +1,7 @@
 #include <shape.h>
 #include <interaction.h>
 #include <collider.h>
+#include <sstream>
 
 /*************************************************************/
 //                   2 D    S H A P E S                      //
@@ -259,6 +260,9 @@ __host__ std::string Shape::Serialize() const{
         case ShapeType::ShapeBox:{
             return BoxSerialize();
         } break;
+        case ShapeType::ShapeMesh:{
+            return MeshSerialize();
+        } break;
 
         default:{
             printf("Unsupported shape serialization\n");
@@ -297,6 +301,28 @@ __bidevice__ vec3f Shape::VelocityAt(const vec3f &point) const{
     vec3f p = point - translation;
     vec3f angularVel = Cross(angularVelocity, p);
     return linearVelocity + angularVel;
+}
+
+__host__ std::string Shape::MeshSerialize() const{
+    std::stringstream ss;
+    Transform transform = mesh->transform;
+    ss << "ShapeBegin\n";
+    ss << "\t\"Type\" mesh" << std::endl;
+    ss << "\t\"Name\" " << std::string(mesh->name) << std::endl;
+    ss << "\t\"Transform\" ";
+    for(int i = 0; i < 4; i++){
+        for(int j = 0; j < 4; j++){
+            if(i == 3 && j == 3){
+                ss << transform.m.m[i][j];
+            }else{
+                ss << transform.m.m[i][j] << " ";
+            }
+        }
+    }
+
+    ss << std::endl;
+    ss << "ShapeEnd";
+    return ss.str();
 }
 
 /*
@@ -448,8 +474,8 @@ __host__ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
     shape->grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx), 
                        bounds.pMin, VertexCentered);
     
-    printf("Generating SDF for shape: [%d x %d x %d] ... ",
-           resolution, resolutionY, resolutionZ);
+    printf("Generating SDF for shape %s: [%d x %d x %d] ... ",
+           shape->mesh->name, resolution, resolutionY, resolutionZ);
     
     GPULaunch(shape->grid->total, CreateShapeSDFGPU, shape);
     shape->grid->MarkFilled();

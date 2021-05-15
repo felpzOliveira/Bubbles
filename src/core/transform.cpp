@@ -1,6 +1,7 @@
 #include <transform.h>
 #include <string.h>
 #include <quaternion.h>
+#include <shape.h>
 
 //PBRT is an freaking excellent reference!
 __bidevice__ void Interpolate(InterpolatedTransform *iTransform, Float t, Transform *transform){
@@ -342,4 +343,6 @@ __bidevice__ void Transform::Mesh(ParsedMesh *mesh) const{
             mesh->n[i] = Normal(n);
         }
     }
+
+    mesh->transform = *this;
 }

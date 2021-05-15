@@ -13,7 +13,7 @@
 #include <sstream>
 
 #if defined(DEBUG)
-    #define BB_MSG(name) printf("* %s [DEBUG] - Built %s at %s *\n", name, __DATE__, __TIME__)
+    #define BB_MSG(name) printf("* %s - Built %s at %s [DEBUG] *\n", name, __DATE__, __TIME__)
 #else
     #define BB_MSG(name) printf("* %s - Built %s at %s *\n", name, __DATE__, __TIME__)
 #endif

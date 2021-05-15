@@ -68,9 +68,9 @@ int SerializerFlagsFromString(const char *spec){
     return flags;
 }
 
-int SerializerProcessToken(std::string &token, int &in_region,
-                           std::string &format, int &pCount,
-                           std::string linebuf, int i)
+int SerializerFluidProcessToken(std::string &token, int &in_region,
+                                std::string &format, int &pCount,
+                                std::string linebuf, int i)
 {
     int r = 0;
     if(token.size() > 0){
@@ -112,18 +112,43 @@ int SerializerProcessToken(std::string &token, int &in_region,
     return r;
 }
 
-int SerializerFindFluidSection(std::istream &is, std::string &format){
+int SerializerNextToken(std::istream &ifs, std::string &value){
+    std::string linebuf;
+    while(ifs.peek() != -1){
+        GetLine(ifs, linebuf);
+        std::string token;
+        for(int i = 0; i < linebuf.size(); i++){
+            if(IS_SPACE(linebuf[i]) || IS_NEW_LINE(linebuf[i])){
+                if(token.size() > 0){
+                    value = token;
+                    return 1;
+                }
+            }
+
+            token += linebuf[i];
+        }
+
+        if(token.size() > 0){
+            value = token;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int SerializerFindFluidSection(std::istream &is, std::string &format, int region=0){
     std::string linebuf;
     int pCount = 0;
-    int in_region = 0;
+    int in_region = region;
     int r = 0;
     while(is.peek() != -1){
         GetLine(is, linebuf);
         std::string token;
         for(int i = 0; i < linebuf.size(); i++){
             if(IS_SPACE(linebuf[i]) || IS_NEW_LINE(linebuf[i])){
-                r = SerializerProcessToken(token, in_region, format,
-                                           pCount, linebuf, i);
+                r = SerializerFluidProcessToken(token, in_region, format,
+                                                pCount, linebuf, i);
                 if(r){
                     return pCount;
                 }
@@ -134,8 +159,8 @@ int SerializerFindFluidSection(std::istream &is, std::string &format){
             token += linebuf[i];
         }
 
-        r = SerializerProcessToken(token, in_region, format,
-                                   pCount, linebuf, 0);
+        r = SerializerFluidProcessToken(token, in_region, format,
+                                        pCount, linebuf, 0);
         if(r) return pCount;
     }
 
@@ -143,9 +168,10 @@ int SerializerFindFluidSection(std::istream &is, std::string &format){
 }
 
 void SerializerLoadPoints3(std::vector<vec3f> *points,
-                           const char *filename, int flags)
+                           const char *filename, int &flags)
 {
     std::ifstream ifs(filename);
+    int found_end = 0;
     if(ifs){
         std::string format;
         int pCount = 0;
@@ -179,7 +205,7 @@ void SerializerLoadPoints3(std::vector<vec3f> *points,
             token += strspn(token, " \t");
 
             if(std::string(token).find("DataEnd") != std::string::npos){
-                // done
+                found_end = 1;
                 break;
             }
 
@@ -214,25 +240,100 @@ void SerializerLoadPoints3(std::vector<vec3f> *points,
             points->push_back(pos);
         }
     }
+
+    if(!found_end){
+        printf("Error: Unterminated fluid description, missing \'DataEnd\'\n");
+        exit(0);
+    }
 }
 
-int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet, 
-                             const char *filename, int flags)
+ShapeType _SerializerGetShapeType(std::string name){
+    if(name == "box") return ShapeBox;
+    if(name == "sphere") return ShapeSphere;
+    if(name == "mesh") return ShapeMesh;
+    //TODO
+    printf("Unknown shape type \'%s\'\n", name.c_str());
+    exit(0);
+}
+
+const char *SerializerGetShapeName(ShapeType type){
+    if(type == ShapeBox) return "box";
+    if(type == ShapeSphere) return "sphere";
+    if(type == ShapeMesh) return "mesh";
+    printf("Unknown shape name for \'%d\'\n", (int)type);
+    exit(0);
+}
+
+void _SerializerLoadShape(SerializedShape *shape, std::ifstream &ifs){
+    std::string linebuf;
+    int found_end = 0;
+    while(ifs.peek() != -1){
+        GetLine(ifs, linebuf);
+        if(linebuf.size() > 0){ //remove '\n'
+            if(linebuf[linebuf.size()-1] == '\n') linebuf.erase(linebuf.size() - 1);
+        }
+
+        if(linebuf.size() > 0){ //remove '\r'
+            if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
+        }
+
+        // skip empty
+        if(linebuf.empty()) continue;
+        const char *token = linebuf.c_str();
+        token += strspn(token, " \t");
+
+        Assert(token);
+        if(token[0] == '\0') continue; //empty line
+        if(token[0] == '#') continue; //comment line
+
+        if(std::string(token).find("ShapeEnd") != std::string::npos){
+            found_end = 1;
+            break;
+        }
+
+        size_t type = std::string(token).find("\"Type\"");
+        size_t len  = std::string(token).find("\"Length\"");
+        size_t tran = std::string(token).find("\"Transform\"");
+        size_t name = std::string(token).find("\"Name\"");
+        if(type != std::string::npos){
+            const char *val = token + type + std::string("\"Type\"").size();
+            while(CAN_SKIP(val[0])) val++;
+            shape->type = _SerializerGetShapeType(std::string(val));
+        }else if(len != std::string::npos){
+            vec3f v;
+            size_t ss = std::string("\"Length\"").size();
+            const char *val = token + len + ss;
+            while(CAN_SKIP(val[0])) val++;
+            ParseV3(&v, &val);
+            shape->numParameters["Length"] = vec4f(v.x, v.y, v.z, 0.0);
+        }else if(tran != std::string::npos){
+            Transform t;
+            size_t ss = std::string("\"Transform\"").size();
+            const char *val = token + tran + ss;
+            while(CAN_SKIP(val[0])) val++;
+            ParseTransform(&t, &val);
+            shape->transfParameters["Transform"] = t;
+        }else if(name != std::string::npos){
+            const char *val = token + name + std::string("\"Name\"").size();
+            while(CAN_SKIP(val[0])) val++;
+            shape->strParameters["Name"] = std::string(val);
+        }else{
+            printf("Unknown %s\n", token);
+        }
+    }
+
+    if(!found_end){
+        printf("Error: Unterminated shape description, missing \'ShapeEnd\'\n");
+        exit(0);
+    }
+}
+
+int _SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
+                              std::ifstream &ifs, int &flags, int pCount)
 {
     std::string linebuf;
-    std::string format;
-    int pCount = 0;
-    std::ifstream ifs(filename);
-    if(!ifs){
-        printf("Could not open file %s\n", filename);
-        return -1;
-    }
-    
+    int found_end = 0;
     int size = 0;
-    pCount = SerializerFindFluidSection(ifs, format);
-    if(format.size() > 0){
-        flags = SerializerFlagsFromString(format.c_str());
-    }
 
     pSet->clear();
     pSet->reserve(pCount);
@@ -259,7 +360,7 @@ int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
         if(token[0] == '#') continue; //comment line
 
         if(std::string(token).find("DataEnd") != std::string::npos){
-            // done
+            found_end = 1;
             break;
         }
 
@@ -315,15 +416,38 @@ int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
         pSet->push_back(particle);
         size += 1;
     }
+
+    if(!found_end){
+        printf("Error: Unterminated fluid description, missing \'DataEnd\'\n");
+        exit(0);
+    }
     
-    if(size == pCount) printf("OK\n");
-    else printf(" found %d\n", size);
+    if(size != pCount) printf(" found %d\n", size);
     
     return size;
 }
 
+int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
+                             const char *filename, int &flags)
+{
+    int pCount = 0;
+    std::string format;
+    std::ifstream ifs(filename);
+    if(!ifs){
+        printf("Could not open file %s\n", filename);
+        return -1;
+    }
+
+    pCount = SerializerFindFluidSection(ifs, format);
+    if(format.size() > 0){
+        flags = SerializerFlagsFromString(format.c_str());
+    }
+
+    return _SerializerLoadParticles3(pSet, ifs, flags, pCount);
+}
+
 int SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder,
-                              const char *filename, int flags,
+                              const char *filename, int &flags,
                               std::vector<int> *boundary)
 {
     std::vector<SerializedParticle> particles;
@@ -339,7 +463,66 @@ int SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder,
     return pCount;
 }
 
-int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int flags,
+void SerializerLoadSystem3(ParticleSetBuilder3 *builder,
+                           std::vector<SerializedShape> *shapes,
+                           const char *filename, int &flags,
+                           std::vector<int> *boundary)
+{
+    std::vector<SerializedParticle> particles;
+    std::ifstream ifs(filename);
+    if(!ifs){
+        printf("Could not open file %s\n", filename);
+    }
+
+    while(ifs.peek() != -1){
+        std::string token;
+        int found = SerializerNextToken(ifs, token);
+        if(!found){
+            break;
+        }
+
+        if(token == "FluidBegin"){
+            std::string format;
+            int pCount = 0;
+            pCount = SerializerFindFluidSection(ifs, format, 1);
+            if(format.size() > 0){
+                flags = SerializerFlagsFromString(format.c_str());
+            }
+
+            pCount = _SerializerLoadParticles3(&particles, ifs, flags, pCount);
+            for(int i = 0; i < pCount; i++){
+                builder->AddParticle(particles[i].position, particles[i].velocity);
+                if(boundary){
+                    boundary->push_back(particles[i].boundary);
+                }
+            }
+
+            // go to FluidEnd
+            int end = 0;
+            while(ifs.peek() != -1){
+                found = SerializerNextToken(ifs, token);
+                if(!found) break;
+                if(token == "FluidEnd"){
+                    end = 1;
+                    break;
+                }
+            }
+
+            if(!end){
+                printf("Error: Unterminated fluid description, missing \'FluidEnd\'\n");
+                exit(0);
+            }
+        }else if(token == "ShapeBegin"){
+            SerializedShape shp;
+            _SerializerLoadShape(&shp, ifs);
+            shapes->push_back(shp);
+        }else{
+            printf("Unknown token %s\n", token.c_str());
+        }
+    }
+}
+
+int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &flags,
                         int start, int end)
 {
     // Get amount of particles in first
@@ -465,7 +648,54 @@ void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
     }
 }
 
-void SerializerSaveSphDataSet3(SphSolverData3 *pSet, const char *filename, 
+void SerializerWriteShapes(std::vector<SerializedShape> *shapes, const char *filename){
+    FILE *fp = fopen(filename, "a+");
+    if(!fp){
+        printf("Failed to open file %s\n", filename);
+        exit(0);
+    }
+
+    for(SerializedShape sh : *shapes){
+        fprintf(fp, "ShapeBegin\n");
+        fprintf(fp, "\t\"Type\" %s\n", SerializerGetShapeName(sh.type));
+        for(auto it = sh.numParameters.begin(); it != sh.numParameters.end(); it++){
+            vec4f v = it->second;
+            fprintf(fp, "\t\"%s\" %g %g %g\n", it->first.c_str(), v.x, v.y, v.z);
+        }
+
+        for(auto it = sh.strParameters.begin();
+            it != sh.strParameters.end(); it++)
+        {
+            std::string name  = it->first;
+            std::string value = it->second;
+            fprintf(fp, "\t\"%s\" %s\n", name.c_str(), value.c_str());
+        }
+
+        for(auto it = sh.transfParameters.begin();
+            it != sh.transfParameters.end(); it++)
+        {
+            Transform t = it->second;
+            fprintf(fp, "\t\"%s\" ", it->first.c_str());
+            for(int i = 0; i < 4; i++){
+                for(int j = 0; j < 4; j++){
+                    if(i == 3 && j == 3){
+                        fprintf(fp, "%g", t.m.m[i][j]);
+                    }else{
+                        fprintf(fp, "%g ", t.m.m[i][j]);
+                    }
+                }
+            }
+
+            fprintf(fp, "\n");
+        }
+
+        fprintf(fp, "ShapeEnd\n");
+    }
+
+    fclose(fp);
+}
+
+void SerializerSaveSphDataSet3(SphSolverData3 *pSet, const char *filename,
                                int flags, std::vector<int> *boundary)
 {
     SaveSphParticleSet<SphSolverData3, ParticleSet3, Grid3, vec3f>(pSet, filename, 

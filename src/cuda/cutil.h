@@ -33,13 +33,6 @@ typedef enum{
 
 #define GPU_LAMBDA(...) [=] __device__(__VA_ARGS__)
 
-#define cudaZeroSymbol(symbol)\
-{\
-    void *__addr = 0;\
-    CUCHECK(cudaGetSymbolAddress(&__addr, symbol));\
-    _cudaSetToZero(__addr, sizeof(symbol));\
-}
-
 typedef struct{
     size_t free_bytes;
     size_t total_bytes;
@@ -134,11 +127,6 @@ std::string time_to_string(std::string val, int size);
 * after a region is no longer nedded.
 */
 void *_cudaAllocate(size_t bytes, int line, const char *filename, bool abort);
-
-/*
- * Sets an GPU address to be zero.
- */
-void _cudaSetToZero(void *addr, size_t bytes);
 
 template<typename T>
 class DataBuffer{

@@ -33,9 +33,9 @@ __host__ void PredictVelocityAndPositionCPU(PciSphSolverData2 *data,
 {
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
-    for(int i = 0; i < count; i++){
+    ParallelFor(0, count, [&](int i){
         PredictVelocityAndPositionFor(data, i, timeIntervalInSeconds, is_first);
-    }
+    });
 }
 
 __global__ void PredictVelocityAndPositionKernel(PciSphSolverData2 *data, 
@@ -94,9 +94,9 @@ __bidevice__ void PredictPressureFor(PciSphSolverData2 *pciData, Float delta, in
 __host__ void PredictPressureCPU(PciSphSolverData2 *data, Float delta){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
-    for(int i = 0; i < count; i++){
+    ParallelFor(0, count, [&](int i){
         PredictPressureFor(data, delta, i);
-    }
+    });
 }
 
 __global__ void PredictPressureKernel(PciSphSolverData2 *data, Float delta){
@@ -159,9 +159,9 @@ __bidevice__ void PredictPressureForceFor(PciSphSolverData2 *pciData, int partic
 __host__ void PredictPressureForceCPU(PciSphSolverData2 *data){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
-    for(int i = 0; i < count; i++){
+    ParallelFor(0, count, [&](int i){
         PredictPressureForceFor(data, i);
-    }
+    });
 }
 
 __global__ void PredictPressureForceKernel(PciSphSolverData2 *data){
@@ -193,9 +193,9 @@ __bidevice__ void AccumulateAndIntegrateFor(PciSphSolverData2 *pciData, int part
 __host__ void AccumulateAndIntegrateCPU(PciSphSolverData2 *data, Float timeStep){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
-    for(int i = 0; i < count; i++){
+    ParallelFor(0, count, [&](int i){
         AccumulateAndIntegrateFor(data, i, timeStep);
-    }
+    });
 }
 
 __global__ void AccumulateAndIntegrateKernel(PciSphSolverData2 *data, Float timeStep){

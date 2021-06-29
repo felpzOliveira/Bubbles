@@ -629,7 +629,10 @@ void test_pcisph2_water_block_lnm(){
         UtilGenerateCirclePoints(pos, col, vec3f(1,1,0), pCenter, block->radius, c);
         return c;
     };
-    
+
+    //SetCPUThreads(1);
+    //SetSystemUseCPU();
+
     UtilRunDynamicSimulation2<PciSphSolver2, ParticleSet2>(&solver, set2, spacing,
                                                            vec2f(-1, -1), vec2f(1, 1),
                                                            targetInterval, c, 

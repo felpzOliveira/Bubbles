@@ -362,25 +362,26 @@ __host__ void UpdateGridDistributionCPU(SphSolverData2 *data){
     Grid2 *grid = data->domain;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver2 has no domain for UpdateGridDistribution");
+    int cellCount = data->domain->GetCellCount();
     if(data->frame_index == 0){
-        for(int i = 0; i < grid->GetCellCount(); i++){
-            grid->DistributeToCell(pSet, i);
-        }
+        ParallelFor(0, cellCount, [&](int i){
+            data->domain->DistributeResetCell(i);
+        });
     }else{
-        for(int i = 0; i < grid->GetCellCount(); i++){
+        ParallelFor(0, cellCount, [&](int i){
             grid->DistributeToCellOpt(pSet, i);
-        }
-        
-        for(int i = 0; i < grid->GetCellCount(); i++){
+        });
+
+        ParallelFor(0, cellCount, [&](int i){
             grid->SwapCellList(i);
-        }
+        });
     }
     
     int pCount = pSet->GetParticleCount();
     Float kernelRadius = data->sphpSet->GetKernelRadius();
-    for(int i = 0; i < pCount; i++){
+    ParallelFor(0, pCount, [&](int i){
         grid->DistributeParticleBucket(pSet, i, kernelRadius);
-    }
+    });
     
     data->frame_index = 1;
 }
@@ -439,9 +440,9 @@ __host__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputeDensity");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver2 has no particles for ComputeDensity");
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
         ComputeDensityFor(data, i, compute_pressure);
-    }
+    });
 }
 
 __global__ void ComputeDensityKernel(SphSolverData2 *data, int compute_pressure){
@@ -493,13 +494,13 @@ __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float
     if(scale > 0.1){
         ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
         int N = pSet->GetParticleCount();
-        for(int i = 0; i < N; i++){
+        ParallelFor(0, N, [&](int i){
             ComputePseudoViscosityAggregationKernelFor(data, i);
-        }
+        });
         
-        for(int i = 0; i < N; i++){
+        ParallelFor(0, N, [&](int i){
             ComputePseudoViscosityInterpolationKernelFor(data, i, timeStep);
-        }
+        });
     }
 }
 
@@ -510,9 +511,9 @@ __host__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputePressureForce");
     AssertA(pSet->GetParticleCount() > 0,
             "SphSolver2 has no particles for ComputePressureForce");
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
         ComputeAllForcesFor(data, i, timeStep, 0, integrate);
-    }
+    });
 }
 
 __host__ void ComputeNonPressureForceCPU(SphSolverData2 *data){
@@ -520,9 +521,9 @@ __host__ void ComputeNonPressureForceCPU(SphSolverData2 *data){
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputeNonPressureForce");
     AssertA(pSet->GetParticleCount() > 0,
             "SphSolver2 has no particles for ComputeNonPressureForce");
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
         ComputeNonPressureForceFor(data, i);
-    }
+    });
 }
 
 
@@ -563,9 +564,9 @@ __host__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int exten
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for TimeIntegration");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver2 has no particles for TimeIntegration");
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
         TimeIntegrationFor(data, i, timeStep, extended);
-    }
+    });
 }
 
 __global__ void TimeIntegrationKernel(SphSolverData2 *data, Float timeStep, int extended){
@@ -602,9 +603,9 @@ __host__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
-    for(int i = 0; i < count; i++){
+    ParallelFor(0, count, [&](int i){
         ComputeInitialTemperatureFor(data, i, Tmin, Tmax, maxLevel);
-    }
+    });
 }
 
 __global__ void ComputeInitialTemperatureMapKernel(SphSolverData2 *data, Float Tmin, 

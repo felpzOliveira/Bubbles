@@ -205,28 +205,6 @@ void cudaSetLaunchStrategy(CudaLaunchStrategy strategy, int blockSize){
     global_cuda_strategy.blockSize = blockSize;
 }
 
-static void *zeroBuffer = nullptr;
-static size_t zeroBufferLen = 0;
-#define RND_UP(VAL, MOD) (VAL + (((VAL) % (MOD)) != 0 ? ((MOD) - ((VAL) % (MOD))) : (0)))
-#define RND_16(VAL) RND_UP(VAL, 16)
-#define DMAX2(A, B) ((A) > (B) ? (A) : (B))
-
-void _cudaSetToZero(void *addr, size_t bytes){
-    if(!zeroBuffer || zeroBufferLen < bytes){
-        if(zeroBuffer){
-            cudaFree(zeroBuffer);
-        }
-
-        zeroBufferLen = RND_16(DMAX2(bytes, zeroBufferLen));
-        zeroBuffer = malloc(zeroBufferLen);
-        for(int i = 0; i < zeroBufferLen / 8; i++){
-            *((unsigned long long*)zeroBuffer + i) = 0;
-        }
-    }
-
-    CUCHECK(cudaMemcpy(addr, zeroBuffer, bytes, cudaMemcpyHostToDevice));
-}
-
 int cudaHasMemory(size_t bytes){
     DeviceMemoryStats mem = cudaReportMemoryUsage();
     int ok = 0;

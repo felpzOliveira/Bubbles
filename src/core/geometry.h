@@ -1491,6 +1491,18 @@ typedef Bounds2<int> Bounds2i;
 typedef Bounds3<Float> Bounds3f;
 typedef Bounds3<int> Bounds3i;
 
+template<typename T> inline __bidevice__
+int SplitBounds(const Bounds2<T> &bounds, Bounds2<T> *split){
+    vec2f center = bounds.Center();
+    vec2f pMin = bounds.pMin;
+    vec2f pMax = bounds.pMax;
+    split[0] = Bounds2<T>(pMin, center);
+    split[1] = Bounds2<T>(vec2<T>(pMin.x, center.y), vec2<T>(center.x, pMax.y));
+    split[2] = Bounds2<T>(center, pMax);
+    split[3] = Bounds2<T>(vec2<T>(center.x, pMin.y), vec2<T>(pMax.x, center.y));
+    return 4;
+}
+
 template <typename T> inline __bidevice__ 
 vec2<T> &Bounds2<T>::operator[](int i){
     Assert(i == 0 || i == 1);
@@ -1525,6 +1537,13 @@ template <typename T> inline __bidevice__
 bool Overlaps(const Bounds2<T> &b1, const Bounds2<T> &b2){
     bool x = (b1.pMax.x >= b2.pMin.x) && (b1.pMin.x <= b2.pMax.x);
     bool y = (b1.pMax.y >= b2.pMin.y) && (b1.pMin.y <= b2.pMax.y);
+    return (x && y);
+}
+
+template <typename T> inline __bidevice__
+bool Inside(const Bounds2<T> &b1, const Bounds2<T> &b2){
+    bool x = (b1.pMax.x <= b2.pMax.x) && (b1.pMin.x >= b2.pMin.x);
+    bool y = (b1.pMax.y <= b2.pMax.y) && (b1.pMin.y >= b2.pMin.y);
     return (x && y);
 }
 
@@ -1600,6 +1619,14 @@ bool Overlaps(const Bounds3<T> &b1, const Bounds3<T> &b2){
 }
 
 template <typename T> inline __bidevice__
+bool Inside(const Bounds3<T> &b1, const Bounds3<T> &b2){
+    bool x = (b1.pMax.x <= b2.pMax.x) && (b1.pMin.x >= b2.pMin.x);
+    bool y = (b1.pMax.y <= b2.pMax.y) && (b1.pMin.y >= b2.pMin.y);
+    bool z = (b1.pMax.z <= b2.pMax.z) && (b1.pMin.z >= b2.pMin.z);
+    return (x && y && z);
+}
+
+template <typename T> inline __bidevice__
 bool Inside(const T &p, const Bounds1<T> &b){
     bool rv = (p >= b.pMin && p <= b.pMin);
     if(!rv){
@@ -1632,6 +1659,35 @@ template <typename T, typename U> inline __bidevice__
 Bounds3<T> Expand(const Bounds3<T> &b, U delta){
     return Bounds3<T>(b.pMin - vec3<T>(delta, delta, delta),
                       b.pMax + vec3<T>(delta, delta, delta));
+}
+
+template<typename T> inline __bidevice__
+int SplitBounds(const Bounds3<T> &bounds, Bounds3<T> *split){
+    vec3<T> center = bounds.Center();
+    vec3<T> pMin = bounds.pMin;
+    vec3<T> pMax = bounds.pMax;
+    split[0] = Bounds3<T>(pMin, center);
+    split[1] = Bounds3<T>(vec3<T>(center.x, pMin.y, pMin.z),
+                          vec3<T>(pMax.x, center.y, center.z));
+
+    split[2] = Bounds3<T>(vec3<T>(center.x, center.y, pMin.z),
+                          vec3<T>(pMax.x, pMax.y, center.z));
+
+    split[3] = Bounds3<T>(vec3<T>(pMin.x, center.y, pMin.z),
+                          vec3<T>(center.x, pMax.y, center.z));
+
+    split[4] = Bounds3<T>(vec3<T>(center.x, pMin.y, center.z),
+                          vec3<T>(pMax.x, center.y, pMax.z));
+
+    split[5] = Bounds3<T>(vec3<T>(pMin.x, pMin.y, center.z),
+                          vec3<T>(center.x, center.y, pMax.z));
+
+    split[6] = Bounds3<T>(vec3<T>(pMin.x, center.y, center.z),
+                          vec3<T>(center.x, pMax.y, pMax.z));
+
+    split[7] = Bounds3<T>(center, pMax);
+
+    return 8;
 }
 
 class Ray2{

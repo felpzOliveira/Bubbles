@@ -111,7 +111,7 @@ void set_colors_lnm(float *col, SphSolverData2 *data, int is_first, int classify
         }
         
         int level = LNMClassifyLazyGPU(data->domain);
-        printf("Domain #levels: %d\n", level);
+        //printf("Domain #levels: %d\n", level);
     }
     
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
@@ -127,6 +127,14 @@ void set_colors_lnm(float *col, SphSolverData2 *data, int is_first, int classify
         }
         
         vec3f color = get_color_level(level);
+        if(i == 132 || i == 266 || i == 267 || i == 133){
+            color = vec3f(1.0, 0.0, 0.0);
+        }
+
+        if(i == 200){
+            color = vec3f(1.0, 1.0, 0.0);
+        }
+
         col[3 * i + 0] = color[0];
         col[3 * i + 1] = color[1];
         col[3 * i + 2] = color[2];

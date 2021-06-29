@@ -12,9 +12,13 @@ CudaExecutionStrategy global_cuda_strategy = {
     .blockSize = 0,
 };
 
-void _check(cudaError_t err, int line, const char *filename){
+void _check(cudaError_t err, const char *cmd, int line, const char *filename){
     if(err != cudaSuccess){
-        std::cout << "CUDA error > " << filename << ": " << line << "[" << cudaGetErrorString(err) << "]" << std::endl;
+        std::cout << "Aborting ==============" << std::endl;
+        std::cout << "  CUDA error: \'" << cmd << "\'" << std::endl;
+        std::cout << "  Location: " << filename << ":" << line << std::endl;
+        std::cout << "  Reason: " << cudaGetErrorString(err) << " [ " << err << " ]" << std::endl;
+        std::cout << "=======================" << std::endl;
         cudaDeviceReset();
         getchar();
         exit(0);
@@ -201,6 +205,28 @@ void cudaSetLaunchStrategy(CudaLaunchStrategy strategy, int blockSize){
     global_cuda_strategy.blockSize = blockSize;
 }
 
+static void *zeroBuffer = nullptr;
+static size_t zeroBufferLen = 0;
+#define RND_UP(VAL, MOD) (VAL + (((VAL) % (MOD)) != 0 ? ((MOD) - ((VAL) % (MOD))) : (0)))
+#define RND_16(VAL) RND_UP(VAL, 16)
+#define DMAX2(A, B) ((A) > (B) ? (A) : (B))
+
+void _cudaSetToZero(void *addr, size_t bytes){
+    if(!zeroBuffer || zeroBufferLen < bytes){
+        if(zeroBuffer){
+            cudaFree(zeroBuffer);
+        }
+
+        zeroBufferLen = RND_16(DMAX2(bytes, zeroBufferLen));
+        zeroBuffer = malloc(zeroBufferLen);
+        for(int i = 0; i < zeroBufferLen / 8; i++){
+            *((unsigned long long*)zeroBuffer + i) = 0;
+        }
+    }
+
+    CUCHECK(cudaMemcpy(addr, zeroBuffer, bytes, cudaMemcpyHostToDevice));
+}
+
 int cudaHasMemory(size_t bytes){
     DeviceMemoryStats mem = cudaReportMemoryUsage();
     int ok = 0;
@@ -216,3 +242,24 @@ void cudaSafeExit(){
     exit(0);
 }
 
+int kUseThreadsNum = -1;
+int kUseCPU = 0;
+int GetConfiguredCPUThreads(){
+    return kUseThreadsNum;
+}
+
+int GetSystemUseCPU(){
+    return kUseCPU;
+}
+
+void SetSystemUseCPU(){
+    kUseCPU = 1;
+}
+
+void SetSystemUseGPU(){
+    kUseCPU = 0;
+}
+
+void SetCPUThreads(int nThreads){
+    kUseThreadsNum = MAX(1, nThreads);
+}

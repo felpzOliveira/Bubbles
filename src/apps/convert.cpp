@@ -27,6 +27,7 @@ typedef struct{
     std::string informArgs;
     vec3f origin;
     vec3f target;
+    int to_legacy;
 }config_opts;
 
 static config_opts g_opts;
@@ -47,6 +48,7 @@ void default_opts(config_opts *opts){
     opts->preview = 0;
     opts->origin = vec3f(3);
     opts->target = vec3f(0);
+    opts->to_legacy = 0;
 }
 
 void print_configs(config_opts *opts){
@@ -72,6 +74,13 @@ void print_configs(config_opts *opts){
         std::cout << "        - Outform : " << opts->outformArgs << std::endl;
         std::cout << "        - Data : " << opts->dataArgs << std::endl;
     }
+    std::cout << "    * Legacy : " << opts->to_legacy << std::endl;
+}
+
+ARGUMENT_PROCESS(legacy_arg){
+    config_opts *opts = (config_opts *)config;
+    opts->to_legacy = 1;
+    return 0;
 }
 
 ARGUMENT_PROCESS(rotate_x_arg){
@@ -154,6 +163,12 @@ ARGUMENT_PROCESS(gen_data_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(convert_file_arg){
+    config_opts *opts = (config_opts *)config;
+    opts->gen_data = 2;
+    return 0;
+}
+
 ARGUMENT_PROCESS(parse_outform_arg){
     config_opts *opts = (config_opts *)config;
     opts->outformArgs = ParseNext(argc, argv, i, "-outform", 1);
@@ -169,7 +184,12 @@ ARGUMENT_PROCESS(parse_inform_arg){
 std::map<const char *, arg_desc> argument_map = {
     {"-gen-data",
         {.processor = gen_data_arg,
-            .help = "Given a bubbles output result generates its normal vector."
+            .help = "Given a bubbles output compute extra information not previously obtained."
+        }
+    },
+    {"-cvt",
+        {.processor = convert_file_arg,
+            .help = "Given a bubbles output convert it to different format."
         }
     },
     {"-inform",
@@ -232,6 +252,11 @@ std::map<const char *, arg_desc> argument_map = {
             .help = "Use Graphy to preview the point cloud." 
         }
     },
+    {"-legacyfmt",
+        { .processor = legacy_arg,
+            .help = "Use legacy file format for outputing fluid."
+        }
+    },
 };
 
 
@@ -264,7 +289,11 @@ void PreviewParticles(SphParticleSet3 *sphSet, config_opts *opts){
 }
 
 void GenerateData(config_opts *opts){
-    printf("===== Generating Data\n");
+    if(opts->gen_data == 1){
+        printf("===== Generating Data\n");
+    }else if(opts->gen_data == 2){
+        printf("===== Converting Data\n");
+    }
     CudaMemoryManagerStart(__FUNCTION__);
     // For this case input is a Bubbles simulation file
     ParticleSetBuilder3 builder;
@@ -330,10 +359,20 @@ void GenerateData(config_opts *opts){
         printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout);
         UtilEraseFile(opts->output.c_str());
 
-        SerializerWriteShapes(&shapes, opts->output.c_str());
+        if(flagsIn & SERIALIZER_BOUNDARY){
+            flagsOut |= SERIALIZER_BOUNDARY;
+        }
 
-        SerializerSaveSphDataSet3(solver.solverData, opts->output.c_str(),
-                                  flagsOut, &boundary);
+        if(opts->to_legacy){
+            SerializerSaveSphDataSet3Legacy(solver.solverData, opts->output.c_str(),
+                                            flagsOut, &boundary);
+        }else{
+            SerializerWriteShapes(&shapes, opts->output.c_str());
+
+            SerializerSaveSphDataSet3(solver.solverData, opts->output.c_str(),
+                                      flagsOut, &boundary);
+        }
+
         printf("OK\n");
         ok = 1;
     }
@@ -377,15 +416,22 @@ void convert_command(int argc, char **argv){
     argument_process(argument_map, argc, argv, "convert", &g_opts);
     print_configs(&g_opts);
     
-    if(!g_opts.gen_data){
+    if(g_opts.gen_data == 0){
         MeshToParticles(g_opts.input.c_str(), g_opts.transform, 
                         g_opts.spacing, &data);
         if(g_opts.preview){
             PreviewParticles(data->sphpSet, &g_opts);
         }
-        
-        SerializerSaveSphDataSet3(data, g_opts.output.c_str(), SERIALIZER_POSITION);
-    }else{
+
+        if(g_opts.to_legacy){
+            SerializerSaveSphDataSet3Legacy(data, g_opts.output.c_str(),
+                                            SERIALIZER_POSITION, nullptr);
+        }else{
+            SerializerSaveSphDataSet3(data, g_opts.output.c_str(), SERIALIZER_POSITION);
+        }
+    }else if(g_opts.gen_data == 1){
+        GenerateData(&g_opts);
+    }else{ // == 2
         GenerateData(&g_opts);
     }
 }

@@ -124,7 +124,7 @@ __host__ void PbfSolver2::Advance(Float timeIntervalInSeconds){
         numberOfIntervals = sphpSet->ComputeNumberOfTimeSteps(remainingTime,
                                                               data->soundSpeed, 2);
         Float timeStep = remainingTime / (Float)numberOfIntervals;
-        AdvanceTimeStep(this, timeStep);
+        AdvanceTimeStep(this, timeStep, GetSystemUseCPU());
         remainingTime -= timeStep;
         ProfilerIncreaseStepIteration();
     }

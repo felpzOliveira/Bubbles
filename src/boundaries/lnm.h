@@ -180,7 +180,7 @@ __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     Float maxd = MinComponent(len);
     
     Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
-    delta -= domain->dimensions > 2 ? 0 : 1;
+    delta -= domain->dimensions > 2 ? 0 : 1; // offset compensation for 2D
     
     /* Classify L1 */
     GPULaunch(domain->GetActiveCellCount(), 
@@ -315,7 +315,7 @@ __host__ void LNMBoundaryExtended(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     Float maxd = MinComponent(len);
 
     Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
-    delta -= domain->dimensions > 2 ? 0 : 1;
+    delta -= domain->dimensions > 2 ? 0 : 1; // offset compensation for 2D
 
     /* Filter and Classify LK */
     GPULaunch(domain->GetActiveCellCount(), GPUKernel(LNMBoundaryLKKernel<T, U, Q>),

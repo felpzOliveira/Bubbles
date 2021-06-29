@@ -248,7 +248,7 @@ class ParticleSet{
     __bidevice__ bool HasNormal(){ return normals.size > 0; }
     __bidevice__ void SetFamilyId(unsigned int id){ familyId = id; }
     __bidevice__ unsigned int GetFamilyId(){ return familyId; }
-    
+
     __bidevice__ Bucket *GetParticleBucket(int pId){
         AssertA(pId < count && pId >= 0, "Invalid set for particle bucket");
         return buckets.Get(pId);

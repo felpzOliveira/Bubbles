@@ -90,7 +90,7 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
         numberOfIntervals = sphpSet->ComputeNumberOfTimeSteps(remainingTime,
                                                               solverData->soundSpeed);
         Float timeStep = remainingTime / (Float)numberOfIntervals;
-        AdvanceTimeStep(this, timeStep);
+        AdvanceTimeStep(this, timeStep, GetSystemUseCPU());
         remainingTime -= timeStep;
         numberOfIntervalsRunned += 1;
         ProfilerIncreaseStepIteration();

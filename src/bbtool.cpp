@@ -41,7 +41,7 @@ std::map<const char *, arg_desc> command_map = {
 };
 
 int main(int argc, char **argv){
-    BB_MSG("BubblesTool");
-    argument_process(command_map, argc, argv, "BubblesTool", nullptr);
+    BB_MSG("Bubbles Tool");
+    argument_process(command_map, argc, argv, "Bubbles Tool", nullptr);
     return 0;
 }

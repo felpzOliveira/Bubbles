@@ -7,6 +7,8 @@
 #include <map>
 #include <typeindex>
 #include <profiler.h>
+#include <thread>
+#include <vector>
 
 /*
 * CUDA UTILITIES
@@ -19,16 +21,24 @@ typedef enum{
     GPU=0, CPU
 }AllocatorType;
 
-#define CUCHECK(r) _check((r), __LINE__, __FILE__)
+#define CUCHECK(r) _check((r), #r, __LINE__, __FILE__)
 #define cudaAllocate(bytes) _cudaAllocate(bytes, __LINE__, __FILE__, true)
 #define cudaAllocateEx(bytes, abort) _cudaAllocate(bytes, __LINE__, __FILE__, abort)
 #define cudaAllocateVx(type, n) (type *)_cudaAllocate(sizeof(type)*n, __LINE__, __FILE__, true)
 #define cudaDeviceAssert(fname) if(cudaKernelSynchronize()){ printf("Failure for %s\n", fname); cudaSafeExit(); }
 
 #define __bidevice__ __host__ __device__ 
-#define MAX(a, b) a > b ? a : b
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 #define GPU_LAMBDA(...) [=] __device__(__VA_ARGS__)
+
+#define cudaZeroSymbol(symbol)\
+{\
+    void *__addr = 0;\
+    CUCHECK(cudaGetSymbolAddress(&__addr, symbol));\
+    _cudaSetToZero(__addr, sizeof(symbol));\
+}
 
 typedef struct{
     size_t free_bytes;
@@ -52,7 +62,7 @@ extern CudaExecutionStrategy global_cuda_strategy;
 /*
 * Sanity function to check for cuda* operations.
 */
-void _check(cudaError_t err, int line, const char *filename);
+void _check(cudaError_t err, const char *cmd, int line, const char *filename);
 
 /*
 * Initialize a cuda capable device to start kernel launches.
@@ -125,6 +135,10 @@ std::string time_to_string(std::string val, int size);
 */
 void *_cudaAllocate(size_t bytes, int line, const char *filename, bool abort);
 
+/*
+ * Sets an GPU address to be zero.
+ */
+void _cudaSetToZero(void *addr, size_t bytes);
 
 template<typename T>
 class DataBuffer{
@@ -237,6 +251,94 @@ __host__ void GPUParallelLambda(const char *desc, int nItems, F fn){
 {\
     int __blockSize = GetBlockSize(call, #call);\
     GPULaunchItens(nItems, __blockSize, call, __VA_ARGS__);\
+}
+
+
+// CPU
+
+/*
+ * Returns the amount of cores in as seen by the system or 1 in case
+ * a failure happens.
+ */
+inline int GetConcurrency(){
+    return MAX(1, (int)std::thread::hardware_concurrency());
+}
+
+/*
+ * Get user configuration of number of threads to use.
+ */
+int GetConfiguredCPUThreads();
+
+/*
+ * Configures how many threads CPU should use.
+ */
+void SetCPUThreads(int nThreads);
+
+/*
+ * Configures the system to use CPU parallelism instead of GPU.
+ */
+void SetSystemUseCPU();
+
+/*
+ * Configures the system to use GPU parallism.
+ */
+void SetSystemUseGPU();
+
+/*
+ * Check which device should use for parallelism.
+ */
+int GetSystemUseCPU();
+
+/*
+ * CPU parallel for. Divides the range [start, end) into slices and spawn
+ * either 'kUseThreadsNum' or the system core count threads to solve the slices
+ * using the function 'fn'. Setting 'kUseThreadsNum' to 1 makes this function
+ * perform a simple for loop for easier debug.
+ */
+template<typename Index, typename Function>
+void ParallelFor(Index start, Index end, const Function &fn){
+    if(start > end) return;
+    int userThreads = GetConfiguredCPUThreads();
+
+    if(userThreads == 1){
+        for(Index j = start; j < end; j++){
+            fn(j);
+        }
+    }else{
+        std::vector<std::thread> threads;
+        int numThreads = GetConcurrency();
+
+        numThreads = userThreads < 0 ? numThreads : MIN(userThreads, numThreads);
+
+        Index n = end - start + 1;
+        Index slice = (Index)std::round(n / (double)numThreads);
+        slice = MAX(slice, Index(1));
+
+        auto helper = [&fn](Index j1, Index j2){
+            for(Index j = j1; j < j2; j++){
+                fn(j);
+            }
+        };
+
+        threads.reserve(numThreads);
+        Index i0 = start;
+        Index i1 = MIN(start + slice, end);
+        for(int i = 0; i + 1 < numThreads && i0 < end; i++){
+            threads.emplace_back(helper, i0, i1);
+            i0 = i1;
+            i1 = MIN(i1 + slice, end);
+        }
+
+        if(i0 < end){
+            threads.emplace_back(helper, i0, end);
+        }
+
+        for(std::thread &th : threads){
+            if(th.joinable()){
+                th.join();
+            }
+        }
+    }
 }
 
 #endif

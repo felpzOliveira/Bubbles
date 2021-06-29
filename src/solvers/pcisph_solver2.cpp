@@ -92,7 +92,7 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
                                                               data->soundSpeed,
                                                               kDefaultTimeStepLimitScale);
         Float timeStep = remainingTime / (Float)numberOfIntervals;
-        AdvanceTimeStep(this, timeStep);
+        AdvanceTimeStep(this, timeStep, GetSystemUseCPU());
         remainingTime -= timeStep;
         ProfilerIncreaseStepIteration();
     }

@@ -5,6 +5,7 @@
 #include <util.h>
 #include <memory.h>
 #include <marching_squares.h>
+#include <interval.h>
 
 void test_pcisph2_marching_squares(){
     printf("===== PCISPH Solver 2D -- Marching Squares\n");
@@ -145,13 +146,22 @@ void test_pcisph2_water_block(){
     float *col = new float[count * 3];
     
     SphSolverData2 *data = solver.GetSphSolverData();
-    //set_colors_lnm(col, data);
-    set_colors_pressure(col, data);
+    set_colors_lnm(col, data, 0, 0);
+    //set_colors_pressure(col, data);
     
     for(int i = 0; i < 20 * 26; i++){
         solver.Advance(targetInterval);
-        set_colors_pressure(col, data);
+        //set_colors_pressure(col, data);
+
+        for(int i = 0; i < set2->GetParticleCount(); i++){
+            set2->SetParticleV0(i, 0);
+        }
+
+        IntervalBoundary2(set2, spacing);
+
+        set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
+        getchar();
     }
     
     delete[] pos;

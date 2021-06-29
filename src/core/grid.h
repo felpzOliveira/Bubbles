@@ -67,24 +67,22 @@ struct Cell{
         if(active) return chainAuxLength;
         return chainLength;
     }
-    
-    
+
     __bidevice__ ParticleChain **GetActiveChain(){
         if(active) return &headAux;
         return &head;
     }
-    
+
     __bidevice__ ParticleChain **GetActiveTail(){
         if(active) return &tailAux;
         return &tail;
     }
-    
-    
+
     __bidevice__ ParticleChain **GetNextChain(){
         if(!active) return &headAux;
         return &head;
     }
-    
+
     __bidevice__ ParticleChain **GetNextTail(){
         if(!active) return &tailAux;
         return &tail;
@@ -253,7 +251,7 @@ class Grid{
     }
     
     __bidevice__ Cell<Q> *GetCell(int cellId){
-        AssertA(cellId >= 0 && cellId < total, "Invalid cellId for GetCell");
+        if(cellId >= total || cellId < 0) return nullptr;
         return &cells[cellId];
     }
     

@@ -559,6 +559,87 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &f
     return pCount;
 }
 
+template<typename SolverData = SphSolverData3, typename ParticleSet = ParticleSet3,
+typename Domain = Grid3, typename T>
+void SaveSphParticleSetLegacy(SolverData *data, const char *filename, int flags,
+                              std::vector<int> *boundary = nullptr)
+{
+    ParticleSet *pSet = data->sphpSet->GetParticleSet();
+    FILE *fp = fopen(filename, "a+");
+    std::string format = SerializerStringFromFlags(flags);
+    int logged = 0;
+    if(fp){
+        int pCount = pSet->GetParticleCount();
+        if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && boundary){
+            pCount = 0;
+            for(int i = 0; i < boundary->size(); i++){
+                pCount += boundary->at(i) > 0 ? 1 : 0;
+            }
+        }else if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && !boundary){
+            printf("Invalid configuration for Serialized particles\n");
+            return;
+        }
+
+        fprintf(fp, "%d\n", pCount);
+        for(int i = 0; i < pSet->GetParticleCount(); i++){
+            int needs_space = 0;
+            int boundary_value = 0;
+            T pi = pSet->GetParticlePosition(i);
+
+            if(boundary) boundary_value = boundary->at(i);
+
+            if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && !boundary_value){
+                continue;
+            }
+
+            if(flags & SERIALIZER_POSITION){
+                PrintToFile(fp, pi);
+                needs_space = 1;
+            }
+
+            if(flags & SERIALIZER_VELOCITY){
+                T vi = pSet->GetParticleVelocity(i);
+                PrintToFile(fp, vi, needs_space);
+                needs_space = 1;
+            }
+
+            if(flags & SERIALIZER_DENSITY){
+                Float di = pSet->GetParticleDensity(i);
+                PrintToFile(fp, di, needs_space);
+                needs_space = 1;
+            }
+
+            if(flags & SERIALIZER_MASS){
+                Float mi = pSet->GetMass();
+                PrintToFile(fp, mi, needs_space);
+                needs_space = 1;
+            }
+
+            if(flags & SERIALIZER_BOUNDARY){
+                if(!boundary && !logged){
+                    printf("Warning: Not a valid boundary given\n");
+                    logged = 1;
+                }else if(boundary){
+                    PrintToFile(fp, boundary->at(i), needs_space);
+                    needs_space = 1;
+                }
+            }
+
+            if(flags & SERIALIZER_NORMAL){
+                T ni = pSet->GetParticleNormal(i);
+                PrintToFile(fp, ni, needs_space);
+                needs_space = 1;
+            }
+
+            fprintf(fp, "\n");
+        }
+
+        fclose(fp);
+    }else{
+        printf("Error: Failed to open %s\n", filename);
+    }
+}
+
 template<typename SolverData = SphSolverData3, typename ParticleSet = ParticleSet3, 
 typename Domain = Grid3, typename T>
 void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
@@ -695,11 +776,25 @@ void SerializerWriteShapes(std::vector<SerializedShape> *shapes, const char *fil
     fclose(fp);
 }
 
+void SerializerSaveSphDataSet3Legacy(SphSolverData3 *pSet, const char *filename,
+                                     int flags, std::vector<int> *boundary)
+{
+    SaveSphParticleSetLegacy<SphSolverData3, ParticleSet3, Grid3, vec3f>(pSet, filename,
+                                                                         flags, boundary);
+}
+
 void SerializerSaveSphDataSet3(SphSolverData3 *pSet, const char *filename,
                                int flags, std::vector<int> *boundary)
 {
     SaveSphParticleSet<SphSolverData3, ParticleSet3, Grid3, vec3f>(pSet, filename, 
                                                                    flags, boundary);
+}
+
+void SerializerSaveSphDataSet2Legacy(SphSolverData2 *pSet, const char *filename,
+                                     int flags, std::vector<int> *boundary)
+{
+    SaveSphParticleSetLegacy<SphSolverData2, ParticleSet2, Grid2, vec2f>(pSet, filename,
+                                                                         flags, boundary);
 }
 
 void SerializerSaveSphDataSet2(SphSolverData2 *pSet, const char *filename, 

@@ -365,6 +365,7 @@ class Transform{
 __bidevice__ Transform Translate(const vec3f &delta);
 __bidevice__ Transform Translate(Float x, Float y, Float z);
 __bidevice__ Transform Translate(Float u);
+__bidevice__ Transform Scale(const vec3f &delta);
 __bidevice__ Transform Scale(Float x, Float y, Float z);
 __bidevice__ Transform Scale(Float u);
 __bidevice__ Transform RotateX(Float theta);

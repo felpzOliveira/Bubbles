@@ -406,12 +406,12 @@ static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v,
         int iit = (it > -1) ? pickedU[it] : -1;
         if(mesh->uv){
             if(iin > cN) {
-                printf("[OBJ_LOADER]Invalid index for normal [%d > %d]\n", iin, cN);
+                printf("[OBJ LOADER]Invalid index for normal [%d > %d]\n", iin, cN);
                 iin = -1;
             }
             
             if(iit > cU){
-                printf("[OBJ_LOADER]Invalid index for uv [%d > %d]\n", iit, cU);
+                printf("[OBJ LOADER]Invalid index for uv [%d > %d]\n", iit, cU);
                 iit = -1;
             }
         }
@@ -456,11 +456,11 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
     int facen = 0;
     
     pack_data_t pack;
-    printf("[OBJ_LOADER]Attempting to parse %s\n", &path[p]);
+    printf("[OBJ LOADER] Attempting to parse %s\n", &path[p]);
     
     std::ifstream ifs(path);
     if(!ifs){
-        printf("[OBJ_LOADER]Could not open file %s\n", path);
+        printf("[OBJ LOADER] Could not open file %s\n", path);
         return meshes;
     }
     
@@ -579,14 +579,14 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
                                  static_cast<int>(vn.size()),
                                  static_cast<int>(vt.size()), &vi)) 
                 {
-                    printf("[OBJ_LOADER]Failed parsing face\n");
+                    printf("[OBJ LOADER] Failed parsing face\n");
                     break;
                 }
                 
                 size_t n = strspn(token, " \t\r");
                 token += n;
                 if(facen >= 4){
-                    printf("[OBJ_LOADER]Error: Not a supported face description\n");
+                    printf("[OBJ LOADER] Error: Not a supported face description\n");
                     exit(0);
                 }
                 
@@ -601,7 +601,7 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
                 indexes.push_back(face[2]); indexes.push_back(face[0]); 
                 indexes.push_back(face[2]); indexes.push_back(face[3]);
             }else{
-                printf("[OBJ_LOADER]Warning unsupported face with %d vertices\n", facen);
+                printf("[OBJ LOADER] Warning unsupported face with %d vertices\n", facen);
             }
             
             continue;
@@ -618,7 +618,7 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
     clock_t end = clock();
     
     double time_taken = to_cpu_time(start, end);
-    printf("[OBJ_LOADER]Took %g seconds, #v [%d] #vn [%d] #vt [%d]. Decomposed in %d meshe(s)\n",
+    printf("[OBJ LOADER] Took %g seconds, #v [%d] #vn [%d] #vt [%d]. Decomposed in %d meshe(s)\n",
            time_taken, (int)v.size(), (int)vn.size(), (int)vt.size(),
            (int)meshes->size());
     

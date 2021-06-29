@@ -253,6 +253,10 @@ __bidevice__ Transform Scale(Float u){
     return Scale(u, u, u);
 }
 
+__bidevice__ Transform Scale(const vec3f &delta){
+    return Scale(delta.x, delta.y, delta.z);
+}
+
 __bidevice__ Transform RotateX(Float theta) {
     Float sinTheta = std::sin(Radians(theta));
     Float cosTheta = std::cos(Radians(theta));

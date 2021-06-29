@@ -534,6 +534,50 @@ void test_box_distance(){
     printf("===== OK\n");
 }
 
+void test_bounds_split2(){
+    printf("===== Test Bounds2 Split\n");
+    Bounds2f bounds(vec2f(-1), vec2f(1));
+    Bounds2f splits[4];
+
+    vec2f res[] = {
+        vec2f(-1, -1), vec2f(0, 0),
+        vec2f(-1, 0), vec2f(0, 1),
+        vec2f(0, 0), vec2f(1, 1),
+        vec2f(0, -1), vec2f(1, 0),
+    };
+
+    printf("Splitting : ");
+    bounds.PrintSelf();
+    printf("\n");
+
+    int k = SplitBounds(bounds, &splits[0]);
+    TEST_CHECK(k == 4, "Invalid returned bound split count");
+
+    int it = 0;
+    for(int i = 0; i < 4; i++){
+        Bounds2f b = splits[i];
+        vec2f pMin = b.pMin;
+        vec2f pMax = b.pMax;
+        TEST_CHECK((IsZero(pMin.x - res[it].x) &&
+                   IsZero(pMin.y - res[it].y) &&
+                   IsZero(pMax.x - res[it+1].x) &&
+                   IsZero(pMax.y - res[it+1].y)),
+                   "Unexpected position");
+        it += 2;
+
+        // print for easy inspection
+        b.PrintSelf();
+        printf("\n");
+
+        TEST_CHECK(Inside(b, bounds), "Not inside");
+    }
+
+    Bounds2f bout(vec2f(-2), vec2f(1));
+    TEST_CHECK(!Inside(bout, bounds), "Invalid computation of bounds inside");
+
+    printf("===== OK\n");
+}
+
 void test_matrix_operations(){
     printf("===== Test Matrix3x3\n");
     

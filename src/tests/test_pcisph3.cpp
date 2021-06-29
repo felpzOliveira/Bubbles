@@ -12,6 +12,98 @@
 #include <transform_sequence.h>
 #include <sdfs.h>
 
+void test_pcisph3_box_drop(){
+    printf("===== PCISPH Solver 3D -- Box Drop\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    vec3f origin(3.0, 0, 0);
+    vec3f target(0.0f);
+    vec3f containerSize(1.5);
+    vec3f boxEmitSize(0.4, 0.1, 0.4);
+    vec3f boxSize0(0.4);
+    Float spacing = 0.02;
+    Float spacingScale = 1.8;
+
+    Shape *container = MakeBox(Transform(), containerSize, true);
+
+    Float y0of = (containerSize.y - boxSize0.y) * 0.5; y0of -= spacing;
+    Shape *box0 = MakeBox(RotateY(45) * RotateX(45.0), boxSize0);
+
+    Float yEof = (containerSize.y - boxEmitSize.y) * 0.5; yEof -= spacing;
+    Shape *boxEmitter = MakeBox(Translate(0, yEof, 0), boxEmitSize);
+
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(box0);
+    cBuilder.AddCollider3(container);
+
+    ContinuousParticleSetBuilder3 pBuilder;
+    VolumeParticleEmitterSet3 emitterSet;
+    emitterSet.AddEmitter(boxEmitter, spacing);
+
+    pBuilder.SetKernelRadius(spacing * spacingScale);
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    Assure(UtilIsEmitterOverlapping(&emitterSet, colliders) == 0);
+
+    emitterSet.Emit(&pBuilder);
+    SphParticleSet3 *sphSet = SphParticleSet3FromContinuousBuilder(&pBuilder);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(),
+                                               spacing, spacingScale);
+
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+
+    Float targetInterval =  1.0 / 240.0;
+    pBuilder.MapGrid(domainGrid);
+    int extraParts = 24 * 10;
+
+    auto velocityField = [&](const vec3f &p) -> vec3f{
+        return vec3f(0, -10, 0);
+    };
+
+    auto filler = [&](float *pos, float *col) -> int{
+        int f = UtilGenerateBoxPoints(pos, col, vec3f(1,1,0), containerSize,
+                                      extraParts * 0.8, container->ObjectToWorld);
+        f += UtilGenerateBoxPoints(&pos[3 * f], &col[3 * f], vec3f(1,1,0), boxSize0,
+                                   extraParts * 0.2, box0->ObjectToWorld);
+        return f;
+    };
+
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        for(int i = 0; i < pCount; i++){
+            colors[3 * i + 0] = 1; colors[3 * i + 1] = 0;
+            colors[3 * i + 2] = 1;
+        }
+    };
+
+    auto onStepUpdate = [&](int step) -> int{
+        if(step == 0) return 1;
+        if(pSet->GetParticleCount() < 300000){
+            pBuilder.MapGridEmit(velocityField, spacing);
+        }
+        UtilPrintStepStandard(&solver, step-1);
+#if 1
+        std::string path("/media/felipe/FluidStuff/box/out_");
+        path += std::to_string(step-1);
+        path += ".txt";
+        SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
+                                        SERIALIZER_POSITION);
+#endif
+        return 1;
+    };
+
+    UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
+                                                           target, targetInterval, extraParts,
+                                                           {}, onStepUpdate, colorFunction,
+                                                           filler);
+
+    CudaMemoryManagerClearCurrent();
+
+    printf("===== OK\n");
+}
+
 void test_pcisph3_water_box_forward(){
     printf("===== PCISPH Solver 3D -- Rotating Water Block\n");
 
@@ -182,8 +274,8 @@ void test_pcisph3_rotating_water_box(){
     vec3f origin(4);
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
-    Float spacing = 0.08;
-    Float spacingScale = 2.0;
+    Float spacing = 0.06;
+    Float spacingScale = 1.8;
     int steps = 500;
     Float targetInterval =  1.0 / 240.0;
     vec3f waterBox(3.0-spacing, 0.5, 3.0-spacing);
@@ -217,7 +309,7 @@ void test_pcisph3_rotating_water_box(){
     solver.SetColliders(colliders);
 
     Float invInterval = 1.0 / targetInterval;
-    //ProfilerInitKernel(pSet->GetParticleCount());
+    ProfilerInitKernel(pSet->GetParticleCount());
 
     int extraParts = 12 * 10 + 12;
 
@@ -237,36 +329,42 @@ void test_pcisph3_rotating_water_box(){
                                      extraParts-12, container->ObjectToWorld);
     };
 
+    int maxSteps = steps * 2.0;
+
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;
-        Float f = ((Float)(step % steps)) / (Float)steps;
-        Transform transform;
-        vec3f linear, angular;
-        //sequence.Interpolate(f, &transform, &linear, &angular);
-        //sequence.Interpolate(f, &transform, &angular);
+        if(step < maxSteps){
+            Float f = ((Float)(step % steps)) / (Float)steps;
+            Float g = ((Float)(step % maxSteps)) / (Float) maxSteps;
+            Transform transform, g_transform;
+            vec3f linear, angular;
+            //sequence.Interpolate(f, &transform, &linear, &angular);
+            //sequence.Interpolate(f, &transform, &angular);
 
-        EuclideanInterpolate(0, 360, f, 0, 1, vec3f(1,1,0), &transform);
+            // TODO: Quaternion => angular velocity
+            EuclideanInterpolate(0, 360, f, 0, 1, vec3f(1,1,0), &transform);
+            EuclideanInterpolate(0, 360, g, 0, 1, vec3f(0,1,0), &g_transform);
 
-        angular *= 1.0 / (targetInterval);
-        linear *= 1.0 / (targetInterval);
-
+            angular *= 1.0 / (targetInterval);
+            linear *= 1.0 / (targetInterval);
+            container->Update(g_transform * transform);
+            container->SetVelocities(linear, angular * 50.0);
+        }
 #if 0
-        std::string respath("/home/felipe/Documents/Bubbles/simulations/box_rotate/output_");
-        respath += std::to_string(step-1);
-        respath += ".txt";
-
-        int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
-        UtilSaveSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet,
-                                                         respath.c_str(), flags);
+        std::string path("/home/felipe/Documents/Bubbles/simulations/box_rotate/out_");
+        path += std::to_string(step-1);
+        path += ".txt";
+        SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
+                                        SERIALIZER_POSITION);
 #endif
-        container->Update(transform);
-        container->SetVelocities(linear, angular * 50.0);
 
-        UtilPrintStepStandard(&solver,step-1);
-        //ProfilerReport();
+        //UtilPrintStepStandard(&solver,step-1);
+        ProfilerReport();
         //return 1;
         return step > 2000 ? 0 : 1;
     };
+
+    //SetSystemUseCPU();
 
     UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
                                                            target, targetInterval, extraParts,
@@ -1285,8 +1383,8 @@ void test_pcisph3_sdf(){
     printf("===== OK\n");
 }
 
-void test_pcisph3_double_dam_break_double_dragon(){
-    printf("===== PCISPH Solver 3D -- Double Dam Break Double Dragon\n");
+void test_pcisph3_dam_break_double_dragon(){
+    printf("===== PCISPH Solver 3D -- Dam Break Double Dragon\n");
 #define WITH_MESH
     CudaMemoryManagerStart(__FUNCTION__);
     vec3f origin(0.0, 0.0, 7.0);
@@ -1312,8 +1410,8 @@ void test_pcisph3_double_dam_break_double_dragon(){
     Float df = (boxSize.y - bounds.ExtentOn(1)) * 0.5;
 
     ParsedMesh *meshCopy = DuplicateMesh(mesh);
-    Shape *dragon = MakeMesh(mesh, Translate(0.2, -df, 0) * RotateY(14) * baseScale);
-    Shape *dragonCopy = MakeMesh(meshCopy, Translate(-1.0, -df, 0) * baseScale);
+    Shape *dragon = MakeMesh(mesh, Translate(0.2, -df - 0.05, 0) * RotateY(14) * baseScale);
+    Shape *dragonCopy = MakeMesh(meshCopy, Translate(-1.0, -df - 0.05, 0) * baseScale);
 
 #undef MODELS_PATH
 #endif
@@ -1364,7 +1462,7 @@ void test_pcisph3_double_dam_break_double_dragon(){
                                                          path.c_str(), flags);
 #endif
         ProfilerReport();
-        return step > 2000 ? 0 : 1;
+        return step > 900 ? 0 : 1;
     };
 
     std::vector<Shape*> sdfs;
@@ -1448,27 +1546,118 @@ void test_pcisph3_double_dam_break(){
     printf("===== OK\n");
 }
 
+void test_pcisph3_pathing(){
+    printf("===== PCISPH Solver 3D -- Pathing\n");
+    vec3f origin(2);
+    vec3f target(0);
+    Float spacingScale = 1.8;
+    Float spacing = 0.02;
+
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    // main cube container
+    vec3f containerLen(2.0, 1.0, 1.0);
+    Shape *container = MakeBox(Transform(), containerLen, true);
+
+#define MODELS_PATH "/home/felipe/Documents/CGStuff/models/"
+    ParsedMesh *unityCube = LoadObj(MODELS_PATH "cube.obj");
+    Float xExtent = 0.5;
+    vec3f scaleSize(xExtent, 0.2, 0.5);
+    Float xof = (containerLen.x - xExtent) * 0.5; xof -= spacing;
+    Transform t = Translate(-xof, 0, 0) * RotateZ(-14) * Scale(scaleSize);
+    Shape *leftRamp = MakeMesh(unityCube, t);
+
+#undef MODELS_PATH
+
+    Shape *boxEmitter = MakeBox(Translate(0, 0, 0), vec3f(0.05));
+
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(leftRamp);
+    cBuilder.AddCollider3(container);
+
+    ContinuousParticleSetBuilder3 pBuilder;
+    VolumeParticleEmitterSet3 emitterSet;
+    emitterSet.AddEmitter(boxEmitter, spacing);
+
+    pBuilder.SetKernelRadius(spacing * spacingScale);
+
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    Assure(UtilIsEmitterOverlapping(&emitterSet, colliders) == 0);
+
+    emitterSet.Emit(&pBuilder);
+    SphParticleSet3 *sphSet = SphParticleSet3FromContinuousBuilder(&pBuilder);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(),
+                                               spacing, spacingScale);
+
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+
+    Float targetInterval =  1.0 / 240.0;
+    pBuilder.MapGrid(domainGrid);
+    int extraParts = 24 * 10;
+
+    auto velocityField = [&](const vec3f &p) -> vec3f{
+        return vec3f(0, -5, 0);
+    };
+
+    auto filler = [&](float *pos, float *col) -> int{
+        int f = UtilGenerateBoxPoints(pos, col, vec3f(1,1,0), containerLen,
+                                      extraParts * 0.5, container->ObjectToWorld);
+        f += UtilGenerateBoxPoints(&pos[3 * f], &col[3 * f], vec3f(1,1,0),
+                                   scaleSize, extraParts * 0.5, t);
+        return f;
+    };
+
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        for(int i = 0; i < pCount; i++){
+            colors[3 * i + 0] = 1; colors[3 * i + 1] = 0;
+            colors[3 * i + 2] = 1;
+        }
+    };
+
+    auto onStepUpdate = [&](int step) -> int{
+        if(step == 0) return 1;
+        if(1){
+            pBuilder.MapGridEmit(velocityField, spacing);
+        }
+        UtilPrintStepStandard(&solver, step-1);
+        return 1;
+    };
+
+    UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
+                                                           target, targetInterval, extraParts,
+                                                           {}, onStepUpdate, colorFunction,
+                                                           filler);
+
+    CudaMemoryManagerClearCurrent();
+
+    printf("===== OK\n");
+}
+
 void test_pcisph3_quadruple_dam(){
     printf("===== PCISPH Solver 3D -- Quadruple Dam Break\n");
-    Float spacing = 0.02;
+    Float spacing = 0.06;
     Float spacingScale = 2.0;
-    vec3f boxLen(4.0, 2.0, 4.0);
-    vec3f waterBoxLen(0.6, 1.8, 0.6);
+    vec3f boxLen(3.0, 4.0, 3.0);
+    vec3f waterBoxLen(0.7, 1.8, 0.7);
     vec3f initialVelocity(0.0, -3.0, 0);
     vec3f origin(0, 2, -5);
-    vec3f target(0);
+    vec3f target(0, -1, 0);
     
     CudaMemoryManagerStart(__FUNCTION__);
     
     Float xof = (boxLen.x - waterBoxLen.x) * 0.5; xof -= spacing;
     Float yof = (boxLen.y - waterBoxLen.y) * 0.5; yof -= spacing;
     Float zof = (boxLen.z - waterBoxLen.z) * 0.5; zof -= spacing;
-    
+
     Shape *container = MakeBox(Transform(), boxLen, true);
-    Shape *box0 = MakeBox(Translate(0, -yof, -zof), waterBoxLen);
-    Shape *box1 = MakeBox(Translate(0, -yof, +zof), waterBoxLen);
-    Shape *box2 = MakeBox(Translate(+xof, -yof, 0), waterBoxLen);
-    Shape *box3 = MakeBox(Translate(-xof, -yof, 0), waterBoxLen);
+    Shape *box0 = MakeBox(Translate(+xof * 0.9, -yof, -zof), waterBoxLen);
+    Shape *box1 = MakeBox(Translate(-xof * 0.7, -yof, +zof * 0.9), waterBoxLen);
+    Shape *box2 = MakeBox(Translate(+xof * 0.8, -yof, +zof), waterBoxLen);
+    Shape *box3 = MakeBox(Translate(-xof * 0.8, -yof, -zof * 0.8), waterBoxLen);
     
     ParticleSetBuilder3 pBuilder;
     VolumeParticleEmitterSet3 emitterSet;
@@ -1503,13 +1692,12 @@ void test_pcisph3_quadruple_dam(){
         std::string respath("/media/felipe/Novo volume/quadruple_out/sim_data/out_");
         respath += std::to_string(step-1);
         respath += ".txt";
-        SerializerSaveSphDataSet3(solver.GetSphSolverData(), respath.c_str(),
-                                  SERIALIZER_POSITION);
+        SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), respath.c_str(),
+                                        SERIALIZER_POSITION);
         UtilPrintStepStandard(&solver, step-1);
-        return 1;
+        return step > 500 ? 0 : 1;
     };
-#endif
-    
+#else
     auto callback = [&](int step) -> int{
         if(step == 0) return 1;
         UtilPrintStepStandard(&solver, step-1, {0, 16, 31, 74, 151, 235, 
@@ -1517,8 +1705,8 @@ void test_pcisph3_quadruple_dam(){
         ProfilerReport();
         return step > 450 ? 0 : 1;
     };
-    
-    Float targetInterval =  1.0 / 240.0;
+#endif
+    Float targetInterval =  1.0 / 60.0;
     PciSphRunSimulation3(&solver, spacing, origin, target, 
                          targetInterval, {}, callback);
     

@@ -5,10 +5,12 @@
 #include <obj_loader.h> // get parser utilities
 #include <transform.h>
 
+// Two dragons scene: -clip-plane 4 3.6 2 -layered -mat diffuse -mat-value 0.549 0.647 0.643
 #define MESH_FOLDER "/home/felipe/Documents/CGStuff/models"
 
 #define __to_stringf __to_string<Float>
 #define __to_stringi __to_string<int>
+#define GetStringColor(n) RGBStringFromHex(Colors[n])
 
 typedef enum{
     LAYERED=0, FILTERED, LEVEL, ALL
@@ -40,12 +42,27 @@ typedef struct{
 }pbrt_mat;
 
 const std::string ColorsString[] = {
+    //"0.866 0 0.301",
+    //"0.670 0.368 0.286",
+    //"0.666 0.815 0.588",
+    //"0.00 0.89 1.0",
+    //"0.019 0.682 1.0",
     "0.78 0.78 0.78",
-    "0.866 0 0.301",
-    "0.670 0.368 0.286",
-    "0.666 0.815 0.588",
-    "0.00 0.89 1.0",
-    "0.019 0.682 1.0",
+    "0.749 0.023 0.247",
+    "0.737 0.564 0.274",
+    "0.760 0.756 0.494",
+    "0.505 0.698 0.901",
+    "0.270 0.533 0.890",
+};
+
+const unsigned int Colors[] = {
+    0xffcccccc,
+    0xffc60043,
+    //0xffc60043,
+    0xffe3b256,
+    0xffe7dd96,
+    0xff81c1f4,
+    0xff4a94f4,
 };
 
 pbrt_mat Materials[] = {
@@ -53,6 +70,20 @@ pbrt_mat Materials[] = {
     {.name = "glass-thin", .mat = "\"dielectric\" \"float eta\" [ 1.1 ]", .built=1},
     {.name = "diffuse", .mat = "\"diffuse\" \"rgb reflectance\"", .built=0}
 };
+
+std::string RGBStringFromHex(int hex){
+    std::stringstream ss;
+    unsigned int ur = (hex & 0x00ff0000) >> 16;
+    unsigned int ug = (hex & 0x0000ff00) >> 8;
+    unsigned int ub = (hex & 0x000000ff);
+
+    Float r = ((Float)(ur)) / 255.0;
+    Float g = ((Float)(ug)) / 255.0;
+    Float b = ((Float)(ub)) / 255.0;
+
+    ss << r << " " << g << " " << b;
+    return ss.str();
+}
 
 std::string find_material(std::string name, int *ok){
     int count = sizeof(Materials) / sizeof(Materials[0]);
@@ -343,19 +374,22 @@ template<typename T> std::string __to_string(T value){
 * any other is gray
 */
 static std::string GetMaterialStringFiltered(int layer){
-    if(layer != 1 && layer != 2) return ColorsString[0];
-    return ColorsString[1];
+    //if(layer != 1 && layer != 2) return ColorsString[0];
+    //return ColorsString[1];
+    if(layer != 1 && layer != 2) return GetStringColor(0);
+    return GetStringColor(1);
 }
 
 /*
 * Follow color map
 */
 static std::string GetMaterialStringAll(int layer){
-    int max_layer = sizeof(ColorsString) / sizeof(ColorsString[0]);
+    int max_layer = sizeof(Colors) / sizeof(Colors[0]);
     if(layer > max_layer-1){
         layer = max_layer-1;
     }
-    return ColorsString[layer];
+    //return ColorsString[layer];
+    return GetStringColor(layer);
 }
 
 /*
@@ -368,8 +402,12 @@ static std::string GetMaterialStringLayered(int layer){
         layer = max_layer-1;
     }
 
-    if(layer != 1 && layer != 2) return ColorsString[0];
-    return ColorsString[layer];
+    if(layer != 1 && layer != 2) return GetStringColor(0);
+    return GetStringColor(layer);
+
+    //if(layer != 1 && layer != 2) return ColorsString[0];
+    //return ColorsString[layer];
+    //return ColorsString[1];
 }
 
 std::string GetMaterialString(int layer, pbrt_opts *opts){

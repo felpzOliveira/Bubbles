@@ -144,17 +144,17 @@ __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particl
 
 // Generic calls for sph solvers wrappers
 // Perform computation on CPU {easy debug}
-__bidevice__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure = 1);
-__bidevice__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure = 1);
-__bidevice__ void ComputeNormalCPU(SphSolverData3 *data);
-__bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
+__host__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure = 1);
+__host__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure = 1);
+__host__ void ComputeNormalCPU(SphSolverData3 *data);
+__host__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
                                           int integrate=1);
-__bidevice__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
-__bidevice__ void ComputeNonPressureForceCPU(SphSolverData2 *data);
-__bidevice__ void ComputeNonPressureForceCPU(SphSolverData3 *data);
-__bidevice__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended=0);
-__bidevice__ void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended=0);
-__bidevice__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin, 
+__host__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
+__host__ void ComputeNonPressureForceCPU(SphSolverData2 *data);
+__host__ void ComputeNonPressureForceCPU(SphSolverData3 *data);
+__host__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended=0);
+__host__ void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended=0);
+__host__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
                                                   Float Tmax, int maxLevel);
 __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float timeStep);
 __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData3 *data, Float timeStep);

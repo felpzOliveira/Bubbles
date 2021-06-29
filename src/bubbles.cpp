@@ -29,6 +29,7 @@ void run_self_tests(){
     test_kernels_2D();
     test_kernels_3D();
     test_triangle_point_generator();
+    test_bounds_split2();
     //test_matrix_operations(); // precision is killing this test for 32 bits
     test_ray2_intersect();
     test_closest_point_sphere2D();
@@ -77,7 +78,8 @@ void run_self_tests(){
 }
 #endif
 
-
+void test_pcisph3_pathing();
+void test_pcisph3_box_drop();
 int main(int argc, char **argv){
     BB_MSG("Bubbles Fluid Simulator");
     /* Initialize cuda API */
@@ -86,9 +88,15 @@ int main(int argc, char **argv){
     /* Sets the default kernel launching parameters, 16 is good for my notebook */
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
 
+    //test_pcisph2_double_dam_break();
+    //test_pcisph2_water_block_lnm();
+    //test_pcisph2_water_block();
     //test_pcisph3_sdf();
-    //test_pcisph3_rotating_water_box();
-    test_pcisph3_double_dam_break_double_dragon();
+    test_pcisph3_rotating_water_box();
+    //test_pcisph3_dam_break_double_dragon();
+    //test_pcisph3_quadruple_dam();
+    //test_pcisph3_pathing();
+    //test_pcisph3_box_drop();
     //test_pcisph3_happy_whale();
 
 #if defined(RUN_TESTS)

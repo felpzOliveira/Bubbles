@@ -435,7 +435,7 @@ __host__ void UpdateGridDistributionGPU(SphSolverData2 *data){
     data->frame_index = 1;
 }
 
-__bidevice__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure){
+__host__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputeDensity");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver2 has no particles for ComputeDensity");
@@ -503,7 +503,7 @@ __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float
     }
 }
 
-__bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
+__host__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
                                           int integrate)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
@@ -515,7 +515,7 @@ __bidevice__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
     }
 }
 
-__bidevice__ void ComputeNonPressureForceCPU(SphSolverData2 *data){
+__host__ void ComputeNonPressureForceCPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputeNonPressureForce");
     AssertA(pSet->GetParticleCount() > 0,
@@ -559,7 +559,7 @@ __host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep, int 
     GPULaunch(N, ComputePressureForceKernel, data, timeStep, integrate);
 }
 
-__bidevice__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended){
+__host__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for TimeIntegration");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver2 has no particles for TimeIntegration");
@@ -597,7 +597,7 @@ __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particl
     pSet->SetParticleTemperature(particleId, Ti);
 }
 
-__bidevice__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin, 
+__host__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
                                                   Float Tmax, int maxLevel)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();

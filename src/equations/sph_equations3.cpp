@@ -368,79 +368,81 @@ __host__ void UpdateGridDistributionCPU(SphSolverData3 *data){
     Grid3 *grid = data->domain;
     AssertA(grid, "SphSolver3 has no domain for UpdateGridDistribution");
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    int cellCount = data->domain->GetCellCount();
     if(data->sphpSet->requiresHigherLevelUpdate){
         //printf("Performing full distribution by excessive delta\n");
-        for(int i = 0; i < data->domain->GetCellCount(); i++){
+        ParallelFor(0, cellCount, [&](int i){
             data->domain->DistributeResetCell(i);
-        }
+        });
+
         data->domain->DistributeByParticle(pSet);
     }else{
         if(data->frame_index == 0){
-            for(int i = 0; i < grid->GetCellCount(); i++){
+            ParallelFor(0, cellCount, [&](int i){
                 grid->DistributeToCell(pSet, i);
-            }
+            });
         }else{
-            for(int i = 0; i < grid->GetCellCount(); i++){
+            ParallelFor(0, cellCount, [&](int i){
                 grid->DistributeToCellOpt(pSet, i);
-            }
+            });
             
-            for(int i = 0; i < grid->GetCellCount(); i++){
+            ParallelFor(0, cellCount, [&](int i){
                 grid->SwapCellList(i);
-            }
+            });
         }
     }
     
     int pCount = pSet->GetParticleCount();
     Float kernelRadius = data->sphpSet->GetKernelRadius();
-    for(int i = 0; i < pCount; i++){
+    ParallelFor(0, pCount, [&](int i){
         grid->DistributeParticleBucket(pSet, i, kernelRadius);
-    }
-    
+    });
+
     data->frame_index = 1;
 }
 
-__bidevice__ void ComputeNormalCPU(SphSolverData3 *data){
+__host__ void ComputeNormalCPU(SphSolverData3 *data){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver3 has no valid particle set for ComputeDensity");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver3 has no particles for ComputeDensity");
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
         ComputeNormalFor(data, i);
-    }
+    });
 }
 
-__bidevice__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure){
+__host__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver3 has no valid particle set for ComputeDensity");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver3 has no particles for ComputeDensity");
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
         ComputeDensityFor(data, i, compute_pressure);
-    }
+    });
 }
 
-__bidevice__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep){
+__host__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver3 has no valid particle set for ComputePressureForce");
     AssertA(pSet->GetParticleCount() > 0,
             "SphSolver3 has no particles for ComputePressureForce");
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
         ComputeAllForcesFor(data, i, timeStep);
-    }
+    });
 }
 
-__bidevice__ void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended){
+__host__ void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver3 has no valid particle set for TimeIntegration");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver3 has no particles for TimeIntegration");
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
         TimeIntegrationFor(data, i, timeStep, extended);
-    }
+    });
 }
 
-__bidevice__ void ComputeNonPressureForceCPU(SphSolverData3 *data){
+__host__ void ComputeNonPressureForceCPU(SphSolverData3 *data){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
         ComputeNonPressureForceFor(data, i);
-    }
+    });
 }
 
 __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData3 *data, Float timeStep){
@@ -448,13 +450,13 @@ __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData3 *data, Float
     if(scale > 0.1){
         ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
         int N = pSet->GetParticleCount();
-        for(int i = 0; i < N; i++){
+        ParallelFor(0, N, [&](int i){
             ComputePseudoViscosityAggregationKernelFor(data, i);
-        }
-        
-        for(int i = 0; i < N; i++){
+        });
+
+        ParallelFor(0, N, [&](int i){
             ComputePseudoViscosityInterpolationKernelFor(data, i, timeStep);
-        }
+        });
     }
 }
 
@@ -489,12 +491,14 @@ __host__ void UpdateGridDistributionGPU(SphSolverData3 *data){
     Grid3 *grid = data->domain;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver3 has no domain for UpdateGridDistribution");
-    
+    int cellCount = data->domain->GetCellCount();
+
     if(data->sphpSet->requiresHigherLevelUpdate){
         //printf("Performing full distribution by excessive delta\n");
-        for(int i = 0; i < data->domain->GetCellCount(); i++){
+        ParallelFor(0, cellCount, [&](int i){
             data->domain->DistributeResetCell(i);
-        }
+        });
+        
         data->domain->DistributeByParticle(pSet);
     }else{
         int N = grid->GetCellCount();

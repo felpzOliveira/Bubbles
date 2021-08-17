@@ -16,6 +16,10 @@ typedef enum{
     LAYERED=0, FILTERED, LEVEL, ALL
 }RenderMode;
 
+typedef enum{
+    RENDERER_PBRT, RENDERER_LIT,
+}Renderer;
+
 typedef struct{
     Float cutSource;
     Float cutDistance;
@@ -33,6 +37,8 @@ typedef struct{
     std::map<std::string, std::string> meshMap;
     int warn_ply_mesh;
     std::string meshFolder;
+    Renderer renderer;
+    int is_legacy;
 }pbrt_opts;
 
 typedef struct{
@@ -40,6 +46,8 @@ typedef struct{
     std::string mat;
     int built;
 }pbrt_mat;
+
+typedef pbrt_mat lit_mat;
 
 const std::string ColorsString[] = {
     //"0.866 0 0.301",
@@ -69,6 +77,12 @@ pbrt_mat Materials[] = {
     {.name = "glass-BK7", .mat = "\"dielectric\" \"spectrum eta\" \"glass-BK7\"", .built=1},
     {.name = "glass-thin", .mat = "\"dielectric\" \"float eta\" [ 1.1 ]", .built=1},
     {.name = "diffuse", .mat = "\"diffuse\" \"rgb reflectance\"", .built=0}
+};
+
+lit_mat MaterialsLit[] = {
+    {.name = "glass", .mat = "reflectance [1.0] name[glass] eta[1.3] type [dielectric]", .built=1},
+    {.name = "glass-thin", .mat = "reflectance [1.0] name[glass-thin] eta[1.05] type [dielectric]", .built=1},
+    {.name = "diffuse", .mat = "type [diffuse] ", .built=0},
 };
 
 std::string RGBStringFromHex(int hex){
@@ -136,10 +150,18 @@ std::string mesh_name_to_pbrt(std::string name, pbrt_opts *opts){
 
     ext = name.substr(at);
     pbrt_name = name;
-    if(ext != ".ply"){
-        opts->warn_ply_mesh = 1;
-        pbrt_name = name.substr(0, at);
-        pbrt_name += ".ply";
+    if(opts->renderer == RENDERER_PBRT){
+        if(ext != ".ply"){
+            opts->warn_ply_mesh = 1;
+            pbrt_name = name.substr(0, at);
+            pbrt_name += ".ply";
+        }
+    }else{
+        if(ext != ".obj"){
+            opts->warn_ply_mesh = 1;
+            pbrt_name = name.substr(0, at);
+            pbrt_name += ".obj";
+        }
     }
 
     return pbrt_name;
@@ -243,6 +265,26 @@ ARGUMENT_PROCESS(pbrt_rotate_z_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(pbrt_renderer){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "-renderer");
+    if(value == "pbrt"){
+        opts->renderer = RENDERER_PBRT;
+    }else if(value == "lit"){
+        opts->renderer = RENDERER_LIT;
+    }else{
+        return -1;
+    }
+
+    return 0;
+}
+
+ARGUMENT_PROCESS(pbrt_legacy){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    opts->is_legacy = 1;
+    return 0;
+}
+
 ARGUMENT_PROCESS(pbrt_rotate_x_arg){
     pbrt_opts *opts = (pbrt_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-rotateX");
@@ -279,6 +321,16 @@ std::map<const char *, arg_desc> pbrt_argument_map = {
     {"-in",
         { .processor = pbrt_input_arg, 
             .help = "Where to read input file." 
+        }
+    },
+    {"-legacy",
+        { .processor = pbrt_legacy,
+            .help = "Inform the loader to use legacy format instead."
+        }
+    },
+    {"-renderer",
+        { .processor = pbrt_renderer,
+            .help = "Inform target renderer for output generation (default: pbrt)"
         }
     },
     {"-out", 
@@ -412,6 +464,11 @@ static std::string GetMaterialStringLayered(int layer){
 
 std::string GetMaterialString(int layer, pbrt_opts *opts){
     std::string data("Material \"coateddiffuse\"\n\t\"rgb reflectance\" [ ");
+    if(opts->renderer == RENDERER_LIT){
+        data = "Material{ type [diffuse] name[layer_";
+        data += __to_stringi(layer);
+        data += "] reflectance[";
+    }
     switch(opts->mode){
         case RenderMode::ALL:
         case RenderMode::LEVEL: data += GetMaterialStringAll(layer); break;
@@ -422,12 +479,16 @@ std::string GetMaterialString(int layer, pbrt_opts *opts){
             exit(0);
         }
     }
-    data += " ]\n\t\"float roughness\" [ 0 ]\n";
+    if(opts->renderer == RENDERER_PBRT){
+        data += " ]\n\t\"float roughness\" [ 0 ]\n";
+    }else{
+        data += "] }\n";
+    }
     return data;
 }
 
 void default_pbrt_opts(pbrt_opts *opts){
-    opts->output = "geometry.pbrt";
+    opts->output = "";
     opts->flags = SERIALIZER_POSITION;
     opts->radius = 0.012;
     opts->mode = RenderMode::ALL;
@@ -438,12 +499,13 @@ void default_pbrt_opts(pbrt_opts *opts){
     opts->cutDistance = FLT_MAX;
     opts->hasClipArgs = 0;
     opts->warn_ply_mesh = 0;
+    opts->renderer = RENDERER_PBRT;
+    opts->is_legacy = 0;
 }
 
 void print_configs(pbrt_opts *opts){
     std::cout << "Configs: " << std::endl;
     std::cout << "    * Target file : " << opts->input << std::endl;
-    std::cout << "    * Target output : " << opts->output << std::endl;
     std::cout << "    * Render radius : " << opts->radius << std::endl;
     std::cout << "    * Render mode : " << render_mode_string(opts->mode) << std::endl;
     if(opts->mode == RenderMode::LEVEL){
@@ -458,6 +520,12 @@ void print_configs(pbrt_opts *opts){
 
     if(opts->pickedMat.size() > 0){
         std::cout << "    * Material : " << opts->pickedMat << std::endl;
+    }
+
+    if(opts->renderer == RENDERER_PBRT){
+        std::cout << "    * Renderer : PBRT" << std::endl;
+    }else if(opts->renderer == RENDERER_LIT){
+        std::cout << "    * Renderer : LIT" << std::endl;
     }
 }
 
@@ -581,9 +649,13 @@ std::string pbrt_build_material(pbrt_mat *mat, pbrt_opts *opts){
         printf("Material is null\n");
         exit(0);
     }
-
-    ss << mat->mat << " [ ";
-    ss << v.x << " " << v.y << " " << v.z << " ]";
+    if(opts->renderer == RENDERER_PBRT){
+        ss << mat->mat << " [ ";
+        ss << v.x << " " << v.y << " " << v.z << " ]";
+    }else if(opts->renderer == RENDERER_LIT){
+        ss << mat->mat << " [ ";
+        ss << v.x << " " << v.y << " " << v.z << " ]";
+    }
     return ss.str();
 }
 
@@ -694,16 +766,27 @@ void pbrt_command(int argc, char **argv){
         return;
     }
 
-    SerializerLoadSystem3(&builder, &shapes, opts.input.c_str(),
-                          opts.flags, &boundaries);
+    if(opts.is_legacy){
+        std::vector<vec3f> points;
+        SerializerLoadLegacySystem3(&points, opts.input.c_str(),
+                                    opts.flags, &boundaries);
+        for(int i = 0; i < points.size(); i++){
+            SerializedParticle sp;
+            sp.position = points[i];
+            sp.boundary = boundaries[i];
+            particles.push_back(sp);
+        }
+    }else{
+        SerializerLoadSystem3(&builder, &shapes, opts.input.c_str(),
+                              opts.flags, &boundaries);
+        //TODO: Hacky implementation
+        for(int i = 0; i < boundaries.size(); i++){
+            SerializedParticle sp;
+            sp.position = builder.positions[i];
+            sp.boundary = boundaries[i];
 
-    //TODO: Hacky implementation
-    for(int i = 0; i < boundaries.size(); i++){
-        SerializedParticle sp;
-        sp.position = builder.positions[i];
-        sp.boundary = boundaries[i];
-
-        particles.push_back(sp);
+            particles.push_back(sp);
+        }
     }
 
     count = particles.size();
@@ -718,6 +801,10 @@ void pbrt_command(int argc, char **argv){
     if(count > 0){
         int total = count;
         std::string data;
+        if(opts.output.size() == 0){
+            opts.output = opts.renderer == RENDERER_PBRT ? "geometry.pbrt" : "geometry.lit";
+        }
+
         std::ofstream ofs(opts.output, std::ofstream::out);
         
         if(!ofs.is_open()){
@@ -790,13 +877,24 @@ void pbrt_command(int argc, char **argv){
                         Float dist = Distance(ref, at);
                         if(dist < opts.cutDistance) continue;
                     }
-                    data += "AttributeBegin\n\tTranslate ";
-                    data += __to_stringf(p.position.x); data += " ";
-                    data += __to_stringf(p.position.y); data += " ";
-                    data += __to_stringf(p.position.z); data += "\n";
-                    data += "\tShape \"sphere\" \"float radius\" [";
-                    data += radiusString;
-                    data += "]\nAttributeEnd\n";
+                    if(opts.renderer == RENDERER_PBRT){
+                        data += "AttributeBegin\n\tTranslate ";
+                        data += __to_stringf(p.position.x); data += " ";
+                        data += __to_stringf(p.position.y); data += " ";
+                        data += __to_stringf(p.position.z); data += "\n";
+                        data += "\tShape \"sphere\" \"float radius\" [";
+                        data += radiusString;
+                        data += "]\nAttributeEnd\n";
+                    }else{
+                        data += "Shape{ type[sphere] radius[";
+                        data += radiusString;
+                        data += "] mat[layer_";
+                        data += __to_stringi(i);
+                        data += "] center[";
+                        data += __to_stringf(p.position.x); data += " ";
+                        data += __to_stringf(p.position.y); data += " ";
+                        data += __to_stringf(p.position.z); data += "] }\n";
+                    }
                     pAdded += 1;
                 }
             }
@@ -815,7 +913,12 @@ void pbrt_command(int argc, char **argv){
     if(rendergroups) delete[] rendergroups;
 
     if(opts.warn_ply_mesh){
-        printf("* Warning: PBRT only supports ply objects but the given simulation contains\n");
-        printf("           alternative formats. Make sure to convert to ply before rendering.\n");
+        if(opts.renderer == RENDERER_PBRT){
+            printf("* Warning: PBRT only supports ply objects but the given simulation contains\n");
+            printf("           alternative formats. Make sure to convert to ply before rendering.\n");
+        }else{
+            printf("* Warning: LIT only supports obj objects but the given simulation contains\n");
+            printf("           alternative formats. Make sure to convert to obj before rendering.\n");
+        }
     }
 }

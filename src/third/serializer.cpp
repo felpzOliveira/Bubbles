@@ -247,6 +247,95 @@ void SerializerLoadPoints3(std::vector<vec3f> *points,
     }
 }
 
+void SerializerLoadLegacySystem3(std::vector<vec3f> *points, const char *filename,
+                                 int flags, std::vector<int> *boundaries)
+{
+    std::ifstream ifs(filename);
+    if(ifs){
+        std::string format;
+        int pCount = 0;
+        std::string linebuf;
+        vec3f vel(0), nor(0);
+        int boundary = 0;
+        int readCount = 0;
+
+        GetLine(ifs, linebuf);
+        if(linebuf.size() > 0){ //remove '\n'
+            if(linebuf[linebuf.size()-1] == '\n') linebuf.erase(linebuf.size() - 1);
+        }
+
+        if(linebuf.size() > 0){ //remove '\r'
+            if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
+        }
+
+        pCount = std::stoi(linebuf);
+        if(pCount < 1){
+            printf("Failed to read particle count\n");
+            return;
+        }
+
+        points->clear();
+        points->reserve(pCount);
+
+        while(ifs.peek() != -1){
+            GetLine(ifs, linebuf);
+
+            if(linebuf.size() > 0){ //remove '\n'
+                if(linebuf[linebuf.size()-1] == '\n') linebuf.erase(linebuf.size() - 1);
+            }
+
+            if(linebuf.size() > 0){ //remove '\r'
+                if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
+            }
+
+            // skip empty
+            if(linebuf.empty()) continue;
+            vec3f pos(0);
+            const char *token = linebuf.c_str();
+            token += strspn(token, " \t");
+
+            if(readCount == pCount){
+                break;
+            }
+
+            if(flags & SERIALIZER_POSITION){
+                ParseV3(&pos, &token);
+                while(CAN_SKIP(token[0])) token++;
+            }
+
+            if(flags & SERIALIZER_VELOCITY){
+                ParseV3(&vel, &token);
+                while(CAN_SKIP(token[0])) token++;
+            }
+
+            if(flags & SERIALIZER_DENSITY){
+                (void)ParseFloat(&token);
+                while(CAN_SKIP(token[0])) token++;
+            }
+
+            if(flags & SERIALIZER_MASS){
+                (void)ParseFloat(&token);
+                while(CAN_SKIP(token[0])) token++;
+            }
+
+            if(flags & SERIALIZER_BOUNDARY){
+                boundary = (int)ParseFloat(&token);
+                while(CAN_SKIP(token[0])) token++;
+                if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && !boundary){
+                    continue;
+                }
+            }
+
+            points->push_back(pos);
+            if(boundaries){
+                boundaries->push_back(boundary);
+            }
+
+            readCount += 1;
+        }
+    }
+}
+
 ShapeType _SerializerGetShapeType(std::string name){
     if(name == "box") return ShapeBox;
     if(name == "sphere") return ShapeSphere;

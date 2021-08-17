@@ -3,6 +3,8 @@
 #include <graphy.h>
 #include <gr_display.hpp>
 #include <gr_opengl.hpp>
+#include <chrono>
+#include <thread>
 #define GraphyPath "/home/felipe/Documents/Graphics/build/libgraphy.so"
 
 #define NEW_DISPLAY "_Z14gr_new_displayii"
@@ -12,7 +14,7 @@
 #define RENDER_PTS_SIZE "_Z23gr_opengl_render_pointsPfS_ifP12gr_display_t"
 #define SET_VIEW_2D "_Z21gr_display_set_view2dP12gr_display_tffff"
 #define SET_VIEW_3D "_Z21gr_display_set_view3dP12gr_display_tfffffffff"
-#define CLOSE_DISPLAY "_Z18gr_destroy_displayP12gr_display_t"
+#define CLOSE_DISPLAY "_Z16gr_close_displayP12gr_display_t"
 #define RENDER_LINES "_Z22gr_opengl_render_linesPfS_iP12gr_display_t"
 
 static int display_width = 1000;
@@ -101,6 +103,7 @@ static void graphy_initialize(int width, int height){
 void graphy_close_display(){
     if(display){
         graphy_display_close(display);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         display = nullptr;
         graphy_ok = 0;
         if(colors) delete[] colors;

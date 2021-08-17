@@ -2,6 +2,7 @@ bubbles
 bbtool
 build
 simulations
+.cody
 fluid_engine_questions.txt
 *.pbrt
 *.o

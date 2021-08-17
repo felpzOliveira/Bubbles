@@ -274,7 +274,7 @@ void test_pcisph3_rotating_water_box(){
     vec3f origin(4);
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
-    Float spacing = 0.06;
+    Float spacing = 0.02;
     Float spacingScale = 1.8;
     int steps = 500;
     Float targetInterval =  1.0 / 240.0;
@@ -487,7 +487,7 @@ void test_pcisph3_water_drop(){
     vec3f origin(4);
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
-    Float spacing = 0.03;
+    Float spacing = 0.02;
     Float spacingScale = 2.0;
     Float sphereRadius = 0.3;
     vec3f waterBox(3.0-spacing, 0.3, 3.0-spacing);

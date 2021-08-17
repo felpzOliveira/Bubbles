@@ -89,7 +89,7 @@ int main(int argc, char **argv){
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
 
     //test_pcisph2_double_dam_break();
-    test_pcisph2_water_block_lnm();
+    //test_pcisph2_water_block_lnm();
     //test_pcisph2_water_block();
     //test_pcisph3_sdf();
     //test_pcisph3_rotating_water_box();
@@ -98,6 +98,8 @@ int main(int argc, char **argv){
     //test_pcisph3_pathing();
     //test_pcisph3_box_drop();
     //test_pcisph3_happy_whale();
+    //test_pcisph3_water_drop();
+    test_pcisph3_rotating_water_box();
 
 #if defined(RUN_TESTS)
     //run_self_tests();

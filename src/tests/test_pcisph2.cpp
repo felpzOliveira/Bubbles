@@ -6,6 +6,7 @@
 #include <memory.h>
 #include <marching_squares.h>
 #include <interval.h>
+#include <dilts.h>
 
 void test_pcisph2_marching_squares(){
     printf("===== PCISPH Solver 2D -- Marching Squares\n");
@@ -157,7 +158,8 @@ void test_pcisph2_water_block(){
             set2->SetParticleV0(i, 0);
         }
 
-        IntervalBoundary2(set2, spacing);
+        //IntervalBoundary2(set2, spacing);
+        DiltsSpokeBoundary(grid, set2);
 
         set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);

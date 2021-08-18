@@ -1,5 +1,6 @@
 #include <pcisph_solver.h>
 #include <util.h>
+#include <dilts.h>
 
 extern const Float kDefaultTimeStepLimitScale;
 
@@ -94,6 +95,7 @@ __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
     
     lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h, 0);
+    //DiltsSpokeBoundary(data->domain, pSet);
     lnmTimer.Stop();
     
     Float lnm = lnmTimer.GetElapsedGPU(0);

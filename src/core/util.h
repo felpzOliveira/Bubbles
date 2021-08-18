@@ -603,16 +603,20 @@ inline __host__ void UtilSaveSph3Frame(const char *basedir, int step, SphSolverD
 * Fetch the current boundary of the particle set.
 */
 template<typename ParticleSetAccessor> inline __host__
-void UtilGetBoundaryState(ParticleSetAccessor *pSet, std::vector<int> *boundaries){
+int UtilGetBoundaryState(ParticleSetAccessor *pSet, std::vector<int> *boundaries){
     int count = pSet->GetParticleCount();
+    int n = 0;
     boundaries->clear();
     for(int i = 0; i < count; i++){
         int b = 0;
         int v0 = pSet->GetParticleV0(i);
         if(v0 > 0){
             b = v0;
+            n++;
         }
         
         boundaries->push_back(b);
     }
+
+    return n;
 }

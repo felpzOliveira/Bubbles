@@ -80,6 +80,7 @@ void run_self_tests(){
 
 void test_pcisph3_pathing();
 void test_pcisph3_box_drop();
+
 int main(int argc, char **argv){
     BB_MSG("Bubbles Fluid Simulator");
     /* Initialize cuda API */
@@ -92,14 +93,16 @@ int main(int argc, char **argv){
     //test_pcisph2_water_block_lnm();
     //test_pcisph2_water_block();
     //test_pcisph3_sdf();
-    //test_pcisph3_rotating_water_box();
+    test_pcisph3_rotating_water_box();
     //test_pcisph3_dam_break_double_dragon();
     //test_pcisph3_quadruple_dam();
     //test_pcisph3_pathing();
     //test_pcisph3_box_drop();
     //test_pcisph3_happy_whale();
     //test_pcisph3_water_drop();
-    test_pcisph3_rotating_water_box();
+    //test_pcisph3_rotating_water_box();
+
+    //test_pcisph2_water_block();
 
 #if defined(RUN_TESTS)
     //run_self_tests();

@@ -1,4 +1,7 @@
 /* date = May 19th 2021 15:25 */
+#pragma once
+#include <grid.h>
+#include <cutil.h>
 
 /**************************************************************/
 //               I N T E R V A L   M E T H O D                //
@@ -6,11 +9,11 @@
 /**************************************************************/
 
 /*
-* Attempting to implement Sandim's interval method for boundary detection.
+* Attempting to implement Sandim's new interval method for boundary detection.
 * Going to implement the simple one first and we see where this goes.
 */
 
-//TODO: This is not GPU ready
+//TODO: This is not GPU ready. Heavily recursive.
 template<typename T>
 inline __bidevice__ void IntervalBoundaryGetBoundsFor2(ParticleSet<T> *pSet, int i,
                                                        Bounds2f *bounds, Float h)

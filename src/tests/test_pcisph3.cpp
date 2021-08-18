@@ -11,6 +11,7 @@
 #include <memory.h>
 #include <transform_sequence.h>
 #include <sdfs.h>
+#include <dilts.h>
 
 void test_pcisph3_box_drop(){
     printf("===== PCISPH Solver 3D -- Box Drop\n");
@@ -350,12 +351,19 @@ void test_pcisph3_rotating_water_box(){
             container->Update(g_transform * transform);
             container->SetVelocities(linear, angular * 50.0);
         }
-#if 0
+#if 1
+        std::vector<int> bounds;
+        int n = UtilGetBoundaryState(pSet, &bounds);
+        printf("Boundary %d / %d\n", (int)n, (int)pSet->GetParticleCount());
+
         std::string path("/home/felipe/Documents/Bubbles/simulations/box_rotate/out_");
         path += std::to_string(step-1);
         path += ".txt";
+        int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
+        //UtilSaveSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet,
+                                                         //path.c_str(), flags, &bounds);
         SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
-                                        SERIALIZER_POSITION);
+                                        flags, &bounds);
 #endif
 
         //UtilPrintStepStandard(&solver,step-1);
@@ -1134,7 +1142,7 @@ void test_pcisph3_rock_dam(){
 
 void test_lnm_happy_whale(){
     printf("===== LNM 3D -- Happy Whale\n");
-    const char *pFile = "output.txt";
+    const char *pFile = "whale";
     Bounds3f meshBounds;
     Float spacingScale = 2.0;
     Float spacing = 0.02;
@@ -1206,10 +1214,11 @@ void test_lnm_happy_whale(){
     TimerList timers;
     timers.Start();
     LNMBoundary(pSet, grid, spacing, 0);
+    //DiltsSpokeBoundary(grid, pSet);
     timers.Stop();
     
     std::cout << "Time taken " << timers.GetElapsedGPU(0) << " ms" << std::endl;
-    
+
     CudaMemoryManagerClearCurrent();
     printf("===== OK\n");
 }

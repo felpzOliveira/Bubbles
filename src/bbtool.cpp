@@ -21,6 +21,11 @@ ARGUMENT_PROCESS(view_cmd){
     return 1;
 }
 
+ARGUMENT_PROCESS(boundary_cmd){
+    boundary_command(argc-1, &argv[1]);
+    return 1;
+}
+
 std::map<const char *, arg_desc> command_map = {
     {"convert", 
         { .processor = convert_cmd, 
@@ -32,11 +37,15 @@ std::map<const char *, arg_desc> command_map = {
     },
     {"pbrt",
         { .processor = pbrt_cmd, 
-            .help = "Generates a rendarable PBRT point cloud geometry from Bubbles output."} 
+            .help = "Generates a rendarable PBRT/LIT point cloud geometry from Bubbles output."}
     },
     {"view",
         { .processor = view_cmd, 
             .help = "Uses Graphy to display a saved Bubbles simulation."} 
+    },
+    {"boundary",
+        { .processor = boundary_cmd,
+            .help = "Perform different types of boundary computation." }
     }
 };
 

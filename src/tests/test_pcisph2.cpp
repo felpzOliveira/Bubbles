@@ -6,7 +6,7 @@
 #include <memory.h>
 #include <marching_squares.h>
 #include <interval.h>
-#include <dilts.h>
+#include <boundary.h>
 
 void test_pcisph2_marching_squares(){
     printf("===== PCISPH Solver 2D -- Marching Squares\n");
@@ -158,8 +158,10 @@ void test_pcisph2_water_block(){
             set2->SetParticleV0(i, 0);
         }
 
-        //IntervalBoundary2(set2, spacing);
-        DiltsSpokeBoundary(grid, set2);
+        IntervalBoundary(set2, grid, spacing);
+        //DiltsSpokeBoundary(set2, grid);
+        //MullerBoundary(set2, grid, spacing);
+        //XiaoweiBoundary(set2, grid, spacing);
 
         set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
@@ -843,7 +845,8 @@ void test_pcisph2_water_sphere(){
     
     for(int i = 0; i < 20 * 26 * 20; i++){
         solver.Advance(targetInterval);
-        set_colors_pressure(col, data);
+        //set_colors_pressure(col, data);
+        set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
     }
     

@@ -534,6 +534,69 @@ void test_box_distance(){
     printf("===== OK\n");
 }
 
+void test_bounds_split3(){
+    printf("===== Test Bounds3 Split\n");
+    vec3f A(-1), B(1);
+    Bounds3f bounds(vec3f(-1), vec3f(1));
+    Bounds3f splits[8];
+
+    Float lx = (B.x - A.x) * 0.5;
+    Float ly = (B.y - A.y) * 0.5;
+    Float lz = (B.z - A.z) * 0.5;
+    vec3f res[] = {
+        vec3f(A.x, A.y, A.z),
+        vec3f(A.x + lx, A.y + ly, A.z + lz),
+        vec3f(A.x + lx, A.y, A.z),
+        vec3f(B.x, A.y + ly, A.z + lz),
+        vec3f(A.x, A.y + ly, A.z),
+        vec3f(A.x + lx, B.y, A.z + lz),
+        vec3f(A.x + lx, A.y + ly, A.z),
+        vec3f(B.x, B.y, A.z + lz),
+
+        vec3f(A.x, A.y, A.z + lz),
+        vec3f(A.x + lx, A.y + ly, A.z + lz + lz),
+        vec3f(A.x + lx, A.y, A.z + lz),
+        vec3f(B.x, A.y + ly, A.z + lz + lz),
+        vec3f(A.x, A.y + ly, A.z + lz),
+        vec3f(A.x + lx, B.y, A.z + lz + lz),
+        vec3f(A.x + lx, A.y + ly, A.z + lz),
+        vec3f(B.x, B.y, A.z + lz + lz),
+    };
+
+    printf("Splitting : ");
+    bounds.PrintSelf();
+    printf("\n");
+
+    int k = SplitBounds(bounds, &splits[0]);
+    TEST_CHECK(k == 8, "Invalid returned bound split count");
+
+    int it = 0;
+    for(int i = 0; i < 8; i++){
+        Bounds3f b = splits[i];
+        vec3f pMin = b.pMin;
+        vec3f pMax = b.pMax;
+        TEST_CHECK((IsZero(pMin.x - res[it].x) &&
+                   IsZero(pMin.y - res[it].y) &&
+                   IsZero(pMax.x - res[it+1].x) &&
+                   IsZero(pMax.y - res[it+1].y) &&
+                   IsZero(pMax.z - res[it+1].z) &&
+                   IsZero(pMax.z - res[it+1].z)),
+                   "Unexpected position");
+        it += 2;
+
+        // print for easy inspection
+        b.PrintSelf();
+        printf("\n");
+
+        TEST_CHECK(Inside(b, bounds), "Not inside");
+    }
+
+    Bounds3f bout(vec3f(-2), vec3f(1));
+    TEST_CHECK(!Inside(bout, bounds), "Invalid computation of bounds inside");
+
+    printf("===== OK\n");
+}
+
 void test_bounds_split2(){
     printf("===== Test Bounds2 Split\n");
     Bounds2f bounds(vec2f(-1), vec2f(1));

@@ -85,7 +85,7 @@ __global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
             int count = domain->GetNeighborsOf(i, &neighbors);
             for(int i = 0; i < count; i++){
                 Cell<Q> *cell = domain->GetCell(neighbors[i]);
-                if(cell->GetLevel() == 1 && cell->GetChainLength() < preDelta){
+                if(cell->GetLevel() == 1 && (cell->GetChainLength() <= preDelta)){
                     self->SetLevel(2);
                     if(algorithm == 0){ // fast
                         LNMBoundaryLNSet(pSet, self, 2);
@@ -127,7 +127,7 @@ __global__ void LNMBoundaryLKKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
             int count = domain->GetNeighborsOf(i, &neighbors);
             for(int i = 0; i < count; i++){
                 Cell<Q> *cell = domain->GetCell(neighbors[i]);
-                if(cell->GetLevel() == 1 && cell->GetChainLength() < preDelta){
+                if(cell->GetLevel() == 1 && cell->GetChainLength() <= preDelta){
                     self->SetLevel(-2);
                     LNMBoundaryLNSet(pSet, self, 2);
                     break;
@@ -187,7 +187,7 @@ __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
               GPUKernel(LNMBoundaryL1Kernel<T, U, Q>), pSet, domain);
     
     /* Filter L2 */
-    GPULaunch(domain->GetActiveCellCount(), GPUKernel(LNMBoundaryL2Kernel<T, U, Q>), 
+    GPULaunch(domain->GetActiveCellCount(), GPUKernel(LNMBoundaryL2Kernel<T, U, Q>),
               pSet, domain, delta, h, algorithm);
 }
 

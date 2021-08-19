@@ -59,6 +59,9 @@ __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
 __host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
                                        Float spacingScale = 2.0);
 
+__host__ Grid3 *UtilBuildGridForBuilder(ParticleSetBuilder3 *builder,
+                                        Float spacing, Float spacingScale);
+
 /*
 * Checks if emitting from any of the emitters in VolumeParticleEmitterSet3 
 * will overlaps any of the colliders given in the ColliderSet3. This is important

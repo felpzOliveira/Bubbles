@@ -276,8 +276,7 @@ __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
     half = vec3f(mx * hlen, my * hlen, mz * hlen);
     pMin = domain.Center() - half;
     pMax = domain.Center() + half;
-    vec3ui resolution(mx, my, mz);
-    return MakeGrid(resolution, pMin, pMax);
+    return MakeGrid(vec3ui(mx, my, mz), pMin, pMax);
 }
 
 __host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
@@ -295,8 +294,21 @@ __host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
     half = vec2f(mx * hlen, my * hlen);
     pMin = domain.Center() - half;
     pMax = domain.Center() + half;
-    vec2ui resolution(mx, my);
-    return MakeGrid(resolution, pMin, pMax);
+    return MakeGrid(vec2ui(mx, my), pMin, pMax);
+}
+
+__host__ Grid3 *UtilBuildGridForBuilder(ParticleSetBuilder3 *builder, Float spacing,
+                                        Float spacingScale)
+{
+    int size = builder->positions.size();
+    vec3f p = builder->positions[0];
+    Bounds3f container(p, p);
+    for(int i = 1; i < size; i++){
+        container = Union(container, builder->positions[i]);
+    }
+
+    container.Expand(spacing);
+    return UtilBuildGridForDomain(container, spacing, spacingScale);
 }
 
 __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBuilder3 *builder,

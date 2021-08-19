@@ -15,6 +15,25 @@
 * in the interior of the fluid I'll implement this version.
 */
 
+#define DILTS_RADIUS_MULTIPLIER 0.75
+#define DILTS_LINEAR_SAMPLE_COUNT 64
+
+// NOTE: Because this is applied directly in the simulator system
+//       querying for the particle radius will return the SPH kernel
+//       after scalers. However rendering system do not use this value
+//       as it is a massive blob. Dilts method needs to be executed
+//       with rendering radius otherwise it will fail (for rendering
+//       at least). Bubbles has no idea how this is going to be rendered
+//       and can't assume anything. LIT/PBRT are versatile in defining
+//       particle radius but SSS is not. It applys a 0.75 scaling, if we
+//       don't apply this Dilts will fail for SSS, so I'll hardcode this
+//       value here for now. It will increase the boundary for LIT
+//       but it is stable enough for all these renderers.
+inline __bidevice__
+Float DiltsGetParticleRadius(Float simRadius){
+    return simRadius * DILTS_RADIUS_MULTIPLIER;
+}
+
 template<typename T> inline __bidevice__
 bool DoesSpheresIntersect(T pi, T pj, Float ri, Float rj){
     Float d = Distance(pi, pj);
@@ -74,6 +93,10 @@ vec3f DiltsSpokeTakeUniformPoint(vec3f pi, Float r, int &done,
 
 }
 
+/*
+* Computes if the particle with id 'pId' present in the set 'pSet' over the domain
+* 'domain' is classified as boundary by the Spoke version of Dilts method.
+*/
 template<typename T, typename U, typename Q> inline __bidevice__
 int DiltsSpokeParticleIsBoundary(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, int pId){
     int *neighbors = nullptr;
@@ -84,10 +107,7 @@ int DiltsSpokeParticleIsBoundary(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, in
     unsigned int cellId = domain->GetLinearHashedPosition(pi);
     int count = domain->GetNeighborsOf(cellId, &neighbors);
 
-    // TODO: grab compensation factor from spacing multiplier and pass it here,
-    //       most simulations implemented in bubbles use 1.8/2.0 scaling
-    //       so I'll just hardcode 0.9 here.
-    Float rad = pSet->GetRadius() * 0.9;
+    Float rad = DiltsGetParticleRadius(pSet->GetRadius());
 
     for(int i = 0; i < count; i++){
         Cell<Q> *cell = domain->GetCell(neighbors[i]);
@@ -111,11 +131,11 @@ int DiltsSpokeParticleIsBoundary(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, in
 
     int done = 0;
     int iti = 0, itj = 0;
-    // hardcode sample count, I do believe 32 is waaay more than enough
-    int samples = 32;
+
     while(!done){
         int is_inside = 0;
-        T point = DiltsSpokeTakeUniformPoint(pi, rad, done, iti, itj, samples);
+        T point = DiltsSpokeTakeUniformPoint(pi, rad, done, iti, itj,
+                                             DILTS_LINEAR_SAMPLE_COUNT);
         for(int s = 0; s < n; s++){
             T pj = candidates[s];
             Float d = Distance(pj, point);
@@ -142,7 +162,7 @@ __global__ void DiltsComputeKernel(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
 }
 
 template<typename T, typename U, typename Q> __host__
-void DiltsSpokeBoundary(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
+void DiltsSpokeBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
     int N = pSet->GetParticleCount();
     GPULaunch(N, GPUKernel(DiltsComputeKernel<T, U, Q>), domain, pSet);
 }

@@ -1214,7 +1214,7 @@ void test_lnm_happy_whale(){
     TimerList timers;
     timers.Start();
     LNMBoundary(pSet, grid, spacing, 0);
-    //DiltsSpokeBoundary(grid, pSet);
+    //DiltsSpokeBoundary(pSet, grid);
     timers.Stop();
     
     std::cout << "Time taken " << timers.GetElapsedGPU(0) << " ms" << std::endl;

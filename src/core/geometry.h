@@ -1664,29 +1664,20 @@ Bounds3<T> Expand(const Bounds3<T> &b, U delta){
 
 template<typename T> inline __bidevice__
 int SplitBounds(const Bounds3<T> &bounds, Bounds3<T> *split){
-    vec3<T> center = bounds.Center();
-    vec3<T> pMin = bounds.pMin;
-    vec3<T> pMax = bounds.pMax;
-    split[0] = Bounds3<T>(pMin, center);
-    split[1] = Bounds3<T>(vec3<T>(center.x, pMin.y, pMin.z),
-                          vec3<T>(pMax.x, center.y, center.z));
+    vec3<T> A = bounds.pMin;
+    vec3<T> B = bounds.pMax;
+    T lx = (B.x - A.x) * 0.5;
+    T ly = (B.y - A.y) * 0.5;
+    T lz = (B.z - A.z) * 0.5;
+    split[0] = Bounds3<T>(vec3f(A.x, A.y, A.z), vec3f(A.x + lx, A.y + ly, A.z + lz));
+    split[1] = Bounds3<T>(vec3f(A.x + lx, A.y, A.z), vec3f(B.x, A.y + ly, A.z + lz));
+    split[2] = Bounds3<T>(vec3f(A.x, A.y + ly, A.z), vec3f(A.x + lx, B.y, A.z + lz));
+    split[3] = Bounds3<T>(vec3f(A.x + lx, A.y + ly, A.z), vec3f(B.x, B.y, A.z + lz));
 
-    split[2] = Bounds3<T>(vec3<T>(center.x, center.y, pMin.z),
-                          vec3<T>(pMax.x, pMax.y, center.z));
-
-    split[3] = Bounds3<T>(vec3<T>(pMin.x, center.y, pMin.z),
-                          vec3<T>(center.x, pMax.y, center.z));
-
-    split[4] = Bounds3<T>(vec3<T>(center.x, pMin.y, center.z),
-                          vec3<T>(pMax.x, center.y, pMax.z));
-
-    split[5] = Bounds3<T>(vec3<T>(pMin.x, pMin.y, center.z),
-                          vec3<T>(center.x, center.y, pMax.z));
-
-    split[6] = Bounds3<T>(vec3<T>(pMin.x, center.y, center.z),
-                          vec3<T>(center.x, pMax.y, pMax.z));
-
-    split[7] = Bounds3<T>(center, pMax);
+    split[4] = Bounds3<T>(vec3f(A.x, A.y, A.z + lz), vec3f(A.x + lx, A.y + ly, A.z + lz + lz));
+    split[5] = Bounds3<T>(vec3f(A.x + lx, A.y, A.z + lz), vec3f(B.x, A.y + ly, A.z + lz + lz));
+    split[6] = Bounds3<T>(vec3f(A.x, A.y + ly, A.z + lz), vec3f(A.x + lx, B.y, A.z + lz + lz));
+    split[7] = Bounds3<T>(vec3f(A.x + lx, A.y + ly, A.z +lz), vec3f(B.x, B.y, A.z + lz + lz));
 
     return 8;
 }

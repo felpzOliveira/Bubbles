@@ -2,6 +2,7 @@
 #include <shape.h>
 #include <point_generator.h>
 #include <util.h>
+#include <boundary.h>
 
 Float kDefaultTimeStepLimitScale = 5.0;
 
@@ -104,7 +105,11 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     data->domain->UpdateQueryState();
     
     lnmTimer.Start();
-    LNMBoundary(pSet, data->domain, h, 0);
+    //LNMBoundary(pSet, data->domain, h, 0);
+    //DiltsSpokeBoundary(pSet, data->domain);
+    //MullerBoundary(pSet, data->domain, h);
+    //XiaoweiBoundary(pSet, data->domain, h);
+    IntervalBoundary(pSet, data->domain, h);
     lnmTimer.Stop();
     
     Float lnm = lnmTimer.GetElapsedGPU(0);

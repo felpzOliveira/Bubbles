@@ -5,81 +5,173 @@
 
 /**************************************************************/
 //               I N T E R V A L   M E T H O D                //
-//                      Trivial version                       //
+//                                                            //
 /**************************************************************/
 
 /*
-* Attempting to implement Sandim's new interval method for boundary detection.
-* Going to implement the simple one first and we see where this goes.
+* Attempting to implement Sandim's new interval method for boundary detection
+* presented in:
+* Simple and reliable boundary detection for meshfree particle methods
+*                       using interval analysis
+* I'm not sure why this doesn't trivially expands to 3D but for now it is
+* only working for 2D. I'm not sure I want to implement mesh manipulation
+* so it might only be this.
 */
 
-//TODO: This is not GPU ready. Heavily recursive.
+#define INTERVAL_LABEL_COVERED 0
+#define INTERVAL_LABEL_UNCOVERED 1
+#define INTERVAL_LABEL_PARTIALLY_COVERED 2
+
 template<typename T>
-inline __bidevice__ void IntervalBoundaryGetBoundsFor2(ParticleSet<T> *pSet, int i,
-                                                       Bounds2f *bounds, Float h)
+class Stack{
+    public:
+    T data[256];
+    unsigned int _top;
+    unsigned int capacity;
+    unsigned int size;
+    __bidevice__ Stack(){
+        _top = 0;
+        capacity = 256;
+        size = 0;
+    }
+
+    __bidevice__ void push(T item){
+        if(!(_top < capacity)){
+            printf("Not enough space\n");
+            return;
+        }
+
+        memcpy(&data[_top++], &item, sizeof(T));
+        size += 1;
+    }
+
+    __bidevice__ bool empty(){ return size < 1; }
+
+    __bidevice__ void pop(){
+        if(size > 0 && _top > 0){
+            _top--;
+            size--;
+        }
+    }
+
+    __bidevice__ void top(T *item){
+        if(size > 0 && _top > 0){
+            memcpy(item, &data[_top-1], sizeof(T));
+        }
+    }
+
+    __bidevice__ ~Stack(){}
+};
+
+template<typename T, typename Q> inline __bidevice__
+void IntervalBoundaryGetBoundsFor(ParticleSet<T> *pSet, int i,
+                                  Q *bounds, Float h)
 {
-    vec2f p = pSet->GetParticlePosition(i);
-    *bounds = Bounds2f(p - vec2f(h), p + vec2f(h));
+    T p = pSet->GetParticlePosition(i);
+    *bounds = Q(p - T(h), p + T(h));
 }
 
-template<typename T>
-__bidevice__ bool IntervalQuery2(ParticleSet<T> *pSet, int i, Bounds2f Bq,
-                                 int depth, int max_depth, Float h)
+template<typename T, typename U, typename Q, typename Func> __bidevice__
+void ForAllNeighbors(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, int pId, Func fn){
+    int *neighbors = nullptr;
+    T pi = pSet->GetParticlePosition(pId);
+    unsigned int cellId = domain->GetLinearHashedPosition(pi);
+    int count = domain->GetNeighborsOf(cellId, &neighbors);
+    int terminate = 0;
+
+    for(int i = 0; i < count && !terminate; i++){
+        Cell<Q> *cell = domain->GetCell(neighbors[i]);
+        ParticleChain *pChain = cell->GetChain();
+        int size = cell->GetChainLength();
+        for(int j = 0; j < size && !terminate; j++){
+            if(pChain->pId != pId){
+                terminate = fn(pChain->pId);
+            }
+
+            pChain = pChain->next;
+        }
+    }
+}
+
+template<typename T, typename U, typename Q> __bidevice__
+bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
+                                int max_depth, Float h, int pId)
 {
-    bool interior = true;
-    Bucket *bucket = pSet->GetParticleBucket(i);
-    for(int k = 0; k < bucket->Count(); k++){
-        Bounds2f Bj;
-        int j = bucket->Get(k);
+    struct IntervalData{
+        Q bq;
+        int depth;
+    };
 
-        if(i == j) continue;
+    Q Bi;
+    Stack<IntervalData> stack;
+    IntervalBoundaryGetBoundsFor<T, Q>(pSet, pId, &Bi, h);
 
-        IntervalBoundaryGetBoundsFor2(pSet, j, &Bj, h);
-        // in this case this Q can be let go
+    int q = INTERVAL_LABEL_UNCOVERED;
+    Q Bq = Bi;
+    auto fn = [&](int j) -> int{
+        Q Bj;
+        IntervalBoundaryGetBoundsFor<T, Q>(pSet, j, &Bj, h);
         if(Inside(Bq, Bj)){
-            return true;
+            q = INTERVAL_LABEL_COVERED;
+            return 1;
         }
 
-        // if Q is not inside Bj, overlaps will only return the 'straddle' class.
         if(Overlaps(Bq, Bj)){
-            interior = false;
+            q = INTERVAL_LABEL_PARTIALLY_COVERED;
+        }
+
+        return 0;
+    };
+
+    stack.push({Bi, 0});
+    while(!stack.empty()){
+        IntervalData iBq;
+        stack.top(&iBq);
+        stack.pop();
+
+        Bq = iBq.bq;
+        q = INTERVAL_LABEL_UNCOVERED;
+        ForAllNeighbors(domain, pSet, pId, fn);
+
+        if(q == INTERVAL_LABEL_COVERED){
+            // continue looping
+        }else if(q == INTERVAL_LABEL_UNCOVERED){
+            return false;
+        }else{
+            if(iBq.depth < max_depth){
+                Q inner[8];
+                int s = SplitBounds(Bq, &inner[0]);
+                for(int k = 0; k < s; k++){
+                    stack.push({inner[k], iBq.depth+1});
+                }
+            }else{
+                return false;
+            }
         }
     }
 
-    if(interior){
-        return false;
-    }
-
-    if(depth >= max_depth){
-        return false;
-    }
-
-    Bounds2f inner[4];
-    int s = SplitBounds(Bq, &inner[0]);
-    bool r = true;
-    for(int k = 0; k < s; k++){
-        r &= IntervalQuery2(pSet, i, inner[k], depth+1, max_depth, h);
-    }
-
-    return r;
+    return true;
 }
 
-template<typename T>
-__bidevice__ void IntervalBoundaryClassify2(ParticleSet<T> *pSet, int i, Float h){
-    Bounds2f Bi;
-    int max_depth = 1;
-    IntervalBoundaryGetBoundsFor2(pSet, i, &Bi, h);
-    if(!IntervalQuery2(pSet, i, Bi, 0, max_depth, h)){
-        pSet->SetParticleV0(i, 1);
+template<typename T, typename U, typename Q> __global__
+void IntervalBoundaryKernel(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
+                            Float h, int max_depth)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < pSet->GetParticleCount()){
+        int is_interior = IntervalParticleIsInterior<T, U, Q>(domain, pSet,
+                                                              max_depth, h, i);
+        if(!is_interior){
+            pSet->SetParticleV0(i, 1);
+        }
     }
 }
 
-template<typename T>
-__host__ void IntervalBoundary2(ParticleSet<T> *pSet, Float h){
+template<typename T, typename U, typename Q>
+__host__ void IntervalBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                               Float h, int max_depth = 4)
+{
     int N = pSet->GetParticleCount();
-
-    // this is a per-particle method
-    for(int i = 0; i < N; i++){
-        IntervalBoundaryClassify2(pSet, i, h);
-    }
+    GPULaunch(N, GPUKernel(IntervalBoundaryKernel<T, U, Q>),
+                            domain, pSet, h, max_depth);
 }

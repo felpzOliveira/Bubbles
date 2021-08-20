@@ -74,6 +74,26 @@ void *_cudaAllocator(size_t bytes, int line, const char *filename, bool abort){
     return ptr;
 }
 
+void *_cudaAllocatorExclusive(size_t bytes, int line, const char *filename, bool abort){
+    void *ptr = nullptr;
+    if(cudaHasMemory(bytes)){
+        cudaError_t err = cudaMalloc(&ptr, bytes);
+        if(err != cudaSuccess){
+            std::cout << "Failed to allocate memory " << filename << ":" << line << "[" << bytes << " bytes]" << std::endl;
+            ptr = nullptr;
+        }else{
+            global_memory.allocated += bytes;
+        }
+    }
+
+    if(!ptr && abort){
+        getchar();
+        cudaSafeExit();
+    }
+
+    return ptr;
+}
+
 __host__ void CudaMemoryManagerClearCurrent(){
     if(manager.activeEntry){
         int size = manager.activeEntry->addresses.size();
@@ -114,6 +134,18 @@ __host__ void CudaMemoryManagerStart(const char *key){
 
 void *_cudaAllocate(size_t bytes, int line, const char *filename, bool abort){
     void *ptr = _cudaAllocator(bytes, line, filename, abort);
+    if(!initialized){
+        initialized = 1;
+        CudaMemoryManagerEmpty();
+        CudaMemoryManagerInsertRegion(globalKey.c_str());
+    }
+    manager.activeEntry->addresses.push_back(ptr);
+    manager.activeEntry->size += bytes;
+    return ptr;
+}
+
+void *_cudaAllocateExclusive(size_t bytes, int line, const char *filename, bool abort){
+    void *ptr = _cudaAllocatorExclusive(bytes, line, filename, abort);
     if(!initialized){
         initialized = 1;
         CudaMemoryManagerEmpty();

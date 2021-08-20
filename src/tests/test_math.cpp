@@ -524,7 +524,7 @@ void test_box_distance(){
     
     vec3f origin(0,0,3);
     vec3f target(0,0,0);
-    Float rgb[3] = {1, 0, 0};
+    float rgb[3] = {1, 0, 0};
     
     graphy_vector_set(origin, target);
     graphy_render_points3(pos, rgb, targets.size(), 0.01);

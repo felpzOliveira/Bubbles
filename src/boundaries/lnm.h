@@ -1,6 +1,7 @@
 #pragma once
 #include <grid.h>
 #include <cutil.h>
+#include <dilts.h>
 
 /**************************************************************/
 //      L A Y E R E D   N E I G H B O R   M E T H O D         //
@@ -13,6 +14,50 @@
 * TODO: Implement generic Fn search for Li-boundaries for GPU.
 */
 
+template<typename T> inline __bidevice__ int QueuePushEntry(T *Q){
+#if defined(__CUDA_ARCH__)
+    return atomicAdd(&Q->size, 1);
+#else
+    return __atomic_fetch_add(&Q->size, 1, __ATOMIC_SEQ_CST);
+#endif
+}
+
+template<typename T> inline __bidevice__ int QueueGetEntry(T *Q){
+#if defined(__CUDA_ARCH__)
+    return atomicAdd(&Q->entry, 1);
+#else
+    return __atomic_fetch_add(&Q->entry, 1, __ATOMIC_SEQ_CST);
+#endif
+}
+
+class LNMWorkQueue{
+    public:
+    int size;
+    int entry;
+    int *ids;
+    __bidevice__ LNMWorkQueue(){}
+    __host__ void SetParticles(int n){
+        ids = (int *)cudaAllocateExclusive(n * sizeof(int));
+        size = 0;
+        entry = 0;
+    }
+
+    __bidevice__ void Push(int id){
+        int at = QueuePushEntry(this);
+        ids[at] = id;
+    }
+
+    __bidevice__ int Fetch(){
+        int at = QueueGetEntry(this);
+        return ids[at];
+    }
+
+    __host__ void Reset(){
+        entry = 0;
+        size = 0;
+    }
+};
+
 // going to classify on v0 buffer as simulation step should already be resolved
 template<typename T, typename Q>
 __bidevice__ void LNMBoundaryLNSet(ParticleSet<T> *pSet, Cell<Q> *self, int L){
@@ -21,6 +66,17 @@ __bidevice__ void LNMBoundaryLNSet(ParticleSet<T> *pSet, Cell<Q> *self, int L){
     for(int i = 0; i < count; i++){
         pSet->SetParticleV0(pChain->pId, L);
         pChain = pChain->next;
+    }
+}
+
+template<typename T, typename Q>
+__bidevice__ void LNMBoundaryPushWork(ParticleSet<T> *pSet, Cell<Q> *self,
+                                      LNMWorkQueue *workQ)
+{
+    int count = self->GetChainLength();
+    ParticleChain *pChain = self->GetChain();
+    for(int i = 0; i < count; i++){
+        workQ->Push(pChain->pId);
     }
 }
 
@@ -72,9 +128,32 @@ __bidevice__ void LNMBoundaryL2Asymmetry(ParticleSet<T> *pSet, Cell<Q> *self, Fl
     }
 }
 
+template<typename T, typename U, typename Q> __global__
+void LNMBoundaryL2GeomKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                             Float preDelta, Float h, LNMWorkQueue *workQ)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < workQ->size){
+        int id = workQ->Fetch();
+        T pi = pSet->GetParticlePosition(id);
+        unsigned int cellId = domain->GetLinearHashedPosition(pi);
+        Cell<Q> *cell = domain->GetCell(cellId);
+        // TODO: This needs to be a queue in order to perform decently
+        if(cell->GetLevel() == 2){
+            int b = DiltsSpokeParticleIsBoundary(domain, pSet, id);
+            if(b > 0){
+                pSet->SetParticleV0(id, 2);
+            }
+
+            workQ->ids[id] = b;
+        }
+    }
+}
+
 template<typename T, typename U, typename Q>
 __global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, 
-                                    Float preDelta, Float h, int algorithm)
+                                    Float preDelta, Float h, int algorithm,
+                                    LNMWorkQueue *workQ)
 {
     int id = threadIdx.x + blockIdx.x * blockDim.x;
     if(id < domain->GetActiveCellCount()){
@@ -92,6 +171,8 @@ __global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                     }else if(algorithm == 1){ // asymmetry
                         LNMBoundaryL2Asymmetry(pSet, self, h, domain, 
                                                neighbors, count);
+                    }else if(algorithm >= 2 && workQ){
+                        LNMBoundaryPushWork(pSet, self, workQ);
                     }
                     
                     break;
@@ -173,7 +254,7 @@ __global__ void LNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain)
 */
 template<typename T, typename U, typename Q>
 __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, 
-                          Float h, int algorithm=0)
+                          Float h, int algorithm=0, LNMWorkQueue *workQ=nullptr)
 {
     /* Get the minimum in case its not a regular grid */
     T len = domain->GetCellSize();
@@ -181,14 +262,25 @@ __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     
     Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
     delta -= domain->dimensions > 2 ? 0 : 1; // offset compensation for 2D
-    
+
+    if(workQ){
+        workQ->Reset();
+    }
+
     /* Classify L1 */
     GPULaunch(domain->GetActiveCellCount(), 
               GPUKernel(LNMBoundaryL1Kernel<T, U, Q>), pSet, domain);
-    
-    /* Filter L2 */
+
+    /* Filter L2 by Voxel */
     GPULaunch(domain->GetActiveCellCount(), GPUKernel(LNMBoundaryL2Kernel<T, U, Q>),
-              pSet, domain, delta, h, algorithm);
+              pSet, domain, delta, h, algorithm, workQ);
+
+    if(algorithm >= 2 && workQ){
+        /* Apply Geometric intersection */
+        int N = workQ->size;
+        GPULaunch(N, GPUKernel(LNMBoundaryL2GeomKernel<T, U, Q>),
+                   pSet, domain, delta, h, workQ);
+    }
 }
 
 /**************************************************************/

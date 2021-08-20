@@ -49,7 +49,7 @@ vec2f DiltsSpokeTakeUniformPoint(vec2f pi, Float r, int &done,
 {
     Float samples = (Float)spoke_samples;
     Float angle = (Float)sp * TwoPi / samples;
-    Float co, so;
+    float co, so;
 #if defined(__CUDA_ARCH__)
     __sincosf(angle, &so, &co);
 #else
@@ -73,7 +73,7 @@ vec3f DiltsSpokeTakeUniformPoint(vec3f pi, Float r, int &done,
     Float samples = (Float)spoke_samples;
     Float u = i * Pi / samples;
     Float v = j * TwoPi / samples;
-    Float sinu, cosu, sinv, cosv;
+    float sinu, cosu, sinv, cosv;
 #if defined(__CUDA_ARCH__)
     __sincosf(u, &sinu, &cosu);
     __sincosf(v, &sinv, &cosv);

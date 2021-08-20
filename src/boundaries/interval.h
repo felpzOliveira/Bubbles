@@ -5,17 +5,12 @@
 
 /**************************************************************/
 //               I N T E R V A L   M E T H O D                //
-//                                                            //
 /**************************************************************/
 
 /*
-* Attempting to implement Sandim's new interval method for boundary detection
-* presented in:
+* Implementation of Sandim's new interval method for boundary detection in:
 * Simple and reliable boundary detection for meshfree particle methods
 *                       using interval analysis
-* I'm not sure why this doesn't trivially expands to 3D but for now it is
-* only working for 2D. I'm not sure I want to implement mesh manipulation
-* so it might only be this.
 */
 
 #define INTERVAL_LABEL_COVERED 0
@@ -172,6 +167,8 @@ __host__ void IntervalBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                Float h, int max_depth = 4)
 {
     int N = pSet->GetParticleCount();
+    // 2/3 , 2/2
+    Float scale = domain->GetDimensions() == 3 ? 0.666 : 1.0;
     GPULaunch(N, GPUKernel(IntervalBoundaryKernel<T, U, Q>),
-                            domain, pSet, h, max_depth);
+                            domain, pSet, h * scale, max_depth);
 }

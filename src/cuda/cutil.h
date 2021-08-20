@@ -23,6 +23,7 @@ typedef enum{
 
 #define CUCHECK(r) _check((r), #r, __LINE__, __FILE__)
 #define cudaAllocate(bytes) _cudaAllocate(bytes, __LINE__, __FILE__, true)
+#define cudaAllocateExclusive(bytes) _cudaAllocateExclusive(bytes, __LINE__, __FILE__, true)
 #define cudaAllocateEx(bytes, abort) _cudaAllocate(bytes, __LINE__, __FILE__, abort)
 #define cudaAllocateVx(type, n) (type *)_cudaAllocate(sizeof(type)*n, __LINE__, __FILE__, true)
 #define cudaDeviceAssert(fname) if(cudaKernelSynchronize()){ printf("Failure for %s\n", fname); cudaSafeExit(); }
@@ -127,6 +128,7 @@ std::string time_to_string(std::string val, int size);
 * after a region is no longer nedded.
 */
 void *_cudaAllocate(size_t bytes, int line, const char *filename, bool abort);
+void *_cudaAllocateExclusive(size_t bytes, int line, const char *filename, bool abort);
 
 template<typename T>
 class DataBuffer{

@@ -26,8 +26,8 @@ class GPUTimer{
         cudaEventRecord(end);
         cudaEventSynchronize(end);
     }
-    __host__ Float TimeElapsed(){
-        Float milliseconds = 0;
+    __host__ float TimeElapsed(){
+        float milliseconds = 0;
         cudaEventElapsedTime(&milliseconds, start, end);
         return milliseconds;
     }

@@ -127,7 +127,7 @@ void test_pcisph2_water_block(){
     pMax = containerBounds.pMax + vec2f(spacing);
     
     Grid2 *grid = MakeGrid(res, pMin, pMax);
-    
+
     VolumeParticleEmitter2 emitter(rect, rect->GetBounds(), spacing);
     
     emitter.Emit(&builder);
@@ -848,6 +848,7 @@ void test_pcisph2_water_sphere(){
         //set_colors_pressure(col, data);
         set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
+        if(i == 200) getchar();
     }
     
     delete[] pos;

@@ -14,6 +14,7 @@ typedef struct{
     int inflags;
     int outflags;
     int legacy;
+    int lnmalgo;
     BoundaryMethod method;
 }boundary_opts;
 
@@ -25,6 +26,7 @@ void default_boundary_opts(boundary_opts *opts){
     opts->spacing = 0.02;
     opts->spacingScale = 2.0;
     opts->legacy = 0;
+    opts->lnmalgo = 0;
 }
 
 void print_boundary_configs(boundary_opts *opts){
@@ -34,11 +36,26 @@ void print_boundary_configs(boundary_opts *opts){
     std::cout << "    * Method : " << GetBoundaryMethodName(opts->method) << std::endl;
     std::cout << "    * Spacing : " << opts->spacing << std::endl;
     std::cout << "    * Spacing Scale : " << opts->spacingScale << std::endl;
+    if(opts->method == BOUNDARY_LNM){
+        std::cout << "    * LNM Algo: " << opts->lnmalgo << std::endl;
+    }
 }
 
 ARGUMENT_PROCESS(boundary_in_args){
     boundary_opts *opts = (boundary_opts *)config;
     opts->input = ParseNext(argc, argv, i, "-in", 1);
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_lnm_algo_args){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->lnmalgo = ParseNextFloat(argc, argv, i, "-lnm-algo");
+    if(opts->lnmalgo != 0 && opts->lnmalgo != 1 &&
+       opts->lnmalgo != 2 && opts->lnmalgo != 5)
+    {
+        printf("Unknown algorithm value\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -104,6 +121,12 @@ std::map<const char *, arg_desc> bounds_arg_map = {
             .help = "Sets the input file for boundary computation."
         }
     },
+    {"-lnmalgo",
+        {
+            .processor = boundary_lnm_algo_args,
+            .help = "Sets the LNM algorithm to use ( Applies to LNM method only )."
+        }
+    },
     {"-out",
         {
             .processor = boundary_out_args,
@@ -165,7 +188,7 @@ void process_boundary_request(boundary_opts *opts){
     }
 
     if(!(opts->method >= BOUNDARY_LNM && opts->method < BOUNDARY_NONE)){
-        printf("No method specified\n");
+        printf("No valid method specified\n");
         return;
     }
 
@@ -183,6 +206,14 @@ void process_boundary_request(boundary_opts *opts){
 
     Grid3 *grid = UtilBuildGridForBuilder(&builder, opts->spacing,
                                           opts->spacingScale);
+
+    Bounds3f dBounds = grid->GetBounds();
+    vec3f p0 = dBounds.pMin;
+    vec3f p1 = dBounds.pMax;
+    printf("Built domain with extension:\n"
+            "    [%g %g %g]  x  [%g %g %g]\n",
+           p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
+
     SphSolver3 solver;
     SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(&builder);
     ParticleSet3 *pSet = sphpSet->GetParticleSet();
@@ -199,8 +230,38 @@ void process_boundary_request(boundary_opts *opts){
     TimerList timer;
     timer.Start();
     if(opts->method == BOUNDARY_LNM){
-        //LNMBoundaryExtended(pSet, grid, opts->spacing, 5, 0);
-        LNMBoundary(pSet, grid, opts->spacing, 0);
+        if(opts->lnmalgo == 5){
+            LNMBoundaryExtended(pSet, grid, opts->spacing, 5, 0);
+        }else{
+            int npart = pSet->GetParticleCount();
+            LNMWorkQueue *workQ = nullptr;
+            if(opts->lnmalgo >= 2){
+                workQ = cudaAllocateVx(LNMWorkQueue, 1);
+                workQ->SetParticles(npart);
+            }
+
+            LNMBoundary(pSet, grid, opts->spacing, opts->lnmalgo, workQ);
+
+            if(workQ){
+                int workQueueParts = workQ->size;
+                Float bounds = 0;
+                int *localId = new int[npart];
+                CUCHECK(cudaMemcpy(localId, workQ->ids, sizeof(int) * npart,
+                                                    cudaMemcpyDeviceToHost));
+
+                for(int i = 0; i < workQueueParts; i++){
+                    if(localId[i] > 0){
+                        bounds++;
+                    }
+                }
+
+                Float evals = (Float)workQ->size;
+                Float ratio = 100.0 * bounds / evals;
+                printf("WorkQueue ratio: %g%%\n", ratio);
+
+                delete[] localId;
+            }
+        }
     }else if(opts->method == BOUNDARY_DILTS){
         DiltsSpokeBoundary(pSet, grid);
         Float rad = DiltsGetParticleRadius(pSet->GetRadius());
@@ -213,7 +274,7 @@ void process_boundary_request(boundary_opts *opts){
         IntervalBoundary(pSet, grid, opts->spacing);
     }
     else{
-        // TODO: 3D Interval and other methods
+        // TODO: 3D Interval seems dubious and others methods
     }
 
     timer.Stop();

@@ -131,8 +131,8 @@ void test_volume_particle_emitter3_mesh(){
 #endif
     int count = 0;
     int pCount = pSet->GetParticleCount();
-    Float *pos = new Float[3 * pCount];
-    Float *col = new Float[3 * pCount];
+    float *pos = new float[3 * pCount];
+    float *col = new float[3 * pCount];
     
     int it = 0;
     for(int i = 0; i < pSet->GetParticleCount(); i++){
@@ -195,8 +195,8 @@ void test_volume_particle_emitter3(){
     printf("Size: %d <=> %g\n", size, timers.GetElapsedGPU(0));
     
     int count = 0;
-    Float *pos = new Float[3 * pCount];
-    Float *col = new Float[3 * pCount];
+    float *pos = new float[3 * pCount];
+    float *col = new float[3 * pCount];
     
     for(int i = 0; i < pCount; i++){
         vec3f point = pSet->GetParticlePosition(i);
@@ -237,8 +237,8 @@ void test_bcclattice_point_generator(){
     printf(" * Generated %ld points\n", points.size());
     printf(" * Graphy interation\n");
     
-    Float *p = new Float[3 * points.size()];
-    Float rgb[3] = {1,0,0};
+    float *p = new float[3 * points.size()];
+    float rgb[3] = {1,0,0};
     
     for(int i = 0; i < points.size(); i++){
         vec3f point = points[i];

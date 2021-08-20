@@ -1085,6 +1085,73 @@ void test_pcisph3_multiple_emission(){
     printf("===== OK\n");
 }
 
+void test_pcisph3_water_block(){
+    printf("===== PCISPH Solver 3D -- Water block\n");
+    Float spacing = 0.02;
+    vec3f center(0,0,0);
+    vec3f origin(2);
+    vec3f target(0,0,0);
+    Float lenc = 2;
+    Float targetDensity = WaterDensity;
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    vec3f pMin, pMax;
+    Bounds3f containerBounds;
+    ParticleSetBuilder3 builder;
+    ColliderSetBuilder3 colliderBuilder;
+
+    PciSphSolver3 solver;
+    int reso = (int)std::floor(lenc / (spacing * 2.0));
+    printf("Using grid with resolution %d x %d\n", reso, reso);
+    vec3ui res(reso, reso, reso);
+
+    solver.Initialize(DefaultSphSolverData3());
+    Shape *rect = MakeBox(Translate(center.x, center.y+0.45, 0), vec3f(1));
+    Shape *block = MakeBox(Translate(center.x, center.y-0.3, 0), 0.2);
+    Shape *container = MakeBox(Translate(center.x, center.y, 0), vec3f(lenc), true);
+
+    containerBounds = container->GetBounds();
+    pMin = containerBounds.pMin - vec3f(spacing);
+    pMax = containerBounds.pMax + vec3f(spacing);
+
+    Grid3 *grid = MakeGrid(res, pMin, pMax);
+    VolumeParticleEmitter3 emitter(rect, rect->GetBounds(), spacing);
+    emitter.Emit(&builder);
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&builder);
+    ParticleSet3 *set2 = sphSet->GetParticleSet();
+    int count = set2->GetParticleCount();
+
+    colliderBuilder.AddCollider3(block);
+    colliderBuilder.AddCollider3(container);
+    ColliderSet3 *collider = colliderBuilder.GetColliderSet();
+
+    solver.Setup(targetDensity, spacing, 2.0, grid, sphSet);
+    solver.SetColliders(collider);
+
+    Float targetInterval = 1.0 / 240.0;
+
+    auto callback = [&](int step) -> int{
+        const char *sim_folder = "/home/felipe/Documents/Bubbles/simulations/";
+        std::string path(sim_folder);
+        std::vector<int> bounds;
+        int n = UtilGetBoundaryState(set2, &bounds);
+        path += "water_block/output_";
+        path += std::to_string(step-1);
+        path += ".txt";
+        int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
+        UtilEraseFile(path.c_str());
+        SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
+                                        flags, &bounds);
+        return 1;
+    };
+
+    UtilRunSimulation3(&solver, set2,  spacing, origin, target,
+                       targetInterval, {}, callback);
+
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
 void test_pcisph3_rock_dam(){
     printf("===== PCISPH Solver 3D -- Rock Dam\n");
     Float spacing = 0.04;
@@ -1092,40 +1159,40 @@ void test_pcisph3_rock_dam(){
     vec3f origin(8, 0, 0);
     vec3f target(0,-1,0);
     const char *objPath = "/home/felipe/Documents/CGStuff/models/rock.obj";
-    
+
     vec3f targetPos(0, -1.1, 1.0);
     Float rockMaxSize = 2.4;
     vec3f containerSize(3.08, 3.30324, 4.46138);
     vec3f waterBlockSize(3.0, 3.0, 0.5);
-    
+
     CudaMemoryManagerStart("test_pcisph3_rock_dam");
-    
+
     ParsedMesh *mesh = LoadObj(objPath);
-    
+
     Transform meshScale = UtilComputeFitTransform(mesh, rockMaxSize);
     Shape *rock = MakeMesh(mesh, Translate(targetPos) * RotateY(90) * meshScale);
-    
+
     vec3f of = (containerSize - waterBlockSize) * 0.5; of -= vec3f(spacing);
     Shape *waterBox = MakeBox(Translate(vec3f(of.x, -of.y, -of.z)), waterBlockSize);
     Shape *container = MakeBox(Transform(), containerSize, true);
-    
+
     VolumeParticleEmitterSet3 emitter;
     emitter.AddEmitter(waterBox, spacing);
-    
+
     ColliderSetBuilder3 cBuilder;
     cBuilder.AddCollider3(container);
     cBuilder.AddCollider3(rock);
     ColliderSet3 *colliders = cBuilder.GetColliderSet();
-    
+
     Assure(UtilIsEmitterOverlapping(&emitter, colliders) == 0);
-    
+
     ParticleSetBuilder3 pBuilder;
     emitter.Emit(&pBuilder);
     pBuilder.SetVelocityForAll(vec3f(0, -10, 0));
-    
+
     SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
-    
-    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(), 
+
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(),
                                                spacing, spacingScale);
     PciSphSolver3 solver;
     solver.Initialize(DefaultSphSolverData3());

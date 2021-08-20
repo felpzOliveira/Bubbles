@@ -81,6 +81,7 @@ void run_self_tests(){
 void test_pcisph3_pathing();
 void test_pcisph3_box_drop();
 void test_bounds_split3();
+void test_pcisph3_water_block();
 
 int main(int argc, char **argv){
     BB_MSG("Bubbles Fluid Simulator");
@@ -105,6 +106,7 @@ int main(int argc, char **argv){
 
     //test_pcisph2_water_block();
     test_pcisph2_water_sphere();
+    //test_pcisph3_water_block();
 
 #if defined(RUN_TESTS)
     //run_self_tests();

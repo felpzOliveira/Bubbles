@@ -8,3 +8,5 @@ fluid_engine_questions.txt
 *.o
 *.obj
 *.sh
+*.lit
+*.txt

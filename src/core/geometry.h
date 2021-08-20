@@ -64,8 +64,8 @@
 #define SqrtInfinity 3.1622776601683794E+18
 #define IntInfinity 2147483646
 
-typedef float Float;
-//typedef double Float;
+//typedef float Float;
+typedef double Float;
 
 /*
 * NOTE: The Inside routines for BoundsN<T> are considering Epsilons 
@@ -1669,15 +1669,16 @@ int SplitBounds(const Bounds3<T> &bounds, Bounds3<T> *split){
     T lx = (B.x - A.x) * 0.5;
     T ly = (B.y - A.y) * 0.5;
     T lz = (B.z - A.z) * 0.5;
-    split[0] = Bounds3<T>(vec3f(A.x, A.y, A.z), vec3f(A.x + lx, A.y + ly, A.z + lz));
-    split[1] = Bounds3<T>(vec3f(A.x + lx, A.y, A.z), vec3f(B.x, A.y + ly, A.z + lz));
-    split[2] = Bounds3<T>(vec3f(A.x, A.y + ly, A.z), vec3f(A.x + lx, B.y, A.z + lz));
-    split[3] = Bounds3<T>(vec3f(A.x + lx, A.y + ly, A.z), vec3f(B.x, B.y, A.z + lz));
-
-    split[4] = Bounds3<T>(vec3f(A.x, A.y, A.z + lz), vec3f(A.x + lx, A.y + ly, A.z + lz + lz));
-    split[5] = Bounds3<T>(vec3f(A.x + lx, A.y, A.z + lz), vec3f(B.x, A.y + ly, A.z + lz + lz));
-    split[6] = Bounds3<T>(vec3f(A.x, A.y + ly, A.z + lz), vec3f(A.x + lx, B.y, A.z + lz + lz));
-    split[7] = Bounds3<T>(vec3f(A.x + lx, A.y + ly, A.z +lz), vec3f(B.x, B.y, A.z + lz + lz));
+    vec3f h(lx, ly, lz);
+    vec3f C = bounds.Center();
+    split[0] = Bounds3<T>(C, C + vec3f(1,1,1) * h);
+    split[1] = Bounds3<T>(C, C + vec3f(1,1,-1) * h);
+    split[2] = Bounds3<T>(C, C + vec3f(-1,1,1) * h);
+    split[3] = Bounds3<T>(C, C + vec3f(-1,1,-1) * h);
+    split[4] = Bounds3<T>(C, C + vec3f(1,-1,1) * h);
+    split[5] = Bounds3<T>(C, C + vec3f(1,-1,-1) * h);
+    split[6] = Bounds3<T>(C, C + vec3f(-1,-1,1) * h);
+    split[7] = Bounds3<T>(C, C + vec3f(-1,-1,-1) * h);
 
     return 8;
 }

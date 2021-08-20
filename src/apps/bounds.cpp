@@ -26,7 +26,7 @@ void default_boundary_opts(boundary_opts *opts){
     opts->spacing = 0.02;
     opts->spacingScale = 2.0;
     opts->legacy = 0;
-    opts->lnmalgo = 0;
+    opts->lnmalgo = 2;
 }
 
 void print_boundary_configs(boundary_opts *opts){

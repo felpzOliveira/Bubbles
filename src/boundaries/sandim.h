@@ -28,9 +28,14 @@ extern "C" {
 * use a simple Jarvis March on CUDA.
 */
 
-#define SANDIM_SMALL_DISTANCE 1e-5
 #define SANDIM_MAX_FLIP_SLOTS 3072 // this is a guess
 #define SANDIM_GAMMA 1.3 // this is also a guess
+/*
+* This is the distance considered for detecting out-of-domain particles
+* this realy depends on the quality of the convex hull implentation.
+* For us this gives decent results.
+*/
+#define SANDIM_SMALL_DISTANCE 1e-5
 
 /*
  * Computes, for every particle, if this particle can be resolved through

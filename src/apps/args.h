@@ -3,6 +3,7 @@
 #include <map>
 #include <iostream>
 #include <obj_loader.h>
+#include <fstream>
 
 #define ARGUMENT_PROCESS(name)\
 int name(int argc, char **argv, int &i, const char *arg, void *config)
@@ -79,11 +80,30 @@ inline std::string ParseNext(int argc, char **argv, int &i,
     return res;
 }
 
+template<typename Fn>
+inline int ParseNextOrNone(int argc, char **argv, int &i,
+                           const char *arg, Fn func)
+{
+    int ok = (argc > i + 1) ? 1 : 0;
+    if(!ok) return 0;
+    std::string res(argv[i+1]);
+    int r = func(res);
+    if(r){
+        i += 1;
+    }
+
+    return r;
+}
 
 inline Float ParseNextFloat(int argc, char **argv, int &i, const char *arg){
     std::string value = ParseNext(argc, argv, i, arg);
     const char *token = value.c_str();
     return ParseFloat(&token);
+}
+
+inline bool FileExists(const char *path){
+    std::ifstream ifs(path);
+    return ifs.is_open();
 }
 
 void convert_command(int argc, char **argv);

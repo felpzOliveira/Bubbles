@@ -2,6 +2,7 @@
 #include <grid.h>
 #include <cutil.h>
 #include <dilts.h>
+#include <bound_util.h>
 
 /**************************************************************/
 //      L A Y E R E D   N E I G H B O R   M E T H O D         //
@@ -11,52 +12,8 @@
 /*
 * The following is the direct imlementation for the version used in thesis.
 * It strictly implements L1 and L2 searches only.
-* TODO: Implement generic Fn search for Li-boundaries for GPU.
+* TODO: Implement generic Fn search for Li-boundaries for GPU, i.e.: port from CPU.
 */
-
-template<typename T> inline __bidevice__ int QueuePushEntry(T *Q){
-#if defined(__CUDA_ARCH__)
-    return atomicAdd(&Q->size, 1);
-#else
-    return __atomic_fetch_add(&Q->size, 1, __ATOMIC_SEQ_CST);
-#endif
-}
-
-template<typename T> inline __bidevice__ int QueueGetEntry(T *Q){
-#if defined(__CUDA_ARCH__)
-    return atomicAdd(&Q->entry, 1);
-#else
-    return __atomic_fetch_add(&Q->entry, 1, __ATOMIC_SEQ_CST);
-#endif
-}
-
-class LNMWorkQueue{
-    public:
-    int size;
-    int entry;
-    int *ids;
-    __bidevice__ LNMWorkQueue(){}
-    __host__ void SetParticles(int n){
-        ids = (int *)cudaAllocateExclusive(n * sizeof(int));
-        size = 0;
-        entry = 0;
-    }
-
-    __bidevice__ void Push(int id){
-        int at = QueuePushEntry(this);
-        ids[at] = id;
-    }
-
-    __bidevice__ int Fetch(){
-        int at = QueueGetEntry(this);
-        return ids[at];
-    }
-
-    __host__ void Reset(){
-        entry = 0;
-        size = 0;
-    }
-};
 
 // going to classify on v0 buffer as simulation step should already be resolved
 template<typename T, typename Q>

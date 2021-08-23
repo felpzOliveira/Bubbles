@@ -346,6 +346,11 @@ template<typename T> class vec2{
     __bidevice__ vec2(T a, T b): x(a), y(b){
         Assert(!HasNaN());
     }
+
+    template<typename V>
+    __bidevice__ vec2(vec2<V> v) : x(v.x), y(v.y){
+        Assert(!HasNaN());
+    }
     
     __bidevice__ bool IsZeroVector() const{
         return IsZero(x) && IsZero(y);
@@ -450,6 +455,10 @@ template<typename T> class vec3{
     __bidevice__ vec3(){ x = y = z = (T)0; }
     __bidevice__ vec3(T a){ x = y = z = a; }
     __bidevice__ vec3(T a, T b, T c): x(a), y(b), z(c){
+        Assert(!HasNaN());
+    }
+
+    template<typename V> __bidevice__ vec3(vec3<V> v): x(v.x), y(v.y), z(v.z){
         Assert(!HasNaN());
     }
     

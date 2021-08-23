@@ -2,6 +2,7 @@
 #pragma once
 #include <grid.h>
 #include <cutil.h>
+#include <bound_util.h>
 
 /**************************************************************/
 //               I N T E R V A L   M E T H O D                //
@@ -64,28 +65,6 @@ void IntervalBoundaryGetBoundsFor(ParticleSet<T> *pSet, int i,
 {
     T p = pSet->GetParticlePosition(i);
     *bounds = Q(p - T(h), p + T(h));
-}
-
-template<typename T, typename U, typename Q, typename Func> __bidevice__
-void ForAllNeighbors(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, int pId, Func fn){
-    int *neighbors = nullptr;
-    T pi = pSet->GetParticlePosition(pId);
-    unsigned int cellId = domain->GetLinearHashedPosition(pi);
-    int count = domain->GetNeighborsOf(cellId, &neighbors);
-    int terminate = 0;
-
-    for(int i = 0; i < count && !terminate; i++){
-        Cell<Q> *cell = domain->GetCell(neighbors[i]);
-        ParticleChain *pChain = cell->GetChain();
-        int size = cell->GetChainLength();
-        for(int j = 0; j < size && !terminate; j++){
-            if(pChain->pId != pId){
-                terminate = fn(pChain->pId);
-            }
-
-            pChain = pChain->next;
-        }
-    }
 }
 
 template<typename T, typename U, typename Q> __bidevice__

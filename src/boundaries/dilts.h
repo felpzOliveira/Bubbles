@@ -162,7 +162,22 @@ __global__ void DiltsComputeKernel(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
 }
 
 template<typename T, typename U, typename Q> __host__
+void DiltsComputeCPU(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, int i){
+    if(i < pSet->GetParticleCount()){
+        int b = DiltsSpokeParticleIsBoundary(domain, pSet, i);
+        pSet->SetParticleV0(i, b);
+    }
+}
+
+template<typename T, typename U, typename Q> __host__
 void DiltsSpokeBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
+    int use_cpu = GetSystemUseCPU();
     int N = pSet->GetParticleCount();
-    GPULaunch(N, GPUKernel(DiltsComputeKernel<T, U, Q>), domain, pSet);
+    if(!use_cpu){
+        GPULaunch(N, GPUKernel(DiltsComputeKernel<T, U, Q>), domain, pSet);
+    }else{
+        ParallelFor(0, N, [&](int i)->void{
+            DiltsComputeCPU(domain, pSet, i);
+        });
+    }
 }

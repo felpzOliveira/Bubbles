@@ -170,6 +170,19 @@ __host__ Bounds3f UtilComputeParticleSetBounds(ParticleSet3 *pSet){
     return bounds;
 }
 
+inline
+__host__ Bounds2f UtilComputeParticleSetBounds(ParticleSet2 *pSet){
+    int count = pSet->GetParticleCount();
+    vec2f pi = pSet->GetParticlePosition(0);
+    Bounds2f bounds(pi, pi);
+    for(int i = 1; i < count; i++){
+        pi = pSet->GetParticlePosition(i);
+        bounds = Union(bounds, pi);
+    }
+
+    return bounds;
+}
+
 template<typename DataAccessor>
 inline __host__ Float UtilComputeMedian(DataAccessor *accessor, int size){
     double value = 0;

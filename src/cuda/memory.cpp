@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <cutil.h>
 
 //#define PRINT_MEMORY
 
@@ -76,13 +77,18 @@ void *_cudaAllocator(size_t bytes, int line, const char *filename, bool abort){
 
 void *_cudaAllocatorExclusive(size_t bytes, int line, const char *filename, bool abort){
     void *ptr = nullptr;
-    if(cudaHasMemory(bytes)){
-        cudaError_t err = cudaMalloc(&ptr, bytes);
-        if(err != cudaSuccess){
-            std::cout << "Failed to allocate memory " << filename << ":" << line << "[" << bytes << " bytes]" << std::endl;
-            ptr = nullptr;
-        }else{
-            global_memory.allocated += bytes;
+    int use_cpu = GetSystemUseCPU();
+    if(use_cpu){
+        return _cudaAllocator(bytes, line, filename, abort);
+    }else{
+        if(cudaHasMemory(bytes)){
+            cudaError_t err = cudaMalloc(&ptr, bytes);
+            if(err != cudaSuccess){
+                std::cout << "Failed to allocate memory " << filename << ":" << line << "[" << bytes << " bytes]" << std::endl;
+                ptr = nullptr;
+            }else{
+                global_memory.allocated += bytes;
+            }
         }
     }
 
@@ -154,6 +160,10 @@ void *_cudaAllocateExclusive(size_t bytes, int line, const char *filename, bool 
     manager.activeEntry->addresses.push_back(ptr);
     manager.activeEntry->size += bytes;
     return ptr;
+}
+
+void *_cudaAllocateUnregister(size_t bytes, int line, const char *filename, bool abort){
+    return _cudaAllocator(bytes, line, filename, abort);
 }
 
 __host__ void CudaMemoryManagerClearAll(){

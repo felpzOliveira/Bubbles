@@ -16,7 +16,7 @@
 * it attempts to compute a particle property referred as 'asymmetry'.
 * It is an extension of the classic color field method.
 */
-#define XIAOWEI_KERNEL_EXPANSION 3.0
+#define XIAOWEI_KERNEL_EXPANSION 6.0
 
 template<typename T, typename U, typename Q> __bidevice__
 int XiaoweiParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
@@ -89,7 +89,22 @@ void XiaoweiBoundaryKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h)
 }
 
 template<typename T, typename U, typename Q> __host__
+void XiaoweiBoundaryCPU(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h, int i){
+    if(i < pSet->GetParticleCount()){
+        int b = XiaoweiParticleIsBoundary(pSet, domain, h, i);
+        pSet->SetParticleV0(i, b);
+    }
+}
+
+template<typename T, typename U, typename Q> __host__
 void XiaoweiBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
+    int use_cpu = GetSystemUseCPU();
     int N = pSet->GetParticleCount();
-    GPULaunch(N, GPUKernel(XiaoweiBoundaryKernel<T, U, Q>), pSet, domain, h);
+    if(!use_cpu){
+        GPULaunch(N, GPUKernel(XiaoweiBoundaryKernel<T, U, Q>), pSet, domain, h);
+    }else{
+        ParallelFor(0, N, [&](int i)->void{
+            XiaoweiBoundaryCPU(pSet, domain, h, i);
+        });
+    }
 }

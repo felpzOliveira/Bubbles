@@ -15,7 +15,7 @@
 * It is quite accurate but it can have some strong failures on edge cases.
 */
 
-#define MULLER_KERNEL_EXPANSION 1.8
+#define MULLER_KERNEL_EXPANSION 3.0
 
 inline __bidevice__ vec3f KernelGradient(Float rho, Float distance, vec3f dir){
     SphStdKernel3 kernel3d(rho);
@@ -59,8 +59,8 @@ int MullerParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
         }
     }
 
-    Float l2 = s.LengthSquared();
-    if(l2 > 100.0){
+    Float l2 = s.Length();
+    if(l2 > 7.0){
         return 1;
     }
 
@@ -77,7 +77,22 @@ void MullerBoundaryKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
 }
 
 template<typename T, typename U, typename Q> __host__
+void MullerBoundaryCPU(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h, int i){
+    if(i < pSet->GetParticleCount()){
+        int b = MullerParticleIsBoundary(pSet, domain, h, i);
+        pSet->SetParticleV0(i, b);
+    }
+}
+
+template<typename T, typename U, typename Q> __host__
 void MullerBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
+    int use_cpu = GetSystemUseCPU();
     int N = pSet->GetParticleCount();
-    GPULaunch(N, GPUKernel(MullerBoundaryKernel<T, U, Q>), pSet, domain, h);
+    if(!use_cpu){
+        GPULaunch(N, GPUKernel(MullerBoundaryKernel<T, U, Q>), pSet, domain, h);
+    }else{
+        ParallelFor(0, N, [&](int i)-> void{
+            MullerBoundaryCPU(pSet, domain, h, i);
+        });
+    }
 }

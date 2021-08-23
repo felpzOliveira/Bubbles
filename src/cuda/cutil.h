@@ -27,6 +27,7 @@ typedef enum{
 #define cudaAllocateEx(bytes, abort) _cudaAllocate(bytes, __LINE__, __FILE__, abort)
 #define cudaAllocateVx(type, n) (type *)_cudaAllocate(sizeof(type)*n, __LINE__, __FILE__, true)
 #define cudaDeviceAssert(fname) if(cudaKernelSynchronize()){ printf("Failure for %s\n", fname); cudaSafeExit(); }
+#define cudaAllocateUnregisterVx(type, n) (type *)_cudaAllocateUnregister(sizeof(type)*n, __LINE__, __FILE__, true)
 
 #define __bidevice__ __host__ __device__ 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -128,6 +129,7 @@ std::string time_to_string(std::string val, int size);
 * after a region is no longer nedded.
 */
 void *_cudaAllocate(size_t bytes, int line, const char *filename, bool abort);
+void *_cudaAllocateUnregister(size_t bytes, int line, const char *filename, bool abort);
 void *_cudaAllocateExclusive(size_t bytes, int line, const char *filename, bool abort);
 
 template<typename T>

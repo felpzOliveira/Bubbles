@@ -125,8 +125,6 @@ void test_pcisph2_water_block(){
     containerBounds = container->GetBounds();
     pMin = containerBounds.pMin - vec2f(spacing);
     pMax = containerBounds.pMax + vec2f(spacing);
-    
-    Grid2 *grid = MakeGrid(res, pMin, pMax);
 
     VolumeParticleEmitter2 emitter(rect, rect->GetBounds(), spacing);
     
@@ -134,6 +132,9 @@ void test_pcisph2_water_block(){
     SphParticleSet2 *sphSet = SphParticleSet2FromBuilder(&builder);
     ParticleSet2 *set2 = sphSet->GetParticleSet();
     int count = set2->GetParticleCount();
+
+    Grid2 *grid = MakeGrid(res, pMin, pMax);
+    //Grid2 *grid = SandimComputeCompatibleGrid(set2, spacing);
     
     colliderBuilder.AddCollider2(block);
     colliderBuilder.AddCollider2(container);
@@ -158,10 +159,21 @@ void test_pcisph2_water_block(){
             set2->SetParticleV0(i, 0);
         }
 
-        IntervalBoundary(set2, grid, spacing);
+        //IntervalBoundary(set2, grid, spacing);
         //DiltsSpokeBoundary(set2, grid);
         //MullerBoundary(set2, grid, spacing);
         //XiaoweiBoundary(set2, grid, spacing);
+
+        int nparts = set2->GetParticleCount();
+        int *partWorkQ = cudaAllocateVx(int, nparts);
+        SandimComputeWorkQueue(set2, grid, partWorkQ);
+        SandimWorkQueue2 *vpWorkQ = cudaAllocateVx(SandimWorkQueue2, 1);
+        vpWorkQ->SetSlots(grid->GetCellCount());
+
+        SandimComputeViewPoints(set2, grid, vpWorkQ);
+
+        SandimComputeHPR(set2, grid, partWorkQ, vpWorkQ);
+
 
         set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);

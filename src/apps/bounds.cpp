@@ -15,6 +15,7 @@ typedef struct{
     int outflags;
     int legacy;
     int lnmalgo;
+    int use_cpu;
     BoundaryMethod method;
 }boundary_opts;
 
@@ -27,6 +28,7 @@ void default_boundary_opts(boundary_opts *opts){
     opts->spacingScale = 2.0;
     opts->legacy = 0;
     opts->lnmalgo = 2;
+    opts->use_cpu = 0;
 }
 
 void print_boundary_configs(boundary_opts *opts){
@@ -44,6 +46,10 @@ void print_boundary_configs(boundary_opts *opts){
 ARGUMENT_PROCESS(boundary_in_args){
     boundary_opts *opts = (boundary_opts *)config;
     opts->input = ParseNext(argc, argv, i, "-in", 1);
+    if(!FileExists(opts->input.c_str())){
+        printf("Input file does not exist\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -114,6 +120,20 @@ ARGUMENT_PROCESS(boundary_outflags_args){
     return 0;
 }
 
+ARGUMENT_PROCESS(boundary_use_cpu_args){
+    boundary_opts *opts = (boundary_opts *)config;
+    auto fn = [&](std::string val) -> int{
+        char *endptr[1];
+        char *nptr = (char *)val.c_str();
+        int n = strtol(nptr, endptr, 10);
+        if(*endptr == nptr) return 0;
+        return n;
+    };
+    int nt = ParseNextOrNone(argc, argv, i, "-cpu", fn);
+    opts->use_cpu = nt > 0 ? nt : GetConcurrency();
+    return 0;
+}
+
 std::map<const char *, arg_desc> bounds_arg_map = {
     {"-in",
         {
@@ -131,6 +151,12 @@ std::map<const char *, arg_desc> bounds_arg_map = {
         {
             .processor = boundary_out_args,
             .help = "Sets the output file."
+        }
+    },
+    {"-cpu",
+        {
+            .processor = boundary_use_cpu_args,
+            .help = "Sets the computation to run on the CPU instead."
         }
     },
     {"-spacing",
@@ -192,6 +218,11 @@ void process_boundary_request(boundary_opts *opts){
         return;
     }
 
+    if(opts->use_cpu){
+        SetCPUThreads(opts->use_cpu);
+        SetSystemUseCPU();
+    }
+
     if(opts->legacy){
         std::vector<vec3f> points;
         SerializerLoadLegacySystem3(&points, opts->input.c_str(),
@@ -204,8 +235,22 @@ void process_boundary_request(boundary_opts *opts){
                               opts->inflags, nullptr);
     }
 
-    Grid3 *grid = UtilBuildGridForBuilder(&builder, opts->spacing,
-                                          opts->spacingScale);
+    SphSolver3 solver;
+    SphParticleSet3 *sphpSet = nullptr;
+    ParticleSet3 *pSet = nullptr;
+
+    solver.Initialize(DefaultSphSolverData3());
+    Grid3 *grid = nullptr;
+    if(opts->method != BOUNDARY_SANDIM){
+        grid = UtilBuildGridForBuilder(&builder, opts->spacing,
+                                       opts->spacingScale);
+        sphpSet = SphParticleSet3FromBuilder(&builder);
+        pSet = sphpSet->GetParticleSet();
+    }else{
+        sphpSet = SphParticleSet3FromBuilder(&builder);
+        pSet = sphpSet->GetParticleSet();
+        grid = SandimComputeCompatibleGrid(pSet, opts->spacing);
+    }
 
     Bounds3f dBounds = grid->GetBounds();
     vec3f p0 = dBounds.pMin;
@@ -214,10 +259,7 @@ void process_boundary_request(boundary_opts *opts){
             "    [%g %g %g]  x  [%g %g %g]\n",
            p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
 
-    SphSolver3 solver;
-    SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(&builder);
-    ParticleSet3 *pSet = sphpSet->GetParticleSet();
-    solver.Initialize(DefaultSphSolverData3());
+    
     solver.Setup(WaterDensity, opts->spacing, opts->spacingScale, grid, sphpSet);
 
     UpdateGridDistributionGPU(solver.solverData);
@@ -228,20 +270,22 @@ void process_boundary_request(boundary_opts *opts){
     pSet->ClearDataBuffer(&pSet->v0s);
 
     TimerList timer;
-    timer.Start();
+    boundary.clear();
     if(opts->method == BOUNDARY_LNM){
         if(opts->lnmalgo == 5){
+            timer.Start();
             LNMBoundaryExtended(pSet, grid, opts->spacing, 5, 0);
+            timer.Stop();
         }else{
             int npart = pSet->GetParticleCount();
             LNMWorkQueue *workQ = nullptr;
             if(opts->lnmalgo >= 2){
                 workQ = cudaAllocateVx(LNMWorkQueue, 1);
-                workQ->SetParticles(npart);
+                workQ->SetSlots(npart);
             }
-
+            timer.Start();
             LNMBoundary(pSet, grid, opts->spacing, opts->lnmalgo, workQ);
-
+            timer.Stop();
             if(workQ){
                 int workQueueParts = workQ->size;
                 Float bounds = 0;
@@ -263,24 +307,36 @@ void process_boundary_request(boundary_opts *opts){
             }
         }
     }else if(opts->method == BOUNDARY_DILTS){
+        timer.Start();
         DiltsSpokeBoundary(pSet, grid);
+        timer.Stop();
         Float rad = DiltsGetParticleRadius(pSet->GetRadius());
         printf("Dilts radius %g\n", rad);
     }else if(opts->method == BOUNDARY_MULLER){
+        timer.Start();
         MullerBoundary(pSet, grid, opts->spacing);
+        timer.Stop();
     }else if(opts->method == BOUNDARY_XIAOWEI){
+        timer.Start();
         XiaoweiBoundary(pSet, grid, opts->spacing);
+        timer.Stop();
+    }else if(opts->method == BOUNDARY_SANDIM){
+        timer.Start();
+        SandimWorkQueue3 *vpWorkQ = cudaAllocateVx(SandimWorkQueue3, 1);
+        vpWorkQ->SetSlots(grid->GetCellCount());
+        SandimBoundary(pSet, grid, vpWorkQ);
+        timer.Stop();
     }else if(opts->method == BOUNDARY_INTERVAL){
+        timer.Start();
         IntervalBoundary(pSet, grid, opts->spacing);
+        timer.Stop();
     }
     else{
         // TODO: 3D Interval seems dubious and others methods
     }
 
-    timer.Stop();
     Float interval = timer.GetElapsedGPU(0);
 
-    boundary.clear();
     int n = UtilGetBoundaryState(pSet, &boundary);
     printf("Got %d / %d - %g ms\n", n, (int)boundary.size(), interval);
     printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout);

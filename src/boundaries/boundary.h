@@ -7,12 +7,14 @@
 #include <dilts.h>
 #include <xiaowei.h>
 #include <interval.h>
+#include <sandim.h>
 
 typedef enum{
     BOUNDARY_LNM=0,
     BOUNDARY_DILTS,
     BOUNDARY_MULLER,
     BOUNDARY_XIAOWEI,
+    BOUNDARY_SANDIM,
     BOUNDARY_INTERVAL,
     BOUNDARY_NONE
 }BoundaryMethod;
@@ -23,6 +25,7 @@ inline std::string GetBoundaryMethodName(BoundaryMethod method){
         case BOUNDARY_DILTS : return "Dilts";
         case BOUNDARY_MULLER : return "Muller";
         case BOUNDARY_XIAOWEI : return "Xiaowei";
+        case BOUNDARY_SANDIM : return "Sandim";
         case BOUNDARY_INTERVAL : return "Interval";
         default:{
             return "NONE";
@@ -39,8 +42,10 @@ inline BoundaryMethod GetBoundaryMethod(std::string method){
         return BOUNDARY_MULLER;
     if(method == "XIAOWEI" || method == "Xiaowei" || method == "xiaowei")
         return BOUNDARY_XIAOWEI;
+    if(method == "SANDIM" || method == "Sandim" || method == "sandim")
+        return BOUNDARY_SANDIM;
 
-    return BOUNDARY_LNM;
+    return BOUNDARY_NONE;
 }
 
 inline void GetBoundaryNames(std::vector<std::string> &names){

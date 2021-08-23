@@ -104,8 +104,8 @@ int main(int argc, char **argv){
     //test_pcisph3_water_drop();
     //test_pcisph3_rotating_water_box();
 
-    //test_pcisph2_water_block();
-    test_pcisph2_water_sphere();
+    test_pcisph2_water_block();
+    //test_pcisph2_water_sphere();
     //test_pcisph3_water_block();
 
 #if defined(RUN_TESTS)

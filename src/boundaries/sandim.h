@@ -165,7 +165,8 @@ inline __host__ void SandimComputeViewPoints(ParticleSet2 *pSet, Grid2 *domain,
 /*
  * This is the grid implementation Sandim suggests to use for the domain.
  * I particularly don't like it, I feel the solver grid is better but
- * it is here.
+ * it is here if you wish to use it, 'bbtool boundary ... -method sandim' uses this
+ * implementation instead of the default one.
  */
 template<typename T, typename U, typename Q> inline __host__
 Grid<T, U, Q> *SandimComputeCompatibleGridImpl(ParticleSet<T> *pSet, Float h){
@@ -193,11 +194,6 @@ template<typename T> struct IndexedParticle{
     T p;
 };
 
-template<typename T> struct ViewpointInfo{
-    IndexedParticle<T> *points;
-    int pcount;
-};
-
 /*
  * Performs exponential flip.
  */
@@ -210,7 +206,6 @@ int SandimExponentialFlip(T vp, Float gamma, IndexedParticle<T> *invPoints,
     int n = 0;
     Float cellSize = domain->GetCellSize()[0];
     Float searchRadius = 2.0 * cellSize;
-    bool found_any = false;
     int depth = 2; // depth = 2 makes sure the ball 4 * rho is reached
     int would_need = 0;
     // Compute max norm
@@ -222,8 +217,6 @@ int SandimExponentialFlip(T vp, Float gamma, IndexedParticle<T> *invPoints,
             if(norm <= searchRadius){
                 maxnorm = Max(pi.Length(), maxnorm);
                 would_need += 1;
-            }else{
-                found_any = true;
             }
         }
         return 0;

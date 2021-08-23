@@ -44,6 +44,8 @@ inline BoundaryMethod GetBoundaryMethod(std::string method){
         return BOUNDARY_XIAOWEI;
     if(method == "SANDIM" || method == "Sandim" || method == "sandim")
         return BOUNDARY_SANDIM;
+    if(method == "LNM" || method == "Lnm" || method == "lnm")
+        return BOUNDARY_LNM;
 
     return BOUNDARY_NONE;
 }

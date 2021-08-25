@@ -147,12 +147,6 @@ inline __bidevice__ bool Quadratic(Float a, Float b, Float c, Float *t0, Float *
     return true;
 }
 
-inline __bidevice__ int Log2Int(uint64_t n){
-#define S(k) if (n >= (UINT64_C(1) << k)) { i += k; n >>= k; }
-    int i = -(n == 0); S(32); S(16); S(8); S(4); S(2); S(1); return i;
-#undef S
-}
-
 inline __bidevice__ uint32_t FloatToBits(float f){
     uint32_t ui;
     memcpy(&ui, &f, sizeof(float));

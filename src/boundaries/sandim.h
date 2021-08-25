@@ -23,12 +23,12 @@ extern "C" {
 * this method needs a VERY good Convex Hull computation and the
 * one I made for CUDA was simply not robust enough. So I'm adding
 * qhull library to perform this task. Unfortunatelly qhull is not
-* runnable on kernel code, so we do everything in CUDA but Convex Hulls
-* are handled through multi-threaded CPU computation on 3D, for 2D we
+* runnable on kernel code, so i'll do everything in CUDA but Convex Hulls
+* are handled through multi-threaded CPU computation on 3D, for 2D i'll
 * use a simple Jarvis March on CUDA.
 */
 
-#define SANDIM_MAX_FLIP_SLOTS 3072 // this is a guess
+#define SANDIM_MAX_FLIP_SLOTS 512 // this is a guess
 #define SANDIM_GAMMA 1.3 // this is also a guess
 /*
 * This is the distance considered for detecting out-of-domain particles
@@ -418,6 +418,8 @@ void SandimComputeHPRImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *part
 {
     int N = vpWorkQ->size;
     int len = maxN * N;
+    Float mb = len / 1000000.0;
+    printf("[SANDIM] Memory required: %d (%g Mb) ( VP = %d x N = %d )\n", len, mb, N, maxN);
     IndexedParticle<T> *points = cudaAllocateUnregisterVx(IndexedParticle<T>, len);
     int *vp_count = cudaAllocateUnregisterVx(int, N);
 

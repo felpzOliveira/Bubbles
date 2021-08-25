@@ -225,7 +225,7 @@ __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     }
 
     /* Classify L1 */
-    GPULaunch(domain->GetActiveCellCount(), 
+    GPULaunch(domain->GetActiveCellCount(),
               GPUKernel(LNMBoundaryL1Kernel<T, U, Q>), pSet, domain);
 
     /* Filter L2 by Voxel */
@@ -238,6 +238,7 @@ __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
         GPULaunch(N, GPUKernel(LNMBoundaryL2GeomKernel<T, U, Q>),
                    pSet, domain, delta, h, workQ);
     }
+
 }
 
 /**************************************************************/

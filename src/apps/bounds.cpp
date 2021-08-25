@@ -11,6 +11,9 @@ typedef struct{
     std::string output;
     Float spacing;
     Float spacingScale;
+    int countstart;
+    int countend;
+    int stats;
     int inflags;
     int outflags;
     int legacy;
@@ -29,6 +32,9 @@ void default_boundary_opts(boundary_opts *opts){
     opts->legacy = 0;
     opts->lnmalgo = 2;
     opts->use_cpu = 0;
+    opts->countstart = 0;
+    opts->countend = 0;
+    opts->stats = 0;
 }
 
 void print_boundary_configs(boundary_opts *opts){
@@ -43,12 +49,27 @@ void print_boundary_configs(boundary_opts *opts){
     }
 }
 
+ARGUMENT_PROCESS(boundary_stats_arg){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->stats = 1;
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_count_arg){
+    boundary_opts *opts = (boundary_opts *)config;
+    int i0 = ParseNextFloat(argc, argv, i, "-count");
+    int i1 = ParseNextFloat(argc, argv, i, "-count");
+    opts->countstart = i0;
+    opts->countend   = i1;
+    return 0;
+}
+
 ARGUMENT_PROCESS(boundary_in_args){
     boundary_opts *opts = (boundary_opts *)config;
     opts->input = ParseNext(argc, argv, i, "-in", 1);
     if(!FileExists(opts->input.c_str())){
-        printf("Input file does not exist\n");
-        return -1;
+        //printf("Input file does not exist\n");
+        //return -1;
     }
     return 0;
 }
@@ -147,6 +168,18 @@ std::map<const char *, arg_desc> bounds_arg_map = {
             .help = "Sets the LNM algorithm to use ( Applies to LNM method only )."
         }
     },
+    {"-count",
+        {
+            .processor = boundary_count_arg,
+            .help = "Sets the range of values to be used for particle count ( Requires -stats )."
+        }
+    },
+    {"-stats",
+        {
+            .processor = boundary_stats_arg,
+            .help = "Triggers computation of particle boundary statistics."
+        }
+    },
     {"-out",
         {
             .processor = boundary_out_args,
@@ -196,6 +229,88 @@ std::map<const char *, arg_desc> bounds_arg_map = {
         }
     }
 };
+
+void process_count_procedure(boundary_opts *opts){
+    long unsigned int total  = 0;
+    long unsigned int totalb = 0;
+    if(!(opts->inflags & SERIALIZER_BOUNDARY)){
+        printf("\n {ERROR} This procedure requires boundary files\n");
+        return;
+    }
+
+    int count = opts->countend - opts->countstart;
+    if(count <= 0){
+        printf("Invalid range given for -stats\n");
+        return;
+    }
+
+    int s = 0;
+    double worst_case_fraction = 0, best_case_fraction = 100;
+    long unsigned int worst_case_b = 0, best_case_p = 0;
+    long unsigned int worst_case_p = 0, best_case_b = 0;
+    long unsigned int max_b = 0, min_b = 999999999;
+    for(int i = opts->countstart; i < opts->countend; i++){
+        CudaMemoryManagerStart(__FUNCTION__);
+        ParticleSetBuilder3 builder;
+        std::vector<SerializedShape> shapes;
+        std::vector<int> boundary;
+
+        std::stringstream ss;
+        ss << opts->input;
+        ss << i << ".txt";
+
+        std::string str = ss.str();
+        if(opts->legacy){
+            std::vector<vec3f> points;
+            SerializerLoadLegacySystem3(&points, str.c_str(),
+                                        opts->inflags, &boundary);
+        }else{
+            SerializerLoadSystem3(&builder, &shapes, str.c_str(),
+                                  opts->inflags, &boundary);
+        }
+
+        long unsigned int bb = 0, pp = 0;
+        for(int &b : boundary){
+            pp += 1;
+            bb += b > 0 ? 1 : 0;
+        }
+
+        totalb += bb;
+        total  += pp;
+        max_b = Max(max_b, bb);
+        min_b = Min(min_b, bb);
+
+        double f = (double)bb / (double)pp; f *= 100.0;
+        if(f > worst_case_fraction){
+            worst_case_fraction = f;
+            worst_case_p = pp;
+            worst_case_b = bb;
+        }
+
+        if(f < best_case_fraction){
+            best_case_fraction = f;
+            best_case_p = pp;
+            best_case_b = bb;
+        }
+
+
+        CudaMemoryManagerClearCurrent();
+        printf("\r %d / %d", s+1, count); fflush(stdout);
+        s++;
+    }
+
+    double average_p = (double) total / (double) count;
+    double average_b = (double)totalb / (double)count;
+    double fraction = (double)totalb / (double)total;
+    printf("\n Average : P = %g, B = %g ( %g %% )\n", average_p, average_b, fraction * 100.0);
+    printf(" Worst case: P = %lu, B = %lu ( %g %% )\n",
+            worst_case_p, worst_case_b, worst_case_fraction);
+    printf(" Best case: P = %lu, B = %lu ( %g %% )\n",
+            best_case_p, best_case_b, best_case_fraction);
+    printf(" Approx parts: %ld\n", (long int)(fraction * average_p));
+    printf(" Max boundary: %lu\n", max_b);
+    printf(" Min boundary: %lu\n", min_b);
+}
 
 void process_boundary_request(boundary_opts *opts){
     ParticleSetBuilder3 builder;
@@ -378,6 +493,9 @@ void boundary_command(int argc, char **argv){
 
     argument_process(bounds_arg_map, argc, argv, "boundary", &opts);
     print_boundary_configs(&opts);
-
-    process_boundary_request(&opts);
+    if(opts.stats){
+        process_count_procedure(&opts);
+    }else{
+        process_boundary_request(&opts);
+    }
 }

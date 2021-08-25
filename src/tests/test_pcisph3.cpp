@@ -276,7 +276,7 @@ void test_pcisph3_rotating_water_box(){
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
     Float spacing = 0.02;
-    Float spacingScale = 1.8;
+    Float spacingScale = 2.0;
     int steps = 500;
     Float targetInterval =  1.0 / 240.0;
     vec3f waterBox(3.0-spacing, 0.5, 3.0-spacing);
@@ -310,7 +310,7 @@ void test_pcisph3_rotating_water_box(){
     solver.SetColliders(colliders);
 
     Float invInterval = 1.0 / targetInterval;
-    ProfilerInitKernel(pSet->GetParticleCount());
+    //ProfilerInitKernel(pSet->GetParticleCount());
 
     int extraParts = 12 * 10 + 12;
 
@@ -351,7 +351,7 @@ void test_pcisph3_rotating_water_box(){
             container->Update(g_transform * transform);
             container->SetVelocities(linear, angular * 50.0);
         }
-#if 1
+#if 0
         std::vector<int> bounds;
         int n = UtilGetBoundaryState(pSet, &bounds);
         printf("Boundary %d / %d\n", (int)n, (int)pSet->GetParticleCount());
@@ -366,7 +366,7 @@ void test_pcisph3_rotating_water_box(){
                                         flags, &bounds);
 #endif
 
-        //UtilPrintStepStandard(&solver,step-1);
+        UtilPrintStepStandard(&solver,step-1);
         ProfilerReport();
         //return 1;
         return step > 2000 ? 0 : 1;
@@ -496,7 +496,7 @@ void test_pcisph3_water_drop(){
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
     Float spacing = 0.02;
-    Float spacingScale = 2.0;
+    Float spacingScale = 1.8;
     Float sphereRadius = 0.3;
     vec3f waterBox(3.0-spacing, 0.3, 3.0-spacing);
     
@@ -546,7 +546,7 @@ void test_pcisph3_water_drop(){
     
     Float targetInterval =  1.0 / 240.0;
     
-    ProfilerInitKernel(pSet->GetParticleCount());
+    //ProfilerInitKernel(pSet->GetParticleCount());
     int extraParts = 12 * 10 + 12;
     auto colorFunction = [&](float *colors, int pCount) -> void{
         for(int i = 0; i < pCount; i++){
@@ -1007,14 +1007,14 @@ void test_pcisph3_dragon(){
     CudaMemoryManagerStart(__FUNCTION__);
     
     ParticleSetBuilder3 builder;
-    Bounds3f bounds = UtilParticleSetBuilder3FromBB("resources/cuteDragon", &builder);
+    Bounds3f bounds = UtilParticleSetBuilder3FromBB("../resources/cuteDragon", &builder, 1);
     
     bounds.BoundingSphere(&center, &radius);
     radius *= 1.3;
-    
+
     origin = bounds.Center() + radius * vec3f(0, 1, 2.5);
     target = bounds.Center();
-    
+
     Shape *container = MakeSphere(Translate(center), radius, true);
     ColliderSetBuilder3 cBuilder;
     cBuilder.AddCollider3(container);
@@ -1295,7 +1295,7 @@ void test_pcisph3_happy_whale(){
     vec3f origin;
     vec3f target(0.f, 0.f, 0.f);
     Bounds3f meshBounds;
-    Float spacingScale = 2.0;
+    Float spacingScale = 1.8;
     Float spacing = 0.02;
     int count = 0;
     int flags = SERIALIZER_POSITION;
@@ -1376,8 +1376,8 @@ void test_pcisph3_happy_whale(){
     
     auto callback = [&](int step) -> int{
         if(step == 0) return 1;
-        UtilPrintStepStandard(&solver, step-1, {0, 16, 31, 74, 151, 235, 
-                                  256, 278, 361, 420});
+        UtilPrintStepStandard(&solver, step-1);
+        ProfilerReport();
         return step > 450 ? 0 : 1;
     };
     
@@ -1468,7 +1468,7 @@ void test_pcisph3_dam_break_double_dragon(){
 
     vec3f boxSize(3.5, 2.5, 2.0);
     Float spacing = 0.02;
-    Float spacingScale = 2.0;
+    Float spacingScale = 1.8;
 
     vec3f waterBox(0.55, 2.1, boxSize.z - 2.0 * spacing);
     Float yof = (boxSize.y - waterBox.y) * 0.5; yof -= spacing;
@@ -1522,7 +1522,7 @@ void test_pcisph3_dam_break_double_dragon(){
 
     Float targetInterval =  1.0 / 240.0;
 
-    ProfilerInitKernel(pSet->GetParticleCount());
+    //ProfilerInitKernel(pSet->GetParticleCount());
 
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;

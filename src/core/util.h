@@ -84,7 +84,7 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
 * Returns the bounds taken by transformed particles.
 */
 __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBuilder3 *builder,
-                                                Transform transform=Transform(),
+                                                int legacy=0, Transform transform=Transform(),
                                                 vec3f centerAt=vec3f(0),
                                                 vec3f initialVelocity=vec3f(0));
 

@@ -312,14 +312,19 @@ __host__ Grid3 *UtilBuildGridForBuilder(ParticleSetBuilder3 *builder, Float spac
 }
 
 __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBuilder3 *builder,
-                                                Transform transform, vec3f centerAt,
-                                                vec3f initialVelocity)
+                                                int legacy, Transform transform,
+                                                vec3f centerAt, vec3f initialVelocity)
 {
     std::vector<vec3f> points;
     int size = 0;
     int flags = SERIALIZER_POSITION;
-    SerializerLoadPoints3(&points, path, flags);
+    if(legacy){
+        SerializerLoadLegacySystem3(&points, path, flags);
+    }else{
+        SerializerLoadPoints3(&points, path, flags);
+    }
     size = points.size();
+    printf("Psize : %d\n", (int)size);
     
     // compute bounds center and generates the transformed particles
     Bounds3f bounds = _UtilComputePointsBounds(points.data(), size);

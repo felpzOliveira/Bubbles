@@ -2,7 +2,7 @@
 #pragma once
 #include <string>
 #include <vector>
-#include <muller.h>
+#include <colorfield.h>
 #include <lnm.h>
 #include <dilts.h>
 #include <xiaowei.h>
@@ -12,7 +12,7 @@
 typedef enum{
     BOUNDARY_LNM=0,
     BOUNDARY_DILTS,
-    BOUNDARY_MULLER,
+    BOUNDARY_COLOR_FIELD,
     BOUNDARY_XIAOWEI,
     BOUNDARY_SANDIM,
     BOUNDARY_INTERVAL,
@@ -23,7 +23,7 @@ inline std::string GetBoundaryMethodName(BoundaryMethod method){
     switch(method){
         case BOUNDARY_LNM : return "Lnm";
         case BOUNDARY_DILTS : return "Dilts";
-        case BOUNDARY_MULLER : return "Muller";
+        case BOUNDARY_COLOR_FIELD : return "ColorField";
         case BOUNDARY_XIAOWEI : return "Xiaowei";
         case BOUNDARY_SANDIM : return "Sandim";
         case BOUNDARY_INTERVAL : return "Interval";
@@ -38,8 +38,9 @@ inline BoundaryMethod GetBoundaryMethod(std::string method){
         return BOUNDARY_DILTS;
     if(method == "INTERVAL" || method == "Interval" || method == "interval")
         return BOUNDARY_INTERVAL;
-    if(method == "MULLER" || method == "Muller" || method == "muller")
-        return BOUNDARY_MULLER;
+    if(method == "ColorField" || method == "Colorfield" || method == "colorfield" ||
+       method == "CF" || method == "Cf" || method == "cf")
+        return BOUNDARY_COLOR_FIELD;
     if(method == "XIAOWEI" || method == "Xiaowei" || method == "xiaowei")
         return BOUNDARY_XIAOWEI;
     if(method == "SANDIM" || method == "Sandim" || method == "sandim")

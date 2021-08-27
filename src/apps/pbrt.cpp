@@ -395,7 +395,7 @@ std::map<const char *, arg_desc> pbrt_argument_map = {
     },
     {"-translate", 
         { .processor = pbrt_translate_arg, 
-            .help = "Translate input set. (degrees)" 
+            .help = "Translate input set."
         }
     },
     {"-clip-plane", 

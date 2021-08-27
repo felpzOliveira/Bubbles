@@ -40,12 +40,16 @@ void default_boundary_opts(boundary_opts *opts){
 void print_boundary_configs(boundary_opts *opts){
     std::cout << "Configs: " << std::endl;
     std::cout << "    * Input : " << opts->input << std::endl;
-    std::cout << "    * Output : " << opts->output << std::endl;
-    std::cout << "    * Method : " << GetBoundaryMethodName(opts->method) << std::endl;
-    std::cout << "    * Spacing : " << opts->spacing << std::endl;
-    std::cout << "    * Spacing Scale : " << opts->spacingScale << std::endl;
-    if(opts->method == BOUNDARY_LNM){
-        std::cout << "    * LNM Algo: " << opts->lnmalgo << std::endl;
+    if(!opts->stats){
+        std::cout << "    * Output : " << opts->output << std::endl;
+        std::cout << "    * Method : " << GetBoundaryMethodName(opts->method) << std::endl;
+        std::cout << "    * Spacing : " << opts->spacing << std::endl;
+        std::cout << "    * Spacing Scale : " << opts->spacingScale << std::endl;
+        if(opts->method == BOUNDARY_LNM){
+            std::cout << "    * LNM Algo: " << opts->lnmalgo << std::endl;
+        }
+    }else{
+        std::cout << "    * Statistics Run" << std::endl;
     }
 }
 
@@ -159,7 +163,8 @@ std::map<const char *, arg_desc> bounds_arg_map = {
     {"-in",
         {
             .processor = boundary_in_args,
-            .help = "Sets the input file for boundary computation."
+            .help = "Sets the input file for boundary computation when used with methods."
+                    " Sets the base path for statistics ( Requires -stats )."
         }
     },
     {"-lnmalgo",
@@ -171,7 +176,7 @@ std::map<const char *, arg_desc> bounds_arg_map = {
     {"-count",
         {
             .processor = boundary_count_arg,
-            .help = "Sets the range of values to be used for particle count ( Requires -stats )."
+            .help = "Sets the range of files to be automatically loaded for analysis ( Requires -stats )."
         }
     },
     {"-stats",
@@ -225,7 +230,7 @@ std::map<const char *, arg_desc> bounds_arg_map = {
     {"-legacy",
         {
             .processor = boundary_legacy_args,
-            .help = "Sets the loader to use legacy format for reading input."
+            .help = "Sets the loader to use legacy format for input and output."
         }
     }
 };
@@ -427,9 +432,9 @@ void process_boundary_request(boundary_opts *opts){
         timer.Stop();
         Float rad = DiltsGetParticleRadius(pSet->GetRadius());
         printf("Dilts radius %g\n", rad);
-    }else if(opts->method == BOUNDARY_MULLER){
+    }else if(opts->method == BOUNDARY_COLOR_FIELD){
         timer.Start();
-        MullerBoundary(pSet, grid, opts->spacing);
+        CFBoundary(pSet, grid, opts->spacing);
         timer.Stop();
     }else if(opts->method == BOUNDARY_XIAOWEI){
         timer.Start();

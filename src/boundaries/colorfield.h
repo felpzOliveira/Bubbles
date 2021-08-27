@@ -5,7 +5,7 @@
 #include <kernel.h>
 
 /**************************************************************/
-//                M U L L E R   M E T H O D                   //
+//             C O L O R   F I E L D   M E T H O D            //
 //                Classic Color Field method                  //
 /**************************************************************/
 
@@ -15,7 +15,7 @@
 * It is quite accurate but it can have some strong failures on edge cases.
 */
 
-#define MULLER_KERNEL_EXPANSION 3.0
+#define CF_KERNEL_EXPANSION 3.0
 
 inline __bidevice__ vec3f KernelGradient(Float rho, Float distance, vec3f dir){
     SphStdKernel3 kernel3d(rho);
@@ -28,10 +28,10 @@ inline __bidevice__ vec2f KernelGradient(Float rho, Float distance, vec2f dir){
 }
 
 template<typename T, typename U, typename Q> __bidevice__
-int MullerParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+int CFParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                              Float h, int pId)
 {
-    Float rho = MULLER_KERNEL_EXPANSION * h;
+    Float rho = CF_KERNEL_EXPANSION * h;
 
     int *neighbors = nullptr;
     Float mass = pSet->GetMass();
@@ -68,31 +68,31 @@ int MullerParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 }
 
 template<typename T, typename U, typename Q> __global__
-void MullerBoundaryKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
+void CFBoundaryKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < pSet->GetParticleCount()){
-        int b = MullerParticleIsBoundary(pSet, domain, h, i);
+        int b = CFParticleIsBoundary(pSet, domain, h, i);
         pSet->SetParticleV0(i, b);
     }
 }
 
 template<typename T, typename U, typename Q> __host__
-void MullerBoundaryCPU(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h, int i){
+void CFBoundaryCPU(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h, int i){
     if(i < pSet->GetParticleCount()){
-        int b = MullerParticleIsBoundary(pSet, domain, h, i);
+        int b = CFParticleIsBoundary(pSet, domain, h, i);
         pSet->SetParticleV0(i, b);
     }
 }
 
 template<typename T, typename U, typename Q> __host__
-void MullerBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
+void CFBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
     int use_cpu = GetSystemUseCPU();
     int N = pSet->GetParticleCount();
     if(!use_cpu){
-        GPULaunch(N, GPUKernel(MullerBoundaryKernel<T, U, Q>), pSet, domain, h);
+        GPULaunch(N, GPUKernel(CFBoundaryKernel<T, U, Q>), pSet, domain, h);
     }else{
         ParallelFor(0, N, [&](int i)-> void{
-            MullerBoundaryCPU(pSet, domain, h, i);
+            CFBoundaryCPU(pSet, domain, h, i);
         });
     }
 }

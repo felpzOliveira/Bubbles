@@ -211,6 +211,9 @@ __global__ void LNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain)
     }
 }
 
+/*
+ * Checks if a pair of coordinates u0 and u1 lie on the same N1x1 neighborhood.
+ */
 template<typename U> __bidevice__ inline
 bool LNMBoundaryAreCoords1x1(const U u0, const U u1, int dim){
     int eval = 0;

@@ -171,7 +171,8 @@ inline __host__ void SandimComputeViewPoints(ParticleSet2 *pSet, Grid2 *domain,
  * This is the grid implementation Sandim suggests to use for the domain.
  * I particularly don't like it, I feel the solver grid is better but
  * it is here if you wish to use it, 'bbtool boundary ... -method sandim' uses this
- * implementation instead of the default one.
+ * implementation instead of the default one. This grid is not completely symmetric,
+ * use with care.
  */
 template<typename T, typename U, typename Q> inline __host__
 Grid<T, U, Q> *SandimComputeCompatibleGridImpl(ParticleSet<T> *pSet, Float h){

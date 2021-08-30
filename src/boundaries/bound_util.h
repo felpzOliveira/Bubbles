@@ -65,7 +65,12 @@ template<typename T, typename U, typename Q, typename Func> __bidevice__
 void ForAllNeighbors(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, T pi, Func fn,
                      int depth=1)
 {
-    int neighbors[20480];
+    int neighbors[343]; // at most 7³
+    if(depth > 3){
+        printf("Warning: Too large domain search, max is 3 ( 7³ )\n");
+        depth = 3;
+    }
+
     unsigned int cellId = domain->GetLinearHashedPosition(pi);
     int count = domain->GetNeighborListFor(cellId, depth, neighbors);
     int terminate = 0;

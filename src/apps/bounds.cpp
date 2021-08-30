@@ -396,6 +396,10 @@ void process_boundary_request(boundary_opts *opts){
             timer.Start();
             LNMBoundaryExtended(pSet, grid, opts->spacing, 5, 0);
             timer.Stop();
+        }else if(opts->lnmalgo == 0){
+            timer.Start();
+            LNMBoundarySingle(pSet, grid, opts->spacing);
+            timer.Stop();
         }else{
             int npart = pSet->GetParticleCount();
             LNMWorkQueue *workQ = nullptr;

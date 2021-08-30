@@ -104,11 +104,11 @@ int main(int argc, char **argv){
     //test_pcisph3_water_drop();
     //test_pcisph3_rotating_water_box();
 
-    //test_pcisph2_water_block();
+    test_pcisph2_water_block();
     //test_pcisph3_dragon();
     //test_pcisph2_water_sphere();
     //test_pcisph3_water_block();
-    test_pcisph3_dam_break_double_dragon();
+    //test_pcisph3_dam_break_double_dragon();
     //test_pcisph3_water_drop();
 
 #if defined(RUN_TESTS)

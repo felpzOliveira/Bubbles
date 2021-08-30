@@ -501,7 +501,48 @@ class Grid{
         *neighbors = cell->neighborList;
         return cell->neighborListCount;
     }
-    
+
+    template<typename Fn>
+    __bidevice__ int ForAllNeighborsOf(int id, int depth, const Fn fn){
+        AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3,
+                "Unknown dimension distribution {ForAllNeighborsOf}");
+        U u = GetCellIndex(id);
+        T ufmin, ufmax;
+        for(int s = 0; s < dimensions; s++){
+            ufmin[s] = u[s];
+            ufmax[s] = u[s];
+        }
+        ufmin = ufmin - T(depth);
+        ufmax = ufmax + T(depth);
+        int terminate = 0;
+
+        for(int j = ufmin[1]; j <= ufmax[1] && !terminate; j++){
+            if(j < 0 || j >= usizes[1]) continue;
+            if(dimensions > 1){
+                for(int i = ufmin[0]; i <= ufmax[0] && !terminate; i++){
+                    if(i < 0 || i >= usizes[0]) continue;
+                    if(dimensions == 3){
+                        for(int k = ufmin[2]; k <= ufmax[2] && !terminate; k++){
+                            if(k < 0 || k >= usizes[2]) continue;
+                            U f; f[0] = i; f[1] = j; f[2] = k;
+                            int fid = GetLinearCellIndex(f);
+                            terminate = fn(GetCell(fid), f, fid);
+                        }
+                    }else{
+                        U f; f[0] = i; f[1] = j;
+                        int fid = GetLinearCellIndex(f);
+                        terminate = fn(GetCell(fid), f, fid);
+                    }
+                }
+            }else{
+                U f; f[0] = j;
+                int fid = GetLinearCellIndex(f);
+                terminate = fn(GetCell(fid), f, fid);
+            }
+        }
+
+        return terminate;
+    }
     
     /* Get neighbors from a cell with a depth 'depth' */
     __bidevice__ int GetNeighborListFor(int id, int depth, int *neighbors){

@@ -163,17 +163,8 @@ void test_pcisph2_water_block(){
         //DiltsSpokeBoundary(set2, grid);
         //MullerBoundary(set2, grid, spacing);
         //XiaoweiBoundary(set2, grid, spacing);
-
-        int nparts = set2->GetParticleCount();
-        int *partWorkQ = cudaAllocateVx(int, nparts);
-        SandimComputeWorkQueue(set2, grid, partWorkQ);
-        SandimWorkQueue2 *vpWorkQ = cudaAllocateVx(SandimWorkQueue2, 1);
-        vpWorkQ->SetSlots(grid->GetCellCount());
-
-        SandimComputeViewPoints(set2, grid, vpWorkQ);
-
-        SandimComputeHPR(set2, grid, partWorkQ, vpWorkQ);
-
+        //LNMBoundary(set2, grid, spacing);
+        LNMBoundarySingle(set2, grid, spacing);
 
         set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);

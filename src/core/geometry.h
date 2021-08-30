@@ -64,8 +64,8 @@
 #define SqrtInfinity 3.1622776601683794E+18
 #define IntInfinity 2147483646
 
-//typedef float Float;
-typedef double Float;
+typedef float Float;
+//typedef double Float;
 
 /*
 * NOTE: The Inside routines for BoundsN<T> are considering Epsilons 

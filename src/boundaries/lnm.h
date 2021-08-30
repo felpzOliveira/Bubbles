@@ -246,7 +246,6 @@ __global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *dom
         bool is_l1 = false, is_l2 = false;
         U cand[125];
         U sources[125];
-        int *nei = nullptr;
         int depth = 2;
         const int dim = domain->dimensions;
         int threshold = LNMDomainQuerySize(3, dim);
@@ -257,7 +256,7 @@ __global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *dom
         self->SetLevel(-1);
         if(self->GetChainLength() == 0) return;
 
-        int count = domain->GetNeighborsOf(i, &nei);
+        int count = domain->GetNeighborsOf(i, nullptr);
 
         if(count != threshold){
             self->SetLevel(1);
@@ -278,7 +277,7 @@ __global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *dom
                     sources[b++] = cid;
                 }
             }else if(is_n1x1 && n <= preDelta){
-                count = domain->GetNeighborsOf(lid, &nei);
+                count = domain->GetNeighborsOf(lid, nullptr);
                 if(count != threshold){
                     is_l2 = true;
                     p = 0, b = 0;

@@ -498,7 +498,9 @@ class Grid{
     __bidevice__ int GetNeighborsOf(int id, int **neighbors){
         AssertA(id < total, "Invalid cell id given for {GetNeighborsOf}");
         Cell<Q> *cell = &cells[id];
-        *neighbors = cell->neighborList;
+        if(neighbors){
+            *neighbors = cell->neighborList;
+        }
         return cell->neighborListCount;
     }
 

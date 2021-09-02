@@ -100,8 +100,8 @@ vec3f DiltsSpokeTakeUniformPoint(vec3f pi, Float r, int &done,
 template<typename T, typename U, typename Q> inline __bidevice__
 int DiltsSpokeParticleIsBoundary(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, int pId){
     int *neighbors = nullptr;
-    T candidates[256];
-    int max_size = 256;
+    T candidates[1024];
+    int max_size = 1024;
     int n = 0;
     T pi = pSet->GetParticlePosition(pId);
     unsigned int cellId = domain->GetLinearHashedPosition(pi);

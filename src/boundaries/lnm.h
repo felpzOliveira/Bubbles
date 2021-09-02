@@ -2,6 +2,7 @@
 #include <grid.h>
 #include <cutil.h>
 #include <dilts.h>
+#include <xiaowei.h>
 #include <bound_util.h>
 
 /**************************************************************/
@@ -38,75 +39,34 @@ __bidevice__ void LNMBoundaryPushWork(ParticleSet<T> *pSet, Cell<Q> *self,
     ParticleChain *pChain = self->GetChain();
     for(int i = 0; i < count; i++){
         workQ->Push(pChain->pId);
-    }
-}
-
-template<typename T, typename U, typename Q>
-__bidevice__ void LNMBoundaryL2Asymmetry(ParticleSet<T> *pSet, Cell<Q> *self, Float h,
-                                         Grid<T, U, Q> *domain, int *neighbors, int nCount)
-{
-    SphStdKernel2 kernel2(h);
-    SphStdKernel3 kernel3(h);
-    int count = self->GetChainLength();
-    ParticleChain *pSelfChain = self->GetChain();
-    const int dim = domain->dimensions;
-    
-    for(int i = 0; i < count; i++){
-        T sum(0);
-        Float Wsum = 0;
-        T pi = pSet->GetParticlePosition(pSelfChain->pId);
-        for(int v = 0; v < nCount; v++){
-            Cell<Q> *cell = domain->GetCell(neighbors[v]);
-            int level = cell->GetLevel(); // promote
-            if(level == -1 || level == 2){
-                int size = cell->GetChainLength();
-                ParticleChain *pChain = cell->GetChain();
-                for(int j = 0; j < size; j++){ // asymmetry acc
-                    T pj = pSet->GetParticlePosition(pChain->pId);
-                    Float distance = Distance(pi, pj);
-                    Float W = 0;
-                    if(dim == 3){
-                        W = kernel3.W(distance);
-                    }else{ // dim == 2
-                        W = kernel2.W(distance);
-                    }
-                    
-                    Wsum += W;
-                    sum += pj * W;
-                    
-                    pChain = pChain->next;
-                }
-            }
-        }
-        
-        sum = sum / Wsum;
-        Float asymmetry = Distance(pi, sum);
-        if(asymmetry > 1e-8){
-            pSet->SetParticleV0(pSelfChain->pId, 2);
-        }
-        
-        pSelfChain = pSelfChain->next;
+        pChain = pChain->next;
     }
 }
 
 template<typename T, typename U, typename Q> __global__
 void LNMBoundaryL2GeomKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                             Float preDelta, Float h, LNMWorkQueue *workQ)
+                             Float preDelta, Float h, LNMWorkQueue *workQ,
+                             int algorithm)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < workQ->size){
         int id = workQ->Fetch();
-        T pi = pSet->GetParticlePosition(id);
-        unsigned int cellId = domain->GetLinearHashedPosition(pi);
-        Cell<Q> *cell = domain->GetCell(cellId);
-        // TODO: This needs to be a queue in order to perform decently
-        if(cell->GetLevel() == 2){
-            int b = DiltsSpokeParticleIsBoundary(domain, pSet, id);
-            if(b > 0){
-                pSet->SetParticleV0(id, 2);
+        int b = 0;
+        switch(algorithm){
+            case 2: b = DiltsSpokeParticleIsBoundary(domain, pSet, id); break;
+            case 1: b = XiaoweiParticleIsBoundary(pSet, domain, h, id); break;
+            default:{
+                printf("Warning: Unknown algorithm\n");
             }
+        }
+        if(algorithm == 2){
+            b = DiltsSpokeParticleIsBoundary(domain, pSet, id);
+        }else if(algorithm == 1){
 
-            workQ->ids[id] = b;
+        }
+        if(b > 0){
+            pSet->SetParticleV0(id, 2);
+            workQ->IncreaseCounter();
         }
     }
 }
@@ -129,56 +89,15 @@ __global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                     self->SetLevel(2);
                     if(algorithm == 0){ // fast
                         LNMBoundaryLNSet(pSet, self, 2);
-                    }else if(algorithm == 1){ // asymmetry
-                        LNMBoundaryL2Asymmetry(pSet, self, h, domain, 
-                                               neighbors, count);
-                    }else if(algorithm >= 2 && workQ){
+                    }else if(workQ){
                         LNMBoundaryPushWork(pSet, self, workQ);
+                    }else{
+                        printf("Warning: Not sure what to do with L2\n");
                     }
                     
                     break;
                 }
             }
-        }
-    }
-}
-
-template<typename T, typename U, typename Q>
-__global__ void LNMBoundaryExtendL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
-    int id = threadIdx.x + blockIdx.x * blockDim.x;
-    if(id < domain->GetActiveCellCount()){
-        int i = domain->GetActiveCellId(id);
-        Cell<Q> *self = domain->GetCell(i);
-        // promote unbounded L2 levels to L3
-        if(self->GetLevel() == 2){
-            LNMBoundaryLNSet(pSet, self, 3);
-        }
-    }
-}
-
-template<typename T, typename U, typename Q>
-__global__ void LNMBoundaryLKKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                                    Float preDelta, Float h)
-{
-    int id = threadIdx.x + blockIdx.x * blockDim.x;
-    if(id < domain->GetActiveCellCount()){
-        int i = domain->GetActiveCellId(id);
-        Cell<Q> *self = domain->GetCell(i);
-        if(self->GetChainLength() > 0 && self->GetLevel() != 1){
-            int *neighbors = nullptr;
-            int count = domain->GetNeighborsOf(i, &neighbors);
-            for(int s = 0; s < count; s++){
-                Cell<Q> *cell = domain->GetCell(neighbors[s]);
-                if(cell->GetLevel() == 1 && cell->GetChainLength() <= preDelta){
-                    self->SetLevel(-2);
-                    LNMBoundaryLNSet(pSet, self, 2);
-                    break;
-                }
-            }
-        }else if(self->GetLevel() == 1){
-            LNMBoundaryLNSet(pSet, self, 1);
-        }else if(self->GetLevel() > 2){
-            LNMBoundaryLNSet(pSet, self, self->GetLevel());
         }
     }
 }
@@ -234,7 +153,7 @@ bool LNMBoundaryAreCoords1x1(const U u0, const U u1, int dim){
  * This call perform full L1 and L2 classification in one step for the case
  * in the paper i.e.: F2(p) = 1. This is mostly symbolic, just to show
  * that it is possible to write a function to perform full classification
- * over N2x2.
+ * over N2x2. Performance is basically the same from splitting computation.
  */
 template<typename T, typename U, typename Q>
 __global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
@@ -349,18 +268,57 @@ __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     GPULaunch(domain->GetActiveCellCount(), GPUKernel(LNMBoundaryL2Kernel<T, U, Q>),
               pSet, domain, delta, h, algorithm, workQ);
 
-    if(algorithm >= 2 && workQ){
+    if(algorithm != 0 && workQ){
         /* Apply Geometric intersection */
         int N = workQ->size;
         GPULaunch(N, GPUKernel(LNMBoundaryL2GeomKernel<T, U, Q>),
-                   pSet, domain, delta, h, workQ);
+                   pSet, domain, delta, h, workQ, algorithm);
     }
-
 }
 
 /**************************************************************/
 //                 V O X E L   C L A S S I F I E R            */
 /**************************************************************/
+template<typename T, typename U, typename Q>
+__global__ void LNMBoundaryExtendL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    if(id < domain->GetActiveCellCount()){
+        int i = domain->GetActiveCellId(id);
+        Cell<Q> *self = domain->GetCell(i);
+        // promote unbounded L2 levels to L3
+        if(self->GetLevel() == 2){
+            LNMBoundaryLNSet(pSet, self, 3);
+        }
+    }
+}
+
+template<typename T, typename U, typename Q>
+__global__ void LNMBoundaryLKKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                                    Float preDelta, Float h)
+{
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    if(id < domain->GetActiveCellCount()){
+        int i = domain->GetActiveCellId(id);
+        Cell<Q> *self = domain->GetCell(i);
+        if(self->GetChainLength() > 0 && self->GetLevel() != 1){
+            int *neighbors = nullptr;
+            int count = domain->GetNeighborsOf(i, &neighbors);
+            for(int s = 0; s < count; s++){
+                Cell<Q> *cell = domain->GetCell(neighbors[s]);
+                if(cell->GetLevel() == 1 && cell->GetChainLength() <= preDelta){
+                    self->SetLevel(-2);
+                    LNMBoundaryLNSet(pSet, self, 2);
+                    break;
+                }
+            }
+        }else if(self->GetLevel() == 1){
+            LNMBoundaryLNSet(pSet, self, 1);
+        }else if(self->GetLevel() > 2){
+            LNMBoundaryLNSet(pSet, self, self->GetLevel());
+        }
+    }
+}
+
 template<typename T, typename U, typename Q>
 __bidevice__ bool LNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned int cellId){
     int *neighbors = nullptr;

@@ -25,18 +25,25 @@ class WorkQueue{
     int size;
     int entry;
     int capacity;
+    int counter;
     T *ids;
     __bidevice__ WorkQueue(){}
     __host__ void SetSlots(int n){
-        //ids = (T *)cudaAllocateExclusive(n * sizeof(T));
         ids = cudaAllocateVx(T, n);
+        for(int i = 0; i < n; i++){
+            ids[i] = T(0);
+        }
         size = 0;
         entry = 0;
+        counter = 0;
         capacity = n;
     }
 
     __bidevice__ int Push(T id){
         int at = QueuePushEntry(this);
+        if(at >= capacity){
+            printf("Too many entries\n");
+        }
         ids[at] = id;
         return at;
     }
@@ -47,6 +54,14 @@ class WorkQueue{
         return ids[at];
     }
 
+    __bidevice__ void IncreaseCounter(){
+    #if defined(__CUDA_ARCH__)
+        atomicAdd(&counter, 1);
+    #else
+        __atomic_fetch_add(&counter, 1, __ATOMIC_SEQ_CST);
+    #endif
+    }
+
     __host__ void ResetEntry(){
         entry = 0;
     }
@@ -54,6 +69,7 @@ class WorkQueue{
     __host__ void Reset(){
         entry = 0;
         size = 0;
+        counter = 0;
     }
 };
 

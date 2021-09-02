@@ -5,6 +5,15 @@
 #include <string>
 #include <boundary.h>
 #include <memory.h>
+#include <fstream>
+#include <sstream>
+
+typedef struct{
+    Float partl2ratio;
+    Float partl2acceptedratio;
+    int partl2count;
+    int partl2accepted;
+}work_queue_stats;
 
 typedef struct{
     std::string input;
@@ -235,7 +244,7 @@ std::map<const char *, arg_desc> bounds_arg_map = {
     }
 };
 
-void process_count_procedure(boundary_opts *opts){
+void process_stats_procedure(boundary_opts *opts){
     long unsigned int total  = 0;
     long unsigned int totalb = 0;
     if(!(opts->inflags & SERIALIZER_BOUNDARY)){
@@ -317,7 +326,7 @@ void process_count_procedure(boundary_opts *opts){
     printf(" Min boundary: %lu\n", min_b);
 }
 
-void process_boundary_request(boundary_opts *opts){
+void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=nullptr){
     ParticleSetBuilder3 builder;
     std::vector<SerializedShape> shapes;
     std::vector<int> boundary;
@@ -402,32 +411,29 @@ void process_boundary_request(boundary_opts *opts){
             timer.Stop();
         }else{
             int npart = pSet->GetParticleCount();
-            LNMWorkQueue *workQ = nullptr;
-            if(opts->lnmalgo >= 2){
-                workQ = cudaAllocateVx(LNMWorkQueue, 1);
-                workQ->SetSlots(npart);
-            }
+            LNMWorkQueue *workQ = cudaAllocateVx(LNMWorkQueue, 1);
+            workQ->SetSlots(npart);
             timer.Start();
             LNMBoundary(pSet, grid, opts->spacing, opts->lnmalgo, workQ);
             timer.Stop();
             if(workQ){
-                int workQueueParts = workQ->size;
-                Float bounds = 0;
-                int *localId = new int[npart];
-                CUCHECK(cudaMemcpy(localId, workQ->ids, sizeof(int) * npart,
-                                                    cudaMemcpyDeviceToHost));
-
-                for(int i = 0; i < workQueueParts; i++){
-                    if(localId[i] > 0){
-                        bounds++;
-                    }
+                Float evals = (Float)workQ->size;
+                Float counter = (Float)workQ->counter;
+                Float pl2aratio = 100.0 * counter / evals;
+                Float pl2ratio  = 100.0 * evals / (Float)npart;
+                if(workQstats){
+                    workQstats->partl2acceptedratio = pl2aratio;
+                    workQstats->partl2ratio = pl2ratio;
+                    workQstats->partl2count = workQ->size;
+                    workQstats->partl2accepted = counter;
                 }
 
-                Float evals = (Float)workQ->size;
-                Float ratio = 100.0 * bounds / evals;
-                printf("WorkQueue ratio: %g%%\n", ratio);
-
-                delete[] localId;
+                printf("WorkQueue Stats: \n"
+                       "  * L2 ratio: %g%%\n"
+                       "  * Acceptance ratio: %g%%\n"
+                       "  * L2 particles: %d\n"
+                       "  * Accepted particles: %d\n",
+                       pl2ratio, pl2aratio, workQ->size, workQ->counter);
             }
         }
     }else if(opts->method == BOUNDARY_DILTS){
@@ -503,8 +509,39 @@ void boundary_command(int argc, char **argv){
     argument_process(bounds_arg_map, argc, argv, "boundary", &opts);
     print_boundary_configs(&opts);
     if(opts.stats){
-        process_count_procedure(&opts);
+        process_stats_procedure(&opts);
     }else{
-        process_boundary_request(&opts);
+        int start = opts.countstart;
+        int end   = opts.countend;
+        if(start != end && end > 0){
+            std::string base = opts.input;
+            std::string baseout = opts.output;
+            std::vector<work_queue_stats> vals;
+            for(int i = start; i < end; i++){
+                work_queue_stats ratios = {0, 0};
+                std::string path = base + std::to_string(i);
+                path += ".txt";
+                printf(" ***** %s *****\n", path.c_str());
+                opts.input = path;
+                process_boundary_request(&opts, &ratios);
+                vals.push_back(ratios);
+            }
+
+            std::ofstream ifs("ratio.txt");
+            if(ifs.is_open()){
+                std::stringstream ss;
+                for(int i = 0; i < vals.size(); i++){
+                    work_queue_stats stats = vals[i];
+                    ifs << (i+1) << "," << stats.partl2ratio <<
+                    "," << stats.partl2acceptedratio << "," <<
+                    stats.partl2accepted << "," << stats.partl2count << "\n";
+                }
+
+                ifs << ss.str();
+                ifs.close();
+            }
+        }else{
+            process_boundary_request(&opts);
+        }
     }
 }

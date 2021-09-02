@@ -225,7 +225,8 @@ __host__ void GPUParallelLambda(const char *desc, int nItems, F fn){
     int gridSize = (nItems + blockSize - 1) / blockSize;
     ProfilerPrepare(desc);
     kernel<<<gridSize, blockSize>>>(fn, nItems);
-    cudaDeviceAssert(desc);
+    //cudaDeviceAssert(desc);
+    cudaDeviceSynchronize();
     ProfilerFinish();
 }
 
@@ -235,7 +236,7 @@ __host__ void GPUParallelLambda(const char *desc, int nItems, F fn){
     int __gridSize = (nItems + __blockSize - 1) / __blockSize;\
     ProfilerPrepare(#call);\
     call<<<__gridSize, __blockSize>>>(__VA_ARGS__);\
-    cudaDeviceAssert(#call);\
+    cudaDeviceSynchronize();\
     ProfilerFinish();\
 }
 

@@ -59,11 +59,7 @@ void LNMBoundaryL2GeomKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                 printf("Warning: Unknown algorithm\n");
             }
         }
-        if(algorithm == 2){
-            b = DiltsSpokeParticleIsBoundary(domain, pSet, id);
-        }else if(algorithm == 1){
 
-        }
         if(b > 0){
             pSet->SetParticleV0(id, 2);
             workQ->IncreaseCounter();
@@ -153,7 +149,8 @@ bool LNMBoundaryAreCoords1x1(const U u0, const U u1, int dim){
  * This call perform full L1 and L2 classification in one step for the case
  * in the paper i.e.: F2(p) = 1. This is mostly symbolic, just to show
  * that it is possible to write a function to perform full classification
- * over N2x2. Performance is basically the same from splitting computation.
+ * over N2x2. Performance is basically the same from splitting computation
+ * there are however a few cases where this is faster (see thesis).
  */
 template<typename T, typename U, typename Q>
 __global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,

@@ -28,7 +28,7 @@ extern "C" {
 * use a simple Jarvis March on CUDA.
 */
 
-#define SANDIM_MAX_FLIP_SLOTS 512 // this is a guess
+#define SANDIM_MAX_FLIP_SLOTS 4096 // this is a guess
 #define SANDIM_GAMMA 1.3 // this is also a guess
 /*
 * This is the distance considered for detecting out-of-domain particles
@@ -375,8 +375,7 @@ void SandimConvexHull3(IndexedParticle<vec3f> *points, int *vp_count,
             return;
         }
 
-        /* oh boy, here goes our stack */
-        coordT ps[3 * SANDIM_MAX_FLIP_SLOTS];
+        coordT *ps = new coordT[3 * SANDIM_MAX_FLIP_SLOTS];
         qhT qh_qh;
         qhT *qh= &qh_qh;
         boolT ismalloc = 0;
@@ -407,6 +406,7 @@ void SandimConvexHull3(IndexedParticle<vec3f> *points, int *vp_count,
         }
 
         qh_freeqhull(qh, qh_ALL);
+        delete[] ps;
     });
 
     fclose(fp);
@@ -419,8 +419,10 @@ void SandimComputeHPRImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *part
 {
     int N = vpWorkQ->size;
     int len = maxN * N;
-    Float mb = len / 1000000.0;
-    printf("[SANDIM] Memory required: %d (%g Mb) ( VP = %d x N = %d )\n", len, mb, N, maxN);
+    int totalLen = len + N * sizeof(int);
+    Float mb = totalLen / 1e+6;
+    printf("[SANDIM] GPU Extra memory required: %d (%g Mb) ( VP = %d x N = %d )\n",
+           totalLen, mb, N, maxN);
     IndexedParticle<T> *points = cudaAllocateUnregisterVx(IndexedParticle<T>, len);
     int *vp_count = cudaAllocateUnregisterVx(int, N);
 

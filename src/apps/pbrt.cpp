@@ -65,7 +65,7 @@ const std::string ColorsString[] = {
 
 const unsigned int Colors[] = {
     0xffcccccc,
-    0xffc60043,
+    0xffb20018,
     //0xffc60043,
     0xffe3b256,
     0xffe7dd96,

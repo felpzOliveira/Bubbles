@@ -119,6 +119,36 @@ __host__ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f 
 __host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
                                    vec3f length, int nPoints, Transform transform);
 
+template<typename T, typename U, typename Q> inline __host__
+int UtilIsDistributionConsistent(ParticleSet<T> *pSet, Grid<T, U, Q> *grid){
+    // for now just check all hashes match
+    Q gridBounds = grid->GetBounds();
+
+    for(int i = 0; i < pSet->GetParticleCount(); i++){
+        T p = pSet->GetParticlePosition(i);
+        if(!Inside(p, gridBounds)){
+            T p0 = gridBounds.pMin;
+            T p1 = gridBounds.pMax;
+            if(grid->GetDimensions() == 3){
+                printf("**************************************\n");
+                printf("Warning: Domain {%g %g %g} x {%g %g %g} "
+                       "cannot hash position {%g %g %g}\n", p0[0], p0[1], p0[2],
+                       p1[0], p1[1], p1[2], p[0], p[1], p[2]);
+                printf("**************************************\n");
+            }else{
+                printf("**************************************\n");
+                printf("Warning: Domain {%g %g} x {%g %g} "
+                       "cannot hash position {%g %g}\n", p0[0], p0[1],
+                       p1[0], p1[1], p[0], p[1]);
+                printf("**************************************\n");
+            }
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 inline
 __host__ int UtilIsDomainContaining(Bounds3f domainBounds, std::vector<Bounds3f> testBounds)
 {
@@ -143,10 +173,12 @@ __host__ int UtilIsDomainContaining(Bounds3f domainBounds, std::vector<Bounds3f>
             vec3f p1 = domainBounds.pMax;
             vec3f v0 = bound.pMin;
             vec3f v1 = bound.pMax;
+            printf("*********************************************************\n");
             printf("Warning: Domain {%g %g %g} x {%g %g %g} does not contain:\n" 
                    "\t{%g %g %g} x {%g %g %g}\n", p0.x, p0.y, p0.z, p1.x, p1.y, p1.z,
                    v0.x, v0.y, v0.z, v1.x, v1.y, v1.z);
             printf("Offending axis: %d\n", rv);
+            printf("*********************************************************\n");
             return 0;
         }
     }
@@ -253,6 +285,34 @@ inline __host__ void UtilSaveSimulation3(Solver *solver, ParticleAccessor *pSet,
 
     UtilGetBoundaryState(pSet, &boundaries);
     SerializerSaveSphDataSet3(solver->GetSphSolverData(), filename, flags, &boundaries);
+}
+
+template<typename Solver, typename ParticleAccessor> inline __host__
+void UtilSaveSimulation3(Solver *solver, std::vector<ParticleAccessor *> pSets,
+                         const char *filename, int flags)
+{
+    std::stringstream ss;
+    UtilEraseFile(filename);
+    FILE *fp = fopen(filename, "a+");
+    if(!fp){
+        printf("Failed to open file %s\n", filename);
+        return;
+    }
+
+    ColliderSet3 *colSet3 = solver->GetColliders();
+    for(int i = 0; i < colSet3->nColiders-1; i++){
+        if(colSet3->IsActive(i)){
+            Collider3 *colider = colSet3->colliders[i];
+            ss << colider->shape->Serialize() << std::endl;
+        }
+    }
+
+    std::string str = ss.str();
+    fprintf(fp, "%s", str.c_str());
+    fclose(fp);
+
+    flags &= ~SERIALIZER_BOUNDARY;
+    SerializerSaveSphDataSet3Many(solver->GetSphSolverData(), pSets, filename, flags);
 }
 
 /*
@@ -445,9 +505,9 @@ inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
     float *pos = nullptr;
     float *col = nullptr;
     for(Shape *shape : sdfs){
-        UtilGetSDFParticles(shape->grid, &particles, 0, spacing);
+        UtilGetSDFParticles(shape->grid, &particles, 0, spacing, 0);
     }
-    
+
     total += particles.size();
     ptr = new float[2 * 3 * total];
     pos = &ptr[0];

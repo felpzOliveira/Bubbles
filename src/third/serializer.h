@@ -35,6 +35,10 @@ struct SerializedShape{
 void SerializerSaveSphDataSet3(SphSolverData3 *pSet, const char *filename, int flags,
                                std::vector<int> *boundary = nullptr);
 
+void SerializerSaveSphDataSet3Many(SphSolverData3 *data,
+                                   std::vector<ParticleSet3 *> pSets,
+                                   const char *filename, int flags);
+
 void SerializerSaveSphDataSet2(SphSolverData2 *pSet, const char *filename, int flags,
                                std::vector<int> *boundary = nullptr);
 

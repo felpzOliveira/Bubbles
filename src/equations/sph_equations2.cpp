@@ -307,6 +307,9 @@ __bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
     
     //TODO: Figure out restitution coefficient
     data->collider->ResolveCollision(pSet->GetRadius(), 0.75, &pi, &vi);
+    if(!Inside(pi, data->domain->bounds)){
+        pi = data->domain->bounds.Clamped(pi, pSet->GetRadius());
+    }
     pSet->SetParticlePosition(particleId, pi);
     pSet->SetParticleVelocity(particleId, vi);
 }

@@ -371,7 +371,7 @@ __bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
             hits++;
         }
     }while(hit_anything);
-    
+
     return (hits % 2 != 0 && hits > 0);
 }
 
@@ -453,8 +453,8 @@ __host__ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
 
 __host__ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
     //TODO: Update grid if already exists
-
     int resolution = 0;
+    dx = 0.005;
     Bounds3f bounds = shape->GetBounds();
     vec3f scale(bounds.ExtentOn(0), bounds.ExtentOn(1), bounds.ExtentOn(2));
     bounds.pMin -= margin * scale;

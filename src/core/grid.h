@@ -1210,22 +1210,31 @@ class FieldGrid{
 typedef FieldGrid<vec2f, vec2ui, Bounds2f, Float> FieldGrid2f;
 typedef FieldGrid<vec3f, vec3ui, Bounds3f, Float> FieldGrid3f;
 
+static const int kDefaultContinuousMaxParticles=1000000;
 template<typename T, typename U, typename Q>
 class ContinuousParticleSetBuilder{
     public:
+
     std::vector<T> positions;
     std::vector<T> velocities;
     std::vector<T> forces;
     ParticleSet<T> *particleSet;
     Float kernelRadius;
     int maxNumOfParticles;
+    int reemitions;
+    bool reemitOnce;
     bool warned;
     Grid<T, U, Q> *mappedDomain;
     std::set<unsigned int> mappedCellSet;
     std::map<unsigned int, std::vector<T>> mappedPositions;
     
-    __host__ ContinuousParticleSetBuilder(int maxParticles=1000000){
+    __host__
+    ContinuousParticleSetBuilder(int maxParticles=kDefaultContinuousMaxParticles,
+                                 bool _reemitOnce=false)
+    {
         maxNumOfParticles = Max(1, maxParticles);
+        reemitions = 0;
+        reemitOnce = _reemitOnce;
         particleSet = cudaAllocateVx(ParticleSet<T>, 1);
         particleSet->SetSize(maxNumOfParticles);
         int pSize = MaximumParticlesPerBucket;
@@ -1279,8 +1288,54 @@ class ContinuousParticleSetBuilder{
                     "Inconsistent grid mapping detected, invalid first distribution?");
         }
     }
+
+    __host__ void MapGridEmitToOther(ContinuousParticleSetBuilder<T, U, Q> *other,
+                                     const std::function<T(const T &)> velocity,
+                                     Float d=0.02)
+    {
+        if(reemitions > 0 && reemitOnce) return;
+
+        std::set<unsigned int>::iterator it;
+        int numNewParticles = 0;
+        Grid<T, U, Q> *otherDomain = other->mappedDomain;
+        for(it = mappedCellSet.begin(); it != mappedCellSet.end(); it++){
+            unsigned int h = *it;
+            std::vector<T> pos = mappedPositions[h];
+            Cell<Q> *cell = otherDomain->GetCell(h);
+            int size = cell->GetChainLength();
+            if(size >= MaximumParticlesPerBucket) continue;
+            int toInsert = Min(MaximumParticlesPerBucket - size, pos.size());
+
+            for(int i = 0; i < toInsert; i++){
+                T pi = pos[i];
+                int can_add = 1;
+                ParticleChain *pChain = cell->GetChain();
+                for(int j = 0; j < size; j++){
+                    T pj = particleSet->GetParticlePosition(pChain->pId);
+                    if(Distance(pj, pi) < d){
+                        can_add = 0;
+                        break;
+                    }
+                    pChain = pChain->next;
+                }
+
+                if(can_add){
+                    if(other->AddParticle(pi, velocity(pi))){
+                        numNewParticles++;
+                    }else{
+                        other->Commit();
+                        return;
+                    }
+                }
+            }
+        }
+
+        if(numNewParticles > 0) other->Commit();
+        reemitions += 1;
+    }
     
     __host__ void MapGridEmit(const std::function<T(const T &)> velocity, Float d=0.02){
+        if(reemitions > 0 && reemitOnce) return;
         std::set<unsigned int>::iterator it;
         int numNewParticles = 0;
         for(it = mappedCellSet.begin(); it != mappedCellSet.end(); it++){
@@ -1316,6 +1371,7 @@ class ContinuousParticleSetBuilder{
         }
         
         if(numNewParticles > 0) Commit();
+        reemitions += 1;
     }
     
     __host__ int AddParticle(const T &pos, const T &vel = T(0),

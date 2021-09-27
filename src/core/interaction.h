@@ -48,5 +48,6 @@ class SurfaceInteraction{
 inline __bidevice__ 
 Ray SpawnRayInDirection(const SurfaceInteraction &isect, const vec3f &dir){
     vec3f o = OffsetRayOrigin(isect.p, isect.pError, isect.n, dir);
+    //vec3f o = isect.p + Epsilon * dir;
     return Ray(o, dir, Infinity);
 }

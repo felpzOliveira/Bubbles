@@ -290,17 +290,25 @@ __bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId,
     
     vi += timeStep * at;
     pi += timeStep * vi;
-    
+
+#ifdef DEBUG
     vec3f opi = pi;
-    
+#endif
+
     data->collider->ResolveCollision(pSet->GetRadius(), 0.6, &pi, &vi);
-    
+
+    // miss configuration on spacing x domain size is hard to detect
+    // during scene setup so let's push particles inside in case they
+    // somehow got pushed out by collider collision solver
     if(!Inside(pi, data->domain->bounds)){
+#if DEBUG
         vec3f pMin = data->domain->bounds.pMin;
         vec3f pMax = data->domain->bounds.pMax;
         printf("Point pi outside: {%g %g %g}, {%g %g %g} x {%g %g %g} [%g %g %g]\n",
                pi.x, pi.y, pi.z, pMin.x, pMin.y, pMin.z, 
                pMax.x, pMax.y, pMax.z, opi.x, opi.y, opi.z);
+#endif
+        pi = data->domain->bounds.Clamped(pi, pSet->GetRadius());
     }
     
     AssertA(Inside(pi, data->domain->bounds), "Particle outside domain");

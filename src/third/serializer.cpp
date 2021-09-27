@@ -36,11 +36,11 @@ static void PrintToFile(FILE *fp, const vec2f &value, int spacing=0){
 std::string SerializerStringFromFlags(int flags){
     std::string str;
     if(flags & SERIALIZER_POSITION) str += "p";
-    if(flags & SERIALIZER_DENSITY) str += "d";
-    if(flags & SERIALIZER_NORMAL) str += "n";
-    if(flags & SERIALIZER_BOUNDARY) str += "b";
     if(flags & SERIALIZER_VELOCITY) str += "v";
+    if(flags & SERIALIZER_DENSITY) str += "d";
     if(flags & SERIALIZER_MASS) str += "m";
+    if(flags & SERIALIZER_BOUNDARY) str += "b";
+    if(flags & SERIALIZER_NORMAL) str += "n";
     if(flags & SERIALIZER_LAYERS) str += "l";
     if(flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) str += "o";
     return str;
@@ -52,11 +52,11 @@ int SerializerFlagsFromString(const char *spec){
     for(int i = 0; i < str.size(); i++){
         char c = spec[i];
         if(c == 'p' || c == 'P') flags |= SERIALIZER_POSITION;
-        else if(c == 'd' || c == 'D') flags |= SERIALIZER_DENSITY;
-        else if(c == 'n' || c == 'N') flags |= SERIALIZER_NORMAL;
-        else if(c == 'b' || c == 'B') flags |= SERIALIZER_BOUNDARY;
         else if(c == 'v' || c == 'V') flags |= SERIALIZER_VELOCITY;
+        else if(c == 'd' || c == 'D') flags |= SERIALIZER_DENSITY;
         else if(c == 'm' || c == 'M') flags |= SERIALIZER_MASS;
+        else if(c == 'b' || c == 'B') flags |= SERIALIZER_BOUNDARY;
+        else if(c == 'n' || c == 'N') flags |= SERIALIZER_NORMAL;
         else if(c == 'l' || c == 'L') flags |= SERIALIZER_LAYERS;
         else if(c == 'o' || c == 'O') flags |= SERIALIZER_RULE_BOUNDARY_EXCLUSIVE;
         else{
@@ -729,6 +729,78 @@ void SaveSphParticleSetLegacy(SolverData *data, const char *filename, int flags,
     }
 }
 
+template<typename ParticleSet = ParticleSet3, typename T>
+void PushParticleSetToFile(ParticleSet *pSet, const char *filename, int flags,
+                           FILE *fp, std::vector<int> *boundary = nullptr)
+{
+    if(fp){
+        int logged = 0;
+        int pCount = pSet->GetParticleCount();
+        if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && boundary){
+            pCount = 0;
+            for(int i = 0; i < boundary->size(); i++){
+                pCount += boundary->at(i) > 0 ? 1 : 0;
+            }
+        }else if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && !boundary){
+            printf("Invalid configuration for Serialized particles\n");
+            return;
+        }
+        for(int i = 0; i < pSet->GetParticleCount(); i++){
+            int needs_space = 0;
+            int boundary_value = 0;
+            T pi = pSet->GetParticlePosition(i);
+
+            if(boundary) boundary_value = boundary->at(i);
+
+            if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && !boundary_value){
+                continue;
+            }
+
+            fprintf(fp, "\t\t");
+            if(flags & SERIALIZER_POSITION){
+                PrintToFile(fp, pi);
+                needs_space = 1;
+            }
+
+            if(flags & SERIALIZER_VELOCITY){
+                T vi = pSet->GetParticleVelocity(i);
+                PrintToFile(fp, vi, needs_space);
+                needs_space = 1;
+            }
+
+            if(flags & SERIALIZER_DENSITY){
+                Float di = pSet->GetParticleDensity(i);
+                PrintToFile(fp, di, needs_space);
+                needs_space = 1;
+            }
+
+            if(flags & SERIALIZER_MASS){
+                Float mi = pSet->GetMass();
+                PrintToFile(fp, mi, needs_space);
+                needs_space = 1;
+            }
+
+            if(flags & SERIALIZER_BOUNDARY){
+                if(!boundary && !logged){
+                    printf("Warning: Not a valid boundary given\n");
+                    logged = 1;
+                }else if(boundary){
+                    PrintToFile(fp, boundary->at(i), needs_space);
+                    needs_space = 1;
+                }
+            }
+
+            if(flags & SERIALIZER_NORMAL){
+                T ni = pSet->GetParticleNormal(i);
+                PrintToFile(fp, ni, needs_space);
+                needs_space = 1;
+            }
+
+            fprintf(fp, "\n");
+        }
+    }
+}
+
 template<typename SolverData = SphSolverData3, typename ParticleSet = ParticleSet3, 
 typename Domain = Grid3, typename T>
 void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
@@ -737,7 +809,6 @@ void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
     ParticleSet *pSet = data->sphpSet->GetParticleSet();
     Float spacing = data->sphpSet->GetTargetSpacing();
     FILE *fp = fopen(filename, "a+");
-    int logged = 0;
     std::string format = SerializerStringFromFlags(flags);
     if(fp){
         int pCount = pSet->GetParticleCount();
@@ -757,59 +828,49 @@ void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
         fprintf(fp, "\t\"Format\" %s\n", format.c_str());
         fprintf(fp, "\t\"Spacing\" %g\n", spacing);
         fprintf(fp, "\tDataBegin\n");
-        for(int i = 0; i < pSet->GetParticleCount(); i++){
-            int needs_space = 0;
-            int boundary_value = 0;
-            T pi = pSet->GetParticlePosition(i);
-            
-            if(boundary) boundary_value = boundary->at(i);
-            
-            if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && !boundary_value){
-                continue;
-            }
 
-            fprintf(fp, "\t\t");
-            if(flags & SERIALIZER_POSITION){
-                PrintToFile(fp, pi);
-                needs_space = 1;
-            }
-            
-            if(flags & SERIALIZER_VELOCITY){
-                T vi = pSet->GetParticleVelocity(i);
-                PrintToFile(fp, vi, needs_space);
-                needs_space = 1;
-            }
-            
-            if(flags & SERIALIZER_DENSITY){
-                Float di = pSet->GetParticleDensity(i);
-                PrintToFile(fp, di, needs_space);
-                needs_space = 1;
-            }
-            
-            if(flags & SERIALIZER_MASS){
-                Float mi = pSet->GetMass();
-                PrintToFile(fp, mi, needs_space);
-                needs_space = 1;
-            }
-            
-            if(flags & SERIALIZER_BOUNDARY){
-                if(!boundary && !logged){
-                    printf("Warning: Not a valid boundary given\n");
-                    logged = 1;
-                }else if(boundary){
-                    PrintToFile(fp, boundary->at(i), needs_space);
-                    needs_space = 1;
-                }
-            }
-            
-            if(flags & SERIALIZER_NORMAL){
-                T ni = pSet->GetParticleNormal(i);
-                PrintToFile(fp, ni, needs_space);
-                needs_space = 1;
-            }
-            
-            fprintf(fp, "\n");
+        PushParticleSetToFile<ParticleSet, T>(pSet, filename, flags, fp, boundary);
+
+        fprintf(fp, "\tDataEnd\n");
+        fprintf(fp, "FluidEnd\n");
+        fclose(fp);
+    }else{
+        printf("Error: Failed to open %s\n", filename);
+    }
+}
+
+template<typename SolverData = SphSolverData3, typename ParticleSet = ParticleSet3,
+typename Domain = Grid3, typename T>
+void SaveSphParticleSetMany(SolverData *data, const char *filename, int flags,
+                            std::vector<ParticleSet *> pSets)
+{
+    ParticleSet *pSet = data->sphpSet->GetParticleSet();
+    Float spacing = data->sphpSet->GetTargetSpacing();
+    std::string format = SerializerStringFromFlags(flags);
+    if(flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE){
+        printf("Data set concatenation does not support boundary information\n");
+        return;
+    }
+
+    FILE *fp = fopen(filename, "a+");
+
+    if(fp){
+        int pCount = 0;
+        for(ParticleSet *set : pSets){
+            pCount += set->GetParticleCount();
         }
+
+        fprintf(fp, "FluidBegin\n");
+        fprintf(fp, "\t\"Type\" particles\n");
+        fprintf(fp, "\t\"Count\" %d\n", pCount);
+        fprintf(fp, "\t\"Format\" %s\n", format.c_str());
+        fprintf(fp, "\t\"Spacing\" %g\n", spacing);
+        fprintf(fp, "\tDataBegin\n");
+
+        for(ParticleSet *set : pSets){
+            PushParticleSetToFile<ParticleSet, T>(set, filename, flags, fp, nullptr);
+        }
+
         fprintf(fp, "\tDataEnd\n");
         fprintf(fp, "FluidEnd\n");
         fclose(fp);
@@ -877,6 +938,14 @@ void SerializerSaveSphDataSet3(SphSolverData3 *pSet, const char *filename,
 {
     SaveSphParticleSet<SphSolverData3, ParticleSet3, Grid3, vec3f>(pSet, filename, 
                                                                    flags, boundary);
+}
+
+void SerializerSaveSphDataSet3Many(SphSolverData3 *data,
+                                   std::vector<ParticleSet3 *> pSets,
+                                   const char *filename, int flags)
+{
+    SaveSphParticleSetMany<SphSolverData3, ParticleSet3, Grid3, vec3f>(data, filename,
+                                                                       flags, pSets);
 }
 
 void SerializerSaveSphDataSet2Legacy(SphSolverData2 *pSet, const char *filename,

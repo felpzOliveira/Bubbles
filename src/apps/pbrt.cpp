@@ -23,6 +23,8 @@ typedef enum{
 typedef struct{
     Float cutSource;
     Float cutDistance;
+    vec3f cutPointSource;
+    vec3f cutPointAt;
     int cutAxis;
     std::string input;
     std::string output;
@@ -45,26 +47,15 @@ typedef struct{
     std::string name;
     std::string mat;
     int built;
+    std::string warn_msg;
 }pbrt_mat;
 
 typedef pbrt_mat lit_mat;
 
-const std::string ColorsString[] = {
-    //"0.866 0 0.301",
-    //"0.670 0.368 0.286",
-    //"0.666 0.815 0.588",
-    //"0.00 0.89 1.0",
-    //"0.019 0.682 1.0",
-    "0.78 0.78 0.78",
-    "0.749 0.023 0.247",
-    "0.737 0.564 0.274",
-    "0.760 0.756 0.494",
-    "0.505 0.698 0.901",
-    "0.270 0.533 0.890",
-};
-
 const unsigned int Colors[] = {
-    0xffcccccc,
+    //0xffcccccc,
+    //0xff00ff00,
+    0xff00b218,
     0xffb20018,
     //0xffc60043,
     0xffe3b256,
@@ -76,13 +67,17 @@ const unsigned int Colors[] = {
 pbrt_mat Materials[] = {
     {.name = "glass-BK7", .mat = "\"dielectric\" \"spectrum eta\" \"glass-BK7\"", .built=1},
     {.name = "glass-thin", .mat = "\"dielectric\" \"float eta\" [ 1.1 ]", .built=1},
-    {.name = "diffuse", .mat = "\"diffuse\" \"rgb reflectance\"", .built=0}
+    {.name = "diffuse", .mat = "\"diffuse\" \"rgb reflectance\"", .built=0},
+    {.name = "coated", .mat = "\"coateddiffuse\" \"float roughness\" [0] \"rgb reflectance\"", .built=0}
 };
 
 lit_mat MaterialsLit[] = {
     {.name = "glass", .mat = "reflectance [1.0] name[glass] eta[1.3] type [dielectric]", .built=1},
     {.name = "glass-thin", .mat = "reflectance [1.0] name[glass-thin] eta[1.05] type [dielectric]", .built=1},
-    {.name = "diffuse", .mat = "type [diffuse] ", .built=0},
+    {.name = "diffuse", .mat = "type [diffuse] reflectance ", .built=0},
+    {.name = "coated", .mat = "type [disney] rough[0.001 0.001] specular[0.5]"
+          " clearcoat[1.0] clearcoatGloss [0.93] reflectance ", .built=0,
+  .warn_msg = "Warning: Lit does not support PBRT coated material, using disney format instead"},
 };
 
 std::string RGBStringFromHex(int hex){
@@ -105,6 +100,9 @@ std::string find_material(std::string name, int *ok){
     for(int i = 0; i < count; i++){
         if(name == Materials[i].name){
             *ok = i;
+            if(Materials[i].warn_msg.size() > 0){
+                std::cout << Materials[i].warn_msg << std::endl;
+            }
             return Materials[i].mat;
         }
     }
@@ -317,6 +315,17 @@ ARGUMENT_PROCESS(pbrt_clip_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(pbrt_clip_point_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "-clip-point", 7);
+    const char *token = value.c_str();
+    ParseV3(&opts->cutPointSource, &token);
+    ParseV3(&opts->cutPointAt, &token);
+    opts->cutDistance = ParseFloat(&token);
+    opts->hasClipArgs = 2;
+    return 0;
+}
+
 std::map<const char *, arg_desc> pbrt_argument_map = {
     {"-in",
         { .processor = pbrt_input_arg, 
@@ -378,29 +387,34 @@ std::map<const char *, arg_desc> pbrt_argument_map = {
             .help = "Sets a 3 dimensional vector as argument for the chosen material."
         }
     },
-    {"-rotateY", 
-        { .processor = pbrt_rotate_y_arg, 
-            .help = "Rotate input in the Y direction. (degrees)" 
+    {"-rotateY",
+        { .processor = pbrt_rotate_y_arg,
+            .help = "Rotate input in the Y direction. (degrees)"
         }
     },
-    {"-rotateZ", 
-        { .processor = pbrt_rotate_z_arg, 
-            .help = "Rotate input in the Z direction. (degrees)" 
+    {"-rotateZ",
+        { .processor = pbrt_rotate_z_arg,
+            .help = "Rotate input in the Z direction. (degrees)"
         }
     },
-    {"-rotateX", 
-        { .processor = pbrt_rotate_x_arg, 
-            .help = "Rotate input in the X direction. (degrees)" 
+    {"-rotateX",
+        { .processor = pbrt_rotate_x_arg,
+            .help = "Rotate input in the X direction. (degrees)"
         }
     },
-    {"-translate", 
+    {"-translate",
         { .processor = pbrt_translate_arg, 
             .help = "Translate input set."
         }
     },
-    {"-clip-plane", 
-        { .processor = pbrt_clip_arg, 
-            .help = "Specify parameters to perform plane clip, <source> <distance> <axis>." 
+    {"-clip-plane",
+        { .processor = pbrt_clip_arg,
+            .help = "Specify parameters to perform plane clip, <source> <distance> <axis>."
+        }
+    },
+    {"-clip-point",
+        { .processor = pbrt_clip_point_arg,
+            .help = "Specify parameters to perform point clip, <source> <at> <distance>."
         }
     },
 };
@@ -426,8 +440,6 @@ template<typename T> std::string __to_string(T value){
 * any other is gray
 */
 static std::string GetMaterialStringFiltered(int layer){
-    //if(layer != 1 && layer != 2) return ColorsString[0];
-    //return ColorsString[1];
     if(layer != 1 && layer != 2) return GetStringColor(0);
     return GetStringColor(1);
 }
@@ -440,7 +452,6 @@ static std::string GetMaterialStringAll(int layer){
     if(layer > max_layer-1){
         layer = max_layer-1;
     }
-    //return ColorsString[layer];
     return GetStringColor(layer);
 }
 
@@ -449,17 +460,13 @@ static std::string GetMaterialStringAll(int layer){
 * anything other should not get here but return gray
 */
 static std::string GetMaterialStringLayered(int layer){
-    int max_layer = sizeof(ColorsString) / sizeof(ColorsString[0]);
+    int max_layer = sizeof(Colors) / sizeof(Colors[0]);
     if(layer > max_layer-1){
         layer = max_layer-1;
     }
 
     if(layer != 1 && layer != 2) return GetStringColor(0);
     return GetStringColor(layer);
-
-    //if(layer != 1 && layer != 2) return ColorsString[0];
-    //return ColorsString[layer];
-    //return ColorsString[1];
 }
 
 std::string GetMaterialString(int layer, pbrt_opts *opts){
@@ -512,10 +519,19 @@ void print_configs(pbrt_opts *opts){
         std::cout << "    * Level : " << opts->level << std::endl;
     }
     
-    if(opts->hasClipArgs){
+    if(opts->hasClipArgs == 1){
         std::cout << "    * Clip source : " << opts->cutSource << std::endl;
         std::cout << "    * Clip distance : " << opts->cutDistance << std::endl;
         std::cout << "    * Clip axis : " << opts->cutAxis << std::endl;
+    }
+
+    if(opts->hasClipArgs == 2){
+        std::cout << "    * Clip source P : [" << opts->cutPointSource.x <<
+        " " << opts->cutPointSource.y << " " << opts->cutPointSource.z << "]"
+        << std::endl;
+        std::cout << "    * Clip at P: [" << opts->cutPointAt.x <<
+           " " << opts->cutPointAt.y << " " << opts->cutPointAt.z << "]" << std::endl;
+        std::cout << "    * Clip distance : " << opts->cutDistance << std::endl;
     }
 
     if(opts->pickedMat.size() > 0){
@@ -534,7 +550,7 @@ int SplitByLayer(std::vector<SerializedParticle> **renderflags,
                  pbrt_opts *opts)
 {
     int mCount = 0;
-    int max_layer = sizeof(ColorsString) / sizeof(ColorsString[0]);
+    int max_layer = sizeof(Colors) / sizeof(Colors[0]);
     std::vector<SerializedParticle> *groups;
     
     for(int i = 0; i < pCount; i++){
@@ -568,7 +584,9 @@ int AcceptLayer(int layer, pbrt_opts *opts){
     exit(0);
 }
 
-void pbrt_insert_box(SerializedShape *shape, std::string &data, int depth, Float of=0){
+void pbrt_insert_box(SerializedShape *shape, std::string &data, int depth,
+                     pbrt_opts *opts, Float of=0)
+{
     char t[30];
     vec3f points[8];
     Transform transform;
@@ -606,9 +624,14 @@ void pbrt_insert_box(SerializedShape *shape, std::string &data, int depth, Float
     points[6] = vec3f(px, py, nz);
     points[7] = vec3f(nx, py, nz);
 
-    data += tab + "AttributeBegin\n";
-    data += tab + "\tShape \"trianglemesh\"\n";
-    data += tab + "\t\t\"point3 P\" [\n";
+    if(opts->renderer == RENDERER_PBRT){
+        data += tab + "AttributeBegin\n";
+        data += tab + "\tShape \"trianglemesh\"\n";
+        data += tab + "\t\t\"point3 P\" [\n";
+    }else if(opts->renderer == RENDERER_LIT){
+        data += tab + "\tShape{ type [trianglemesh]\n";
+        data += tab + "\t\tvertex [\n";
+    }
 
     // NOTE: I think PBRT transform computation are a bit different from ours,
     // lets transform the points here and give the geometry without transformations
@@ -621,8 +644,11 @@ void pbrt_insert_box(SerializedShape *shape, std::string &data, int depth, Float
 
     data += ss.str();
     ss.str(std::string());
-
-    data += tab + "\t\t\"integer indices\" [\n";
+    if(opts->renderer == RENDERER_PBRT){
+        data += tab + "\t\t\"integer indices\" [\n";
+    }else if(opts->renderer == RENDERER_LIT){
+        data += tab + "\t\tindices[";
+    }
     ss << tab << "\t\t\t" << "0 1 2\n";
     ss << tab << "\t\t\t" << "2 3 0\n";
     ss << tab << "\t\t\t" << "1 5 6\n";
@@ -638,11 +664,14 @@ void pbrt_insert_box(SerializedShape *shape, std::string &data, int depth, Float
     ss << tab << "\t\t]\n";
 
     data += ss.str();
-
-    data += tab + "AttributeEnd\n";
+    if(opts->renderer == RENDERER_PBRT){
+        data += tab + "AttributeEnd\n";
+    }else if(opts->renderer == RENDERER_LIT){
+        data += tab + "}";
+    }
 }
 
-std::string pbrt_build_material(pbrt_mat *mat, pbrt_opts *opts){
+std::string pbrt_build_material(pbrt_mat *mat, pbrt_opts *opts, int refname=-1){
     std::stringstream ss;
     vec3f v = opts->mat_value;
     if(!mat){
@@ -653,14 +682,18 @@ std::string pbrt_build_material(pbrt_mat *mat, pbrt_opts *opts){
         ss << mat->mat << " [ ";
         ss << v.x << " " << v.y << " " << v.z << " ]";
     }else if(opts->renderer == RENDERER_LIT){
+        ss << "{";
+        if(refname >= 0){
+            ss << "name[mat_ " << refname << "] ";
+        }
         ss << mat->mat << " [ ";
-        ss << v.x << " " << v.y << " " << v.z << " ]";
+        ss << v.x << " " << v.y << " " << v.z << " ] }";
     }
     return ss.str();
 }
 
-void pbrt_insert_dual_layer_box(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
-                                std::string strmat, std::string &data, int depth)
+void pbrt_insert_single_box(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
+                            std::string strmat, std::string &data, int depth)
 {
     data += "AttributeBegin\n\t";
     if(mat == nullptr){
@@ -673,50 +706,62 @@ void pbrt_insert_dual_layer_box(SerializedShape *shape, pbrt_mat *mat, pbrt_opts
         }
     }
 
-    // insert the box with a small offset
-    pbrt_insert_box(shape, data, depth, 0.01);
+    pbrt_insert_box(shape, data, depth, opts);
     data += "AttributeEnd\n";
-
-    // insert a second box inside, if the material contains dielectric
-    // properties it is nice for us to restore it so that thin properties
-    // are captured
-    data += "AttributeBegin\n\t";
-    data += "Material \"dielectric\" \"float eta\" [ 1.0 ] \n";
-    pbrt_insert_box(shape, data, depth);
-    data += "AttributeEnd\n";
-
 }
 
 void pbrt_insert_mesh(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
                       std::string strmat, int depth, std::string refPath)
 {
+    static int meshId = 0;
     std::string meshName = shape->strParameters["Name"];
     std::string path = refPath + "/" + mesh_name_to_pbrt(meshName, opts);
     std::string bname = mesh_base_name(meshName);
     std::string data;
+    std::string mats("Material ");
+    std::string mate("\n");
+    if(opts->renderer == RENDERER_LIT){
+        mats = "Material { ";
+        mate = " }\n";
+    }
 
     if(opts->meshMap.find(meshName) != opts->meshMap.end()){
         data = opts->meshMap[meshName];
     }else{
         if(mat == nullptr){
-            data += "Material " + strmat + "\n";
+            data += mats + strmat + mate;
         }else{
             if(mat->built){
-                data += "Material " + mat->mat + "\n";
+                if(opts->renderer == RENDERER_LIT){
+                    mats += "name[mat_";
+                    mats += std::to_string(meshId);
+                    mats += "] ";
+                }
+                data += mats + mat->mat + mate;
             }else{
-                data += "Material " + pbrt_build_material(mat, opts) + "\n";
+                data += mats + pbrt_build_material(mat, opts, meshId) + mate;
             }
         }
 
-        data += "AttributeBegin\n";
-        data += "\tObjectBegin \"" + bname + "\"\n";
-        data += "\t\tShape \"plymesh\" \"string filename\" [ \"";
-        data += path + "\" ]\n";
-        data += "\tObjectEnd\n";
-        data += "AttributeEnd\n";
+        if(opts->renderer == RENDERER_PBRT){
+            data += "AttributeBegin\n";
+            data += "\tObjectBegin \"" + bname + "\"\n";
+            data += "\t\tShape \"plymesh\" \"string filename\" [ \"";
+            data += path + "\" ]\n";
+            data += "\tObjectEnd\n";
+            data += "AttributeEnd\n";
+        }else if(opts->renderer == RENDERER_LIT){
+            data += "Shape{ type[mesh] geometry[";
+            data += path; data += "] name[";
+            data += bname; data += "]\n";
+        }
+
+        meshId++;
     }
 
-    data += "AttributeBegin\n";
+    if(opts->renderer == RENDERER_PBRT){
+        data += "AttributeBegin\n";
+    }
 
     // In order to matrch PBRT rendering coordinates we need to transpose
     // our transformations
@@ -734,9 +779,10 @@ void pbrt_insert_mesh(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
         data += "]\n";
     }
 
-    data += "\tObjectInstance \"" + bname + "\"\n";
-
-    data += "AttributeEnd\n";
+    if(opts->renderer == RENDERER_PBRT){
+        data += "\tObjectInstance \"" + bname + "\"\n";
+        data += "AttributeEnd\n";
+    }
     opts->meshMap[meshName] = data;
 }
 
@@ -836,7 +882,8 @@ void pbrt_command(int argc, char **argv){
             }
 
             if(sh.type == ShapeBox){
-                pbrt_insert_dual_layer_box(&sh, pmat, &opts, mat, data, 1);
+                //pbrt_insert_dual_layer_box(&sh, pmat, &opts, mat, data, 1);
+                pbrt_insert_single_box(&sh, pmat, &opts, mat, data, 1);
                 pAdded += 2;
             }else if(sh.type == ShapeMesh){
                 has_mesh = 1;
@@ -869,14 +916,23 @@ void pbrt_command(int argc, char **argv){
                 data += GetMaterialString(i, &opts);
                 
                 for(SerializedParticle &p : *layer){
-                    if(opts.hasClipArgs){
+                    if(opts.hasClipArgs == 1){
                         vec3f ref(0);
                         vec3f at(0);
                         ref[opts.cutAxis] = opts.cutSource;
                         at[opts.cutAxis] = p.position[opts.cutAxis];
                         Float dist = Distance(ref, at);
                         if(dist < opts.cutDistance) continue;
+                    }else if(opts.hasClipArgs == 2){
+                        vec3f s = opts.cutPointSource;
+                        vec3f at = opts.cutPointAt;
+                        vec3f pi = p.position;
+                        vec3f ls = at - s;
+                        vec3f ppi = s + Dot(pi - s, ls) / Dot(ls, ls) * ls;
+                        Float dist = Distance(s, ppi);
+                        if(dist < opts.cutDistance) continue;
                     }
+
                     if(opts.renderer == RENDERER_PBRT){
                         data += "AttributeBegin\n\tTranslate ";
                         data += __to_stringf(p.position.x); data += " ";

@@ -257,34 +257,46 @@ __bidevice__ Transform Scale(const vec3f &delta){
     return Scale(delta.x, delta.y, delta.z);
 }
 
-__bidevice__ Transform RotateX(Float theta) {
-    Float sinTheta = std::sin(Radians(theta));
-    Float cosTheta = std::cos(Radians(theta));
+__bidevice__ Transform RotateX(Float theta, bool radians){
+    if(!radians){
+        theta = Radians(theta);
+    }
+    Float sinTheta = std::sin(theta);
+    Float cosTheta = std::cos(theta);
     Matrix4x4 m(1, 0, 0, 0, 0, cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0,
                 0, 0, 0, 1);
     return Transform(m, Transpose(m));
 }
 
-__bidevice__ Transform RotateY(Float theta) {
-    Float sinTheta = std::sin(Radians(theta));
-    Float cosTheta = std::cos(Radians(theta));
+__bidevice__ Transform RotateY(Float theta, bool radians){
+    if(!radians){
+        theta = Radians(theta);
+    }
+    Float sinTheta = std::sin(theta);
+    Float cosTheta = std::cos(theta);
     Matrix4x4 m(cosTheta, 0, sinTheta, 0, 0, 1, 0, 0, -sinTheta, 0, cosTheta, 0,
                 0, 0, 0, 1);
     return Transform(m, Transpose(m));
 }
 
-__bidevice__ Transform RotateZ(Float theta) {
-    Float sinTheta = std::sin(Radians(theta));
-    Float cosTheta = std::cos(Radians(theta));
+__bidevice__ Transform RotateZ(Float theta, bool radians){
+    if(!radians){
+        theta = Radians(theta);
+    }
+    Float sinTheta = std::sin(theta);
+    Float cosTheta = std::cos(theta);
     Matrix4x4 m(cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1, 0,
                 0, 0, 0, 1);
     return Transform(m, Transpose(m));
 }
 
-__bidevice__ Transform Rotate(Float theta, const vec3f &axis) {
+__bidevice__ Transform Rotate(Float theta, const vec3f &axis, bool radians){
     vec3f a = Normalize(axis);
-    Float sinTheta = std::sin(Radians(theta));
-    Float cosTheta = std::cos(Radians(theta));
+    if(!radians){
+        theta = Radians(theta);
+    }
+    Float sinTheta = std::sin(theta);
+    Float cosTheta = std::cos(theta);
     Matrix4x4 m;
     // Compute rotation of first basis vector
     m.m[0][0] = a.x * a.x + (1 - a.x * a.x) * cosTheta;

@@ -1,6 +1,7 @@
 project(Bubbles LANGUAGES CXX CUDA)
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
+option(CONVEXHULL_QHULL "Use QHull for convex hull" ON)
 set(BUBBLES "bubbles")
 set(BBTOOL "bbtool")
 set(CMAKE_CXX_COMPILER nvcc)
@@ -37,6 +38,17 @@ else()
 	set(BB_FLAGS "${BB_FLAGS} --gpu-architecture=${ARCH}")
 endif()
 
+if(CONVEXHULL_QHULL)
+    add_definitions(-DUSE_QHULL)
+endif()
+
 set(BB_COMPILE "-x cu -dc ${BB_FLAGS}")
 set(BB_LINK ${BB_FLAGS})
+
+if(CONVEXHULL_QHULL)
+set(BB_LINK_LIBS "dl;qhullstatic_r")
+else()
+set(BB_LINK_LIBS "dl")
+endif()
+
 add_subdirectory(src)

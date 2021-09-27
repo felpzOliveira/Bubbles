@@ -201,7 +201,7 @@ __bidevice__ int ParticleBySDF(const vec3f &p, FieldGrid3f *sdf, Float sdfThresh
     int rv = 0;
     Float sample = sdf->Sample(p);
     if(absolute){
-        rv = Absf(sample - sdfThreshold) < 0.01 ? 1 : 0;
+        rv = Absf(sample - sdfThreshold) < Epsilon ? 1 : 0;
     }else{
         rv = sample < sdfThreshold ? 1 : 0;
     }
@@ -429,13 +429,17 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
     }
     
     if(emitter_overlaps){
+        printf("***********************************************************\n");
         printf("Warning: You have overlapping emitters, while this is not\n");
         printf("         an error it might make particles too close and forces to scale up\n");
+        printf("***********************************************************\n");
     }
     
     if(emitter_collider_overlaps){
+        printf("********************************************************************\n");
         printf("Warning: You have overlapping emitter x collider, this will trigger\n");
         printf("         unexpected behaviour during distribution, consider adjusting.\n");
+        printf("********************************************************************\n");
     }
     
     return emitter_collider_overlaps + emitter_overlaps;

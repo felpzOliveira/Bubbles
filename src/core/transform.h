@@ -368,10 +368,10 @@ __bidevice__ Transform Translate(Float u);
 __bidevice__ Transform Scale(const vec3f &delta);
 __bidevice__ Transform Scale(Float x, Float y, Float z);
 __bidevice__ Transform Scale(Float u);
-__bidevice__ Transform RotateX(Float theta);
-__bidevice__ Transform RotateY(Float theta);
-__bidevice__ Transform RotateZ(Float theta);
-__bidevice__ Transform Rotate(Float theta, const vec3f &axis);
+__bidevice__ Transform RotateX(Float theta, bool radians=false);
+__bidevice__ Transform RotateY(Float theta, bool radians=false);
+__bidevice__ Transform RotateZ(Float theta, bool radians=false);
+__bidevice__ Transform Rotate(Float theta, const vec3f &axis, bool radians=false);
 __bidevice__ Transform RotateAround(Float theta, const vec3f &axis, const vec3f &point);
 __bidevice__ bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2], Float *x0,
                                        Float *x1);

@@ -81,10 +81,14 @@ void __assert_check_host(bool v, const char *name, const char *filename,
                          int line, const char *msg)
 {
     if(!v){
+        int at = 0;
+        for(int i = 0; i < 256; i++){
+            if(filename[i] == '/') at = i + 1;
+        }
         if(!msg)
-            printf("Assert: %s (%s:%d) : (No message)\n", name, filename, line);
+            printf("Assert: %s (%s:%d) : (No message)\n", name, &filename[at], line);
         else
-            printf("Assert: %s (%s:%d) : (%s)\n", name, filename, line, msg);
+            printf("Assert: %s (%s:%d) : (%s)\n", name, &filename[at], line, msg);
         exit(0);
     }
 }
@@ -94,11 +98,15 @@ void __assert_check(bool v, const char *name, const char *filename,
                     int line, const char *msg)
 {
     if(!v){
+        int at = 0;
+        for(int i = 0; i < 256; i++){
+            if(filename[i] == '/') at = i + 1;
+        }
         int* ptr = nullptr;
         if(!msg)
-            printf("Assert: %s (%s:%d) : (No message)\n", name, filename, line);
+            printf("Assert: %s (%s:%d) : (No message)\n", name, &filename[at], line);
         else
-            printf("Assert: %s (%s:%d) : (%s)\n", name, filename, line, msg);
+            printf("Assert: %s (%s:%d) : (%s)\n", name, &filename[at], line, msg);
         *ptr = 10;
     }
 }
@@ -1350,8 +1358,8 @@ class Bounds2 {
         return Bounds2<U>((vec2<U>)pMin, (vec2<U>)pMax);
     }
     
-    __bidevice__ vec2<T> Clamped(const vec2<T> &point) const{
-        return Clamp(point, pMin, pMax);
+    __bidevice__ vec2<T> Clamped(const vec2<T> &point, T of=0) const{
+        return Clamp(point, pMin+vec2<T>(of), pMax-vec2<T>(of));
     }
     
     __bidevice__ void PrintSelf() const{
@@ -1459,8 +1467,8 @@ class Bounds3 {
         return o;
     }
     
-    __bidevice__ vec3<T> Clamped(const vec3<T> &point) const{
-        return Clamp(point, pMin, pMax);
+    __bidevice__ vec3<T> Clamped(const vec3<T> &point, T of=0) const{
+        return Clamp(point, pMin+vec3<T>(of), pMax-vec3<T>(of));
     }
     
     __bidevice__ void BoundingSphere(vec3<T> *center, Float *radius) const{

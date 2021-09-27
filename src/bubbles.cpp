@@ -82,6 +82,8 @@ void test_pcisph3_pathing();
 void test_pcisph3_box_drop();
 void test_bounds_split3();
 void test_pcisph3_water_block();
+void test_pcisph3_dissolve();
+void test_pcisph3_emit_test();
 
 int main(int argc, char **argv){
     BB_MSG("Bubbles Fluid Simulator");
@@ -104,11 +106,16 @@ int main(int argc, char **argv){
     //test_pcisph3_water_drop();
     //test_pcisph3_rotating_water_box();
 
-    test_pcisph2_water_block();
-    //test_pcisph3_dragon();
+    //test_pcisph2_water_block();
+    test_pcisph3_dragon();
     //test_pcisph2_water_sphere();
     //test_pcisph3_water_block();
     //test_pcisph3_dam_break_double_dragon();
+    //test_pcisph3_box_mesh();
+    //test_pcisph3_dragon_pool();
+
+    //test_pcisph3_dissolve();
+    //test_pcisph3_emit_test();
     //test_pcisph3_water_drop();
 
 #if defined(RUN_TESTS)

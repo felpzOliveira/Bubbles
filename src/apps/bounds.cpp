@@ -25,7 +25,7 @@ typedef struct{
     int stats;
     int inflags;
     int outflags;
-    int legacy;
+    int legacy_in, legacy_out;
     int lnmalgo;
     int use_cpu;
     BoundaryMethod method;
@@ -38,7 +38,8 @@ void default_boundary_opts(boundary_opts *opts){
     opts->outflags = SERIALIZER_POSITION | SERIALIZER_BOUNDARY;
     opts->spacing = 0.02;
     opts->spacingScale = 2.0;
-    opts->legacy = 0;
+    opts->legacy_in = 0;
+    opts->legacy_out = 0;
     opts->lnmalgo = 2;
     opts->use_cpu = 0;
     opts->countstart = 0;
@@ -121,7 +122,20 @@ ARGUMENT_PROCESS(boundary_spacing_scale_args){
 
 ARGUMENT_PROCESS(boundary_legacy_args){
     boundary_opts *opts = (boundary_opts *)config;
-    opts->legacy = 1;
+    opts->legacy_in = 1;
+    opts->legacy_out = 1;
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_legacy_in_args){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->legacy_in = 1;
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_legacy_out_args){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->legacy_out = 1;
     return 0;
 }
 
@@ -241,6 +255,18 @@ std::map<const char *, arg_desc> bounds_arg_map = {
             .processor = boundary_legacy_args,
             .help = "Sets the loader to use legacy format for input and output."
         }
+    },
+    {"-legacy_in",
+        {
+            .processor = boundary_legacy_in_args,
+            .help = "Sets the loader to use legacy format for input."
+        }
+    },
+    {"-legacy_out",
+        {
+            .processor = boundary_legacy_out_args,
+            .help = "Sets the loader to use legacy format for output."
+        }
     }
 };
 
@@ -274,7 +300,7 @@ void process_stats_procedure(boundary_opts *opts){
         ss << i << ".txt";
 
         std::string str = ss.str();
-        if(opts->legacy){
+        if(opts->legacy_in){
             std::vector<vec3f> points;
             SerializerLoadLegacySystem3(&points, str.c_str(),
                                         opts->inflags, &boundary);
@@ -352,7 +378,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         SetSystemUseCPU();
     }
 
-    if(opts->legacy){
+    if(opts->legacy_in){
         std::vector<vec3f> points;
         SerializerLoadLegacySystem3(&points, opts->input.c_str(),
                                     opts->inflags, nullptr);
@@ -474,7 +500,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
 
     opts->outflags |= SERIALIZER_BOUNDARY;
 
-    if(opts->legacy){
+    if(opts->legacy_out){
         SerializerSaveSphDataSet3Legacy(solver.solverData, opts->output.c_str(),
                                         opts->outflags, &boundary);
     }else{

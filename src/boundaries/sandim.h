@@ -5,9 +5,8 @@
 #include <kernel.h>
 #include <util.h>
 #include <bound_util.h>
-extern "C" {
-    #include <libqhull_r/libqhull_r.h>
-}
+#include <convhull3d.h>
+
 /**************************************************************/
 //                S A N D I M   M E T H O D                   //
 //                 Convex Hull based method                   //
@@ -195,11 +194,6 @@ inline __host__ Grid2 *SandimComputeCompatibleGrid(ParticleSet2 *pSet, Float h){
     return SandimComputeCompatibleGridImpl<vec2f, vec2ui, Bounds2f>(pSet, h);
 }
 
-template<typename T> struct IndexedParticle{
-    int pId;
-    T p;
-};
-
 /*
  * Performs exponential flip.
  */
@@ -359,9 +353,8 @@ inline __host__
 void SandimConvexHull3(IndexedParticle<vec3f> *points, int *vp_count,
                        SandimWorkQueue3 *vpWorkQ, ParticleSet3 *pSet, int maxp)
 {
-    int dim = 3;
-    FILE *fp = fopen("/dev/null", "w");
-    QHULL_LIB_CHECK
+    ConvexHullPrepare();
+
     ParallelFor(0, vpWorkQ->size, [&](int i) -> void{
         int len = vp_count[i];
         IndexedParticle<vec3f> *ips = &points[maxp * i];
@@ -375,41 +368,15 @@ void SandimConvexHull3(IndexedParticle<vec3f> *points, int *vp_count,
             return;
         }
 
-        coordT *ps = new coordT[3 * SANDIM_MAX_FLIP_SLOTS];
-        qhT qh_qh;
-        qhT *qh= &qh_qh;
-        boolT ismalloc = 0;
-        qh_init_A(qh, fp, fp, stderr, 0, NULL);
-        qh_option(qh, "qhull s FA", NULL, NULL);
-        qh->NOerrexit = False;
-        qh_initflags(qh, qh->qhull_command);
-
-        for(int j = 0; j < len; j++){
-            ps[3 * j + 0] = ips[j].p.x;
-            ps[3 * j + 1] = ips[j].p.y;
-            ps[3 * j + 2] = ips[j].p.z;
-        }
-
-        qh_init_B(qh, ps, len, dim, ismalloc);
-        (void)ismalloc;
-        qh_qhull(qh);
-        qh_check_output(qh);
-        qh_produce_output(qh);
-
-        vertexT *vertex;
-        for(vertex = qh->vertex_list; vertex && vertex->next; vertex = vertex->next){
-            unsigned int id = qh_pointid(qh, vertex->point);
+        ConvexHull3D(ips, SANDIM_MAX_FLIP_SLOTS, len, [&](int id){
             int pId = ips[id].pId;
             if(pId >= 0){
                 pSet->SetParticleV0(pId, 1);
             }
-        }
-
-        qh_freeqhull(qh, qh_ALL);
-        delete[] ps;
+        });
     });
 
-    fclose(fp);
+    ConvexHullFinish();
 }
 
 template<typename T, typename U, typename Q, typename SandimWorkQ> inline __host__

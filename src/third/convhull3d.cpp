@@ -19,6 +19,7 @@ __host__ void ConvexHullPrepare(){
 
 __host__ void ConvexHullFinish(){
     if(fp) fclose(fp);
+    fp = NULL;
 }
 
 __host__ void ConvexHull3D(IndexedParticle<vec3f> *ips, int maxLen,

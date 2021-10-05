@@ -67,6 +67,35 @@ struct MeshProperties{
 typedef void*(*MemoryAllocator)(long size);
 typedef void(*MemoryFree)(void *);
 
+class HostTriangleMesh3{
+    public:
+    std::vector<vec3f> points;
+    std::vector<vec3f> normals;
+    std::vector<vec2f> uvs;
+    std::vector<vec3ui> pointIndices;
+    std::vector<vec3ui> normalIndices;
+    std::vector<vec3ui> uvIndices;
+
+    HostTriangleMesh3(){}
+
+    size_t numberOfPoints(){ return points.size(); }
+    size_t numberOfTriangles(){ return pointIndices.size(); }
+
+    bool hasUvs(){ return uvs.size() > 0; }
+    bool hasNormals(){ return normals.size() > 0; }
+
+    void addPoint(vec3f p){ points.push_back(p); }
+    void addNormal(vec3f n){ normals.push_back(n); }
+    void addUv(vec2f uv){ uvs.push_back(uv); }
+    void addPointUvNormalTriangle(vec3ui np, vec3ui nuv, vec3ui nno){
+        pointIndices.push_back(np);
+        uvIndices.push_back(nuv);
+        normalIndices.push_back(nno);
+    }
+
+    void writeToDisk(const char *path);
+};
+
 /*
 * NOTE: Heavily based on tiny_obj_loader. I'm basically splitting the mesh
 * into multiple objects, I don't like the way tiny_obj_loader does it,

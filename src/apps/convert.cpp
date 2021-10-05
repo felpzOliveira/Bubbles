@@ -252,7 +252,7 @@ std::map<const char *, arg_desc> argument_map = {
             .help = "Use Graphy to preview the point cloud." 
         }
     },
-    {"-legacyfmt",
+    {"-legacy",
         { .processor = legacy_arg,
             .help = "Use legacy file format for outputing fluid."
         }
@@ -306,10 +306,17 @@ void GenerateData(config_opts *opts){
     int flagsOut = SerializerFlagsFromString(opts->outformArgs.c_str());
     int toGen    = SerializerFlagsFromString(opts->dataArgs.c_str());
     if(!(flagsIn == -1 || flagsOut == -1 || toGen == -1)){
-        SerializerLoadSystem3(&builder, &shapes, opts->input.c_str(),
-                              flagsIn, &boundary);
-        //int count = SerializerLoadSphDataSet3(&builder, opts->input.c_str(),
-                                             // flagsIn, &boundary);
+        if(opts->to_legacy){
+            std::vector<vec3f> points;
+            SerializerLoadLegacySystem3(&points, opts->input.c_str(),
+                                        flagsIn, &boundary);
+            for(vec3f &p : points){
+                builder.AddParticle(p);
+            }
+        }else{
+            SerializerLoadSystem3(&builder, &shapes, opts->input.c_str(),
+                                  flagsIn, &boundary);
+        }
         
         SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(&builder);
         ParticleSet3 *pSet = sphpSet->GetParticleSet();
@@ -358,10 +365,6 @@ void GenerateData(config_opts *opts){
         
         printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout);
         UtilEraseFile(opts->output.c_str());
-
-        if(flagsIn & SERIALIZER_BOUNDARY){
-            flagsOut |= SERIALIZER_BOUNDARY;
-        }
 
         if(opts->to_legacy){
             SerializerSaveSphDataSet3Legacy(solver.solverData, opts->output.c_str(),

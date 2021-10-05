@@ -117,6 +117,8 @@ int main(int argc, char **argv){
     //test_pcisph3_dissolve();
     //test_pcisph3_emit_test();
     //test_pcisph3_water_drop();
+    //test_pcisph2_water_sphere();
+    //test_pcisph2_marching_squares();
 
 #if defined(RUN_TESTS)
     //run_self_tests();

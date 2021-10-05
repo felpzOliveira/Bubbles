@@ -845,13 +845,35 @@ void test_pcisph2_water_sphere(){
     float *col = new float[count * 3];
     
     SphSolverData2 *data = solver.GetSphSolverData();
-    
-    for(int i = 0; i < 20 * 26 * 20; i++){
+
+    for(int i = 0; i < count * 3; i++){
+        col[i] = 0.6;
+    }
+
+    for(int j = 0; j < 20 * 26 * 20; j++){
         solver.Advance(targetInterval);
         //set_colors_pressure(col, data);
-        set_colors_lnm(col, data, 0, 0);
+        //set_colors_lnm(col, data, 1, 1);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
-        if(i == 200) getchar();
+        if(j == 200){
+#if 0
+            std::vector<int> bounds;
+            for(int s = 0; s < set2->GetParticleCount(); s++){
+                vec2f p = set2->GetParticlePosition(s);
+                unsigned int id = data->domain->GetLinearHashedPosition(p);
+                Cell2 *cell = data->domain->GetCell(id);
+                int level = cell->GetLevel();
+                bounds.push_back(level);
+            }
+
+            UtilEraseFile("test_out2d.txt");
+            SerializerSaveSphDataSet2Legacy(data, "test_out2d.txt",
+                     SERIALIZER_POSITION | SERIALIZER_BOUNDARY, &bounds);
+
+            SerializerSaveDomain(data, "test_domain2d.txt");
+            getchar();
+#endif
+        }
     }
     
     delete[] pos;

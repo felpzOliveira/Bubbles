@@ -26,6 +26,11 @@ ARGUMENT_PROCESS(boundary_cmd){
     return 1;
 }
 
+ARGUMENT_PROCESS(surface_cmd){
+    surface_command(argc-1, &argv[1]);
+    return 1;
+}
+
 std::map<const char *, arg_desc> command_map = {
     {"convert", 
         { .processor = convert_cmd, 
@@ -46,6 +51,10 @@ std::map<const char *, arg_desc> command_map = {
     {"boundary",
         { .processor = boundary_cmd,
             .help = "Perform different types of boundary computation." }
+    },
+    {"surface",
+        { .processor = surface_cmd,
+            .help = "Perform surface reconstruction." }
     }
 };
 

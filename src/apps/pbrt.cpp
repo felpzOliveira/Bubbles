@@ -41,6 +41,7 @@ typedef struct{
     std::string meshFolder;
     Renderer renderer;
     int is_legacy;
+    std::string domain;
 }pbrt_opts;
 
 typedef struct{
@@ -326,6 +327,14 @@ ARGUMENT_PROCESS(pbrt_clip_point_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(pbrt_with_domain_arg){
+    pbrt_opts *opts = (pbrt_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "with-domain", 1);
+    if(value.size() < 1) return -1;
+    opts->domain = value;
+    return 0;
+}
+
 std::map<const char *, arg_desc> pbrt_argument_map = {
     {"-in",
         { .processor = pbrt_input_arg, 
@@ -417,6 +426,11 @@ std::map<const char *, arg_desc> pbrt_argument_map = {
             .help = "Specify parameters to perform point clip, <source> <at> <distance>."
         }
     },
+    {"-with-domain",
+        { .processor = pbrt_with_domain_arg,
+            .help = "Writes a grid in the renderer format."
+        }
+    }
 };
 
 const char *render_mode_string(RenderMode mode){
@@ -515,6 +529,10 @@ void print_configs(pbrt_opts *opts){
     std::cout << "    * Target file : " << opts->input << std::endl;
     std::cout << "    * Render radius : " << opts->radius << std::endl;
     std::cout << "    * Render mode : " << render_mode_string(opts->mode) << std::endl;
+    if(opts->domain.size() > 0){
+        std::cout << "    * Domain : " << opts->domain << std::endl;
+    }
+
     if(opts->mode == RenderMode::LEVEL){
         std::cout << "    * Level : " << opts->level << std::endl;
     }
@@ -763,7 +781,7 @@ void pbrt_insert_mesh(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
         data += "AttributeBegin\n";
     }
 
-    // In order to matrch PBRT rendering coordinates we need to transpose
+    // In order to match PBRT rendering coordinates we need to transpose
     // our transformations
     if(shape->transfParameters.find("Transform") != shape->transfParameters.end()){
         Transform transform = shape->transfParameters["Transform"];
@@ -789,6 +807,40 @@ void pbrt_insert_mesh(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
 void pbrt_mesh_gather(pbrt_opts *opts, std::string &data){
     for(auto it = opts->meshMap.begin(); it != opts->meshMap.end(); it++){
         data += it->second;
+    }
+}
+
+void pbrt_write_domain(pbrt_opts *opts){
+    std::stringstream ss;
+    std::vector<vec3f> points;
+    if(opts->domain.size() < 1) return;
+    SerializerLoadLegacySystem3(&points, opts->domain.c_str(),
+                                SERIALIZER_POSITION, nullptr);
+    Float h = 0.02 * 2.0;
+    if(opts->renderer == RENDERER_LIT){
+        std::string scale = "scale[";
+        scale += __to_stringf(h); scale += " ";
+        scale += __to_stringf(h); scale += " ";
+        scale += __to_stringf(h);
+        scale += "]";
+        vec3f p0 = points[0];
+        ss << "Shape{ type[mesh] geometry[models/wireframe_cube.obj] translate [";
+        ss << p0.x << " " << p0.y << " " << p0.z << "] mat[grid_mat] name[grid_base]\n";
+        ss << "       " << scale << " }\n";
+        for(int i = 1; i < points.size(); i++){
+            vec3f p = points[i];
+            ss << "Shape{ type[instance] mat[grid_mat] base[grid_base] \n";
+            ss << "       translate[" << p.x << " " << p.y << " " << p.z << "]\n";
+            ss << "       " << scale << " }\n";
+        }
+
+        std::ofstream out("domain.lit");
+        if(out.is_open()){
+            out << ss.str();
+            out.close();
+        }
+    }else{
+        printf("[Warning] : PBRT grid not supported\n");
     }
 }
 
@@ -900,6 +952,8 @@ void pbrt_command(int argc, char **argv){
         if(has_mesh){
             pbrt_mesh_gather(&opts, data);
         }
+
+        pbrt_write_domain(&opts);
 
         for(int i = 0; i < count; i++){
             std::vector<SerializedParticle> *layer = &rendergroups[i];

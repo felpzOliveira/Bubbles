@@ -59,6 +59,7 @@ int SerializerFlagsFromString(const char *spec){
         else if(c == 'n' || c == 'N') flags |= SERIALIZER_NORMAL;
         else if(c == 'l' || c == 'L') flags |= SERIALIZER_LAYERS;
         else if(c == 'o' || c == 'O') flags |= SERIALIZER_RULE_BOUNDARY_EXCLUSIVE;
+        else if(c == 'z' || c == 'Z') flags |= SERIALIZER_XYZ;
         else{
             printf("Unknown flag argument %c\n", c);
             return -1;
@@ -268,14 +269,25 @@ void SerializerLoadLegacySystem3(std::vector<vec3f> *points, const char *filenam
             if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
         }
 
-        pCount = std::stoi(linebuf);
-        if(pCount < 1){
-            printf("Failed to read particle count\n");
-            return;
-        }
-
         points->clear();
-        points->reserve(pCount);
+        if(flags & SERIALIZER_XYZ){
+            flags = SERIALIZER_POSITION | SERIALIZER_XYZ;
+            vec3f pos(0);
+            const char *token = linebuf.c_str();
+            token += strspn(token, " \t");
+
+            ParseV3(&pos, &token);
+            points->push_back(pos);
+            readCount = 1;
+        }else{
+            pCount = std::stoi(linebuf);
+            if(pCount < 1){
+                printf("Failed to read particle count\n");
+                return;
+            }
+
+            points->reserve(pCount);
+        }
 
         while(ifs.peek() != -1){
             GetLine(ifs, linebuf);
@@ -294,7 +306,7 @@ void SerializerLoadLegacySystem3(std::vector<vec3f> *points, const char *filenam
             const char *token = linebuf.c_str();
             token += strspn(token, " \t");
 
-            if(readCount == pCount){
+            if(readCount == pCount && !(flags & SERIALIZER_XYZ)){
                 break;
             }
 
@@ -648,6 +660,35 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &f
     return pCount;
 }
 
+template<typename SolverData = SphSolverData3, typename T>
+void SaveSimulationDomain(SolverData *data, const char *filename){
+    FILE *fp = fopen(filename, "a+");
+    int dims = T(0).Dimensions();
+
+    if(fp){
+        auto grid = data->domain;
+        unsigned int count = grid->GetCellCount();
+        fprintf(fp, "%u\n", count);
+        for(unsigned int i = 0; i < count; i++){
+            auto cell = grid->GetCell(i);
+            T center = cell->bounds.Center();
+            vec3f pi;
+            if(dims == 2){
+                pi = vec3f(center[0], center[1], 0);
+            }else{
+                pi = vec3f(center[0], center[1], center[2]);
+            }
+
+            PrintToFile(fp, pi);
+            int n = cell->GetChainLength();
+
+            PrintToFile(fp, n, 1);
+            fprintf(fp, "\n");
+        }
+        fclose(fp);
+    }
+}
+
 template<typename SolverData = SphSolverData3, typename ParticleSet = ParticleSet3,
 typename Domain = Grid3, typename T>
 void SaveSphParticleSetLegacy(SolverData *data, const char *filename, int flags,
@@ -657,6 +698,16 @@ void SaveSphParticleSetLegacy(SolverData *data, const char *filename, int flags,
     FILE *fp = fopen(filename, "a+");
     std::string format = SerializerStringFromFlags(flags);
     int logged = 0;
+    int dims = T(0).Dimensions();
+    if(flags & SERIALIZER_XYZ){ // cleanup
+        if(flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE){
+            flags = SERIALIZER_POSITION | SERIALIZER_XYZ |
+                    SERIALIZER_RULE_BOUNDARY_EXCLUSIVE;
+        }else{
+            flags = SERIALIZER_POSITION | SERIALIZER_XYZ;
+        }
+    }
+
     if(fp){
         int pCount = pSet->GetParticleCount();
         if((flags & SERIALIZER_RULE_BOUNDARY_EXCLUSIVE) && boundary){
@@ -669,7 +720,10 @@ void SaveSphParticleSetLegacy(SolverData *data, const char *filename, int flags,
             return;
         }
 
-        fprintf(fp, "%d\n", pCount);
+        if(!(flags & SERIALIZER_XYZ)){
+            fprintf(fp, "%d\n", pCount);
+        }
+
         for(int i = 0; i < pSet->GetParticleCount(); i++){
             int needs_space = 0;
             int boundary_value = 0;
@@ -682,7 +736,12 @@ void SaveSphParticleSetLegacy(SolverData *data, const char *filename, int flags,
             }
 
             if(flags & SERIALIZER_POSITION){
-                PrintToFile(fp, pi);
+                if(dims == 2){
+                    vec3f ps(pi.x, pi.y, 0);
+                    PrintToFile(fp, ps);
+                }else{
+                    PrintToFile(fp, pi);
+                }
                 needs_space = 1;
             }
 
@@ -924,6 +983,14 @@ void SerializerWriteShapes(std::vector<SerializedShape> *shapes, const char *fil
     }
 
     fclose(fp);
+}
+
+void SerializerSaveDomain(SphSolverData3 *pSet, const char *filename){
+    SaveSimulationDomain<SphSolverData3, vec3f>(pSet, filename);
+}
+
+void SerializerSaveDomain(SphSolverData2 *pSet, const char *filename){
+    SaveSimulationDomain<SphSolverData2, vec2f>(pSet, filename);
 }
 
 void SerializerSaveSphDataSet3Legacy(SphSolverData3 *pSet, const char *filename,

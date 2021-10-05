@@ -1280,6 +1280,12 @@ class Bounds2 {
         return vec2<T>((*this)[(corner & 1)].x,
                        (*this)[(corner & 2) ? 1 : 0].y);
     }
+
+    __bidevice__ vec2<T> Corner(int corner){
+        Assert(corner >= 0 && corner < 4);
+        return vec2<T>((*this)[(corner & 1)].x,
+                       (*this)[(corner & 2) ? 1 : 0].y);
+    }
     
     __bidevice__ void Expand(Float d){
         pMin -= vec2<T>(Absf(d));
@@ -1406,6 +1412,13 @@ class Bounds3 {
     }
     
     __bidevice__ vec3<T> Corner(int corner) const{
+        Assert(corner >= 0 && corner < 8);
+        return vec3<T>((*this)[(corner & 1)].x,
+                       (*this)[(corner & 2) ? 1 : 0].y,
+                       (*this)[(corner & 4) ? 1 : 0].z);
+    }
+
+    __bidevice__ vec3<T> Corner(int corner){
         Assert(corner >= 0 && corner < 8);
         return vec3<T>((*this)[(corner & 1)].x,
                        (*this)[(corner & 2) ? 1 : 0].y,

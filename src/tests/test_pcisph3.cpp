@@ -1201,6 +1201,10 @@ void test_pcisph3_dragon(){
     origin = bounds.Center() + radius * vec3f(0, 1, 2.5);
     target = bounds.Center();
 
+    printf("O = %g %g %g\n", origin.x, origin.y, origin.z);
+    printf("A = %g %g %g\n", center.x, center.y, center.z);
+    printf("R = %g\n", radius);
+
     Shape *container = MakeSphere(Translate(center), radius, true);
     ColliderSetBuilder3 cBuilder;
     cBuilder.AddCollider3(container);
@@ -1214,9 +1218,23 @@ void test_pcisph3_dragon(){
     solver.Initialize(DefaultSphSolverData3());
     solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
     solver.SetColliders(colliders);
-    
+
     Float targetInterval = 1.0 / 240.0;
-    PciSphRunSimulation3(&solver, spacing, origin, target, targetInterval);
+    PciSphRunSimulation3(&solver, spacing, origin, target,
+                         targetInterval, {}, [&](int step)->int
+    {
+        if(step > 0){
+            UtilPrintStepStandard(&solver, step-1);
+#if 0
+            std::string path("/home/felipe/Documents/Bubbles/simulations/dragon2/out_");
+            path += std::to_string(step-1);
+            path += ".txt";
+            SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
+                                            SERIALIZER_POSITION);
+#endif
+        }
+        return 1;
+    });
     
     CudaMemoryManagerClearCurrent();
     printf("===== OK\n");

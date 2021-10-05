@@ -310,3 +310,52 @@ __bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
 
 __bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p, 
                                          Float radius, Float offset=0.0f);
+
+template<typename F>
+__host__ FieldGrid3f *CreateSDF(Bounds3f bounds, vec3f spacing, F sdf){
+    FieldGrid3f *grid = cudaAllocateVx(FieldGrid3f, 1);
+    Float width = bounds.ExtentOn(0);
+    Float height = bounds.ExtentOn(1);
+    Float depth = bounds.ExtentOn(2);
+    int extraOff = 10;
+    int rx = (int)std::ceil(width / spacing.x) + extraOff;
+    int ry = (int)std::ceil(width / spacing.y) + extraOff;
+    int rz = (int)std::ceil(width / spacing.z) + extraOff;
+
+    vec3f p0 = bounds.pMin - spacing * extraOff * 0.5;
+    grid->Build(vec3ui(rx, ry, rz), spacing, p0, VertexCentered);
+
+    GPUParallelLambda("CreateSDF", grid->total, GPU_LAMBDA(int index){
+        vec3ui u = DimensionalIndex(index, grid->resolution, 3);
+        vec3f p = grid->GetDataPosition(u);
+        Float distance = sdf(p);
+        grid->SetValueAt(distance, u);
+    });
+
+    grid->MarkFilled();
+    return grid;
+}
+
+template<typename F>
+__host__ FieldGrid3f *CreateSDFByIndex(Bounds3f bounds, vec3f spacing, F sdf){
+    FieldGrid3f *grid = cudaAllocateVx(FieldGrid3f, 1);
+    Float width = bounds.ExtentOn(0);
+    Float height = bounds.ExtentOn(1);
+    Float depth = bounds.ExtentOn(2);
+    int extraOff = 10;
+    int rx = (int)std::ceil(width / spacing.x) + extraOff;
+    int ry = (int)std::ceil(width / spacing.y) + extraOff;
+    int rz = (int)std::ceil(width / spacing.z) + extraOff;
+
+    vec3f p0 = bounds.pMin - spacing * extraOff * 0.5;
+    grid->Build(vec3ui(rx, ry, rz), spacing, p0, VertexCentered);
+
+    GPUParallelLambda("CreateSDF", grid->total, GPU_LAMBDA(int index){
+        vec3ui u = DimensionalIndex(index, grid->resolution, 3);
+        Float distance = sdf(u);
+        grid->SetValueAt(distance, u);
+    });
+
+    grid->MarkFilled();
+    return grid;
+}

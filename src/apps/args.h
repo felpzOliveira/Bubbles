@@ -111,3 +111,4 @@ void sdf_command(int argc, char **argv);
 void pbrt_command(int argc, char **argv);
 void view_command(int argc, char **argv);
 void boundary_command(int argc, char **argv);
+void surface_command(int argc, char **argv);

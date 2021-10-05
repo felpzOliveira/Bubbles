@@ -106,7 +106,7 @@ void set_colors_pressure(float *col, SphSolverData2 *data){
 
 void set_colors_lnm(float *col, SphSolverData2 *data, int is_first, int classify){
     int pb = 0;
-    int pp = 0;
+    //int pp = 0;
     if(classify){
         if(is_first){
             UpdateGridDistributionGPU(data);
@@ -117,7 +117,7 @@ void set_colors_lnm(float *col, SphSolverData2 *data, int is_first, int classify
     }
     
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
-    pp = pSet->GetParticleCount();
+    //pp = pSet->GetParticleCount();
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         int level = 0;
         if(classify){
@@ -133,7 +133,7 @@ void set_colors_lnm(float *col, SphSolverData2 *data, int is_first, int classify
             pb += 1;
         }
         
-        vec3f color = get_color_level(level);
+        vec3f color = get_color_level0(level);
         if(i == 132 || i == 266 || i == 267 || i == 133){
             //color = vec3f(1.0, 0.0, 0.0);
         }
@@ -147,10 +147,10 @@ void set_colors_lnm(float *col, SphSolverData2 *data, int is_first, int classify
         col[3 * i + 2] = color[2];
     }
 
-    printf("%d / %d\n", pb, pp);
+    //printf("%d / %d\n", pb, pp);
 }
 
-int set_poscol_lnm(float *col, float *pos, SphSolverData3 *data, 
+int set_poscol_lnm(float *col, float *pos, SphSolverData3 *data,
                    int is_first, int classify)
 {
     int level = 0;

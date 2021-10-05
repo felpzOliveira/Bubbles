@@ -722,6 +722,53 @@ __host__ void UseDefaultAllocatorFor(AllocatorType type){
     memoryInitialized = 1;
 }
 
+void writeObj(HostTriangleMesh3 *mesh, std::ostream *strm){
+    // vertex
+    for(const auto& pt : mesh->points){
+        (*strm) << "v " << pt.x << " " << pt.y << " " << pt.z << std::endl;
+    }
+
+    // uv coords
+    for(const auto& uv : mesh->uvs){
+        (*strm) << "vt " << uv.x << " " << uv.y << std::endl;
+    }
+
+    // normals
+    for(const auto& n : mesh->normals){
+        (*strm) << "vn " << n.x << " " << n.y << " " << n.z << std::endl;
+    }
+
+    // faces
+    bool hasUvs_ = mesh->hasUvs();
+    bool hasNormals_ = mesh->hasNormals();
+    for(size_t i = 0; i < mesh->numberOfTriangles(); ++i){
+        (*strm) << "f ";
+        for(int j = 0; j < 3; ++j){
+            (*strm) << mesh->pointIndices[i][j] + 1;
+            if(hasNormals_ || hasUvs_){
+                (*strm) << '/';
+            }
+            if(hasUvs_){
+                (*strm) << mesh->uvIndices[i][j] + 1;
+            }
+            if(hasNormals_){
+                (*strm) << '/' << mesh->normalIndices[i][j] + 1;
+            }
+            (*strm) << ' ';
+        }
+        (*strm) << std::endl;
+    }
+}
+
+void HostTriangleMesh3::writeToDisk(const char *filename){
+    std::ofstream file(filename);
+    if(file){
+        writeObj(this, &file);
+        file.close();
+    }else{
+        printf("[OBJ_LOADER] Cannot open file %s\n", filename);
+    }
+}
 
 void *DefaultAllocatorMemory(long size){
     MemoryCheck();

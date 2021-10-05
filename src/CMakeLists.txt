@@ -5,6 +5,7 @@ file(GLOB BUBBLES_CORE boundaries/*.cpp
 					   generator/*.cpp 
 					   shapes/*.cpp 
 					   solvers/*.cpp 
+                       reconstruction/*.cpp
 					   tests/*.cpp 
 					   third/*.cpp)
 

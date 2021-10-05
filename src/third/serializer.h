@@ -11,6 +11,7 @@
 #define SERIALIZER_NORMAL    0x10
 #define SERIALIZER_MASS      0x20
 #define SERIALIZER_LAYERS    0x40 // NOTE: This is not processed by serializer
+#define SERIALIZER_XYZ       0x80 // NOTE: This flag overwrite other flags on legacy fmt
 
 /* Rules for writting */
 #define SERIALIZER_RULE_BOUNDARY_EXCLUSIVE 0x100
@@ -61,6 +62,10 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &f
 
 int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet, 
                              const char *filename, int &flags);
+
+void SerializerSaveDomain(SphSolverData3 *pSet, const char *filename);
+
+void SerializerSaveDomain(SphSolverData2 *pSet, const char *filename);
 
 void SerializerLoadSystem3(ParticleSetBuilder3 *builder,
                            std::vector<SerializedShape> *shapes,

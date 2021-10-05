@@ -296,6 +296,11 @@ class Grid{
         
         return u;
     }
+
+    /* Check if a point 'p' lies inside this grid */
+    __bidevice__ bool Contains(const T &p){
+        return Inside(p, bounds);
+    }
     
     /* Get logical index of cell */
     __bidevice__ U GetCellIndex(unsigned int i){
@@ -970,6 +975,8 @@ class FieldGrid{
     __bidevice__ void SetDimension(const vec3f &u){ (void)u; dimensions = 3; }
     __bidevice__ int Filled(){ return filled; }
     __bidevice__ void MarkFilled(){ filled = 1; }
+    __bidevice__ U GetResolution(){ return resolution; }
+    __bidevice__ T GetSpacing(){ return spacing; }
     
     __bidevice__ U GetComponentDimension(int component){
         AssertA(component < dimensions, "Invalid component dimension");
@@ -1044,6 +1051,20 @@ class FieldGrid{
     __bidevice__ F GetValueAt(const vec3ui &u){
         vec3ui r(resolution[0], resolution[1], resolution[2]);
         unsigned int h = LinearIndex<vec3ui>(u, r, dimensions);
+        return field[h];
+    }
+
+    __bidevice__ F GetValueAt(size_t i, size_t j, size_t k){
+        vec3ui r(resolution[0], resolution[1], resolution[2]);
+        vec3ui u(i, j, k);
+        unsigned int h = LinearIndex<vec3ui>(u, r, dimensions);
+        return field[h];
+    }
+
+    __bidevice__ F GetValueAt(size_t i, size_t j){
+        vec2ui r(resolution[0], resolution[1]);
+        vec2ui u(i, j);
+        unsigned int h = LinearIndex<vec2ui>(u, r, dimensions);
         return field[h];
     }
     
@@ -1121,12 +1142,11 @@ class FieldGrid{
         // the way our setup works is we adjust resolution in Y/Z axis
         // so the reference spacing is X
         AssertA(!HasZero(spacing), "Zero spacing");
-        Float d = spacing[0];
-        Float inv = 1.0 / (2.0 * spacing[0]);
-        
+
         // central differences at each axis
         for(int i = 0; i < dimensions; i++){
-            T s(0); s[i] = d;
+            T s(0); s[i] = spacing[i];
+            Float inv = 1.0 / (2.0 * spacing[i]);
             Float forward  = Sample(p + s);
             Float backward = Sample(p - s);
             value[i] = (forward - backward) * inv;

@@ -28,6 +28,7 @@ typedef struct{
     int legacy_in, legacy_out;
     int lnmalgo;
     int use_cpu;
+    int write_domain;
     BoundaryMethod method;
 }boundary_opts;
 
@@ -44,6 +45,7 @@ void default_boundary_opts(boundary_opts *opts){
     opts->use_cpu = 0;
     opts->countstart = 0;
     opts->countend = 0;
+    opts->write_domain = 0;
     opts->stats = 0;
 }
 
@@ -55,6 +57,7 @@ void print_boundary_configs(boundary_opts *opts){
         std::cout << "    * Method : " << GetBoundaryMethodName(opts->method) << std::endl;
         std::cout << "    * Spacing : " << opts->spacing << std::endl;
         std::cout << "    * Spacing Scale : " << opts->spacingScale << std::endl;
+        std::cout << "    * Write Domain : " << opts->write_domain << std::endl;
         if(opts->method == BOUNDARY_LNM){
             std::cout << "    * LNM Algo: " << opts->lnmalgo << std::endl;
         }
@@ -182,6 +185,12 @@ ARGUMENT_PROCESS(boundary_use_cpu_args){
     return 0;
 }
 
+ARGUMENT_PROCESS(boundary_write_domain_args){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->write_domain = 1;
+    return 0;
+}
+
 std::map<const char *, arg_desc> bounds_arg_map = {
     {"-in",
         {
@@ -266,6 +275,12 @@ std::map<const char *, arg_desc> bounds_arg_map = {
         {
             .processor = boundary_legacy_out_args,
             .help = "Sets the loader to use legacy format for output."
+        }
+    },
+    {"-write-domain",
+        {
+            .processor = boundary_write_domain_args,
+            .help = "Writes the domain of the boundary computation (grid) in particle format."
         }
     }
 };
@@ -497,6 +512,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     printf("Got %d / %d - %g ms\n", n, (int)boundary.size(), interval);
     printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout);
     UtilEraseFile(opts->output.c_str());
+    printf("OK\n");
 
     opts->outflags |= SERIALIZER_BOUNDARY;
 
@@ -509,7 +525,12 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
                                   opts->outflags, &boundary);
     }
 
-    printf("OK\n");
+    if(opts->write_domain){
+        printf("Writting domain grid to 'domain.txt'... "); fflush(stdout);
+        SerializerSaveDomain(solver.solverData, "domain.txt");
+        printf("OK\n");
+    }
+
     CudaMemoryManagerClearCurrent();
 }
 

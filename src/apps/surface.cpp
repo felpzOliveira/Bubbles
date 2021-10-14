@@ -247,6 +247,39 @@ FieldGrid3f *ParticlesToSDF(ParticleSetBuilder3 *pBuilder, Float spacing,
     return sdfGrid;
 }
 
+void fill_pct(double val, char str[7]){
+    if(val >= 100){
+        sprintf(str, "100.00");
+        return;
+    }
+
+    if(val < 10){
+        sprintf(str, "00%.2f", val);
+    }else if(val < 100){
+        sprintf(str, "0%.2f", val);
+    }
+
+    str[6] = 0;
+}
+
+void fill_number(unsigned int val, char str[4]){
+    int at = 0;
+    if(val > 1000){
+        str[0] = 'N'; str[1] = 'a'; str[2] = 'N';
+        str[3] = 0;
+        return;
+    }
+
+    if(val < 10){
+        str[0] = '0'; str[1] = '0'; at = 2;
+    }else if(val < 100){
+        str[0] = '0'; at = 1;
+    }
+
+    sprintf(&str[at], "%u", val);
+    str[4] = 0;
+}
+
 void surface_command(int argc, char **argv){
     surface_opts opts;
     ParticleSetBuilder3 builder;
@@ -267,7 +300,7 @@ void surface_command(int argc, char **argv){
     }
 
     CudaMemoryManagerStart(__FUNCTION__);
-
+    std::cout << "**********************************" << std::endl;
     std::cout << "Loading simulation file... " << std::flush;
     if(opts.legacy){
         std::vector<vec3f> points;
@@ -293,10 +326,32 @@ void surface_command(int argc, char **argv){
     vec3f sp = grid->GetSpacing();
 
     printf("Running Marching Cubes\n");
-    MarchingCubes(grid, sp, grid->minPoint, &mesh, 0.0);
+
+    vec3ui res = grid->GetResolution();
+    double processed = 0;
+    double total = res.x * res.y * res.z;
+    auto reporter = [&](vec3ui u) -> void{
+        unsigned int i = u.x, j = u.y, k = u.z;
+        processed += 1.0;
+        if(i > res.x){
+            std::cout << "\r" << res.x << " / " << res.y << " / " << res.z;
+            std::cout << " ( 100.00% )" << std::flush;
+        }else{
+            char a[4], b[4], c[4], d[7];
+            fill_number(i, a); fill_number(j, b); fill_number(k, c);
+            double frac = processed * 100.0 / total;
+            fill_pct(frac, d);
+            std::cout << "\r" << a << " / " << b << " / " << c;
+            std::cout << " ( " << d << "% )" << std::flush;
+        }
+    };
+
+    MarchingCubes(grid, sp, grid->minPoint, &mesh, 0.0, reporter);
+    std::cout << std::endl;
+
     mesh.writeToDisk(opts.output.c_str());
 
     printf("Finished, triangle count: %ld\n", mesh.numberOfTriangles());
-
+    std::cout << "**********************************" << std::endl;
     CudaMemoryManagerClearCurrent();
 }

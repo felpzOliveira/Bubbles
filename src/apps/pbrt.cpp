@@ -984,7 +984,7 @@ void pbrt_command(int argc, char **argv){
                         vec3f ls = at - s;
                         vec3f ppi = s + Dot(pi - s, ls) / Dot(ls, ls) * ls;
                         Float dist = Distance(s, ppi);
-                        if(dist < opts.cutDistance) continue;
+                        if(dist < opts.cutDistance && pi.y < 0) continue;
                     }
 
                     if(opts.renderer == RENDERER_PBRT){

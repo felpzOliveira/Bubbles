@@ -364,8 +364,8 @@ static void singleCube(const std::array<Float, 8> &data,
 }
 
 void MarchingCubes(FieldGrid3f *grid, const vec3f &gridSize, const vec3f &origin,
-                   HostTriangleMesh3 *mesh, Float isoValue, int bndClose,
-                   int bndConnectivity)
+                   HostTriangleMesh3 *mesh, Float isoValue,
+                   std::function<void(vec3ui u)> fn, int bndClose, int bndConnectivity)
 {
     MarchingCubeVertexMap vertexMap;
 
@@ -373,6 +373,8 @@ void MarchingCubes(FieldGrid3f *grid, const vec3f &gridSize, const vec3f &origin
     const vec3f invGridSize(1.0 / (Float)gridSize.x,
                             1.0 / (Float)gridSize.y,
                             1.0 / (Float)gridSize.z);
+
+    vec3ui inf(dim.x + 1, dim.y + 1, dim.z + 1);
 
     auto pos = [&](ssize_t i, ssize_t j, ssize_t k){
         return grid->GetDataPosition(vec3ui(i, j, k));
@@ -416,12 +418,13 @@ void MarchingCubes(FieldGrid3f *grid, const vec3f &gridSize, const vec3f &origin
                 bound.pMax = pos(i + 1, j + 1, k + 1);
 
                 singleCube(data, edgeIds, normals, bound, &vertexMap, mesh, isoValue);
-                printf("\r%ld / %ld / %ld       ", k, j, i);
+                fn(vec3ui(i, j, k));
             }  // i
         }      // j
     }          // k
 
-    printf("\n");
+    fn(inf);
+
     // Construct boundaries parallel to x-y plane
     if(bndClose & (kDirectionBack | kDirectionFront)){
         MarchingCubeVertexMap vertexMapBack;

@@ -7,12 +7,20 @@
 #include <memory.h>
 #include <fstream>
 #include <sstream>
+#include <map>
+
+typedef struct{
+    int count;
+    Float accepted;
+}synchronous_stats;
 
 typedef struct{
     Float partl2ratio;
     Float partl2acceptedratio;
     int partl2count;
     int partl2accepted;
+    std::vector<int> partcount, partaccepted;
+    std::vector<Float> partacceptedRatio;
 }work_queue_stats;
 
 typedef struct{
@@ -22,14 +30,16 @@ typedef struct{
     Float spacingScale;
     int countstart;
     int countend;
-    int stats;
+    int inner_cmd;
     int inflags;
     int outflags;
     int legacy_in, legacy_out;
     int lnmalgo;
     int use_cpu;
     int write_domain;
+    int noout;
     BoundaryMethod method;
+    bool unbounded;
 }boundary_opts;
 
 void default_boundary_opts(boundary_opts *opts){
@@ -46,29 +56,47 @@ void default_boundary_opts(boundary_opts *opts){
     opts->countstart = 0;
     opts->countend = 0;
     opts->write_domain = 0;
-    opts->stats = 0;
+    opts->inner_cmd = 0;
+    opts->noout = 0;
+    opts->unbounded = false;
 }
 
 void print_boundary_configs(boundary_opts *opts){
     std::cout << "Configs: " << std::endl;
     std::cout << "    * Input : " << opts->input << std::endl;
-    if(!opts->stats){
+    if(opts->inner_cmd == 0){
         std::cout << "    * Output : " << opts->output << std::endl;
         std::cout << "    * Method : " << GetBoundaryMethodName(opts->method) << std::endl;
         std::cout << "    * Spacing : " << opts->spacing << std::endl;
         std::cout << "    * Spacing Scale : " << opts->spacingScale << std::endl;
         std::cout << "    * Write Domain : " << opts->write_domain << std::endl;
+        std::cout << "    * Noout : " << opts->noout << std::endl;
+        std::cout << "    * Unbounded : " << opts->unbounded << std::endl;
         if(opts->method == BOUNDARY_LNM){
             std::cout << "    * LNM Algo: " << opts->lnmalgo << std::endl;
         }
-    }else{
+    }else if(opts->inner_cmd == 1){
         std::cout << "    * Statistics Run" << std::endl;
+    }else{
+        std::cout << "    * Reference Run" << std::endl;
     }
 }
 
 ARGUMENT_PROCESS(boundary_stats_arg){
     boundary_opts *opts = (boundary_opts *)config;
-    opts->stats = 1;
+    opts->inner_cmd = 1;
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_reference_arg){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->inner_cmd = 2;
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_noout_arg){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->noout = 1;
     return 0;
 }
 
@@ -191,6 +219,12 @@ ARGUMENT_PROCESS(boundary_write_domain_args){
     return 0;
 }
 
+ARGUMENT_PROCESS(boundary_lnm_unbounded_args){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->unbounded = true;
+    return 0;
+}
+
 std::map<const char *, arg_desc> bounds_arg_map = {
     {"-in",
         {
@@ -199,10 +233,28 @@ std::map<const char *, arg_desc> bounds_arg_map = {
                     " Sets the base path for statistics ( Requires -stats )."
         }
     },
+    {"-ref",
+        {
+            .processor = boundary_reference_arg,
+            .help = "Sets solver to compute cell level references."
+        }
+    },
+    {"-noout",
+        {
+            .processor = boundary_noout_arg,
+            .help = "Sets the boundary computation to not output any files."
+        }
+    },
     {"-lnmalgo",
         {
             .processor = boundary_lnm_algo_args,
             .help = "Sets the LNM algorithm to use ( Applies to LNM method only )."
+        }
+    },
+    {"-unbounded",
+        {
+            .processor = boundary_lnm_unbounded_args,
+            .help = "Sets the LNM solver to use unbounded L2 computation."
         }
     },
     {"-count",
@@ -367,7 +419,141 @@ void process_stats_procedure(boundary_opts *opts){
     printf(" Min boundary: %lu\n", min_b);
 }
 
-void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=nullptr){
+template<typename T>
+__bidevice__ void atomic_increase_stats(T *val){
+#if defined(__CUDA_ARCH__)
+    (void)atomicAdd(val, T(1));
+#else
+    (void)__atomic_fetch_add(val, T(1), __ATOMIC_SEQ_CST);
+#endif
+}
+
+void advance_boundary_references(work_queue_stats *workQstats, int targetLevel,
+                                 SphSolverData3 *data, int bcount)
+{
+    int accepted = 0;
+    Float acceptedRatio = 0;
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    Grid3 *grid = data->domain;
+    std::string kernel("Reference Kernel #");
+    kernel += std::to_string(targetLevel);
+
+    synchronous_stats *stats = cudaAllocateUnregisterVx(synchronous_stats, 1);
+    stats->count = 0;
+    stats->accepted = 0;
+
+    GPUParallelLambda(kernel.c_str(), pSet->GetParticleCount(), GPU_LAMBDA(int i){
+        vec3f pi = pSet->GetParticlePosition(i);
+        unsigned int cellId = grid->GetLinearHashedPosition(pi);
+        int level = grid->GetCellLevel(cellId);
+        if(level == targetLevel){
+            int bid = pSet->GetParticleV0(i);
+            atomic_increase_stats(&stats->count);
+            if(bid > 0){
+                atomic_increase_stats(&stats->accepted);
+            }
+        }
+    });
+
+    workQstats->partcount.push_back(stats->count);
+    if(stats->count > 0){
+        acceptedRatio = stats->accepted / Float(bcount);
+        accepted = (int)stats->accepted;
+    }
+
+    workQstats->partacceptedRatio.push_back(acceptedRatio);
+    workQstats->partaccepted.push_back(accepted);
+
+    printf("*******************************\n");
+    printf(" * Level : %d\n", targetLevel);
+    printf(" * Count : %d\n", stats->count);
+    printf(" * Accepted : %d\n", accepted);
+    printf(" * Ratio : %g%%\n", acceptedRatio * 100.0);
+    printf("*******************************\n");
+
+    cudaFree(stats);
+}
+
+__bidevice__
+vec2i compute_part2_minimum_neighboors(ParticleSet3 *pSet, Grid3 *grid, int i){
+    vec2i res(0, 0);
+    vec3f pi = pSet->GetParticlePosition(i);
+    int bi = pSet->GetParticleV0(i);
+    int minCount = -1;
+    unsigned int cellId = grid->GetLinearHashedPosition(pi);
+    int level = grid->GetCellLevel(cellId);
+    if(level == 2 && bi != 2){
+        res.y = 1;
+    }else if(bi == 2){
+        if(level != 2){
+            printf("Ooops\n");
+        }
+
+        grid->ForAllNeighborsOf(cellId, 1, [&](Cell3 *cell, vec3ui cid, int lid) -> int{
+            if(i == lid) return 0;
+            if(cell->GetChainLength() > 0){
+                if(minCount < 0) minCount = cell->GetChainLength();
+
+                minCount = Min(minCount, cell->GetChainLength());
+            }
+            return 0;
+        });
+    }
+
+    res.x = minCount;
+
+    return res;
+}
+
+vec2i *compute_particle_l2_afinnity(ParticleSet3 *pSet, Grid3 *grid,
+                                    Float h, int *cellsAff)
+{
+    vec2i *minimums = cudaAllocateVx(vec2i, pSet->GetParticleCount());
+    int *cAf = cudaAllocateUnregisterVx(int, 1);
+    Float rho = h;
+
+    *cAf = 0;
+    GPUParallelLambda("Affinity", pSet->GetParticleCount(), GPU_LAMBDA(int i){
+        vec2i minCount = compute_part2_minimum_neighboors(pSet, grid, i);
+        minimums[i] = minCount;
+    });
+
+    GPUParallelLambda("Affinity", grid->GetActiveCellCount(), GPU_LAMBDA(int id){
+        int i = grid->GetActiveCellId(id);
+        Cell3 *self = grid->GetCell(i);
+        Float delta = LNMComputeDelta(grid, rho);
+        int level = self->GetLevel();
+        bool is_l2 = false;
+
+        if(level == 2){
+            grid->ForAllNeighborsOf(i, 1, [&](Cell3 *cell, vec3ui cid, int lid)->int{
+                if(i == lid) return 0;
+
+                if(cell->GetLevel() == 1){
+                    int n = cell->GetChainLength();
+                    if(n <= delta){
+                        is_l2 = true;
+                        return 1;
+                    }
+                }
+
+                return 0;
+            });
+        }
+
+        if(is_l2){
+            atomic_increase_stats(cAf);
+        }
+    });
+
+    *cellsAff = *cAf;
+    cudaFree(cAf);
+    return minimums;
+}
+
+void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=nullptr,
+                              bool dump_to_file=true)
+{
     ParticleSetBuilder3 builder;
     std::vector<SerializedShape> shapes;
     std::vector<int> boundary;
@@ -444,39 +630,94 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     if(opts->method == BOUNDARY_LNM){
         if(opts->lnmalgo == 5){
             timer.Start();
-            LNMBoundaryExtended(pSet, grid, opts->spacing, 5, 0);
+            LNMBoundaryExtended(pSet, grid, opts->spacing, 5, 0, opts->unbounded);
             timer.Stop();
         }else if(opts->lnmalgo == 0){
             timer.Start();
-            LNMBoundarySingle(pSet, grid, opts->spacing);
+            LNMBoundarySingle(pSet, grid, opts->spacing, opts->unbounded);
             timer.Stop();
         }else{
             int npart = pSet->GetParticleCount();
             LNMWorkQueue *workQ = cudaAllocateVx(LNMWorkQueue, 1);
             workQ->SetSlots(npart);
             timer.Start();
-            LNMBoundary(pSet, grid, opts->spacing, opts->lnmalgo, workQ);
+            LNMBoundary(pSet, grid, opts->spacing, opts->lnmalgo,
+                        workQ, opts->unbounded);
             timer.Stop();
-            if(workQ){
-                Float evals = (Float)workQ->size;
-                Float counter = (Float)workQ->counter;
-                Float pl2aratio = 100.0 * counter / evals;
-                Float pl2ratio  = 100.0 * evals / (Float)npart;
-                if(workQstats){
-                    workQstats->partl2acceptedratio = pl2aratio;
-                    workQstats->partl2ratio = pl2ratio;
-                    workQstats->partl2count = workQ->size;
-                    workQstats->partl2accepted = counter;
-                }
+            Float evals = (Float)workQ->size;
+            Float counter = (Float)workQ->counter;
+            Float pl2aratio = 100.0 * counter / evals;
+            Float pl2ratio  = 100.0 * evals / (Float)npart;
+            if(workQstats){
+                workQstats->partl2acceptedratio = pl2aratio;
+                workQstats->partl2ratio = pl2ratio;
+                workQstats->partl2count = workQ->size;
+                workQstats->partl2accepted = counter;
+            }
 
-                printf("WorkQueue Stats: \n"
-                       "  * L2 ratio: %g%%\n"
-                       "  * Acceptance ratio: %g%%\n"
-                       "  * L2 particles: %d\n"
-                       "  * Accepted particles: %d\n",
-                       pl2ratio, pl2aratio, workQ->size, workQ->counter);
+            printf("WorkQueue Stats: \n"
+                   "  * L2 ratio: %g%%\n"
+                   "  * Acceptance ratio: %g%%\n"
+                   "  * L2 particles: %d\n"
+                   "  * Accepted particles: %d\n",
+                   pl2ratio, pl2aratio, workQ->size, workQ->counter);
+        }
+
+        int cAf = 0;
+        vec2i *aff = compute_particle_l2_afinnity(pSet, grid, opts->spacing, &cAf);
+        Float before = 0, after = 0;
+
+        std::map<int, int> id_map;
+        for(int i = 0; i < pSet->GetParticleCount(); i++){
+            int mi = aff[i].x;
+            if(mi > -1){
+                if(id_map.find(mi) == id_map.end()){
+                    id_map[mi] = 1;
+                }else{
+                    int v = id_map[mi];
+                    id_map[mi] = v+1;
+                }
+            }
+
+            if(aff[i].y == 0){
+                before += 1;
+            }else{
+                after += 1;
             }
         }
+
+        std::ofstream ofs("samples_af.txt");
+        int delta = (int)LNMComputeDelta(grid, opts->spacing);
+        unsigned int preDelta = 0, postDelta = 0;
+
+        for(auto it = id_map.begin(); it != id_map.end(); it++){
+            if(it->first <= delta){
+                preDelta += it->second;
+            }else{
+                postDelta += it->second;
+            }
+            ofs << it->first << "," << it->second << std::endl;
+        }
+
+        Float totall2 = 0, partl2 = Float(cAf);
+        for(int i = 0; i < grid->GetActiveCellCount(); i++){
+            unsigned int id = grid->GetActiveCellId(i);
+            Cell3 *cell = grid->GetCell(id);
+            if(cell->GetLevel() == 2){
+                totall2 += 1;
+            }
+        }
+
+        printf("Pre : %u, Pos: %u ( %g%% )\n", preDelta, postDelta,
+                double(preDelta * 100.0) / double(preDelta + postDelta));
+
+        printf("PreL2: %g, PosL2: %g ( %g%% )\n", before, after,
+                (before * 100.0) / (before + after));
+
+        printf("L2: %g, PartL2: %g ( %g%% )\n", totall2, partl2,
+                (partl2 * 100.0) / totall2);
+
+        ofs.close();
     }else if(opts->method == BOUNDARY_DILTS){
         timer.Start();
         DiltsSpokeBoundary(pSet, grid);
@@ -492,9 +733,9 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         XiaoweiBoundary(pSet, grid, opts->spacing);
         timer.Stop();
     }else if(opts->method == BOUNDARY_SANDIM){
-        timer.Start();
         SandimWorkQueue3 *vpWorkQ = cudaAllocateVx(SandimWorkQueue3, 1);
         vpWorkQ->SetSlots(grid->GetCellCount());
+        timer.Start();
         SandimBoundary(pSet, grid, vpWorkQ);
         timer.Stop();
     }else if(opts->method == BOUNDARY_INTERVAL){
@@ -510,25 +751,44 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
 
     int n = UtilGetBoundaryState(pSet, &boundary);
     printf("Got %d / %d - %g ms\n", n, (int)boundary.size(), interval);
-    printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout);
-    UtilEraseFile(opts->output.c_str());
-    printf("OK\n");
 
-    opts->outflags |= SERIALIZER_BOUNDARY;
+    if(workQstats){
+        LNMInvalidateCells(grid);
+        LNMClassifyLazyGPU(grid);
+        int maxLevel = grid->GetLNMMaxLevel();
+        int bcount = 0;
+        for(int i = 0; i < boundary.size(); i++){
+            bcount += boundary[i] > 0 ? 1 : 0;
+        }
 
-    if(opts->legacy_out){
-        SerializerSaveSphDataSet3Legacy(solver.solverData, opts->output.c_str(),
-                                        opts->outflags, &boundary);
-    }else{
-        SerializerWriteShapes(&shapes, opts->output.c_str());
-        SerializerSaveSphDataSet3(solver.solverData, opts->output.c_str(),
-                                  opts->outflags, &boundary);
+        printf(" * Max level class %d\n", maxLevel);
+        SphSolverData3 *data = solver.GetSphSolverData();
+        for(int i = 1; i < maxLevel; i++){
+            advance_boundary_references(workQstats, i, data, bcount);
+        }
     }
 
-    if(opts->write_domain){
-        printf("Writting domain grid to 'domain.txt'... "); fflush(stdout);
-        SerializerSaveDomain(solver.solverData, "domain.txt");
+    if(dump_to_file){
+        printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout);
+        UtilEraseFile(opts->output.c_str());
         printf("OK\n");
+
+        opts->outflags |= SERIALIZER_BOUNDARY;
+
+        if(opts->legacy_out){
+            SerializerSaveSphDataSet3Legacy(solver.solverData, opts->output.c_str(),
+            opts->outflags, &boundary);
+        }else{
+            SerializerWriteShapes(&shapes, opts->output.c_str());
+            SerializerSaveSphDataSet3(solver.solverData, opts->output.c_str(),
+            opts->outflags, &boundary);
+        }
+
+        if(opts->write_domain){
+            printf("Writting domain grid to 'domain.txt'... "); fflush(stdout);
+            SerializerSaveDomain(solver.solverData, "domain.txt");
+            printf("OK\n");
+        }
     }
 
     CudaMemoryManagerClearCurrent();
@@ -555,9 +815,9 @@ void boundary_command(int argc, char **argv){
 
     argument_process(bounds_arg_map, argc, argv, "boundary", &opts);
     print_boundary_configs(&opts);
-    if(opts.stats){
+    if(opts.inner_cmd == 1){
         process_stats_procedure(&opts);
-    }else{
+    }else if(opts.inner_cmd == 0){
         int start = opts.countstart;
         int end   = opts.countend;
         if(start != end && end > 0){
@@ -565,7 +825,7 @@ void boundary_command(int argc, char **argv){
             std::string baseout = opts.output;
             std::vector<work_queue_stats> vals;
             for(int i = start; i < end; i++){
-                work_queue_stats ratios = {0, 0};
+                work_queue_stats ratios = {0, 0, 0, 0};
                 std::string path = base + std::to_string(i);
                 path += ".txt";
                 printf(" ***** %s *****\n", path.c_str());
@@ -590,5 +850,8 @@ void boundary_command(int argc, char **argv){
         }else{
             process_boundary_request(&opts);
         }
+    }else if(opts.inner_cmd == 2){
+        work_queue_stats ratio = {0, 0, 0, 0};
+        process_boundary_request(&opts, &ratio, opts.noout == 0);
     }
 }

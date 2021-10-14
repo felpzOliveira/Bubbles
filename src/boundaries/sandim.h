@@ -27,7 +27,7 @@
 * use a simple Jarvis March on CUDA.
 */
 
-#define SANDIM_MAX_FLIP_SLOTS 4096 // this is a guess
+#define SANDIM_MAX_FLIP_SLOTS 512 // this is a guess
 #define SANDIM_GAMMA 1.3 // this is also a guess
 /*
 * This is the distance considered for detecting out-of-domain particles
@@ -386,9 +386,9 @@ void SandimComputeHPRImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *part
 {
     int N = vpWorkQ->size;
     int len = maxN * N;
-    int totalLen = len + N * sizeof(int);
-    Float mb = totalLen / 1e+6;
-    printf("[SANDIM] GPU Extra memory required: %d (%g Mb) ( VP = %d x N = %d )\n",
+    double totalLen = len * sizeof(IndexedParticle<T>) + N * sizeof(int);
+    double mb = totalLen / 1e+6;
+    printf("[SANDIM] GPU Extra memory required: %g (%g Mb) ( VP = %d x N = %d )\n",
            totalLen, mb, N, maxN);
     IndexedParticle<T> *points = cudaAllocateUnregisterVx(IndexedParticle<T>, len);
     int *vp_count = cudaAllocateUnregisterVx(int, N);
@@ -454,7 +454,7 @@ void SandimComputeHPR(ParticleSet2 *pSet, Grid2 *domain, int *partQ,
 
 template<typename T, typename U, typename Q, typename SandimWorkQ> inline __host__
 void SandimBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, SandimWorkQ *vpWorkQ){
-    if(vpWorkQ->capacity != domain->GetCellCount()){
+    if(vpWorkQ->capacity < domain->GetCellCount()){
         printf("Warning: WorkQueue does not garantee viewpoint capacity, dangerous run\n");
     }
 

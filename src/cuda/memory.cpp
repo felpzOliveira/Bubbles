@@ -65,6 +65,10 @@ void *_cudaAllocator(size_t bytes, int line, const char *filename, bool abort){
         }else{
             global_memory.allocated += bytes;
         }
+    }else{
+        double mb = (double)bytes / 1e+6;
+        std::cout << "[ERROR] : Cannot allocate " << bytes << " bytes ( "
+                  << mb << " Mb )" << std::endl;
     }
     
     if(!ptr && abort){

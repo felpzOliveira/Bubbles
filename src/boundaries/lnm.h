@@ -20,6 +20,17 @@ __bidevice__ inline int LNMDomainQuerySize(int len1D, int dim){
     return (int)pow(len1D, dim);
 }
 
+// compute eq 3.14
+template<typename T, typename U, typename Q>
+__bidevice__ inline Float LNMComputeDelta(Grid<T, U, Q> *domain, Float h){
+    /* Get the minimum in case its not a regular grid */
+    T len = domain->GetCellSize();
+    Float maxd = MinComponent(len);
+    Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
+    delta -= domain->dimensions > 2 ? 0 : 1; // offset compensation for 2D
+    return delta;
+}
+
 // going to classify on v0 buffer as simulation step should already be resolved
 template<typename T, typename Q>
 __bidevice__ void LNMBoundaryLNSet(ParticleSet<T> *pSet, Cell<Q> *self, int L){
@@ -75,13 +86,14 @@ __global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     int id = threadIdx.x + blockIdx.x * blockDim.x;
     if(id < domain->GetActiveCellCount()){
         int i = domain->GetActiveCellId(id);
+        int delta = preDelta > 0 ? preDelta : IntInfinity;
         Cell<Q> *self = domain->GetCell(i);
         if(self->GetChainLength() > 0 && self->GetLevel() != 1){
             int *neighbors = nullptr;
             int count = domain->GetNeighborsOf(i, &neighbors);
             for(int s = 0; s < count; s++){
                 Cell<Q> *cell = domain->GetCell(neighbors[s]);
-                if(cell->GetLevel() == 1 && (cell->GetChainLength() <= preDelta)){
+                if(cell->GetLevel() == 1 && (cell->GetChainLength() <= delta)){
                     self->SetLevel(2);
                     if(algorithm == 0){ // fast
                         LNMBoundaryLNSet(pSet, self, 2);
@@ -160,6 +172,7 @@ __global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *dom
     if(id < domain->GetActiveCellCount()){
         int p = 0, b = 0;
         bool is_l1 = false, is_l2 = false;
+        int delta = preDelta > 0 ? preDelta : IntInfinity;
         U cand[125];
         U sources[125];
         int depth = 2;
@@ -192,7 +205,7 @@ __global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *dom
                 }else{
                     sources[b++] = cid;
                 }
-            }else if(is_n1x1 && n <= preDelta){
+            }else if(is_n1x1 && n <= delta){
                 count = domain->GetNeighborsOf(lid, nullptr);
                 if(count != threshold){
                     is_l2 = true;
@@ -226,13 +239,13 @@ __global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *dom
 }
 
 template<typename T, typename U, typename Q>
-__host__ void LNMBoundarySingle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
-    /* Get the minimum in case its not a regular grid */
-    T len = domain->GetCellSize();
-    Float maxd = MinComponent(len);
-
-    Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
-    delta -= domain->dimensions > 2 ? 0 : 1; // offset compensation for 2D
+__host__ void LNMBoundarySingle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h,
+                                bool unbounded=false)
+{
+    Float delta = LNMComputeDelta(domain, h);
+    if(unbounded){
+        delta = -1;
+    }
 
     /* N2x2 classification */
     GPULaunch(domain->GetActiveCellCount(),
@@ -244,14 +257,13 @@ __host__ void LNMBoundarySingle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Flo
 */
 template<typename T, typename U, typename Q>
 __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                          Float h, int algorithm=0, LNMWorkQueue *workQ=nullptr)
+                          Float h, int algorithm=0, LNMWorkQueue *workQ=nullptr,
+                          bool unbounded=false)
 {
-    /* Get the minimum in case its not a regular grid */
-    T len = domain->GetCellSize();
-    Float maxd = MinComponent(len);
-    
-    Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
-    delta -= domain->dimensions > 2 ? 0 : 1; // offset compensation for 2D
+    Float delta = LNMComputeDelta(domain, h);
+    if(unbounded){
+        delta = -1;
+    }
 
     if(workQ){
         workQ->Reset();
@@ -296,13 +308,14 @@ __global__ void LNMBoundaryLKKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     int id = threadIdx.x + blockIdx.x * blockDim.x;
     if(id < domain->GetActiveCellCount()){
         int i = domain->GetActiveCellId(id);
+        int delta = preDelta > 0 ? preDelta : IntInfinity;
         Cell<Q> *self = domain->GetCell(i);
         if(self->GetChainLength() > 0 && self->GetLevel() != 1){
             int *neighbors = nullptr;
             int count = domain->GetNeighborsOf(i, &neighbors);
             for(int s = 0; s < count; s++){
                 Cell<Q> *cell = domain->GetCell(neighbors[s]);
-                if(cell->GetLevel() == 1 && cell->GetChainLength() <= preDelta){
+                if(cell->GetLevel() == 1 && cell->GetChainLength() <= delta){
                     self->SetLevel(-2);
                     LNMBoundaryLNSet(pSet, self, 2);
                     break;
@@ -321,7 +334,7 @@ __bidevice__ bool LNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned i
     int *neighbors = nullptr;
     int count = domain->GetNeighborsOf(cellId, &neighbors);
     const int dim = domain->dimensions;
-    int threshold = (dim == 3) ? 27 : 9;
+    int threshold = LNMDomainQuerySize(3, dim);
 
     Cell<Q> *self = domain->GetCell(cellId);
     int level = self->GetLevel();
@@ -426,18 +439,17 @@ void LNMAssignParticlesAttributesGPU(Grid<T, U, Q> *domain, ParticleSet<T> *pSet
 
 template<typename T, typename U, typename Q>
 __host__ void LNMBoundaryExtended(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                                  Float h, int max_level, int algorithm=0)
+                                  Float h, int max_level, int algorithm=0,
+                                  bool unbounded=false)
 {
     // classify voxels
     LNMClassifyLazyGPU<T, U, Q>(domain, max_level);
     LNMAssignParticlesAttributesGPU<T, U, Q>(domain, pSet);
 
-    /* Get the minimum in case its not a regular grid */
-    T len = domain->GetCellSize();
-    Float maxd = MinComponent(len);
-
-    Float delta = std::pow((maxd / h), (Float)domain->dimensions); // eq 3.14
-    delta -= domain->dimensions > 2 ? 0 : 1; // offset compensation for 2D
+    Float delta = LNMComputeDelta(domain, h);
+    if(unbounded){
+        delta = -1;
+    }
 
     /* Filter and Classify LK */
     GPULaunch(domain->GetActiveCellCount(), GPUKernel(LNMBoundaryLKKernel<T, U, Q>),

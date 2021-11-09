@@ -30,7 +30,7 @@ vec3f get_color_level(int level){
 
 vec3f get_color_level0(int level){
     vec3f color_map[] = {
-        get_color_by_hex(0x5e4fa2), get_color_by_hex(0x3288bd),
+        get_color_by_hex(0xcccccc), get_color_by_hex(0x3288bd),
         get_color_by_hex(0x66c2a5), get_color_by_hex(0xabdda4),
         get_color_by_hex(0xe6f598), get_color_by_hex(0xffffbf),
         get_color_by_hex(0xfee08b), get_color_by_hex(0xfdae61),
@@ -38,7 +38,7 @@ vec3f get_color_level0(int level){
         get_color_by_hex(0x9e0142)
     };
     
-    level -= 1;
+    //level -= 1;
     int count = sizeof(color_map) / sizeof(vec3f);
     if(level >= count) level = level % count;
     return level < count ? color_map[level] : vec3f(1,0,0);

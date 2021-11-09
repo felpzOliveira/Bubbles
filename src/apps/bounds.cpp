@@ -26,6 +26,7 @@ typedef struct{
 typedef struct{
     std::string input;
     std::string output;
+    Float doringMu;
     Float spacing;
     Float spacingScale;
     int countstart;
@@ -58,6 +59,7 @@ void default_boundary_opts(boundary_opts *opts){
     opts->write_domain = 0;
     opts->inner_cmd = 0;
     opts->noout = 0;
+    opts->doringMu = RDM_MU_3D;
     opts->unbounded = false;
 }
 
@@ -74,6 +76,10 @@ void print_boundary_configs(boundary_opts *opts){
         std::cout << "    * Unbounded : " << opts->unbounded << std::endl;
         if(opts->method == BOUNDARY_LNM){
             std::cout << "    * LNM Algo: " << opts->lnmalgo << std::endl;
+        }
+
+        if(opts->method == BOUNDARY_DORING){
+            std::cout << "    * Doring μ : " << opts->doringMu << std::endl;
         }
     }else if(opts->inner_cmd == 1){
         std::cout << "    * Statistics Run" << std::endl;
@@ -135,6 +141,17 @@ ARGUMENT_PROCESS(boundary_spacing_args){
     boundary_opts *opts = (boundary_opts *)config;
     opts->spacing = ParseNextFloat(argc, argv, i, "-spacing");
     if(opts->spacing < 0.001){
+        return -1;
+    }
+
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_doring_mu_arg){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->doringMu = ParseNextFloat(argc, argv, i, "-mu");
+    if(opts->doringMu > 1 || opts->doringMu < 0){
+        printf("Doring μ must be: 0 < μ < 1\n");
         return -1;
     }
 
@@ -285,6 +302,12 @@ std::map<const char *, arg_desc> bounds_arg_map = {
         {
             .processor = boundary_spacing_args,
             .help = "Sets the spacing of the domain ( Default : 0.02 )."
+        }
+    },
+    {"-mu",
+        {
+            .processor = boundary_doring_mu_arg,
+            .help = "Sets the μ value for the Randles-Doring method ( Default : 0.75 )."
         }
     },
     {"-spacingScale",
@@ -619,6 +642,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     solver.Setup(WaterDensity, opts->spacing, opts->spacingScale, grid, sphpSet);
 
     UpdateGridDistributionGPU(solver.solverData);
+    /* compute density just in case algorithm picked needs it */
     ComputeDensityGPU(solver.solverData);
 
     grid->UpdateQueryState();
@@ -738,9 +762,21 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         timer.Start();
         SandimBoundary(pSet, grid, vpWorkQ);
         timer.Stop();
-    }else if(opts->method == BOUNDARY_INTERVAL){
+    }
+    /*
+        The following methods are implemented correctly
+        **to the best of my knowledge** but they are unstable, i.e.:
+        only working under some frames. I don't know if I'm simply stupid
+        and don't understand their papers or if there are missing information
+        in the presentation, use at your own risk.
+     */
+    else if(opts->method == BOUNDARY_INTERVAL){
         timer.Start();
         IntervalBoundary(pSet, grid, opts->spacing);
+        timer.Stop();
+    }else if(opts->method == BOUNDARY_DORING){
+        timer.Start();
+        RandlesDoringBoundary(pSet, grid, opts->spacing, opts->doringMu);
         timer.Stop();
     }
     else{

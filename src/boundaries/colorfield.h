@@ -91,7 +91,7 @@ void CFBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
     if(!use_cpu){
         GPULaunch(N, GPUKernel(CFBoundaryKernel<T, U, Q>), pSet, domain, h);
     }else{
-        ParallelFor(0, N, [&](int i)-> void{
+        ParallelFor(0, N, [&](int i) -> void{
             CFBoundaryCPU(pSet, domain, h, i);
         });
     }

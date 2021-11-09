@@ -9,6 +9,7 @@
 #include <emitter.h>
 #include <sph_solver.h>
 #include <sampling.h>
+#include <doring.h>
 
 // God, float point precision is hard. Don't want to use double but accumulating
 // float multiplications in matrix breaks precision on zero computations
@@ -637,6 +638,24 @@ void test_bounds_split2(){
 
     Bounds2f bout(vec2f(-2), vec2f(1));
     TEST_CHECK(!Inside(bout, bounds), "Invalid computation of bounds inside");
+
+    printf("===== OK\n");
+}
+
+void test_matrix_operations2(){
+    printf("===== Test MatrixNxN operations\n");
+    Matrix2x2 m(5, 4, 3, 2);
+    m.PrintSelf();
+
+    Matrix2x2 s = Inverse(m);
+    s.PrintSelf();
+
+    Float L = ComputeMinEigenvalue(m);
+    printf("Min : %g\n", L);
+
+    Matrix3x3 t(-2, -4, 2, -2, 1, 2, 4, 2, 5);
+    L = ComputeMinEigenvalue(t);
+    printf("Min : %g\n", L);
 
     printf("===== OK\n");
 }

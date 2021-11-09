@@ -6,12 +6,18 @@
 
 /**************************************************************/
 //               I N T E R V A L   M E T H O D                //
+//                Geometrical AABB intersection               //
 /**************************************************************/
 
 /*
 * Implementation of Sandim's new interval method for boundary detection in:
 * Simple and reliable boundary detection for meshfree particle methods
 *                       using interval analysis
+* TODO: There is a bug here, the method should easily translate into 3D
+* but apparently there is something incorrect happening during AABB split
+* on 3D (or AABB classification), need a strong debug session. It could be
+* the radius/kernel stuff but I'm not sure, anyways untill we find it
+* use only for 2D.
 */
 
 #define INTERVAL_LABEL_COVERED 0

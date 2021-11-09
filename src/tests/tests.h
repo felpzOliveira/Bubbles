@@ -84,6 +84,7 @@ void test_volume_particle_emitter3_mesh();
 void test_mesh_collision();
 void test_continuous_builder2D();
 void test_matrix_operations();
+void test_matrix_operations2();
 void test_sampling_barycentric();
 void test_ray2_intersect();
 void test_closest_point_sphere2D();

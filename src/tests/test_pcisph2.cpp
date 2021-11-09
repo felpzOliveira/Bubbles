@@ -161,14 +161,15 @@ void test_pcisph2_water_block(){
 
         //IntervalBoundary(set2, grid, spacing);
         //DiltsSpokeBoundary(set2, grid);
-        //MullerBoundary(set2, grid, spacing);
+        //CFBoundary(set2, grid, spacing);
         //XiaoweiBoundary(set2, grid, spacing);
         //LNMBoundary(set2, grid, spacing);
-        LNMBoundarySingle(set2, grid, spacing);
+        //LNMBoundarySingle(set2, grid, spacing);
+        RandlesDoringBoundary(set2, grid, spacing);
 
         set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
-        getchar();
+        //getchar();
     }
     
     delete[] pos;

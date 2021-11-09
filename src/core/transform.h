@@ -6,6 +6,95 @@
 
 struct ParsedMesh;
 
+struct Matrix2x2{
+    Float m[2][2];
+    __bidevice__ Matrix2x2(){
+        m[0][0] = m[1][1] = 1.f;
+        m[0][1] = m[1][0] = 0.f;
+    }
+
+    __bidevice__ Matrix2x2(Float mat[2][2]){
+        m[0][0] = mat[0][0]; m[0][1] = mat[0][1];
+        m[1][0] = mat[1][0]; m[1][1] = mat[1][1];
+    }
+
+    __bidevice__ Matrix2x2 (Float t00, Float t01, Float t10, Float t11){
+        m[0][0] = t00; m[0][1] = t01;
+        m[1][0] = t10; m[1][1] = t11;
+    }
+
+    __bidevice__ void Set(Float c){
+        m[0][0] = m[1][1] = c;
+        m[0][1] = m[1][0] = c;
+    }
+
+    __bidevice__ friend Matrix2x2 Transpose(const Matrix2x2 &o){
+        return Matrix2x2(o.m[0][0], o.m[1][0], o.m[0][1], o.m[1][1]);
+    }
+
+    __bidevice__ static Matrix2x2 Mul(const Matrix2x2 &m1, const Matrix2x2 &m2){
+        Matrix2x2 r;
+        for(int i = 0; i < 2; i++){
+            for(int j = 0; j < 2; j++){
+                r.m[i][j] = m1.m[i][0]*m2.m[0][j]+m1.m[i][1]*m2.m[1][j];
+            }
+        }
+        return r;
+    }
+
+    __bidevice__ friend Float Trace(const Matrix2x2 &o){
+        return o.m[0][0] + o.m[1][1];
+    }
+
+    __bidevice__ friend Float Determinant(const Matrix2x2 &o){
+        return o.m[0][0]*o.m[1][1] - o.m[0][1]*o.m[1][0];
+    }
+
+    __bidevice__ friend Matrix2x2 Inverse(const Matrix2x2 &o){
+        Float det = o.m[0][0]*o.m[1][1] - o.m[0][1]*o.m[1][0];
+        AssertA(!IsZero(det), "Zero determinant on matrix inverse");
+        if(IsZero(det)) return o;
+
+        Float invDet = 1.0f / det;
+        Float a00 =  o.m[1][1] * invDet;
+        Float a01 = -o.m[0][1] * invDet;
+        Float a10 = -o.m[1][0] * invDet;
+        Float a11 =  o.m[0][0] * invDet;
+        return Matrix2x2(a00, a01, a10, a11);
+    }
+
+    __bidevice__ friend Matrix2x2 HighpInverse(const Matrix2x2 &o){
+        Float det = o.m[0][0]*o.m[1][1] - o.m[0][1]*o.m[1][0];
+        AssertA(!IsHighpZero(det), "Zero determinant on matrix inverse");
+        if(IsHighpZero(det)) return o;
+
+        Float invDet = 1.0f / det;
+        Float a00 =  o.m[1][1] * invDet;
+        Float a01 = -o.m[0][1] * invDet;
+        Float a10 = -o.m[1][0] * invDet;
+        Float a11 =  o.m[0][0] * invDet;
+        return Matrix2x2(a00, a01, a10, a11);
+    }
+
+    __bidevice__ void TensorAdd(const vec2f &v){
+        Float x2 = v.x * v.x, y2 = v.y * v.y;
+        Float xy = v.x * v.y;
+        m[0][0] += x2; m[0][1] += xy;
+        m[1][0] += xy; m[1][1] += y2;
+    }
+
+    __bidevice__ void PrintSelf(){
+        for(int i = 0; i < 2; i++){
+            printf("[ ");
+            for(int j = 0; j < 2; j++){
+                printf("%g ", m[i][j]);
+            }
+
+            printf("]\n");
+        }
+    }
+};
+
 struct Matrix3x3{
     Float m[3][3];
     
@@ -15,7 +104,7 @@ struct Matrix3x3{
         m[1][0] = m[1][2] = 0.f;
         m[2][0] = m[2][1] = 0.f;
     }
-    
+
     __bidevice__ Matrix3x3(Float mat[3][3]){
         m[0][0] = mat[0][0]; m[1][0] = mat[1][0]; m[2][0] = mat[2][0];
         m[0][1] = mat[0][1]; m[1][1] = mat[1][1]; m[2][1] = mat[2][1];
@@ -29,6 +118,14 @@ struct Matrix3x3{
         m[0][0] = t00; m[0][1] = t01; m[0][2] = t02;
         m[1][0] = t10; m[1][1] = t11; m[1][2] = t12;
         m[2][0] = t20; m[2][1] = t21; m[2][2] = t22;
+    }
+
+    __bidevice__ void Set(Float c){
+        for(int i = 0; i < 3; i++){
+            for(int j = 0; j < 3; j++){
+                m[i][j] = c;
+            }
+        }
     }
     
     __bidevice__ friend Matrix3x3 Transpose(const Matrix3x3 &o){
@@ -48,6 +145,10 @@ struct Matrix3x3{
     __bidevice__ friend vec2f Translation(const Matrix3x3 &m1){
         return vec2f(m1.m[0][2], m1.m[1][2]);
     }
+
+    __bidevice__ friend Float Trace(const Matrix3x3 &o){
+        return o.m[0][0] + o.m[1][1] + o.m[2][2];
+    }
     
     __bidevice__ friend Matrix3x3 Inverse(const Matrix3x3 &o){
         Float det = (o.m[0][0] * (o.m[1][1] * o.m[2][2] - o.m[1][2] * o.m[2][1]) -
@@ -55,6 +156,7 @@ struct Matrix3x3{
                      o.m[0][2] * (o.m[1][0] * o.m[2][1] - o.m[1][1] * o.m[2][0]));
         
         AssertA(!IsZero(det), "Zero determinant on matrix inverse");
+        if(IsZero(det)) return o;
         Float invDet = 1.f / det;
         Float a00 = (o.m[1][1] * o.m[2][2] - o.m[2][1] * o.m[1][2]) * invDet;
         Float a01 = (o.m[0][2] * o.m[2][1] - o.m[2][2] * o.m[0][1]) * invDet;
@@ -67,7 +169,41 @@ struct Matrix3x3{
         Float a22 = (o.m[0][0] * o.m[1][1] - o.m[1][0] * o.m[0][1]) * invDet;
         return Matrix3x3(a00, a01, a02, a10, a11, a12, a20, a21, a22);
     }
-    
+
+    __bidevice__ friend Matrix3x3 HighpInverse(const Matrix3x3 &o){
+        Float det = (o.m[0][0] * (o.m[1][1] * o.m[2][2] - o.m[1][2] * o.m[2][1]) -
+                     o.m[0][1] * (o.m[1][0] * o.m[2][2] - o.m[1][2] * o.m[2][0]) +
+                     o.m[0][2] * (o.m[1][0] * o.m[2][1] - o.m[1][1] * o.m[2][0]));
+
+        AssertA(!IsHighpZero(det), "Zero determinant on matrix inverse");
+        if(IsHighpZero(det)) return o;
+        Float invDet = 1.f / det;
+        Float a00 = (o.m[1][1] * o.m[2][2] - o.m[2][1] * o.m[1][2]) * invDet;
+        Float a01 = (o.m[0][2] * o.m[2][1] - o.m[2][2] * o.m[0][1]) * invDet;
+        Float a02 = (o.m[0][1] * o.m[1][2] - o.m[1][1] * o.m[0][2]) * invDet;
+        Float a10 = (o.m[1][2] * o.m[2][0] - o.m[2][2] * o.m[1][0]) * invDet;
+        Float a11 = (o.m[0][0] * o.m[2][2] - o.m[2][0] * o.m[0][2]) * invDet;
+        Float a12 = (o.m[0][2] * o.m[1][0] - o.m[1][2] * o.m[0][0]) * invDet;
+        Float a20 = (o.m[1][0] * o.m[2][1] - o.m[2][0] * o.m[1][1]) * invDet;
+        Float a21 = (o.m[0][1] * o.m[2][0] - o.m[2][1] * o.m[0][0]) * invDet;
+        Float a22 = (o.m[0][0] * o.m[1][1] - o.m[1][0] * o.m[0][1]) * invDet;
+        return Matrix3x3(a00, a01, a02, a10, a11, a12, a20, a21, a22);
+    }
+
+    __bidevice__ friend Float Determinant(const Matrix3x3 &o){
+        return (o.m[0][0] * (o.m[1][1] * o.m[2][2] - o.m[1][2] * o.m[2][1]) -
+                o.m[0][1] * (o.m[1][0] * o.m[2][2] - o.m[1][2] * o.m[2][0]) +
+                o.m[0][2] * (o.m[1][0] * o.m[2][1] - o.m[1][1] * o.m[2][0]));
+    }
+
+    __bidevice__ void TensorAdd(const vec3f &v){
+        Float x2 = v.x * v.x, y2 = v.y * v.y, z2 = v.z * v.z;
+        Float xy = v.x * v.y, xz = v.x * v.z, yz = v.y * v.z;
+        m[0][0] += x2; m[0][1] += xy; m[0][2] += xz;
+        m[1][0] += xy; m[1][1] += y2; m[1][2] += yz;
+        m[2][0] += xz; m[2][1] += yz; m[2][2] += z2;
+    }
+
     __bidevice__ void PrintSelf(){
         for(int i = 0; i < 3; i++){
             printf("[ ");

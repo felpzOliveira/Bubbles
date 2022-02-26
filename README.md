@@ -36,4 +36,11 @@ It can also be used for generating files that can be used with [PBRT-v4](https:/
 ./bbtool pbr -layered -in <bubbles_output> -out geometry.pbrt -renderer pbrt
 ```
 
-All images used on the thesis and on this git were rendered with Lit however, the file `fluid.lit` contains the scenes used in the thesis `Chapter 3` and images on this git page.
+All images used on the thesis and on this git were rendered with Lit however, the file `fluid.lit` contains the scenes used in the thesis `Chapter 3` and images on this git page. Note however that this file uses directives such as:
+```bash
+...
+import [ geometry.lit ]
+...
+geometry[ fluid.obj ]
+```
+These files must be generated from bubbles output, all simulations can be simply uncommented/commented in the `main` routine located in `bubbles.cpp`.

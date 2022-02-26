@@ -1,0 +1,286 @@
+# This file is a scene description file for the Lit renderer.
+# It is the file used for rendering all scenes from Chapter 3
+# of the thesis and the presentation (boundary and MC).
+
+# In order to reproduce the images in the thesis you have to compile
+# Lit in Spectral mode, i.e.: on lit.h enable #define _RENDERER_SPECTRAL_
+# the original images were rendered using 4 wavelengths: #define NumWavelengths 4
+
+# Uncomment the section you want and run lit with:
+#    ./lit -live fluid.lit    if you have graphy also, if not run:
+#    ./lit fluid.lit
+# Lit outputs a temporary result after the first sample and after every minute
+# so just wait to see how it is going if you don't have support for live viewing.
+
+# set rendering globals
+set-image-resolution [1000 1000] # output image resolution
+set-integrator [wavefront 1024] # use gpu integrator and 1024 samples per pixel
+set-global-light [interpolated] # add the cute interpolated skylight
+set-ray-depth[50] # set the maximum ray depth for the integrator
+
+# set the filter sampling to use Zirr's cascade buffer, from the paper:
+# Reweighting Firefly Samples for Improved Finite-Sample Monte Carlo Estimates
+# this is one good paper
+Filter [Zirr]
+
+# the original images do not have any denoiser to them but we can use one
+# of the available denoisers for an extra result. Lit supports Nvidia's Optix,
+# Intel's Oidn and it contains a custom À-Trous implementation. In order to use
+# the Optix filter lit must be compiled with LIT_OPTIX_PATH pointing to the Optix SDK,
+# for Oidn, Intel's library must be installed in the system. Pick your favorite, I like
+# Intel one more.
+Denoiser [Oidn]
+#Denoiser [Optix]
+#Denoiser [ATrous]
+
+# ground material is a microfacet reflection based on disney bsdf
+Material{ reflectance[0.53 0.50 0.99] name[ground]
+          rough[0.2 0.2] metallic[1.0] type[disney] }
+
+############ Rendering props for Color Field section - double dam break
+# Frames: 0, 40, 120
+# color field bubbles cmd:
+# ./bbtool boundary -in out_N.txt -inform pvm -legacy -outform pb -method cf
+
+#View [1.5 3  6 # eye
+      #1.5 1.1  1 # at
+      #0   1  0 # up
+      #35.0]    # fov
+
+# upper rect (blue)
+#set-render-window [0.70 0.90 # x range
+                   #0.55 0.75]# y range
+
+# lower rect (yellow)
+#set-render-window [0.02 0.20 # x range
+                   #0.47 0.65]# y range
+
+# center rect (orange)
+#set-render-window [0.40 0.65 # x range
+                   #0.50 0.75]# y range
+
+#Shape { type[quad] mat[ground]
+        #vertex[-50.0 0.02  100.0    50.0 0.02  100
+                #50.0 0.02 -100.0   -50.0 0.02 -100] }
+################################################
+
+############ Rendering props for Xiaowei section - water drop
+# Frames: 0, 40, 60, 110
+# xiaowei bubbles cmd:
+# ./bbtool boundary -in water_drop/output_N.txt \
+#                   -inform pvm -legacy -outform pb -method xiaowei
+
+#View [0 3 6 # eye
+      #0 -0.5 0 # at
+      #0   1  0 # up
+      #35.0]    # fov
+
+# center rect (orange)
+#set-render-window [0.35 0.65 # x range
+                   #0.30 0.60]# y range
+
+#Shape { type[quad] mat[ground]
+        #vertex[-50.0 -1.0  100.0    50.0 -1.0  100
+                #50.0 -1.0 -100.0   -50.0 -1.0 -100] }
+################################################
+
+############ Rendering props for Sandim section - quadruple dam break
+# Frames: 0, 60, 100
+# sandim bubbles cmd:
+#./bbtool boundary -in quadruple_out/sim_data/out_N.txt \
+#                  -inform p -legacy -outform pb -method sandim
+
+#View [6 3 0 # eye
+      #0 -1.6 0 # at
+      #0   1  0 # up
+      #35.0]    # fov
+
+# center/bottom rect (blue)
+#set-render-window [0.40 0.60 # x range
+                   #0.30 0.50]# y range
+
+# lower/right rect (yellow)
+#set-render-window [0.68 0.83 # x range
+                   #0.24 0.39]# y range
+
+# center/upper rect (orange)
+#set-render-window [0.46 0.65 # x range
+                   #0.68 0.87]# y range
+
+#Shape { type[quad] mat[ground]
+        #vertex[-50.0 -2.0  100.0    50.0 -2.0  100
+                #50.0 -2.0 -100.0   -50.0 -2.0 -100] }
+################################################
+
+############ Rendering props for LNM section - fluid in ball
+# Cut image with dilts:
+#    - Frame: 120
+#    - Boundary: ./bbtool boundary -in out_120.txt -inform pb \
+#                  -legacy -outform pb -method dilts -narrow-band -nbrho 0.012
+#    - Render: ./bbtool pbr -in output.txt -inform pb -legacy \
+#                           -filtered -clip-plane 5 3.7 2
+
+# Fluid in ball:
+# These images use the performance version (lnmalgo 0) but changing this
+# parameter generates the others
+#    - Frames: 0, 40, 80
+#    - Boundary: ./bbtool boundary -in frame.txt -method lnm -lnmalgo 0 -inform pb -legacy
+
+# constant float texture for white glass refraction with spectral rendering,
+# making it float avoids λ sampling when the ray is reduced, making the object
+# look completely white despite the upsampling method used. Using a unity
+# reflectance will not generate a white glass because of the upsampling scheme,
+# we use the method in: Spectral Primary Decomposition for Rendering with sRGB Reflectance
+# maybe using other methods is better, but untill we actually support them
+# a float textures gives perfect result for spectral
+
+# Note: for this section it is interesting to render without spectral support
+# as the RGB glass with texture value of 0.98 looks amazing. The old renderer
+# was RGB, however it is no longer possible to reproduce its images as it actually
+# had a bug that helped the lighting computation, but using RGB with Lit and
+# texture with value 0.98 is very impresive.
+#Texture{ name[white] value[1.0] type[float] }
+
+# glass material, since we are rendering in spectral we need to care about
+# dispersion to not overwhelm the image so I'll manually set dispersion props,
+# cauchy is the simplest so use that
+#Material{ texture[white] dispersion-coeff[1.02 0.001] dispersion-model[cauchy]
+          #name[glass] type[dielectric] }
+
+#View [0 3 5 # eye
+      #1 1 1 # at
+      #0 1 0 # up
+      #32.0] # fov
+
+# glass sphere
+#Shape{ type[sphere] radius[1.04] center[1 1 1] mat[glass] }
+
+#Shape { type[quad] mat[ground]
+        #vertex[-50.0 -0.045  100.0    50.0 -0.045  100
+                #50.0 -0.045 -100.0   -50.0 -0.045 -100] }
+################################################
+
+# DON'T FORGET TO INCLUDE THIS
+# include the simulation description
+# bubbles cmd: ./bbtool pbr -in output.txt -inform pb -legacy -filtered -renderer lit
+#Include [geometry.lit]
+
+############ Mesh images for presentation uses this
+# marching cubes bubbles cmd:
+# ./bbtool surface -in output.txt -out fluid_0.obj
+
+#set-base-path [/home/felipe/Documents/CGStuff]
+#Material{ reflectance[0.698039 0 0.0941176] name[mat_layer1] type[diffuse] }
+
+#View [6 3 0 # eye
+      #0 -1.2 0 # at
+      #0  1   0 # up
+      #35.0]    # fov
+
+
+#Shape{ type[mesh] geometry[models/fluid_1.obj] mat[mat_layer1] }
+
+#Shape { type[quad] mat[ground]
+        #vertex[-50.0 -2.0  100.0    50.0 -2.0  100
+                #50.0 -2.0 -100.0   -50.0 -2.0 -100] }
+################################################
+
+############ Rendering props for the video
+# The video was actually rendered using PBRT. The reason
+# was that at the time of the need for the video Lit
+# had a serious bug during λ termination and the frames
+# would always corrupt. You can recreate the video by using
+# Bubbles with the following flags:
+# ./bbtool pbr -clip-plane 4 3.6 2 -layered -mat diffuse -mat-value 0.549 0.647 0.643 \
+#        -in <frame> -renderer pbrt
+# changing the renderer flag swaps the renderers. If you are using legacy files the
+# following is the description of the dragons and their positions. Also because
+# PBRT has a different camera orientation than Lit the image is flipped in the
+# x-axis, you can flip it here with:
+#    set-geometry-flip[0]
+
+# The following is a sample of how to render the two dragons scene, it
+# renders the image from the git. In order to make water we need to add mediums.
+# Lit currently only supports homogenous mediums based on Henyey-Greenstein
+# phase function. But the wavefront renderer does not yet handle mediums so we
+# need to use the volpath integrator, it also runs on the GPU but it does
+# not take advantage of the wavefront architecture. If you intend to copy
+# the locations of the dragons to PBRT please note that you need to transpose
+# the transformation for correct placement.
+set-integrator [volpath 1024]
+
+# change to your directory to find the light's spd and the dragon model
+set-base-path [/home/felipe/Documents/CGStuff]
+
+View [0 1.25 5 # eye
+      0 -0.5 0 # at
+      0  1   0 # up
+      36.0]    # fov
+
+Medium{ type[homogenous] name[volume] asym_g[-0.7] scale[2.5]
+        sigma_s[0.00125 0.00125 0.000625] sigma_a[0.0125 0.0125 0.01] }
+
+set-image-resolution [1200 900]
+
+# for a complete white glass we need to use a white texture because
+# spectral upsampling will turn colored white glass into blue
+Texture{ name[white] value[1] type[float] }
+Material{ texture[white] type[dielectric] dispersion[water] name[water_mat] }
+
+# approximate glass with disney bsdf for the box, I give small eta just to make small
+# highlights
+Material{ texture[white] rough[0.01 0.01] transmission[1.0]
+          eta[1.02] name[glass] type[disney] }
+
+# the light in this scene is based on the spd from Ledtech
+Material{ emission [spds/Ledtech.csv] name [light] type [diffuselight] scale [10.0] }
+Material{ reflectance[0.6 0.6 0.6] name[ground2] type[diffuse] }
+
+# blue material for the dragons
+Material { name[mat_0] type [diffuse] reflectance  [ 0.249 0.347 0.643 ] scale [0.5] }
+
+# first dragon
+Shape { type[mesh] name[mesh_0] geometry[models/sssdragon.obj] mat[mat_0]
+    transform [ 0.007695 0.000000 0.001919 0.200000
+                0.000000 0.007931 0.000000 -0.940880
+                -0.001919 0.000000 0.007695 0.000000
+                0.000000 0.000000 0.000000 1.000000 ] }
+
+# second dragon
+Shape { type[instance] base[mesh_0] mat[mat_0]
+    transform [ 0.007931 0.000000 0.000000 -1.000000
+                0.000000 0.007931 0.000000 -0.940880
+                0.000000 0.000000 0.007931 0.000000
+                0.000000 0.000000 0.000000 1.000000 ] }
+
+# box
+Shape{ type[quad] mat[glass]
+       vertex[ 1.75  1.25 -1 -1.75  1.25 -1
+              -1.75 -1.25 -1  1.75 -1.25 -1] }
+
+Shape{ type[quad] mat[glass]
+       vertex[ 1.75  1.25 1 -1.75  1.25 1
+              -1.75 -1.25 1  1.75 -1.25 1] }
+
+Shape{ type[quad] mat[glass]
+       vertex[ 1.75  1.25  1  1.75  1.25 -1
+               1.75 -1.25 -1  1.75 -1.25  1] }
+
+Shape{ type[quad] mat[glass]
+       vertex[ -1.75  1.25  1  -1.75  1.25 -1
+               -1.75 -1.25 -1  -1.75 -1.25  1] }
+
+# light
+Shape{ type [quad] mat[light]
+       vertex [543.0 948.7 532.0  13.0 948.7 532.0
+               13.0  948.7 27.0   543.0 948.7 27.0] }
+
+# floor
+Shape { type[quad] mat[ground2]
+        vertex[-250.0 -1.24  300.0    250.0 -1.24  300
+                250.0 -1.24 -300.0   -250.0 -1.24 -300] }
+
+# fluid
+Shape{ type[mesh] name[mesh_0] geometry[models/fluid_2.obj]
+       mat[water_mat] medium[volume null] }
+

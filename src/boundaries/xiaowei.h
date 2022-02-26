@@ -70,8 +70,7 @@ int XiaoweiParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     sum = sum / Wsum;
     Float asymmetry = Distance(pi, sum);
 
-    // I don't quite understand how this const is picked but 0.1
-    // gives an acceptable result
+    // I don't quite understand how this const is picked
     if(asymmetry > 0.1 * rho){
         return 1;
     }
@@ -103,7 +102,7 @@ void XiaoweiBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
     if(!use_cpu){
         GPULaunch(N, GPUKernel(XiaoweiBoundaryKernel<T, U, Q>), pSet, domain, h);
     }else{
-        ParallelFor(0, N, [&](int i)->void{
+        ParallelFor(0, N, [&](int i) -> void{
             XiaoweiBoundaryCPU(pSet, domain, h, i);
         });
     }

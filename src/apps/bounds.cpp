@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <narrowband.h>
 
 typedef struct{
     int count;
@@ -29,6 +30,7 @@ typedef struct{
     Float doringMu;
     Float spacing;
     Float spacingScale;
+    Float nbRho;
     int countstart;
     int countend;
     int inner_cmd;
@@ -41,6 +43,7 @@ typedef struct{
     int noout;
     BoundaryMethod method;
     bool unbounded;
+    bool narrowband;
 }boundary_opts;
 
 void default_boundary_opts(boundary_opts *opts){
@@ -59,8 +62,10 @@ void default_boundary_opts(boundary_opts *opts){
     opts->write_domain = 0;
     opts->inner_cmd = 0;
     opts->noout = 0;
+    opts->nbRho = 0.02;
     opts->doringMu = RDM_MU_3D;
     opts->unbounded = false;
+    opts->narrowband = false;
 }
 
 void print_boundary_configs(boundary_opts *opts){
@@ -74,12 +79,17 @@ void print_boundary_configs(boundary_opts *opts){
         std::cout << "    * Write Domain : " << opts->write_domain << std::endl;
         std::cout << "    * Noout : " << opts->noout << std::endl;
         std::cout << "    * Unbounded : " << opts->unbounded << std::endl;
+        std::cout << "    * Narrow-Band : " << opts->narrowband << std::endl;
         if(opts->method == BOUNDARY_LNM){
-            std::cout << "    * LNM Algo: " << opts->lnmalgo << std::endl;
+            std::cout << "    * LNM Algo : " << opts->lnmalgo << std::endl;
         }
 
         if(opts->method == BOUNDARY_DORING){
             std::cout << "    * Doring μ : " << opts->doringMu << std::endl;
+        }
+
+        if(opts->narrowband){
+            std::cout << "    * Narrow-Band ρ : " << opts->nbRho << std::endl;
         }
     }else if(opts->inner_cmd == 1){
         std::cout << "    * Statistics Run" << std::endl;
@@ -91,6 +101,23 @@ void print_boundary_configs(boundary_opts *opts){
 ARGUMENT_PROCESS(boundary_stats_arg){
     boundary_opts *opts = (boundary_opts *)config;
     opts->inner_cmd = 1;
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_nb_arg){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->narrowband = true;
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_nb_rho_arg){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->nbRho = ParseNextFloat(argc, argv, i, "-nbrho");
+    if(opts->nbRho <= 0){
+        printf("Invalid ρ value for NB\n");
+        return -1;
+    }
+
     return 0;
 }
 
@@ -248,6 +275,18 @@ std::map<const char *, arg_desc> bounds_arg_map = {
             .processor = boundary_in_args,
             .help = "Sets the input file for boundary computation when used with methods."
                     " Sets the base path for statistics ( Requires -stats )."
+        }
+    },
+    {"-nbrho",
+        {
+            .processor = boundary_nb_rho_arg,
+            .help = "Sets the ρ value for the narrow-band extraction ( Requires -narrow-band )."
+        }
+    },
+    {"-narrow-band",
+        {
+            .processor = boundary_nb_arg,
+            .help = "Extends the boundary with ρ-bounded narrow-band over the boundary."
         }
     },
     {"-ref",
@@ -787,6 +826,14 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
 
     int n = UtilGetBoundaryState(pSet, &boundary);
     printf("Got %d / %d - %g ms\n", n, (int)boundary.size(), interval);
+
+    if(opts->narrowband){
+        boundary.clear();
+        printf("Extracting narrow-band with ρ = %g\n", opts->nbRho);
+        GeometricalNarrowBand(pSet, grid, opts->nbRho);
+        int s = UtilGetBoundaryState(pSet, &boundary);
+        printf("Extended by %d particles\n", s - n);
+    }
 
     if(workQstats){
         LNMInvalidateCells(grid);

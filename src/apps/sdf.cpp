@@ -127,19 +127,19 @@ std::map<const char *, arg_desc> sdf_arg_map = {
             .help = "Scale the input geometry uniformly."
         }
     },
-    {"-rotateX", 
-        { .processor = sdf_rotate_x_arg, 
-            .help = "Rotates the input in the X-direction. (degrees)" 
+    {"-rotateX",
+        { .processor = sdf_rotate_x_arg,
+            .help = "Rotates the input in the X-direction. (degrees)"
         }
     },
-    {"-rotateY", 
-        { .processor = sdf_rotate_y_arg, 
-            .help = "Rotates the input in the Y-direction. (degrees)" 
+    {"-rotateY",
+        { .processor = sdf_rotate_y_arg,
+            .help = "Rotates the input in the Y-direction. (degrees)"
         }
     },
-    {"-rotateZ", 
-        { .processor = sdf_rotate_z_arg, 
-            .help = "Rotates the input in the Z-direction. (degrees)" 
+    {"-rotateZ",
+        { .processor = sdf_rotate_z_arg,
+            .help = "Rotates the input in the Z-direction. (degrees)"
         }
     },
     {"-origin",
@@ -180,9 +180,9 @@ void sdf_print_configs(sdf_opts *opts){
     std::cout << "    * View : " << opts->view << std::endl;
     std::cout << "    * Spacing : " << opts->spacing << std::endl;
     if(opts->view){
-        std::cout << "        - Origin : " << opts->camEye.x << " " << 
+        std::cout << "        - Origin : " << opts->camEye.x << " " <<
             opts->camEye.y << " " << opts->camEye.z << std::endl;
-        std::cout << "        - Target : " << opts->camAt.x << " " << 
+        std::cout << "        - Target : " << opts->camAt.x << " " <<
             opts->camAt.y << " " << opts->camAt.z << std::endl;
     }
 }
@@ -204,7 +204,7 @@ Shape *GenerateMeshSDF(sdf_opts *opts){
         opts->spacing = spacing;
         printf("%g\n", spacing);
     }
-    
+
     GenerateShapeSDF(meshShape, spacing, spacing);
     return meshShape;
 }
@@ -213,14 +213,14 @@ void SDFView(Shape *shape, sdf_opts *opts){
     Float spacing = opts->spacing;
     std::vector<vec3f> particles;
     UtilGetSDFParticles(shape->grid, &particles, 0, spacing);
-    
+
     int count = particles.size();
     float *pos = new float[count * 3];
     float *col = new float[count * 3];
-    
+
     vec3f origin = opts->camEye;
     vec3f target = opts->camAt;
-    
+
     graphy_set_3d(origin.x, origin.y, origin.z, target.x, target.y, target.z,
                   45.0, 0.1f, 100.0f);
     int itp = 0, itc = 0;
@@ -228,13 +228,13 @@ void SDFView(Shape *shape, sdf_opts *opts){
         pos[itp++] = pi.x; pos[itp++] = pi.y; pos[itp++] = pi.z;
         col[itc++] = 0; col[itc++] = 0; col[itc++] = 1;
     }
-    
+
     graphy_render_points3f(pos, col, itp/3, spacing/2.0);
     printf("Press anything ... ");
     fflush(stdout);
     getchar();
     graphy_close_display();
-    
+
     delete[] pos;
     delete[] col;
 }
@@ -244,7 +244,7 @@ void sdf_command(int argc, char **argv){
     argument_process(sdf_arg_map, argc, argv, "sdf", &g_opts);
     sdf_print_configs(&g_opts);
     Shape *shape = GenerateMeshSDF(&g_opts);
-    
+
     if(g_opts.view){
         SDFView(shape, &g_opts);
     }

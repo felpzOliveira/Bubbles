@@ -53,14 +53,14 @@ void run_self_tests(){
     test_sph3_water_sphere();
     test_sph3_water_block();
     test_sph3_double_dam_break();
-    
+
     test_pcisph2_double_dam_break();
     test_pcisph2_water_sphere();
     test_pcisph2_water_drop();
     test_pcisph2_water_block();
     test_pcisph2_water_block_lnm();
     test_pcisph2_continuous_emitter();
-    
+
     test_bcclattice_point_generator();
     test_pcisph3_water_sphere();
     test_pcisph3_double_dam_break();
@@ -89,25 +89,24 @@ int main(int argc, char **argv){
     BB_MSG("Bubbles Fluid Simulator");
     /* Initialize cuda API */
     cudaInitEx();
-    
+
     /* Sets the default kernel launching parameters, 16 is good for my notebook */
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
 
     //test_matrix_operations2();
-    test_pcisph2_water_block();
+    //test_pcisph2_water_block();
 
     //test_pcisph2_double_dam_break();
     //test_pcisph2_water_block_lnm();
     //test_pcisph2_water_block();
     //test_pcisph3_sdf();
     //test_pcisph3_rotating_water_box();
-    //test_pcisph3_dam_break_double_dragon();
+    test_pcisph3_dam_break_double_dragon();
     //test_pcisph3_quadruple_dam();
     //test_pcisph3_pathing();
     //test_pcisph3_box_drop();
     //test_pcisph3_happy_whale();
     //test_pcisph3_water_drop();
-    //test_pcisph3_rotating_water_box();
 
     //test_pcisph2_water_block();
     //test_pcisph3_dragon();
@@ -116,6 +115,8 @@ int main(int argc, char **argv){
     //test_pcisph3_dam_break_double_dragon();
     //test_pcisph3_box_mesh();
     //test_pcisph3_dragon_pool();
+    //test_pcisph3_double_dam_break();
+    //test_pcisph3_rotating_water_box();
 
     //test_pcisph3_dissolve();
     //test_pcisph3_emit_test();
@@ -126,7 +127,7 @@ int main(int argc, char **argv){
 #if defined(RUN_TESTS)
     //run_self_tests();
 #else
-    
+
 #endif
     CudaMemoryManagerClearAll();
     graphy_close_display();

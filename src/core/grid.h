@@ -28,7 +28,7 @@ struct Cell{
     int chainLength, chainAuxLength;
     int active;
     int level;
-    
+
     __bidevice__ void Reset(){
         head = nullptr;
         tail = nullptr;
@@ -39,30 +39,30 @@ struct Cell{
         active = 0;
         level = -1;
     }
-    
+
     __bidevice__ void SetNeighborListPtr(int *list){
         neighborList = list;
     }
-    
+
     __bidevice__ void SetNeighborList(int *list, int n){
         memcpy(neighborList, list, n * sizeof(int));
         neighborListCount = n;
     }
-    
+
     __bidevice__ void SwapActive(){ active = 1 - active; }
-    
+
     __bidevice__ int IsActive(){ return active; }
-    
+
     __bidevice__ ParticleChain *GetChain(){
         if(active) return headAux;
         return head;
     }
-    
+
     __bidevice__ ParticleChain *GetTail(){
         if(active) return tailAux;
         return tail;
     }
-    
+
     __bidevice__ int GetChainLength(){
         if(active) return chainAuxLength;
         return chainLength;
@@ -87,17 +87,17 @@ struct Cell{
         if(!active) return &tailAux;
         return &tail;
     }
-    
+
     __bidevice__ void IncreaseNextChainCount(){
         if(!active) chainAuxLength++;
         else chainLength ++;
     }
-    
+
     __bidevice__ void IncreaseActiveChainCount(){
         if(active) chainAuxLength++;
         else chainLength ++;
     }
-    
+
     __bidevice__ void ResetNext(){
         if(active){
             head = nullptr;
@@ -109,7 +109,7 @@ struct Cell{
             chainAuxLength = 0;
         }
     }
-    
+
     __bidevice__ void AddToNextChain(ParticleChain *node){
         ParticleChain **cHead = GetNextChain();
         ParticleChain **cTail = GetNextTail();
@@ -120,11 +120,11 @@ struct Cell{
             (*cTail)->next = node;
             (*cTail) = node;
         }
-        
+
         (*cTail)->next = nullptr;
         IncreaseNextChainCount();
     }
-    
+
     __bidevice__ void AddToChain(ParticleChain *node){
         ParticleChain **cHead = GetActiveChain();
         ParticleChain **cTail = GetActiveTail();
@@ -135,19 +135,19 @@ struct Cell{
             (*cTail)->next = node;
             (*cTail) = node;
         }
-        
+
         (*cTail)->next = nullptr;
         IncreaseActiveChainCount();
     }
-    
+
     __bidevice__ void SetLevel(int L){
         level = L;
     }
-    
+
     __bidevice__ int GetLevel(){
         return level;
     }
-    
+
     __bidevice__ void Set(T b, int _id){
         bounds = b;
         id = _id;
@@ -161,7 +161,7 @@ typedef Cell<Bounds3f> Cell3;
 
 template<typename U> inline __bidevice__
 U DimensionalIndex(unsigned int id, const U &usizes, int dimensions){
-    AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3, 
+    AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3,
             "Unknown dimension distribution");
     U u;
     u[0] = id;
@@ -170,20 +170,20 @@ U DimensionalIndex(unsigned int id, const U &usizes, int dimensions){
         u[2] = (int)(id / plane);
         id -= u[2] * plane;
     }
-    
+
     if(dimensions > 1){
         u[1] = (int)(id / usizes[0]);
         u[0] = (int)(id % usizes[0]);
     }
-    
+
     return u;
 }
 
-template<typename U> inline __bidevice__ 
+template<typename U> inline __bidevice__
 unsigned int LinearIndex(const U &u, const U &usizes, int dimensions){
-    AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3, 
+    AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3,
             "Unknown dimension distribution {GetLinearIndex}");
-    
+
     unsigned int h = u[0]; // x
     if(dimensions > 1)
         h += u[1] * usizes[0]; // y * sizeX
@@ -209,7 +209,7 @@ class Grid{
     int *neighborListPtr; // address of the first neighborList
     int *activeCells; // list of cells that actually have particle in them
     int activeCellsCount; // amount of active cells at any given moment
-    
+
     __bidevice__ Grid(){ SetDimension(T(0)); }
     __bidevice__ void SetDimension(const Float &u){ (void)u; dimensions = 1; }
     __bidevice__ void SetDimension(const vec2f &u){ (void)u; dimensions = 2; }
@@ -230,13 +230,13 @@ class Grid{
         AssertA(axis >= 0 && axis < dimensions, "Invalid axis given for CountOn");
         return usizes[axis];
     }
-    
+
     __bidevice__ int GetCellLevel(int cellId){
         AssertA(cellId >= 0 && cellId < total, "Invalid cellId for GetCellLevel");
         Cell<Q> *cell = &cells[cellId];
         return cell->GetLevel();
     }
-    
+
     __bidevice__ int GetActiveCellId(int qid){
         if(!(qid >= 0 && qid < activeCellsCount)){
             printf("Got query for %d but have only %d\n", qid, activeCellsCount);
@@ -244,17 +244,17 @@ class Grid{
         AssertA(qid >= 0 && qid < activeCellsCount, "Invalid cellId for GetActiveCellId");
         return activeCells[qid];
     }
-    
+
     __bidevice__ Cell<Q> *GetActiveCell(int qid){
         AssertA(qid >= 0 && qid < activeCellsCount, "Invalid cellId for GetActiveCell");
         return &cells[activeCells[qid]];
     }
-    
+
     __bidevice__ Cell<Q> *GetCell(int cellId){
         if(cellId >= total || cellId < 0) return nullptr;
         return &cells[cellId];
     }
-    
+
     /* Get offset for dimension value 'p' on axis 'axis' in case it lies on boundary */
     __bidevice__ Float ExtremeEpsilon(Float p, int axis){
         Float eps = 0;
@@ -265,10 +265,10 @@ class Grid{
         }else if(IsZero(p - p1)){
             eps = -Epsilon;
         }
-        
+
         return eps;
     }
-    
+
     /* Hash position 'p' into a cell index */
     __bidevice__ U GetHashedPosition(const T &p){
         U u;
@@ -279,21 +279,21 @@ class Grid{
             bounds.PrintSelf();
             printf("\n");
         }
-        
+
         AssertA(Inside(p, bounds), "Out of bounds point");
         for(int i = 0; i < dimensions; i++){
             Float pi = p[i];
             pi += ExtremeEpsilon(pi, i);
-            
+
             Float dmin = minPoint[i];
             Float dlen = cellsLen[i];
             Float dp = (pi - dmin) / dlen;
-            
+
             int linearId = (int)(Floor(dp));
             AssertA(linearId >= 0 && linearId < usizes[i], "Out of bounds position");
             u[i] = linearId;
         }
-        
+
         return u;
     }
 
@@ -301,32 +301,32 @@ class Grid{
     __bidevice__ bool Contains(const T &p){
         return Inside(p, bounds);
     }
-    
+
     /* Get logical index of cell */
     __bidevice__ U GetCellIndex(unsigned int i){
         return DimensionalIndex(i, usizes, dimensions);
     }
-    
+
     /* Get the ordered cell index of a cell */
     __bidevice__ unsigned int GetLinearCellIndex(const U &u){
         unsigned int h = LinearIndex(u, usizes, dimensions);
         AssertA(h < total, "Invalid cell id computation");
         return h;
     }
-    
+
     /* Hash position 'p' and get the linear cell index */
     __bidevice__ unsigned int GetLinearHashedPosition(const T &p){
         U u = GetHashedPosition(p);
         return GetLinearCellIndex(u);
     }
-    
+
     /* Distribute routines for multiple particle types, low level control */
     __bidevice__ void DistributeResetCell(unsigned int cellId){
         AssertA(cellId < total, "Invalid distribution cell id");
         Cell<Q> *cell = &cells[cellId];
         cell->Reset();
     }
-    
+
     /* Distribute to specific cell, low level */
     template<typename ParticleType = ParticleSet<T>>
         __bidevice__ void DistributeAddToCell(ParticleType *pSet, unsigned int cellId){
@@ -341,7 +341,7 @@ class Grid{
                 AssertA(Inside(p, cell->bounds), "Invalid cell computation {Inside}");
                 ParticleChain *pChain = pSet->GetParticleChainNode(i);
                 AssertA(pChain, "Invalid particle chain node");
-                
+
                 pChain->cId = cellId;
                 pChain->pId = i;
                 pChain->sId = pSet->GetFamilyId();
@@ -349,14 +349,14 @@ class Grid{
             }
         }
     }
-    
+
     /* 
     * Distribute a list of particles to the cell in CPU. In order to avoid
     * performing full distribution if a continuous emission is being used
     * allow for distributing a list of particles.
     */
     template<typename ParticleType = ParticleSet<T>>
-        __host__ void DistributeByParticleList(ParticleType *pSet, T *pList, 
+        __host__ void DistributeByParticleList(ParticleType *pSet, T *pList,
                                                int pCount, int startId,
                                                Float kernelRadius)
     {
@@ -368,24 +368,24 @@ class Grid{
             AssertA(h < total, "Invalid particle position");
             Cell<Q> *cell = &cells[h];
             AssertA(Inside(p, cell->bounds), "Invalid particle computation {Inside}");
-            
+
             if(cell->IsActive()){
                 pChain = pSet->GetParticleAuxChainNode(startId+i);
             }else{
                 pChain = pSet->GetParticleChainNode(startId+i);
             }
-            
+
             pChain->cId = h;
             pChain->pId = startId+i;
             pChain->sId = pSet->GetFamilyId();
             cell->AddToChain(pChain);
         }
-        
+
         for(int i = 0; i < pCount; i++){
             DistributeParticleBucket(pSet, startId+i, kernelRadius);
         }
     }
-    
+
     /* Distribute by particle, faster for initialization. Can only run on CPU */
     template<typename ParticleType = ParticleSet<T>>
         __host__ void DistributeByParticle(ParticleType *pSet){
@@ -405,20 +405,20 @@ class Grid{
             cell->AddToChain(pChain);
         }
     }
-    
+
     /* Distribute particles from given ParticleSet by cell Id with optmized search */
     template<typename ParticleType = ParticleSet<T>>
         __bidevice__ void DistributeToCellOpt(ParticleType *pSet, unsigned int cellId){
         DistributeToCellOpt(&pSet, 1, cellId);
     }
-    
+
     /* Distribute particles from given ParticleSet by cell Id */
     template<typename ParticleType = ParticleSet<T>>
         __bidevice__ void DistributeToCell(ParticleType *pSet, unsigned int cellId){
         DistributeResetCell(cellId);
         DistributeAddToCell(pSet, cellId);
     }
-    
+
     template<typename ParticleType = ParticleSet<T>>
         __bidevice__ void DistributeParticleBucket(ParticleType *pSet, int pid,
                                                    Float kernelRadius)
@@ -433,21 +433,21 @@ class Grid{
             Cell<Q> *cell = GetCell(neighbors[i]);
             ParticleChain *pChain = cell->GetChain();
             int size = cell->GetChainLength();
-            
+
             for(int j = 0; j < size; j++){
                 T pj = pSet->GetParticlePosition(pChain->pId);
                 Float distance = Distance(pi, pj);
                 if(IsWithinStd(distance, kernelRadius)){
                     bucket->Insert(pChain->pId);
                 }
-                
+
                 pChain = pChain->next;
             }
         }
     }
-    
+
     template<typename ParticleType = ParticleSet<T>>
-        __bidevice__ void DistributeToCellOpt(ParticleType **ppSet, int n, 
+        __bidevice__ void DistributeToCellOpt(ParticleType **ppSet, int n,
                                               unsigned int cellId)
     {
         AssertA(cellId < total, "Invalid distribution cell id");
@@ -466,10 +466,10 @@ class Grid{
                     pSet = ppSet[i];
                     if(pSet->GetFamilyId() == pChain->sId) break;
                 }
-                
+
                 T p = pSet->GetParticlePosition(pChain->pId);
                 U u = GetHashedPosition(p);
-                
+
                 unsigned int h = GetLinearCellIndex(u);
                 if(h == cellId){
                     AssertA(Inside(p, cell->bounds), "Invalid cell computation {Inside}");
@@ -479,26 +479,26 @@ class Grid{
                     }else{
                         pToAdd = pSet->GetParticleAuxChainNode(pChain->pId);
                     }
-                    
+
                     AssertA(pToAdd, "Invalid particle chain node");
-                    
+
                     pToAdd->cId = cellId;
                     pToAdd->pId = pChain->pId;
                     pToAdd->sId = pSet->GetFamilyId();
                     cell->AddToNextChain(pToAdd);
                 }
-                
+
                 pChain = pChain->next;
             }
         }
     }
-    
+
     __bidevice__ void SwapCellList(int cellId){
         AssertA(cellId < total, "Invalid distribution cell id");
         Cell<Q> *cell = &cells[cellId];
         cell->SwapActive();
     }
-    
+
     /* Query the cell neighbor list */
     __bidevice__ int GetNeighborsOf(int id, int **neighbors){
         AssertA(id < total, "Invalid cell id given for {GetNeighborsOf}");
@@ -550,10 +550,10 @@ class Grid{
 
         return terminate;
     }
-    
+
     /* Get neighbors from a cell with a depth 'depth' */
     __bidevice__ int GetNeighborListFor(int id, int depth, int *neighbors){
-        AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3, 
+        AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3,
                 "Unknown dimension distribution {GetNeighborListFor}");
         int count = 0;
         U u = GetCellIndex(id);
@@ -564,7 +564,7 @@ class Grid{
         }
         ufmin = ufmin - T(depth);
         ufmax = ufmax + T(depth);
-        
+
         for(int j = ufmin[1]; j <= ufmax[1]; j++){
             if(j < 0 || j >= usizes[1]) continue;
             if(dimensions > 1){
@@ -591,10 +591,10 @@ class Grid{
         }
         return count;
     }
-    
+
     /* Computes and allocates the cells for this grid */
     __host__ void Build(const U &resolution, const T &dp0, const T &dp1);
-    
+
     /* Sets and compute grid usage */
     __host__ void UpdateQueryState();
 };
@@ -609,13 +609,13 @@ __global__ void BuildNeighborListKernel(Grid<T, U, Q> *grid){
         U u = grid->GetCellIndex(i);
         T center;
         for(int k = 0; k < grid->dimensions; k++){
-            center[k] = grid->minPoint[k] + u[k] * grid->cellsLen[k] + 
+            center[k] = grid->minPoint[k] + u[k] * grid->cellsLen[k] +
                 0.5 * grid->cellsLen[k];
         }
-        
+
         T pMin = center - 0.5 * grid->cellsLen;
         T pMax = center + 0.5 * grid->cellsLen;
-        
+
         count = grid->GetNeighborListFor(i, 1, &neighbor[0]);
         cell->SetNeighborListPtr(&grid->neighborListPtr[27 * i]);
         cell->Set(Q(pMin, pMax), i);
@@ -639,7 +639,7 @@ __host__ void Grid<T, U, Q>::Build(const U &resolution, const T &dp0, const T &d
         if(du > high[k]) high[k] = du;
         if(du < lower[k]) lower[k] = du;
     }
-    
+
     for(int k = 0; k < dimensions; k++){
         Float s = high[k] - lower[k];
         Float len = s / (Float)resolution[k];
@@ -648,20 +648,20 @@ __host__ void Grid<T, U, Q>::Build(const U &resolution, const T &dp0, const T &d
         maxPoint[k] = lower[k] + (Float)usizes[k] * cellsLen[k];
         total *= usizes[k];
     }
-    
+
     minPoint = lower;
     bounds = Q(minPoint, maxPoint);
-    
+
     cells = cudaAllocateVx(Cell<Q>, total);
     neighborListPtr = cudaAllocateVx(int, total * 27);
     activeCells = cudaAllocateVx(int, total);
     activeCellsCount = 0;
-    
+
     printf("Building acceleration query list [%d] ... ", total);
     fflush(stdout);
-    
+
     GPULaunch(total, GPUKernel(BuildNeighborListKernel<T, U, Q>), this);
-    
+
     printf("OK\n");
 }
 
@@ -673,10 +673,10 @@ __host__ void Grid<T, U, Q>::UpdateQueryState(){
         if(cell->GetChainLength() > 0){
             activeCells[it++] = i;
         }
-        
+
         cell->SetLevel(-1);
     }
-    
+
     activeCellsCount = it;
 }
 
@@ -691,7 +691,7 @@ __host__ void ResetAndDistribute(Grid<T, U, Q> *grid, ParticleSet<T> *pSet){
         for(int i = 0; i < grid->GetCellCount(); i++){
             grid->DistributeResetCell(i);
         }
-        
+
         grid->DistributeByParticle(pSet);
     }
 }
@@ -728,23 +728,23 @@ class NodeEdgeGrid{
     int totalCount; // total count of nodes
     int nodesPerCell; // amount of nodes per cell
     int gridDim; // grid dimension
-    
+
     __bidevice__ NodeEdgeGrid(){
         grid = nullptr; data = nullptr;
         totalCount = 0; nodesPerCell = 0;
     }
-    
+
     __bidevice__ int GetNodeCount(){ return totalCount; }
     __bidevice__ int GetDimensions(){ return gridDim; }
     __bidevice__ T GetSpacing(){ return grid->GetCellSize(); }
     __bidevice__ U GetNodeIndexCount(){ return usizes; }
     __bidevice__ int GetNodesPerCell(){ return nodesPerCell; }
-    
+
     /* Get Cell from index *INDEX IS FROM GRID* */
     __bidevice__ Cell<Q> *GetCell(unsigned int id){
         return grid->GetCell(id);
     }
-    
+
     /* 
     * Initializes the NodeEdgeGrid with the underlying grid,
     * the grid needs to be already built.
@@ -754,7 +754,7 @@ class NodeEdgeGrid{
         // Get grid properties
         U ucount = gridPtr->GetIndexCount();
         gridDim = gridPtr->GetDimensions();
-        
+
         // compute amount of nodes required for this grid
         totalCount = 1;
         nodesPerCell = 1;
@@ -763,25 +763,25 @@ class NodeEdgeGrid{
             totalCount *= usizes[i];
             nodesPerCell *= 2;
         }
-        
+
         // get memory
         data = cudaAllocateVx(F, totalCount);
-        
+
         // initialize
         for(int i = 0; i < totalCount; i++) data[i] = initialValue;
         grid = gridPtr;
     }
-    
+
     /* Get linear index of a node */
     __bidevice__ unsigned int GetNodeLinearIndex(const U &u){
         return LinearIndex(u, usizes, gridDim);
     }
-    
+
     /* Get index for a specific node */
     __bidevice__ U GetNodeIndex(unsigned int nodeId){
         return DimensionalIndex(nodeId, usizes, gridDim);
     }
-    
+
     /* Get cells that contains a node */ // TODO: Review for 3D
     __bidevice__ int GetCellsFrom(unsigned int nodeId, int *cells){
         AssertA(gridDim == 2, "Unsupported routine");
@@ -792,11 +792,11 @@ class NodeEdgeGrid{
         if(u[0] < size[0] && u[1] < size[1]){
             cells[count++] = grid->GetLinearCellIndex(u);
         }
-        
+
         if(u1[0] < size[0] && u1[1] < size[1]){
             cells[count++] = grid->GetLinearCellIndex(u1);
         }
-        
+
         for(int i = 0; i < gridDim; i++){
             U tmp = u;
             tmp[i] -= 1;
@@ -804,10 +804,10 @@ class NodeEdgeGrid{
                 cells[count++] = grid->GetLinearCellIndex(tmp);
             }
         }
-        
+
         return count;
     }
-    
+
     /* Get the nodes from a given a cell */ // TODO: Review for 3D
     __bidevice__ int GetNodesFrom(unsigned int cellId, int *nodes){
         AssertA(gridDim == 2, "Unsupported routine");
@@ -819,47 +819,47 @@ class NodeEdgeGrid{
         nodes[3] = (u[0] + 1) + (u[1] + 1) * usizes[0]; // upper right node
         return nodesPerCell;
     }
-    
+
     /* Get field value for the given linear index */
     __bidevice__ F GetValue(unsigned int u){
         AssertA(u < totalCount, "Invalid index for {NodeEdgeGrid::GetValue}");
         return data[u];
     }
-    
+
     /* Get field value for the given index */
     __bidevice__ F GetValue(const U &u){
         unsigned int h = LinearIndex(u, usizes, gridDim);
         AssertA(h < totalCount, "Invalid index for {NodeEdgeGrid::GetValue}");
         return data[h];
     }
-    
+
     /* Set field value at a particular index */
     __bidevice__ void SetValue(const U &u, F value){
         unsigned int h = LinearIndex(u, usizes, gridDim);
         AssertA(h < totalCount, "Invalid index for {NodeEdgeGrid::SetValue}");
         data[h] = value;
     }
-    
+
     /* Set field value at a particular linear index */
     __bidevice__ void SetValue(unsigned int u, F value){
         AssertA(u < totalCount, "Invalid index for {NodeEdgeGrid::SetValue}");
         data[u] = value;
     }
-    
-    /* Distribute the value of a particle to the node given by 'nodeId' */ 
+
+    /* Distribute the value of a particle to the node given by 'nodeId' */
     __bidevice__ void ParticleToNodes(const T &pos, F value, unsigned int nodeId){
         AssertA(nodeId < totalCount, "Invalid index for {NodeEdgeGrid::ParticleToNode}");
         U u = DimensionalIndex(nodeId, usizes, gridDim); // get d-dimensional index
         ParticleToNodes(pos, value, u, nodeId);
     }
-    
-    /* Distribute the value of a particle to the node given by 'u' */ 
+
+    /* Distribute the value of a particle to the node given by 'u' */
     __bidevice__ void ParticleToNodes(const T &pos, F value, const U &u){
         unsigned nodeId = LinearIndex(u, usizes, gridDim);
         ParticleToNodes(pos, value, u, nodeId);
     }
-    
-    /* Distribute the value of a particle to the node given by 'u' and 'nodeId' */ 
+
+    /* Distribute the value of a particle to the node given by 'u' and 'nodeId' */
     __bidevice__ void ParticleToNodes(const T &pos, F value, const U &u, unsigned int nodeId){
         T nP;
         for(int i = 0; i < gridDim; i++) nP[i] = u[i];
@@ -878,14 +878,14 @@ class NodeEdgeGrid{
             T s;
             s.x = d.x / h.x;
             s.y = d.y / h.y;
-            printf("Invalid Volume: %g {%g %g} - {%g %g} d = {%g %g} | {%g %g}\n", vol, nP.x, 
+            printf("Invalid Volume: %g {%g %g} - {%g %g} d = {%g %g} | {%g %g}\n", vol, nP.x,
                    nP.y, pos.x, pos.y, d.x, d.y, s.x, s.y);
         }
         //AssertA(vol > 0 || IsZero(vol), 
         //"Reference particle outside cell domain during {ParticleToNodes}");
         data[nodeId] += vol * value; // value is ditributed according to its volume
     }
-    
+
     /* Distribute the node values to obtain interpolated particle value */
     __bidevice__ F NodesToParticle(const T &pos){
         int nodes[8]; // since we only deal with max 3D 8 is the maximum nodes
@@ -910,17 +910,17 @@ class NodeEdgeGrid{
                 T s;
                 s.x = d.x / h.x;
                 s.y = d.y / h.y;
-                printf("Invalid Volume: %g {%g %g} - {%g %g} d = {%g %g} | {%g %g}\n", vol, nP.x, 
+                printf("Invalid Volume: %g {%g %g} - {%g %g} d = {%g %g} | {%g %g}\n", vol, nP.x,
                        nP.y, pos.x, pos.y, d.x, d.y, s.x, s.y);
             }
             //AssertA(vol > 0 || IsZero(vol), 
             //"Reference particle outside cell domain during {NodesToParticle}");
             value += vol * GetValue(nodes[i]);
         }
-        
+
         return value;
     }
-    
+
     /* Compute Node Volume */
     __bidevice__ Float NodeVolume(unsigned int id){
         AssertA(id < totalCount, "Invalid index for {NodeEdgeGrid::NodeVolume}");
@@ -931,7 +931,7 @@ class NodeEdgeGrid{
             V *= h[i];
             if(u[i] == 0 || u[i] == usizes[i]-1) V *= 0.5;
         }
-        
+
         return V;
     }
 };
@@ -955,14 +955,14 @@ class FieldGrid{
     // the amount of elements in each direction for VertexCentered and CellCentered
     // the amount of cells for FaceCentered
     U resolution;
-    
+
     unsigned int total; // the total amount of elements
     // the actual value stored in each node for VertexCentered and CellCentered
     // 1D array of (u,v,w) data for FaceCentered
     F *field;
     F *fieldUVW[3]; // easier access
     int perComponent[3]; // easier access to per component count
-    
+
     T minPoint; // minimal point (bottom-left)
     T spacing; // spacing between nodes
     Q bounds; // bounds of the grid
@@ -977,7 +977,7 @@ class FieldGrid{
     __bidevice__ void MarkFilled(){ filled = 1; }
     __bidevice__ U GetResolution(){ return resolution; }
     __bidevice__ T GetSpacing(){ return spacing; }
-    
+
     __bidevice__ U GetComponentDimension(int component){
         AssertA(component < dimensions, "Invalid component dimension");
         U size(0);
@@ -987,10 +987,10 @@ class FieldGrid{
                 size[i] = resolution[i];
             }
         }
-        
+
         return size;
     }
-    
+
     __bidevice__ T GetDataPosition(const U &index, int component){
         T res(0);
         AssertA(type == FaceCentered, "Incorrect query");
@@ -998,16 +998,16 @@ class FieldGrid{
             T origin(0);
             T gridSpacing = spacing;
             gridSpacing[component] = 0;
-            
+
             origin = minPoint + 0.5 * gridSpacing;
             for(int i = 0; i < dimensions; i++){
                 res[i] = origin[i] + spacing[i] * index[i];
             }
         }
-        
+
         return res;
     }
-    
+
     __bidevice__ T GetDataPosition(const U &index){
         T res(0);
         T origin(0);
@@ -1019,14 +1019,14 @@ class FieldGrid{
                 printf("Unimplemented FieldGrid type\n");
             }
         }
-        
+
         for(int i = 0; i < dimensions; i++){
             res[i] = origin[i] + spacing[i] * index[i];
         }
-        
+
         return res;
     }
-    
+
     /*
     * Returns the amount of data points required to represent a type of FieldGrid,
     * i.e.: VertexCentered for example requires n+1 points while CellCentered only n.
@@ -1042,12 +1042,12 @@ class FieldGrid{
             }
         }
     }
-    
+
     __bidevice__ void SetValueAt(const F &value, const U &u){
         unsigned int h = LinearIndex(u, resolution, dimensions);
         field[h] = value;
     }
-    
+
     __bidevice__ F GetValueAt(const vec3ui &u){
         vec3ui r(resolution[0], resolution[1], resolution[2]);
         unsigned int h = LinearIndex<vec3ui>(u, r, dimensions);
@@ -1067,13 +1067,13 @@ class FieldGrid{
         unsigned int h = LinearIndex<vec2ui>(u, r, dimensions);
         return field[h];
     }
-    
+
     __bidevice__ F GetValueAt(const vec2ui &u){
         vec2ui r(resolution[0], resolution[1]);
         unsigned int h = LinearIndex<vec2ui>(u, r, dimensions);
         return field[h];
     }
-    
+
     /*
     * Sample the field in the given point p.
     */
@@ -1095,7 +1095,7 @@ class FieldGrid{
             ii[i] = id;
             jj[i] = Min(id+1, resolution[i]-1);
         }
-        
+
         if(dimensions == 3){
             return Trilerp(
                            GetValueAt(ii), // (i,j,k)
@@ -1116,8 +1116,8 @@ class FieldGrid{
                           weight[0], weight[1]);
         }
     }
-    
-    
+
+
     __bidevice__ F DivergenceAtVertex(const U &index){
         F value(0);
         for(int i = 0; i < dimensions; i++){
@@ -1127,16 +1127,16 @@ class FieldGrid{
             U backward = index;
             forward[i] = idp;
             backward[i] = idn;
-            
+
             F fValue = GetValueAt(forward);
             F bValue = GetValueAt(backward);
-            
+
             value += 0.5 * (fValue - bValue) / spacing[i];
         }
-        
+
         return value;
     }
-    
+
     __bidevice__ T Gradient(const T &p){
         T value;
         // the way our setup works is we adjust resolution in Y/Z axis
@@ -1151,10 +1151,10 @@ class FieldGrid{
             Float backward = Sample(p - s);
             value[i] = (forward - backward) * inv;
         }
-        
+
         return value;
     }
-    
+
     __host__ void BuildFaceCentered(const F &initialValue = F(0)){
         T fres;
         perComponent[0] = 0, perComponent[1] = 0;
@@ -1169,24 +1169,24 @@ class FieldGrid{
                     n *= resolution[j];
                 }
             }
-            
+
             perComponent[i] = n;
             total += n;
         }
-        
+
         bounds = Q(minPoint, minPoint + spacing * fres);
         field = cudaAllocateVx(F, total);
-        
+
         fieldUVW[0] = &field[0];
-        fieldUVW[1] = nullptr; 
+        fieldUVW[1] = nullptr;
         fieldUVW[2] = nullptr;
-        
+
         int at = perComponent[0];
         for(int i = 1; i < dimensions; i++){
             fieldUVW[i] = &field[at];
             at += perComponent[i];
         }
-        
+
         int maxLen = Max(Max(perComponent[0], perComponent[2]), perComponent[1]);
         for(int i = 0; i < maxLen; i++){
             if(i < perComponent[0]) fieldUVW[0][i] = initialValue;
@@ -1194,9 +1194,9 @@ class FieldGrid{
             if(i < perComponent[2]) fieldUVW[2][i] = initialValue;
         }
     }
-    
-    __host__ void Build(const U &resol, const T &space, 
-                        const T &origin, VertexType vtype, 
+
+    __host__ void Build(const U &resol, const T &space,
+                        const T &origin, VertexType vtype,
                         const F &initialValue = F(0))
     {
         T fres;
@@ -1210,15 +1210,15 @@ class FieldGrid{
             BuildFaceCentered(initialValue);
         }else{
             total = 1;
-            
+
             for(int i = 0; i < dimensions; i++){
                 resolution[i] = Get1DLengthFor(resol[i]);
                 total *= resolution[i];
                 fres[i] = (Float)resol[i];
             }
-            
+
             bounds = Q(origin, origin + spacing * fres);
-            
+
             field = cudaAllocateVx(F, total);
             for(int i = 0; i < total; i++){
                 field[i] = initialValue;
@@ -1247,7 +1247,7 @@ class ContinuousParticleSetBuilder{
     Grid<T, U, Q> *mappedDomain;
     std::set<unsigned int> mappedCellSet;
     std::map<unsigned int, std::vector<T>> mappedPositions;
-    
+
     __host__
     ContinuousParticleSetBuilder(int maxParticles=kDefaultContinuousMaxParticles,
                                  bool _reemitOnce=false)
@@ -1264,16 +1264,16 @@ class ContinuousParticleSetBuilder{
             Bucket *bucket = particleSet->GetRawData(particleSet->buckets, i);
             bucket->SetPointer(&ref[i * pSize], pSize);
         }
-        
+
         kernelRadius = 2.0 * 0.02; // TODO: default for now
         mappedDomain = nullptr;
         warned = false;
     }
-    
+
     __host__ void SetKernelRadius(Float radius){
         kernelRadius = radius;
     }
-    
+
     __host__ void MapGrid(Grid<T, U, Q> *grid){
         int count = particleSet->GetParticleCount();
         mappedDomain = grid;
@@ -1283,22 +1283,22 @@ class ContinuousParticleSetBuilder{
             auto ret = mappedCellSet.insert(h);
             if(ret.first != mappedCellSet.end()){
                 std::vector<T> pos;
-                
+
                 Cell<Q> *cell = grid->GetCell(h);
                 ParticleChain *pChain = cell->GetChain();
                 int size = cell->GetChainLength();
                 AssureA(size > 0, "Called for MapGrid but grid is inconsistent, missing first distribution?");
-                
+
                 for(int j = 0; j < size; j++){
                     T pj = particleSet->GetParticlePosition(pChain->pId);
                     pos.push_back(pj);
                     pChain = pChain->next;
                 }
-                
+
                 mappedPositions[h] = pos;
             }
         }
-        
+
         std::set<unsigned int>::iterator it;
         for(it = mappedCellSet.begin(); it != mappedCellSet.end(); it++){
             unsigned int h = *it;
@@ -1353,7 +1353,7 @@ class ContinuousParticleSetBuilder{
         if(numNewParticles > 0) other->Commit();
         reemitions += 1;
     }
-    
+
     __host__ void MapGridEmit(const std::function<T(const T &)> velocity, Float d=0.02){
         if(reemitions > 0 && reemitOnce) return;
         std::set<unsigned int>::iterator it;
@@ -1378,7 +1378,7 @@ class ContinuousParticleSetBuilder{
                     }
                     pChain = pChain->next;
                 }
-                
+
                 if(can_add){
                     if(AddParticle(pi, velocity(pi))){
                         numNewParticles++;
@@ -1389,11 +1389,11 @@ class ContinuousParticleSetBuilder{
                 }
             }
         }
-        
+
         if(numNewParticles > 0) Commit();
         reemitions += 1;
     }
-    
+
     __host__ int AddParticle(const T &pos, const T &vel = T(0),
                              const T &force = T(0))
     {
@@ -1408,17 +1408,17 @@ class ContinuousParticleSetBuilder{
             printf("\nReached maximum builder capacity\n");
             warned = true;
         }
-        
+
         return ok;
     }
-    
+
     __host__ void Commit(){
         if(positions.size() > 0){
             int startId = particleSet->GetParticleCount();
             particleSet->AppendData(positions.data(), velocities.data(),
                                     forces.data(), positions.size());
             if(mappedDomain != nullptr){
-                mappedDomain->DistributeByParticleList(particleSet, positions.data(), 
+                mappedDomain->DistributeByParticleList(particleSet, positions.data(),
                                                        positions.size(), startId,
                                                        kernelRadius);
             }
@@ -1427,11 +1427,11 @@ class ContinuousParticleSetBuilder{
             forces.clear();
         }
     }
-    
+
     __host__ ParticleSet<T> *GetParticleSet(){
         return particleSet;
     }
-    
+
     __host__ int GetParticleCount(){
         return particleSet->GetParticleCount();
     }

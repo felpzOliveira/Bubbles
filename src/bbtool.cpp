@@ -11,8 +11,8 @@ ARGUMENT_PROCESS(sdf_cmd){
     return 1;
 }
 
-ARGUMENT_PROCESS(pbrt_cmd){
-    pbrt_command(argc-1, &argv[1]);
+ARGUMENT_PROCESS(pbr_cmd){
+    pbr_command(argc-1, &argv[1]);
     return 1;
 }
 
@@ -32,21 +32,21 @@ ARGUMENT_PROCESS(surface_cmd){
 }
 
 std::map<const char *, arg_desc> command_map = {
-    {"convert", 
-        { .processor = convert_cmd, 
-            .help = "Performs multiple conversions between particles and meshes."} 
+    {"convert",
+        { .processor = convert_cmd,
+            .help = "Performs multiple conversions between particles and meshes."}
     },
-    {"sdf", 
-        { .processor = sdf_cmd, 
-            .help = "Manipulates different SDF."} 
+    {"sdf",
+        { .processor = sdf_cmd,
+            .help = "Manipulates different SDF."}
     },
-    {"pbrt",
-        { .processor = pbrt_cmd, 
+    {"pbr",
+        { .processor = pbr_cmd,
             .help = "Generates a rendarable PBRT/LIT point cloud geometry from Bubbles output."}
     },
     {"view",
-        { .processor = view_cmd, 
-            .help = "Uses Graphy to display a saved Bubbles simulation."} 
+        { .processor = view_cmd,
+            .help = "Uses Graphy to display a saved Bubbles simulation."}
     },
     {"boundary",
         { .processor = boundary_cmd,

@@ -105,6 +105,8 @@ void test_pcisph2_water_block(){
     Float targetDensity = WaterDensity;
     vec2f center(0,0);
     Float lenc = 2;
+
+    CudaMemoryManagerStart(__FUNCTION__);
     
     vec2f pMin, pMax;
     Bounds2f containerBounds;
@@ -123,8 +125,8 @@ void test_pcisph2_water_block(){
     Shape2 *container = MakeRectangle2(Translate2(center.x, center.y), vec2f(lenc), true);
     
     containerBounds = container->GetBounds();
-    pMin = containerBounds.pMin - vec2f(spacing);
-    pMax = containerBounds.pMax + vec2f(spacing);
+    pMin = containerBounds.pMin - 4.0 * vec2f(spacing);
+    pMax = containerBounds.pMax + 4.0 * vec2f(spacing);
 
     VolumeParticleEmitter2 emitter(rect, rect->GetBounds(), spacing);
     
@@ -134,8 +136,7 @@ void test_pcisph2_water_block(){
     int count = set2->GetParticleCount();
 
     Grid2 *grid = MakeGrid(res, pMin, pMax);
-    //Grid2 *grid = SandimComputeCompatibleGrid(set2, spacing);
-    
+
     colliderBuilder.AddCollider2(block);
     colliderBuilder.AddCollider2(container);
     ColliderSet2 *collider = colliderBuilder.GetColliderSet();
@@ -150,7 +151,10 @@ void test_pcisph2_water_block(){
     SphSolverData2 *data = solver.GetSphSolverData();
     set_colors_lnm(col, data, 0, 0);
     //set_colors_pressure(col, data);
-    
+
+    SandimWorkQueue2 *vpWorkQ = cudaAllocateVx(SandimWorkQueue2, 1);
+    vpWorkQ->SetSlots(grid->GetCellCount());
+
     for(int i = 0; i < 20 * 26; i++){
         solver.Advance(targetInterval);
         //set_colors_pressure(col, data);
@@ -159,13 +163,16 @@ void test_pcisph2_water_block(){
             set2->SetParticleV0(i, 0);
         }
 
+        vpWorkQ->Reset();
+
         //IntervalBoundary(set2, grid, spacing);
         //DiltsSpokeBoundary(set2, grid);
-        //CFBoundary(set2, grid, spacing);
+        CFBoundary(set2, grid, spacing);
         //XiaoweiBoundary(set2, grid, spacing);
+        //SandimBoundary(set2, grid, vpWorkQ);
         //LNMBoundary(set2, grid, spacing);
         //LNMBoundarySingle(set2, grid, spacing);
-        RandlesDoringBoundary(set2, grid, spacing);
+        //RandlesDoringBoundary(set2, grid, spacing);
 
         set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
@@ -174,6 +181,8 @@ void test_pcisph2_water_block(){
     
     delete[] pos;
     delete[] col;
+    CudaMemoryManagerClearCurrent();
+
     printf("===== OK\n");
 }
 

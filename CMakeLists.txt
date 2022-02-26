@@ -20,8 +20,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CUDA_OUTPUT ${CMAKE_BINARY_DIR}/checkcuda)
 execute_process(COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -o ${CUDA_OUTPUT})
 execute_process(COMMAND ${CUDA_OUTPUT}
-				RESULT_VARIABLE CUDA_RETURN_CODE
-				OUTPUT_VARIABLE CHK_CUDA_OUTPUT)
+                RESULT_VARIABLE CUDA_RETURN_CODE
+                OUTPUT_VARIABLE CHK_CUDA_OUTPUT)
 
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -31,6 +31,8 @@ else()
 	message(STATUS "Release build")
 	set(BB_FLAGS "-std=c++11 -Xptxas -O3 -DRELEASE --use_fast_math -maxrregcount 64 --extended-lambda")
 endif()
+
+set(cxx_warning_flags "-fdiagnostics-format=json")
 
 if(NOT ${CUDA_RETURN_CODE} EQUAL 0)
 	message(SEND_ERROR ${CHK_CUDA_OUTPUT})

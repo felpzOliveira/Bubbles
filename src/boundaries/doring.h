@@ -73,6 +73,11 @@ inline __bidevice__ Float ComputeMinEigenvalue(const Matrix2x2 &m){
 * the inversion is zero, i.e.: λ² - trace(A)λ = 0, solutions are:
 *     λ1 = 0
 *     λ2 = trace(A)
+* In the original paper there is nothing talking about λ = 0,
+* it makes sense since this implies det(A) = 0 and A not invertible
+* but since the formulation is based on the fact that it is
+* possible to invert the renormalization matrix I'll won't return
+* 0 here.
 */
 inline __bidevice__ Float ComputeMinEigenvalueZero(const Matrix2x2 &m){
     return Trace(m);
@@ -137,6 +142,10 @@ inline __bidevice__ Float ComputeMinEigenvalue(const Matrix3x3 &m){
 * the inversion is zero, i.e.:
 *    λ(-λ² + trace(A)λ - 0.5(trace(A)² - trace(A²)) = 0
 * Solutions are λ = 0 and the second degree poly.
+* Again, I'm not sure what to do with λ = 0 for det(A) = 0,
+* for 3D it is possible that the characteristic has no solutions
+* besides 0, so it will need to return here, but I'm not sure
+* about consequences of doing so.
 */
 inline __bidevice__ Float ComputeMinEigenvalueZero(const Matrix3x3 &m){
     Matrix3x3 m2 = Matrix3x3::Mul(m, m);
@@ -155,6 +164,16 @@ inline __bidevice__ Float ComputeMinEigenvalueZero(const Matrix3x3 &m){
     }
 }
 
+/*
+* Main routine, computes the minimum eigenvalue for each particle
+* based on the renormalization proposed by Marrone. There are some
+* things it does not make explicit, such as:
+*      - What to do with λ = 0,
+*      - What exactly to do if particles don't have enough neighbors within h,
+*      - How to refine μ
+* So this algorithm is kind of a guess based on the paper, since I couldn't
+* find any base implementation and was unable to get any response from the author.
+*/
 template<typename T, typename U, typename Q, typename M> inline __bidevice__
 void RandlesDoringEigenvalue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                              Float h, Float *L, int pId)
@@ -167,6 +186,7 @@ void RandlesDoringEigenvalue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 
     M Ti;
     Ti.Set(0);
+    /* Make this query in N3x3 just so we get a big particle neighborhood */
     domain->ForAllNeighborsOf(cellId, 3, [&](Cell<Q> *cell, U cid, int lid) -> int{
         int n = cell->GetChainLength();
         ParticleChain *pChain = cell->GetChain();
@@ -200,8 +220,6 @@ void RandlesDoringEigenvalue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     }else{
         Float pL = 0;
         Float det = Determinant(Ti);
-        /* when det = 0 the inverse function returns the original matrix */
-        M inv = HighpInverse(Ti);
         if(IsZero(det)){
             /*
             * This is not strictly correct as the renormalization Ti is not
@@ -216,7 +234,7 @@ void RandlesDoringEigenvalue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
             */
             pL = ComputeMinEigenvalueZero(Ti);
         }else{
-            pL = ComputeMinEigenvalue(inv);
+            pL = ComputeMinEigenvalue(HighpInverse(Ti));
         }
 
         L[pId] = pL;
@@ -330,7 +348,7 @@ void RandlesDoringBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
             pSet->SetParticleV0(i, b);
         });
     }
-    printf("[RDM] Range [λmin, λmax] : [%g, %g]\n", Ls.x, Ls.y);
+    //printf("[RDM] Range [λmin, λmax] : [%g, %g]\n", Ls.x, Ls.y);
 
     cudaFree(L);
 }

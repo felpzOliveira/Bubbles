@@ -58,7 +58,7 @@ int SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder, const char *filename
 void SerializerLoadPoints3(std::vector<vec3f> *points, const char *filename, int &flags);
 
 int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &flags,
-                        int start, int end);
+                        int start, int end, int legacy=0);
 
 int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet, 
                              const char *filename, int &flags);

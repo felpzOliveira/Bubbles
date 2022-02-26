@@ -44,26 +44,26 @@ __bidevice__ SphParticleSet2 *SphSolver2::GetSphParticleSet(){
     return solverData->sphpSet;
 }
 
-__host__ void AdvanceTimeStep(SphSolver2 *solver, Float timeStep, 
+__host__ void AdvanceTimeStep(SphSolver2 *solver, Float timeStep,
                               int use_cpu = 0)
 {
     SphSolverData2 *data = solver->solverData;
-    
+
     if(use_cpu)
         UpdateGridDistributionCPU(data);
     else
         UpdateGridDistributionGPU(data);
-    
+
     if(use_cpu)
         ComputeDensityCPU(data);
     else
         ComputeDensityGPU(data);
-    
+
     if(use_cpu)
         ComputePressureForceCPU(data, timeStep);
     else
         ComputePressureForceGPU(data, timeStep);
-    
+
     if(use_cpu)
         ComputePseudoViscosityInterpolationCPU(data, timeStep);
     else
@@ -75,13 +75,13 @@ __host__ void SphSolver2::Advance(Float timeIntervalInSeconds){
     unsigned int numberOfIntervals = 0;
     unsigned int numberOfIntervalsRunned = 0;
     Float remainingTime = timeIntervalInSeconds;
-    
+
     SphSolverData2 *data = solverData;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     Float h = data->sphpSet->GetTargetSpacing();
-    
+
     ProfilerBeginStep();
-    
+
     while(remainingTime > Epsilon){
         SphParticleSet2 *sphpSet = solverData->sphpSet;
         numberOfIntervals = sphpSet->ComputeNumberOfTimeSteps(remainingTime,
@@ -92,20 +92,20 @@ __host__ void SphSolver2::Advance(Float timeIntervalInSeconds){
         numberOfIntervalsRunned += 1;
         ProfilerIncreaseStepIteration();
     }
-    
+
     ProfilerEndStep();
     stepInterval = ProfilerGetStepInterval();
-    
+
     pSet->ClearDataBuffer(&pSet->v0s);
     data->domain->UpdateQueryState();
-    
+
     lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h, 0);
     lnmTimer.Stop();
 }
 
 
-__host__ void SphSolver2::Setup(Float targetDensity, Float targetSpacing, 
+__host__ void SphSolver2::Setup(Float targetDensity, Float targetSpacing,
                                 Float relativeRadius, Grid2 *dom, SphParticleSet2 *pSet)
 {
     solverData->domain = dom;
@@ -115,15 +115,15 @@ __host__ void SphSolver2::Setup(Float targetDensity, Float targetSpacing,
     solverData->sphpSet->SetTargetSpacing(targetSpacing);
     solverData->sphpSet->SetRelativeKernelRadius(relativeRadius);
     ParticleSet2 *pData = solverData->sphpSet->GetParticleSet();
-    
+
     Float rad  = pData->GetRadius();
     Float mass = pData->GetMass();
     int pCount = pData->GetReservedSize();
     SphSolverData2SetupFor(solverData, pCount);
-    
-    printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n", 
+
+    printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n",
            rad, targetSpacing, pCount);
-    
+
     // Perform a particle distribution so that distribution
     // during simulation can be optmized
     solverData->domain->DistributeByParticle(pData);
@@ -167,7 +167,7 @@ __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buff
         buffer[3 * i + 1] = pi[1];
         buffer[3 * i + 2] = 0;
     }
-    
+
     float rgb[3] = {1,0,0};
     // TODO: Domain size
     graphy_render_points(buffer, rgb, pSet->GetParticleCount(),-2,2,2,-2);
@@ -180,14 +180,14 @@ __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buff
 {
     AssertA(pSet, "Invalid SPHParticle pointer for Debug Display");
     Float pSize = 2.5;
-    
+
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         vec2f pi = pSet->GetParticlePosition(i);
         buffer[3 * i + 0] = pi[0];
         buffer[3 * i + 1] = pi[1];
         buffer[3 * i + 2] = 0;
     }
-    
+
     // TODO: Domain size
     graphy_render_points_size(buffer, colors, pSize, pSet->GetParticleCount(),-1,1,1,-1);
 }

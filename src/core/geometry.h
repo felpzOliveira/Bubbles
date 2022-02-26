@@ -12,7 +12,7 @@
 #ifdef DEBUG
 #define DBG_PRINT(...) printf(__VA_ARGS__)
 #else
-#define DBG_PRINT(...) 
+#define DBG_PRINT(...)
 #endif
 
 #define Assure(x) __assert_check_host((x), #x, __FILE__, __LINE__, "Safe exit")
@@ -93,7 +93,7 @@ void __assert_check_host(bool v, const char *name, const char *filename,
     }
 }
 
-inline __bidevice__ 
+inline __bidevice__
 void __assert_check(bool v, const char *name, const char *filename,
                     int line, const char *msg)
 {
@@ -223,7 +223,7 @@ inline __bidevice__ double NextFloatDown(double v, int delta = 1) {
     return BitsToFloat(ui);
 }
 
-template <typename T, typename U, typename V> 
+template <typename T, typename U, typename V>
 inline __bidevice__ T Clamp(T val, U low, V high){
     if(val < low) return low;
     if(val > high) return high;
@@ -231,8 +231,8 @@ inline __bidevice__ T Clamp(T val, U low, V high){
 }
 
 template<typename T>
-inline __bidevice__ Float gamma(T n){ 
-    return ((Float)n * MachineEpsilon) / (1 - (Float)n * MachineEpsilon); 
+inline __bidevice__ Float gamma(T n){
+    return ((Float)n * MachineEpsilon) / (1 - (Float)n * MachineEpsilon);
 }
 
 __bidevice__ inline void swap(Float *a, Float *b){
@@ -250,87 +250,87 @@ class Ray;
 template<typename T> class vec1{
     public:
     T x;
-    
+
     __bidevice__ vec1(){ x = (T)0; }
     __bidevice__ vec1(T a){ x = a; }
     __bidevice__ vec1(T a, T b): x(a){
         Assert(!HasNaN());
     }
-    
+
     __bidevice__ bool IsZeroVector() const{
         return IsZero(x);
     }
-    
+
     __bidevice__ bool HasNaN() const{
         return IsNaN(x);
     }
-    
+
     __bidevice__ T operator[](int i) const{
         Assert(i == 0);
         return x;
     }
-    
+
     __bidevice__ T &operator[](int i){
         Assert(i == 0);
         return x;
     }
-    
+
     __bidevice__ vec1<T> operator/(T f) const{
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         return vec1<T>(x * inv);
     }
-    
+
     __bidevice__ vec1<T> &operator/(T f){
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         x *= inv;
         return *this;
     }
-    
+
     __bidevice__ vec1<T> operator-(){
         return vec1<T>(-x);
     }
-    
+
     __bidevice__ vec1<T> operator-() const{
         return vec1<T>(-x);
     }
-    
+
     __bidevice__ vec1<T> operator-(const vec1<T> &v) const{
         return vec1(x - v.x);
     }
-    
+
     __bidevice__ vec1<T> operator-(const vec1<T> &v){
         return vec1(x - v.x);
     }
-    
+
     __bidevice__ vec1<T> operator+(const vec1<T> &v) const{
         return vec1<T>(x + v.x);
     }
-    
+
     __bidevice__ vec1<T> operator+=(const vec1<T> &v){
         x += v.x;
         return *this;
     }
-    
+
     __bidevice__ vec1<T> operator*(T s) const{
         return vec1<T>(x * s);
     }
-    
+
     __bidevice__ vec1<T> &operator*=(T s){
         x *= s;
         return *this;
     }
-    
+
     __bidevice__ vec1<T> operator*(const vec1<T> &v) const{
         return vec1<T>(x * v.x);
     }
-    
+
     __bidevice__ vec1<T> &operator*=(const vec1<T> &v){
         x *= v.x;
         return *this;
     }
-    
+
     __bidevice__ Float LengthSquared() const{ return x * x; }
     __bidevice__ Float Length() const{ return sqrt(LengthSquared()); }
     __bidevice__ void PrintSelf() const{
@@ -342,7 +342,7 @@ template<typename T> class vec1{
 template<typename T> class vec2{
     public:
     T x, y;
-    
+
     __bidevice__ vec2(){ x = y = (T)0; }
     __bidevice__ vec2(T a){ x = y = a; }
     __bidevice__ vec2(T a, T b): x(a), y(b){
@@ -353,96 +353,96 @@ template<typename T> class vec2{
     __bidevice__ vec2(vec2<V> v) : x(v.x), y(v.y){
         Assert(!HasNaN());
     }
-    
+
     __bidevice__ bool IsZeroVector() const{
         return IsZero(x) && IsZero(y);
     }
-    
+
     __bidevice__ bool HasNaN() const{
         return IsNaN(x) || IsNaN(y);
     }
-    
+
     __bidevice__ int Dimensions() const{ return 2; }
-    
+
     __bidevice__ T operator[](int i) const{
         Assert(i >= 0 && i < 2);
         if(i == 0) return x;
         return y;
     }
-    
+
     __bidevice__ T &operator[](int i){
         Assert(i >= 0 && i < 2);
         if(i == 0) return x;
         return y;
     }
-    
+
     __bidevice__ vec2<T> operator/(T f) const{
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         return vec2<T>(x * inv, y * inv);
     }
-    
+
     __bidevice__ vec2<T> &operator/(T f){
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         x *= inv; y *= inv;
         return *this;
     }
-    
+
     __bidevice__ vec2<T> operator-(){
         return vec2<T>(-x, -y);
     }
-    
+
     __bidevice__ vec2<T> operator-() const{
         return vec2<T>(-x, -y);
     }
-    
+
     __bidevice__ vec2<T> operator-(const vec2<T> &v) const{
         return vec2(x - v.x, y - v.y);
     }
-    
+
     __bidevice__ vec2<T> operator-(const vec2<T> &v){
         return vec2(x - v.x, y - v.y);
     }
-    
+
     __bidevice__ vec2<T> operator+(const vec2<T> &v) const{
         return vec2<T>(x + v.x, y + v.y);
     }
-    
+
     __bidevice__ vec2<T> &operator-=(const vec2<T> &v){
         x -= v.x; y -= v.y;
         return *this;
     }
-    
+
     __bidevice__ vec2<T> operator+=(const vec2<T> &v){
         x += v.x; y += v.y;
         return *this;
     }
-    
+
     __bidevice__ vec2<T> operator*(T s) const{
         return vec2<T>(x * s, y * s);
     }
-    
+
     __bidevice__ vec2<T> &operator*=(T s){
         x *= s; y *= s;
         return *this;
     }
-    
+
     __bidevice__ vec2<T> operator*(const vec2<T> &v) const{
         return vec2<T>(x * v.x, y * v.y);
     }
-    
+
     __bidevice__ vec2<T> &operator*=(const vec2<T> &v){
         x *= v.x; y *= v.y;
         return *this;
     }
-    
+
     __bidevice__ vec2<T> Rotate(Float radians) const{
         Float si = std::sin(radians);
         Float co = std::cos(radians);
         return vec2<T>(x * co - y * si, x * si + y * co);
     }
-    
+
     __bidevice__ Float LengthSquared() const{ return x * x + y * y; }
     __bidevice__ Float Length() const{ return sqrt(LengthSquared()); }
     __bidevice__ void PrintSelf() const{
@@ -463,39 +463,39 @@ template<typename T> class vec3{
     template<typename V> __bidevice__ vec3(vec3<V> v): x(v.x), y(v.y), z(v.z){
         Assert(!HasNaN());
     }
-    
+
     template<typename V> __bidevice__ vec3(Normal3<V> v): x(v.x), y(v.y), z(v.z){
         Assert(!HasNaN());
     }
-    
+
     __bidevice__ bool IsZeroVector() const{
         return IsZero(x) && IsZero(y) && IsZero(z);
     }
-    
+
     __bidevice__ bool HasNaN(){
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
-    
+
     __bidevice__ bool HasNaN() const{
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
-    
+
     __bidevice__ int Dimensions() const{ return 3; }
-    
+
     __bidevice__ T operator[](int i) const{
         Assert(i >= 0 && i < 3);
         if(i == 0) return x;
         if(i == 1) return y;
         return z;
     }
-    
+
     __bidevice__ T &operator[](int i){
         Assert(i >= 0 && i < 3);
         if(i == 0) return x;
         if(i == 1) return y;
         return z;
     }
-    
+
     __bidevice__ vec3<T> operator/(T f) const{
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
@@ -504,18 +504,18 @@ template<typename T> class vec3{
         Float inv = (Float)1 / f;
         return vec3<T>(x * inv, y * inv, z * inv);
     }
-    
+
     __bidevice__ vec3<T> &operator/(T f){
         Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
-        
+
         Float inv = (Float)1 / f;
         x *= inv; y *= inv; z *= inv;
         return *this;
     }
-    
+
     __bidevice__ vec3<T> operator/(const vec3<T> &v) const{
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
@@ -523,7 +523,7 @@ template<typename T> class vec3{
         Float invz = (Float)1 / v.z;
         return vec3<T>(x * invx, y * invy, z * invz);
     }
-    
+
     __bidevice__ vec3<T> &operator/(const vec3<T> &v){
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
@@ -532,51 +532,51 @@ template<typename T> class vec3{
         x = x * invx; y = y * invy; z = z * invz;
         return *this;
     }
-    
+
     __bidevice__ vec3<T> operator-(){
         return vec3<T>(-x, -y, -z);
     }
-    
+
     __bidevice__ vec3<T> operator-() const{
         return vec3<T>(-x, -y, -z);
     }
-    
+
     __bidevice__ vec3<T> operator-(const vec3<T> &v) const{
         return vec3(x - v.x, y - v.y, z - v.z);
     }
-    
+
     __bidevice__ vec3<T> &operator-=(const vec3<T> &v){
         x -= v.x; y -= v.y; z -= v.z;
         return *this;
     }
-    
+
     __bidevice__ vec3<T> operator+(const vec3<T> &v) const{
         return vec3<T>(x + v.x, y + v.y, z + v.z);
     }
-    
+
     __bidevice__ vec3<T> operator+=(const vec3<T> &v){
         x += v.x; y += v.y; z += v.z;
         return *this;
     }
-    
+
     __bidevice__ vec3<T> operator*(const vec3<T> &v) const{
         return vec3<T>(x * v.x, y * v.y, z * v.z);
     }
-    
+
     __bidevice__ vec3<T> &operator*=(const vec3<T> &v){
         x *= v.x; y *= v.y; z *= v.z;
         return *this;
     }
-    
+
     __bidevice__ vec3<T> operator*(T s) const{
         return vec3<T>(x * s, y * s, z * s);
     }
-    
+
     __bidevice__ vec3<T> &operator*=(T s){
         x *= s; y *= s; z *= s;
         return *this;
     }
-    
+
     __bidevice__ Float LengthSquared() const{ return x * x + y * y + z * z; }
     __bidevice__ Float Length() const{ return sqrt(LengthSquared()); }
     __bidevice__ void PrintSelf() const{
@@ -593,19 +593,19 @@ template<typename T> class vec4{
     __bidevice__ vec4(T a, T b, T c, T d): x(a), y(b), z(c), w(d){
         Assert(!HasNaN());
     }
-    
+
     __bidevice__ bool HasNaN(){
         return IsNaN(x) || IsNaN(y) || IsNaN(z) || IsNaN(w);
     }
-    
+
     __bidevice__ bool HasNaN() const{
         return IsNaN(x) || IsNaN(y) || IsNaN(z) || IsNaN(w);
     }
-    
+
     __bidevice__ bool IsZeroVector() const{
         return IsZero(x) && IsZero(y) && IsZero(z) && IsZero(w);
     }
-    
+
     __bidevice__ T operator[](int i) const{
         Assert(i >= 0 && i < 4);
         if(i == 0) return x;
@@ -613,7 +613,7 @@ template<typename T> class vec4{
         if(i == 2) return z;
         return w;
     }
-    
+
     __bidevice__ T &operator[](int i){
         Assert(i >= 0 && i < 4);
         if(i == 0) return x;
@@ -621,7 +621,7 @@ template<typename T> class vec4{
         if(i == 2) return z;
         return w;
     }
-    
+
     __bidevice__ vec4<T> operator/(T f) const{
         Assert(!IsZero(f));
         if(IsZero(f)){
@@ -630,18 +630,18 @@ template<typename T> class vec4{
         Float inv = (Float)1 / f;
         return vec4<T>(x * inv, y * inv, z * inv, w * inv);
     }
-    
+
     __bidevice__ vec4<T> &operator/(T f){
         Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
-        
+
         Float inv = (Float)1 / f;
         x *= inv; y *= inv; z *= inv; w *= inv;
         return *this;
     }
-    
+
     __bidevice__ vec4<T> operator/(const vec4<T> &v) const{
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
@@ -650,7 +650,7 @@ template<typename T> class vec4{
         Float invw = (Float)1 / v.w;
         return vec4<T>(x * invx, y * invy, z * invz, w * invw);
     }
-    
+
     __bidevice__ vec4<T> &operator/(const vec4<T> &v){
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
@@ -660,51 +660,51 @@ template<typename T> class vec4{
         x = x * invx; y = y * invy; z = z * invz; w *= invw;
         return *this;
     }
-    
+
     __bidevice__ vec4<T> operator-(){
         return vec4<T>(-x, -y, -z, -w);
     }
-    
+
     __bidevice__ vec4<T> operator-() const{
         return vec4<T>(-x, -y, -z, -w);
     }
-    
+
     __bidevice__ vec4<T> operator-(const vec4<T> &v) const{
         return vec4(x - v.x, y - v.y, z - v.z, w - v.w);
     }
-    
+
     __bidevice__ vec4<T> &operator-=(const vec4<T> &v){
         x -= v.x; y -= v.y; z -= v.z; w -= v.w;
         return *this;
     }
-    
+
     __bidevice__ vec4<T> operator+(const vec4<T> &v) const{
         return vec4<T>(x + v.x, y + v.y, z + v.z, w + v.w);
     }
-    
+
     __bidevice__ vec4<T> operator+=(const vec4<T> &v){
         x += v.x; y += v.y; z += v.z; w += v.w;
         return *this;
     }
-    
+
     __bidevice__ vec4<T> operator*(const vec4<T> &v) const{
         return vec4<T>(x * v.x, y * v.y, z * v.z, w * v.w);
     }
-    
+
     __bidevice__ vec4<T> &operator*=(const vec4<T> &v){
         x *= v.x; y *= v.y; z *= v.z; w *= v.w;
         return *this;
     }
-    
+
     __bidevice__ vec4<T> operator*(T s) const{
         return vec4<T>(x * s, y * s, z * s, w * s);
     }
-    
+
     __bidevice__ vec4<T> &operator*=(T s){
         x *= s; y *= s; z *= s; w *= s;
         return *this;
     }
-    
+
     __bidevice__ Float LengthSquared() const{ return x * x + y * y + z * z + w * w; }
     __bidevice__ Float Length() const{ return sqrt(LengthSquared()); }
     __bidevice__ void PrintSelf() const{
@@ -713,12 +713,12 @@ template<typename T> class vec4{
 };
 
 template<typename T>
-inline __bidevice__ bool HasZero(const vec2<T> &v){ 
+inline __bidevice__ bool HasZero(const vec2<T> &v){
     return (IsZero(v.x) || (IsZero(v.y)));
 }
 
 template<typename T>
-inline __bidevice__ bool HasZero(const vec3<T> &v){ 
+inline __bidevice__ bool HasZero(const vec3<T> &v){
     return (IsZero(v.x) || (IsZero(v.y)) || (IsZero(v.z)));
 }
 
@@ -737,17 +737,17 @@ inline __bidevice__ Float SquaredDistance(const vec4<T> &p1, const vec4<T> &p2){
     return (p1 - p2).LengthSquared();
 }
 
-template<typename T> 
+template<typename T>
 inline __bidevice__ Float Distance(const vec2<T> &p1, const vec2<T> &p2){
     return (p1 - p2).Length();
 }
 
-template<typename T> 
+template<typename T>
 inline __bidevice__ Float Distance(const vec3<T> &p1, const vec3<T> &p2){
     return (p1 - p2).Length();
 }
 
-template<typename T> 
+template<typename T>
 inline __bidevice__ Float Distance(const vec4<T> &p1, const vec4<T> &p2){
     return (p1 - p2).Length();
 }
@@ -790,17 +790,17 @@ template<typename T> inline __bidevice__ vec2<T> Abs(const vec2<T> &v){
     return vec2<T>(Absf(v.x), Absf(v.y));
 }
 
-template <typename T, typename U> inline __bidevice__ 
+template <typename T, typename U> inline __bidevice__
 vec2<T> operator*(U s, const vec2<T> &v){
     return v * s;
 }
 
-template <typename T, typename U> inline __bidevice__ 
+template <typename T, typename U> inline __bidevice__
 vec3<T> operator*(U s, const vec3<T> &v){
     return v * s;
 }
 
-template <typename T, typename U> inline __bidevice__ 
+template <typename T, typename U> inline __bidevice__
 vec4<T> operator*(U s, const vec4<T> &v){
     return v * s;
 }
@@ -941,13 +941,13 @@ template<typename T> inline __bidevice__ vec3<T> Permute(const vec3<T> &v, int x
     return vec3<T>(v[x], v[y], v[z]);
 }
 
-template<typename T> inline __bidevice__ 
+template<typename T> inline __bidevice__
 vec3<T> Flip(const vec3<T> &p){ return vec3<T>(p.z, p.y, p.x); }
 
-template<typename T> inline __bidevice__ 
+template<typename T> inline __bidevice__
 vec2<T> Flip(const vec2<T> &p){ return vec2<T>(p.y, p.x); }
 
-template<typename T> inline __bidevice__ void 
+template<typename T> inline __bidevice__ void
 CoordinateSystem(const vec3<T> &v1, vec3<T> *v2, vec3<T> *v3){
     if(Absf(v1.x) > Absf(v1.y)){
         Float f = sqrt(v1.x * v1.x + v1.z * v1.z);
@@ -958,7 +958,7 @@ CoordinateSystem(const vec3<T> &v1, vec3<T> *v2, vec3<T> *v3){
         AssertAEx(!IsZero(f), "Zero y component coordinate system generation");
         *v2 = vec3<T>(0, v1.z, -v1.y) / f;
     }
-    
+
     *v3 = Cross(v1, *v2);
 }
 
@@ -967,7 +967,7 @@ vec3<T> Sqrt(const vec3<T> &v){
     return vec3<T>(std::sqrt(v.x), std::sqrt(v.y), std::sqrt(v.z));
 }
 
-template<typename T> inline __bidevice__ 
+template<typename T> inline __bidevice__
 vec3<T> Pow(const vec3<T> &v, Float val){
     return vec3<T>(std::pow(v.x, val), std::pow(v.y, val), std::pow(v.z, val));
 }
@@ -1043,26 +1043,26 @@ template<typename T> class Normal3{
     {
         Assert(!HasNaN());
     }
-    
+
     template<typename U> __bidevice__ Normal3(const vec3<U> &v):x(v.x), y(v.y), z(v.z){
         Assert(!HasNaN());
     }
-    
+
     __bidevice__ bool HasNaN(){
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
-    
+
     __bidevice__ bool HasNaN() const{
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
-    
+
     __bidevice__ Normal3<T> operator-() const { return Normal3(-x, -y, -z); }
-    
+
     __bidevice__ Normal3<T> operator+(const Normal3<T> &n) const {
         Assert(!n.HasNaN());
         return Normal3<T>(x + n.x, y + n.y, z + n.z);
     }
-    
+
     __bidevice__ Normal3<T> &operator+=(const Normal3<T> &n) {
         Assert(!n.HasNaN());
         x += n.x; y += n.y; z += n.z;
@@ -1072,17 +1072,17 @@ template<typename T> class Normal3{
         Assert(!n.HasNaN());
         return Normal3<T>(x - n.x, y - n.y, z - n.z);
     }
-    
+
     __bidevice__ Normal3<T> &operator-=(const Normal3<T> &n) {
         Assert(!n.HasNaN());
         x -= n.x; y -= n.y; z -= n.z;
         return *this;
     }
-    
+
     template <typename U> __bidevice__ Normal3<T> operator*(U f) const {
         return Normal3<T>(f * x, f * y, f * z);
     }
-    
+
     template <typename U> __bidevice__ Normal3<T> &operator*=(U f) {
         x *= f; y *= f; z *= f;
         return *this;
@@ -1092,43 +1092,43 @@ template<typename T> class Normal3{
         Float inv = (Float)1 / f;
         return Normal3<T>(x * inv, y * inv, z * inv);
     }
-    
+
     template <typename U> __bidevice__ Normal3<T> &operator/=(U f) {
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         x *= inv; y *= inv; z *= inv;
         return *this;
     }
-    
+
     __bidevice__ explicit Normal3<T>(const vec3<T> &v) : x(v.x), y(v.y), z(v.z) {}
-    
+
     __bidevice__ bool operator==(const Normal3<T> &n) const {
         return x == n.x && y == n.y && z == n.z;
     }
-    
+
     __bidevice__ bool operator!=(const Normal3<T> &n) const {
         return x != n.x || y != n.y || z != n.z;
     }
-    
+
     __bidevice__ T operator[](int i) const {
         Assert(i >= 0 && i < 3);
         if (i == 0) return x;
         if (i == 1) return y;
         return z;
     }
-    
+
     __bidevice__ T &operator[](int i) {
         Assert(i >= 0 && i < 3);
         if (i == 0) return x;
         if (i == 1) return y;
         return z;
     }
-    
+
     __bidevice__ Float LengthSquared() const { return x * x + y * y + z * z; }
     __bidevice__ Float Length() const { return sqrt(LengthSquared()); }
 };
 
-template <typename T, typename U> inline __bidevice__ 
+template <typename T, typename U> inline __bidevice__
 Normal3<T> operator*(U s, const Normal3<T> &n){
     return n * s;
 }
@@ -1192,58 +1192,58 @@ class Bounds1{
         pMin = T(-FLT_MAX);
         pMax = T(FLT_MAX);
     }
-    
+
     __bidevice__ explicit Bounds1(const T &p): pMin(p), pMax(p) {}
     __bidevice__ Bounds1(const T &p1, const T &p2)
         : pMin(Min(p1, p2)), pMax(Max(p1, p2)) {}
-    
+
     __bidevice__ const T &operator[](int i) const{
         Assert(i == 0 || i == 1);
         return (i == 0) ? pMin : pMax;
-        
+
     }
     __bidevice__ T &operator[](int i){
         Assert(i == 0 || i == 1);
         return (i == 0) ? pMin : pMax;
     }
-    
+
     __bidevice__ T LengthAt(int i, int axis) const{
         Assert(axis == 0);
         return (i == 0) ? pMin : pMax;
     }
-    
+
     __bidevice__ bool operator==(const Bounds1<T> &b) const{
         return b.pMin == pMin && b.pMax == pMax;
     }
-    
+
     __bidevice__ T Center() const{
         return (pMin + pMax) * 0.5;
     }
-    
+
     __bidevice__ T ExtentOn(int i) const{
         Assert(i == 0);
         return Absf(pMax - pMin);
     }
-    
+
     __bidevice__ int MaximumExtent() const{
         return 0;
     }
-    
+
     __bidevice__ int MinimumExtent() const{
         return 0;
     }
-    
+
     __bidevice__ T Offset(const T &p) const{
         T o = p - pMin;
         if (pMax > pMin) o /= pMax - pMin;
         return o;
     }
-    
+
     __bidevice__ T MinDistance(const T &p) const{
         Float x0 = Absf(pMin - p), x1 = Absf(pMax - p);
         return Min(x0, x1);
     }
-    
+
     __bidevice__ void PrintSelf() const{
         printf("pMin = {x : %g} pMax = {x : %g}", pMin, pMax);
     }
@@ -1253,28 +1253,28 @@ template <typename T>
 class Bounds2 {
     public:
     vec2<T> pMin, pMax;
-    
+
     __bidevice__ Bounds2(){
         T minNum = FLT_MIN;
         T maxNum = FLT_MAX;
         pMin = vec2<T>(maxNum, maxNum);
         pMax = vec2<T>(minNum, minNum);
     }
-    
+
     __bidevice__ explicit Bounds2(const vec2<T> &p) : pMin(p), pMax(p) {}
     __bidevice__ Bounds2(const vec2<T> &p1, const vec2<T> &p2)
         : pMin(Min(p1.x, p2.x), Min(p1.y, p2.y)), pMax(Max(p1.x, p2.x), Max(p1.y, p2.y)) {}
-    
+
     __bidevice__ const vec2<T> &operator[](int i) const;
     __bidevice__ vec2<T> &operator[](int i);
     __bidevice__ bool operator==(const Bounds2<T> &b) const{
         return b.pMin == pMin && b.pMax == pMax;
     }
-    
+
     __bidevice__ bool operator!=(const Bounds2<T> &b) const{
         return b.pMin != pMin || b.pMax != pMax;
     }
-    
+
     __bidevice__ vec2<T> Corner(int corner) const{
         Assert(corner >= 0 && corner < 4);
         return vec2<T>((*this)[(corner & 1)].x,
@@ -1286,43 +1286,43 @@ class Bounds2 {
         return vec2<T>((*this)[(corner & 1)].x,
                        (*this)[(corner & 2) ? 1 : 0].y);
     }
-    
+
     __bidevice__ void Expand(Float d){
         pMin -= vec2<T>(Absf(d));
         pMax += vec2<T>(Absf(d));
     }
-    
+
     __bidevice__ void Reduce(Float d){
         pMin += vec2<T>(Absf(d));
         pMax -= vec2<T>(Absf(d));
     }
-    
+
     __bidevice__ T LengthAt(int i, int axis) const{
         Assert(axis == 0 || axis == 1);
         return (i == 0) ? pMin[axis] : pMax[axis];
     }
-    
+
     __bidevice__ vec2<T> Diagonal() const { return pMax - pMin; }
     __bidevice__ T SurfaceArea() const{
         vec2<T> d = Diagonal();
         return (d.x * d.y);
     }
-    
+
     __bidevice__ T Volume() const{
         printf("Warning: Called for volume on 2D surface\n");
         return 0;
     }
-    
+
     __bidevice__ vec2<T> Center() const{
         return (pMin + pMax) * 0.5;
     }
-    
+
     __bidevice__ T ExtentOn(int i) const{
         Assert(i >= 0 && i < 2);
         if(i == 0) return Absf(pMax.x - pMin.x);
         return Absf(pMax.y - pMin.y);
     }
-    
+
     __bidevice__ int MaximumExtent() const{
         vec2<T> d = Diagonal();
         if (d.x > d.y)
@@ -1330,7 +1330,7 @@ class Bounds2 {
         else
             return 1;
     }
-    
+
     __bidevice__ int MinimumExtent() const{
         vec2<T> d = Diagonal();
         if (d.x > d.y)
@@ -1338,36 +1338,36 @@ class Bounds2 {
         else
             return 0;
     }
-    
+
     __bidevice__ vec2<T> Offset(const vec2<T> &p) const{
         vec2<T> o = p - pMin;
         if (pMax.x > pMin.x) o.x /= pMax.x - pMin.x;
         if (pMax.y > pMin.y) o.y /= pMax.y - pMin.y;
         return o;
     }
-    
+
     __bidevice__ void BoundingSphere(vec2<T> *center, Float *radius) const{
         *center = (pMin + pMax) / 2;
         *radius = Inside(*center, *this) ? Distance(*center, pMax) : 0;
     }
-    
+
     __bidevice__ vec2<T> MinDistance(const vec2<T> &p) const{
         Float x0 = Absf(pMin.x - p.x), x1 = Absf(pMax.x - p.x);
         Float y0 = Absf(pMin.y - p.y), y1 = Absf(pMax.y - p.y);
         return vec2<T>(Min(x0, x1), Min(y0, y1));
     }
-    
+
     __bidevice__ bool Intersect(const Ray2 &ray, Float *tHit0=nullptr,
                                 Float *tHit1=nullptr) const;
-    
+
     template <typename U> __bidevice__ explicit operator Bounds2<U>() const{
         return Bounds2<U>((vec2<U>)pMin, (vec2<U>)pMax);
     }
-    
+
     __bidevice__ vec2<T> Clamped(const vec2<T> &point, T of=0) const{
         return Clamp(point, pMin+vec2<T>(of), pMax-vec2<T>(of));
     }
-    
+
     __bidevice__ void PrintSelf() const{
         printf("pMin = {x : %g, y : %g} pMax = {x : %g, y : %g}",
                pMin.x, pMin.y, pMax.x, pMax.y);
@@ -1378,39 +1378,39 @@ template <typename T>
 class Bounds3 {
     public:
     vec3<T> pMin, pMax;
-    
+
     __bidevice__ Bounds3(){
         T minNum = FLT_MIN;
         T maxNum = FLT_MAX;
         pMin = vec3<T>(maxNum, maxNum, maxNum);
         pMax = vec3<T>(minNum, minNum, minNum);
     }
-    
+
     __bidevice__ explicit Bounds3(const vec3<T> &p) : pMin(p), pMax(p) {}
     __bidevice__ Bounds3(const vec3<T> &p1, const vec3<T> &p2)
         : pMin(Min(p1.x, p2.x), Min(p1.y, p2.y), Min(p1.z, p2.z)),
     pMax(Max(p1.x, p2.x), Max(p1.y, p2.y), Max(p1.z, p2.z)) {}
-    
+
     __bidevice__ const vec3<T> &operator[](int i) const;
     __bidevice__ vec3<T> &operator[](int i);
     __bidevice__ bool operator==(const Bounds3<T> &b) const{
         return b.pMin == pMin && b.pMax == pMax;
     }
-    
+
     __bidevice__ bool operator!=(const Bounds3<T> &b) const{
         return b.pMin != pMin || b.pMax != pMax;
     }
-    
+
     __bidevice__ void Expand(Float d){
         pMin -= vec3<T>(Absf(d));
         pMax += vec3<T>(Absf(d));
     }
-    
+
     __bidevice__ void Reduce(Float d){
         pMin += vec3<T>(Absf(d));
         pMax -= vec3<T>(Absf(d));
     }
-    
+
     __bidevice__ vec3<T> Corner(int corner) const{
         Assert(corner >= 0 && corner < 8);
         return vec3<T>((*this)[(corner & 1)].x,
@@ -1424,34 +1424,34 @@ class Bounds3 {
                        (*this)[(corner & 2) ? 1 : 0].y,
                        (*this)[(corner & 4) ? 1 : 0].z);
     }
-    
+
     __bidevice__ T LengthAt(int i, int axis) const{
         Assert(axis == 0 || axis == 1 || axis == 2);
         return (i == 0) ? pMin[axis] : pMax[axis];
     }
-    
+
     __bidevice__ vec3<T> Diagonal() const { return pMax - pMin; }
     __bidevice__ T SurfaceArea() const{
         vec3<T> d = Diagonal();
         return 2 * (d.x * d.y + d.x * d.z + d.y * d.z);
     }
-    
+
     __bidevice__ vec3<T> Center() const{
         return (pMin + pMax) * 0.5;
     }
-    
+
     __bidevice__ T Volume() const{
         vec3<T> d = Diagonal();
         return d.x * d.y * d.z;
     }
-    
+
     __bidevice__ T ExtentOn(int i) const{
         Assert(i >= 0 && i < 3);
         if(i == 0) return Absf(pMax.x - pMin.x);
         if(i == 1) return Absf(pMax.y - pMin.y);
         return Absf(pMax.z - pMin.z);
     }
-    
+
     __bidevice__ int MaximumExtent() const{
         vec3<T> d = Diagonal();
         if (d.x > d.y && d.x > d.z)
@@ -1461,7 +1461,7 @@ class Bounds3 {
         else
             return 2;
     }
-    
+
     __bidevice__ int MinimumExtent() const{
         vec3<T> d = Diagonal();
         if (d.x > d.z && d.y > d.z)
@@ -1471,7 +1471,7 @@ class Bounds3 {
         else
             return 0;
     }
-    
+
     __bidevice__ vec3<T> Offset(const vec3<T> &p) const{
         vec3<T> o = p - pMin;
         if (pMax.x > pMin.x) o.x /= pMax.x - pMin.x;
@@ -1479,30 +1479,30 @@ class Bounds3 {
         if (pMax.z > pMin.z) o.z /= pMax.z - pMin.z;
         return o;
     }
-    
+
     __bidevice__ vec3<T> Clamped(const vec3<T> &point, T of=0) const{
         return Clamp(point, pMin+vec3<T>(of), pMax-vec3<T>(of));
     }
-    
+
     __bidevice__ void BoundingSphere(vec3<T> *center, Float *radius) const{
         *center = (pMin + pMax) / 2;
         *radius = Inside(*center, *this) ? Distance(*center, pMax) : 0;
     }
-    
+
     __bidevice__ vec3<T> MinDistance(const vec3<T> &p) const{
         Float x0 = Absf(pMin.x - p.x), x1 = Absf(pMax.x - p.x);
         Float y0 = Absf(pMin.y - p.y), y1 = Absf(pMax.y - p.y);
         Float z0 = Absf(pMin.z - p.z), z1 = Absf(pMax.z - p.z);
         return vec3<T>(Min(x0, x1), Min(y0, y1), Min(z0, z1));
     }
-    
-    __bidevice__ bool Intersect(const Ray &ray, Float *tHit0=nullptr, 
+
+    __bidevice__ bool Intersect(const Ray &ray, Float *tHit0=nullptr,
                                 Float *tHit1=nullptr) const;
-    
+
     template <typename U> __bidevice__ explicit operator Bounds3<U>() const{
         return Bounds3<U>((vec3<U>)pMin, (vec3<U>)pMax);
     }
-    
+
     __bidevice__ void PrintSelf() const{
         printf("pMin = {x : %g, y : %g, z : %g} pMax = {x : %g, y : %g, z : %g}",
                pMin.x, pMin.y, pMin.z, pMax.x, pMax.y, pMax.z);
@@ -1528,7 +1528,7 @@ int SplitBounds(const Bounds2<T> &bounds, Bounds2<T> *split){
     return 4;
 }
 
-template <typename T> inline __bidevice__ 
+template <typename T> inline __bidevice__
 vec2<T> &Bounds2<T>::operator[](int i){
     Assert(i == 0 || i == 1);
     return (i == 0) ? pMin : pMax;
@@ -1550,7 +1550,7 @@ Bounds2<T> Union(const Bounds2<T> &b1, const Bounds2<T> &b2){
     return ret;
 }
 
-template <typename T> inline __bidevice__ 
+template <typename T> inline __bidevice__
 Bounds2<T> Intersect(const Bounds2<T> &b1, const Bounds2<T> &b2){
     Bounds2<T> ret;
     ret.pMin = Max(b1.pMin, b2.pMin);
@@ -1558,7 +1558,7 @@ Bounds2<T> Intersect(const Bounds2<T> &b1, const Bounds2<T> &b2){
     return ret;
 }
 
-template <typename T> inline __bidevice__ 
+template <typename T> inline __bidevice__
 bool Overlaps(const Bounds2<T> &b1, const Bounds2<T> &b2){
     bool x = (b1.pMax.x >= b2.pMin.x) && (b1.pMin.x <= b2.pMax.x);
     bool y = (b1.pMax.y >= b2.pMin.y) && (b1.pMin.y <= b2.pMax.y);
@@ -1574,30 +1574,30 @@ bool Inside(const Bounds2<T> &b1, const Bounds2<T> &b2){
 
 template <typename T> inline __bidevice__
 bool Inside(const vec2<T> &p, const Bounds2<T> &b){
-    bool rv = (p.x >= b.pMin.x && p.x <= b.pMax.x && 
+    bool rv = (p.x >= b.pMin.x && p.x <= b.pMax.x &&
                p.y >= b.pMin.y && p.y <= b.pMax.y);
     if(!rv){
         vec2<T> oE = b.MinDistance(p);
         rv = IsUnsafeZero(oE.x) || IsUnsafeZero(oE.y);
     }
-    
+
     return rv;
 }
 
 template <typename T> inline __bidevice__
 bool InsideExclusive(const vec2<T> &p, const Bounds2<T> &b){
-    return (p.x >= b.pMin.x && p.x < b.pMax.x && 
+    return (p.x >= b.pMin.x && p.x < b.pMax.x &&
             p.y >= b.pMin.y && p.y < b.pMax.y);
 }
 
-template <typename T, typename U> inline __bidevice__ 
+template <typename T, typename U> inline __bidevice__
 Bounds2<T> Expand(const Bounds2<T> &b, U delta){
     return Bounds2<T>(b.pMin - vec2<T>(delta, delta),
                       b.pMax + vec2<T>(delta, delta));
 }
 
 
-template <typename T> inline __bidevice__ 
+template <typename T> inline __bidevice__
 vec3<T> &Bounds3<T>::operator[](int i){
     Assert(i == 0 || i == 1);
     return (i == 0) ? pMin : pMax;
@@ -1627,7 +1627,7 @@ Bounds3<T> Union(const Bounds3<T> &b1, const Bounds3<T> &b2){
     return ret;
 }
 
-template <typename T> inline __bidevice__ 
+template <typename T> inline __bidevice__
 Bounds3<T> Intersect(const Bounds3<T> &b1, const Bounds3<T> &b2){
     Bounds3<T> ret;
     ret.pMin = Max(b1.pMin, b2.pMin);
@@ -1635,7 +1635,7 @@ Bounds3<T> Intersect(const Bounds3<T> &b1, const Bounds3<T> &b2){
     return ret;
 }
 
-template <typename T> inline __bidevice__ 
+template <typename T> inline __bidevice__
 bool Overlaps(const Bounds3<T> &b1, const Bounds3<T> &b2){
     bool x = (b1.pMax.x >= b2.pMin.x) && (b1.pMin.x <= b2.pMax.x);
     bool y = (b1.pMax.y >= b2.pMin.y) && (b1.pMin.y <= b2.pMax.y);
@@ -1658,7 +1658,7 @@ bool Inside(const T &p, const Bounds1<T> &b){
         T oE = b.MinDistance(p);
         rv = IsUnsafeZero(oE);
     }
-    
+
     return rv;
 }
 
@@ -1670,7 +1670,7 @@ bool Inside(const vec3<T> &p, const Bounds3<T> &b){
         vec3<T> oE = b.MinDistance(p);
         rv = IsUnsafeZero(oE.x) || IsUnsafeZero(oE.y) || IsUnsafeZero(oE.z);
     }
-    
+
     return rv;
 }
 
@@ -1680,7 +1680,7 @@ bool InsideExclusive(const vec3<T> &p, const Bounds3<T> &b){
             p.y < b.pMax.y && p.z >= b.pMin.z && p.z < b.pMax.z);
 }
 
-template <typename T, typename U> inline __bidevice__ 
+template <typename T, typename U> inline __bidevice__
 Bounds3<T> Expand(const Bounds3<T> &b, U delta){
     return Bounds3<T>(b.pMin - vec3<T>(delta, delta, delta),
                       b.pMax + vec3<T>(delta, delta, delta));
@@ -1714,7 +1714,7 @@ class Ray2{
     __bidevice__ Ray2(const vec2f &origin, const vec2f &direction, Float maxt=Infinity){
         o = origin; d = direction; tMax = maxt;
     }
-    
+
     __bidevice__ vec2f operator()(Float t){ return o + t * d; }
     __bidevice__ vec2f operator()(Float t) const{ return o + t * d; }
 };
@@ -1726,12 +1726,12 @@ class Ray{
     __bidevice__ Ray(const vec3f &origin, const vec3f &direction, Float maxt=Infinity){
         o = origin; d = direction; tMax = maxt;
     }
-    
+
     __bidevice__ vec3f operator()(Float t){ return o + t * d; }
     __bidevice__ vec3f operator()(Float t) const{ return o + t * d; }
 };
 
-inline __bidevice__ 
+inline __bidevice__
 vec3f OffsetRayOrigin(const vec3f &p, const vec3f &pError,
                       const Normal3f &n, const vec3f &w)
 {
@@ -1745,11 +1745,11 @@ vec3f OffsetRayOrigin(const vec3f &p, const vec3f &pError,
         else if(offset[i] < 0)
             po[i] = NextFloatDown(po[i]);
     }
-    
+
     return po;
 }
 
-template<typename T> inline  __bidevice__ 
+template<typename T> inline  __bidevice__
 bool Bounds2<T>::Intersect(const Ray2 &ray, Float *tHit0, Float *tHit1) const{
     Float t0 = 0, t1 = ray.tMax;
     for(int i = 0; i < 2; i++){
@@ -1757,19 +1757,19 @@ bool Bounds2<T>::Intersect(const Ray2 &ray, Float *tHit0, Float *tHit1) const{
         Float tNear = (pMin[i] - ray.o[i]) * invRayDir;
         Float tFar  = (pMax[i] - ray.o[i]) * invRayDir;
         if(tNear > tFar) swap(tNear, tFar);
-        
+
         tFar *= 1 + 2 * gamma(3);
         t0 = tNear > t0 ? tNear : t0;
         t1 = tFar < t1 ? tFar : t1;
         if(t0 > t1) return false;
     }
-    
+
     if(tHit0) *tHit0 = t0;
     if(tHit1) *tHit1 = t1;
     return true;
 }
 
-template<typename T> inline  __bidevice__ 
+template<typename T> inline  __bidevice__
 bool Bounds3<T>::Intersect(const Ray &ray, Float *tHit0, Float *tHit1) const{
     Float t0 = 0, t1 = ray.tMax;
     for(int i = 0; i < 3; i++){
@@ -1777,13 +1777,13 @@ bool Bounds3<T>::Intersect(const Ray &ray, Float *tHit0, Float *tHit1) const{
         Float tNear = (pMin[i] - ray.o[i]) * invRayDir;
         Float tFar  = (pMax[i] - ray.o[i]) * invRayDir;
         if(tNear > tFar) swap(tNear, tFar);
-        
+
         tFar *= 1 + 2 * gamma(3);
         t0 = tNear > t0 ? tNear : t0;
         t1 = tFar < t1 ? tFar : t1;
         if(t0 > t1) return false;
     }
-    
+
     if(tHit0) *tHit0 = t0;
     if(tHit1) *tHit1 = t1;
     return true;

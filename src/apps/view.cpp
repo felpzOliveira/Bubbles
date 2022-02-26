@@ -11,6 +11,8 @@ typedef struct{
     int end;
     int loop;
     int stepping;
+    int inflags;
+    int legacy;
     Float radius;
     int origin_configured;
     int target_configured;
@@ -25,6 +27,8 @@ void default_view_opts(view_opts *opts){
     opts->end = 1;
     opts->loop = 1;
     opts->stepping = 1;
+    opts->legacy = 0;
+    opts->inflags = SERIALIZER_POSITION;
     opts->origin_configured = 0;
     opts->target_configured = 0;
     opts->radius = 0.012;
@@ -37,9 +41,8 @@ void print_view_configs(view_opts *opts){
     std::cout << "    * Basename : " << opts->basename << std::endl;
     std::cout << "    * Radius : " << opts->radius << std::endl;
     std::cout << "    * Loop : " << opts->loop << std::endl;
-    std::cout << "    * Start : " << opts->start << std::endl;
+    std::cout << "    * Range : [ " << opts->start << " " << opts->end << " ]"  << std::endl;
     std::cout << "    * Step : " << opts->stepping << std::endl;
-    std::cout << "    * End : " << opts->end << std::endl;
     std::cout << "    * Origin : " << opts->origin.x << " " <<
         opts->origin.y << " " << opts->origin.z << std::endl;
     std::cout << "    * Target : " << opts->target.x << " " <<
@@ -52,6 +55,20 @@ void print_view_configs(view_opts *opts){
 ARGUMENT_PROCESS(view_basename_arg){
     view_opts *opts = (view_opts *)config;
     opts->basename = ParseNext(argc, argv, i, "-basename");
+    return 0;
+}
+
+ARGUMENT_PROCESS(view_legacy_arg){
+    view_opts *opts = (view_opts *)config;
+    opts->legacy = 1;
+    return 0;
+}
+
+ARGUMENT_PROCESS(view_inflags_arg){
+    view_opts *opts = (view_opts *)config;
+    std::string flags = ParseNext(argc, argv, i, "-inflags", 1);
+    opts->inflags = SerializerFlagsFromString(flags.c_str());
+    if(opts->inflags < 0) return -1;
     return 0;
 }
 
@@ -247,6 +264,18 @@ std::map<const char *, arg_desc> view_arg_map = {
             .processor = view_sdf_rotate_z_arg,
             .help = "Rotates the SDF around the Z-axis. (requires: -with-sdf)"
         }
+    },
+    {"-inform",
+        {
+            .processor = view_inflags_arg,
+            .help = "Sets the input format."
+        }
+    },
+    {"-legacy",
+        {
+            .processor = view_legacy_arg,
+            .help = "Sets the loader to use legacy file format."
+        }
     }
 };
 
@@ -255,9 +284,11 @@ void ViewDisplaySimulation(view_opts *opts){
     Shape *sdfShape = nullptr;
     std::vector<vec3f> sdfParticles;
     int runningCount = 0;
-    int flags = SERIALIZER_POSITION;
+    int flags = opts->inflags;
+
     int partCount = SerializerLoadMany3(&frames, opts->basename.c_str(),
-                                        flags, opts->start, opts->end);
+                                        flags, opts->start, opts->end,
+                                        opts->legacy);
     vec3f origin = opts->origin;
     vec3f target = opts->target;
     

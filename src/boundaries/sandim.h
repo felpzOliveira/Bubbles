@@ -27,7 +27,6 @@
 * use a simple Jarvis March on CUDA.
 */
 
-#define SANDIM_MAX_FLIP_SLOTS 512 // this is a guess
 #define SANDIM_GAMMA 1.3 // this is also a guess
 /*
 * This is the distance considered for detecting out-of-domain particles
@@ -351,7 +350,8 @@ void SandimComputeConvexHull2(IndexedParticle<vec2f> *points, int *vp_count,
  */
 inline __host__
 void SandimConvexHull3(IndexedParticle<vec3f> *points, int *vp_count,
-                       SandimWorkQueue3 *vpWorkQ, ParticleSet3 *pSet, int maxp)
+                       SandimWorkQueue3 *vpWorkQ, ParticleSet3 *pSet,
+                       int maxp)
 {
     ConvexHullPrepare();
 
@@ -368,7 +368,7 @@ void SandimConvexHull3(IndexedParticle<vec3f> *points, int *vp_count,
             return;
         }
 
-        ConvexHull3D(ips, SANDIM_MAX_FLIP_SLOTS, len, [&](int id){
+        ConvexHull3D(ips, maxp, len, [&](int id){
             int pId = ips[id].pId;
             if(pId >= 0){
                 pSet->SetParticleV0(pId, 1);
@@ -388,8 +388,8 @@ void SandimComputeHPRImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *part
     int len = maxN * N;
     double totalLen = len * sizeof(IndexedParticle<T>) + N * sizeof(int);
     double mb = totalLen / 1e+6;
-    printf("[SANDIM] GPU Extra memory required: %g (%g Mb) ( VP = %d x N = %d )\n",
-           totalLen, mb, N, maxN);
+    //printf("[SANDIM] GPU Extra memory required: %g (%g Mb) ( VP = %d x N = %d )\n",
+           //totalLen, mb, N, maxN);
     IndexedParticle<T> *points = cudaAllocateUnregisterVx(IndexedParticle<T>, len);
     int *vp_count = cudaAllocateUnregisterVx(int, N);
 
@@ -415,11 +415,11 @@ void SandimRemapUnboundedParticlesKernel(ParticleSet<T> *pSet, int *partQ){
 
 inline __host__
 void SandimComputeHPR(ParticleSet3 *pSet, Grid3 *domain, int *partQ,
-                      SandimWorkQueue3 *vpWorkQ)
+                      SandimWorkQueue3 *vpWorkQ, int maxFlipSlots)
 {
     IndexedParticle<vec3f> *points;
     int *vp_count;
-    const int maxN = SANDIM_MAX_FLIP_SLOTS;
+    const int maxN = maxFlipSlots;
     SandimComputeHPRImpl<vec3f, vec3ui, Bounds3f, SandimWorkQueue3>(pSet, domain,
                 partQ, vpWorkQ, &points, &vp_count, maxN);
 
@@ -434,11 +434,11 @@ void SandimComputeHPR(ParticleSet3 *pSet, Grid3 *domain, int *partQ,
 
 inline __host__
 void SandimComputeHPR(ParticleSet2 *pSet, Grid2 *domain, int *partQ,
-                      SandimWorkQueue2 *vpWorkQ)
+                      SandimWorkQueue2 *vpWorkQ, int maxFlipSlots)
 {
     IndexedParticle<vec2f> *points;
     int *vp_count;
-    const int maxN = SANDIM_MAX_FLIP_SLOTS;
+    const int maxN = maxFlipSlots;
     SandimComputeHPRImpl<vec2f, vec2ui, Bounds2f, SandimWorkQueue2>(pSet, domain,
                 partQ, vpWorkQ, &points, &vp_count, maxN);
 
@@ -453,7 +453,9 @@ void SandimComputeHPR(ParticleSet2 *pSet, Grid2 *domain, int *partQ,
 }
 
 template<typename T, typename U, typename Q, typename SandimWorkQ> inline __host__
-void SandimBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, SandimWorkQ *vpWorkQ){
+void SandimBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                    SandimWorkQ *vpWorkQ, int maxFlipSlots=512)
+{
     if(vpWorkQ->capacity < domain->GetCellCount()){
         printf("Warning: WorkQueue does not garantee viewpoint capacity, dangerous run\n");
     }
@@ -462,7 +464,7 @@ void SandimBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, SandimWorkQ *vp
     int *partWorkQ = cudaAllocateUnregisterVx(int, nparts);
     SandimComputeWorkQueue(pSet, domain, partWorkQ);
     SandimComputeViewPoints(pSet, domain, vpWorkQ);
-    SandimComputeHPR(pSet, domain, partWorkQ, vpWorkQ);
+    SandimComputeHPR(pSet, domain, partWorkQ, vpWorkQ, maxFlipSlots);
     cudaFree(partWorkQ);
 }
 

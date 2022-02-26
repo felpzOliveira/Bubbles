@@ -20,6 +20,11 @@ typedef enum{
     RENDERER_PBRT, RENDERER_LIT,
 }Renderer;
 
+struct MeshMapDesc{
+    std::string data;
+    std::string basename;
+};
+
 typedef struct{
     Float cutSource;
     Float cutDistance;
@@ -36,22 +41,20 @@ typedef struct{
     int flags;
     int hasClipArgs;
     vec3f mat_value;
-    std::map<std::string, std::string> meshMap;
-    int warn_ply_mesh;
+    std::map<std::string, MeshMapDesc> meshMap;
+    int warn_mesh;
     std::string meshFolder;
     Renderer renderer;
     int is_legacy;
     std::string domain;
-}pbrt_opts;
+}pbr_opts;
 
 typedef struct{
     std::string name;
     std::string mat;
     int built;
     std::string warn_msg;
-}pbrt_mat;
-
-typedef pbrt_mat lit_mat;
+}pbr_mat;
 
 const unsigned int Colors[] = {
     //0xffcccccc,
@@ -65,15 +68,15 @@ const unsigned int Colors[] = {
     0xff4a94f4,
 };
 
-pbrt_mat Materials[] = {
+pbr_mat Materials[] = {
     {.name = "glass-BK7", .mat = "\"dielectric\" \"spectrum eta\" \"glass-BK7\"", .built=1},
     {.name = "glass-thin", .mat = "\"dielectric\" \"float eta\" [ 1.1 ]", .built=1},
     {.name = "diffuse", .mat = "\"diffuse\" \"rgb reflectance\"", .built=0},
     {.name = "coated", .mat = "\"coateddiffuse\" \"float roughness\" [0] \"rgb reflectance\"", .built=0}
 };
 
-lit_mat MaterialsLit[] = {
-    {.name = "glass", .mat = "reflectance [1.0] name[glass] eta[1.3] type [dielectric]", .built=1},
+pbr_mat MaterialsLit[] = {
+    {.name = "glass", .mat = "reflectance [1.0] name[glass] dispersion[bk7] type [dielectric]", .built=1},
     {.name = "glass-thin", .mat = "reflectance [1.0] name[glass-thin] eta[1.05] type [dielectric]", .built=1},
     {.name = "diffuse", .mat = "type [diffuse] reflectance ", .built=0},
     {.name = "coated", .mat = "type [disney] rough[0.001 0.001] specular[0.5]"
@@ -95,16 +98,33 @@ std::string RGBStringFromHex(int hex){
     return ss.str();
 }
 
-std::string find_material(std::string name, int *ok){
+pbr_mat *get_material_ref(int id, pbr_opts *opts){
+    pbr_mat *mats = Materials;
     int count = sizeof(Materials) / sizeof(Materials[0]);
+    if(opts->renderer == RENDERER_LIT){
+        mats = MaterialsLit;
+        count = sizeof(MaterialsLit) / sizeof(MaterialsLit[0]);
+    }
+
+    if(id < count) return &mats[id];
+    return nullptr;
+}
+
+std::string find_material(std::string name, pbr_opts *opts, int *ok){
+    pbr_mat *mats = Materials;
+    int count = sizeof(Materials) / sizeof(Materials[0]);
+    if(opts->renderer == RENDERER_LIT){
+        mats = MaterialsLit;
+        count = sizeof(MaterialsLit) / sizeof(MaterialsLit[0]);
+    }
     *ok = -1;
     for(int i = 0; i < count; i++){
-        if(name == Materials[i].name){
+        if(name == mats[i].name){
             *ok = i;
-            if(Materials[i].warn_msg.size() > 0){
-                std::cout << Materials[i].warn_msg << std::endl;
+            if(mats[i].warn_msg.size() > 0){
+                std::cout << mats[i].warn_msg << std::endl;
             }
-            return Materials[i].mat;
+            return mats[i].mat;
         }
     }
 
@@ -129,9 +149,9 @@ std::string mesh_base_name(std::string name){
     return name.substr(0, at);
 }
 
-std::string mesh_name_to_pbrt(std::string name, pbrt_opts *opts){
+std::string mesh_name_to_pbr(std::string name, pbr_opts *opts){
     std::string ext;
-    std::string pbrt_name;
+    std::string pbr_name;
     int at = -1;
     size_t size = name.size();
     if(size < 2) return name;
@@ -148,29 +168,29 @@ std::string mesh_name_to_pbrt(std::string name, pbrt_opts *opts){
     }
 
     ext = name.substr(at);
-    pbrt_name = name;
+    pbr_name = name;
     if(opts->renderer == RENDERER_PBRT){
         if(ext != ".ply"){
-            opts->warn_ply_mesh = 1;
-            pbrt_name = name.substr(0, at);
-            pbrt_name += ".ply";
+            opts->warn_mesh = 1;
+            pbr_name = name.substr(0, at);
+            pbr_name += ".ply";
         }
     }else{
         if(ext != ".obj"){
-            opts->warn_ply_mesh = 1;
-            pbrt_name = name.substr(0, at);
-            pbrt_name += ".obj";
+            opts->warn_mesh = 1;
+            pbr_name = name.substr(0, at);
+            pbr_name += ".obj";
         }
     }
 
-    return pbrt_name;
+    return pbr_name;
 }
 
-ARGUMENT_PROCESS(pbrt_material_arg){
+ARGUMENT_PROCESS(pbr_material_arg){
     int ok = -1;
-    pbrt_opts *opts = (pbrt_opts *)config;
+    pbr_opts *opts = (pbr_opts *)config;
     opts->pickedMat = ParseNext(argc, argv, i, "-mat", 1);
-    std::string m = find_material(opts->pickedMat, &ok);
+    std::string m = find_material(opts->pickedMat, opts, &ok);
     if(ok < 0){
         printf("Failed to find material \'%s\'\n", opts->pickedMat.c_str());
         return -1;
@@ -179,19 +199,19 @@ ARGUMENT_PROCESS(pbrt_material_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_material_value){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_material_value){
+    pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-mat-value", 3);
     const char *token = value.c_str();
     ParseV3(&opts->mat_value, &token);
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_list_mats){
+ARGUMENT_PROCESS(pbr_list_mats){
     int count = sizeof(Materials) / sizeof(Materials[0]);
     printf("Available default materials:\n");
     for(int i = 0; i < count; i++){
-        pbrt_mat mat = Materials[i];
+        pbr_mat mat = Materials[i];
         printf("  * %s :  %s\n", mat.name.c_str(), mat.mat.c_str());
     }
 
@@ -199,46 +219,46 @@ ARGUMENT_PROCESS(pbrt_list_mats){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_input_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_input_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     opts->input = ParseNext(argc, argv, i, "-in");
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_output_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_output_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     opts->output = ParseNext(argc, argv, i, "-out");
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_radius_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_radius_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     Float radius = ParseNextFloat(argc, argv, i, "-radius");
     opts->radius = radius;
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_serializer_inform_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_serializer_inform_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     std::string format = ParseNext(argc, argv, i, "-inform", 1);
     opts->flags = SerializerFlagsFromString(format.c_str());
     return opts->flags < 0 ? -1 : 0;
 }
 
-ARGUMENT_PROCESS(pbrt_layered_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_layered_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     opts->mode = RenderMode::LAYERED;
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_filtered_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_filtered_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     opts->mode = RenderMode::FILTERED;
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_level_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_level_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-level");
     const char *token = value.c_str();
     opts->level = (int)ParseFloat(&token);
@@ -246,8 +266,8 @@ ARGUMENT_PROCESS(pbrt_level_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_rotate_y_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_rotate_y_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-rotateY");
     const char *token = value.c_str();
     Float rotate = ParseFloat(&token);
@@ -255,8 +275,8 @@ ARGUMENT_PROCESS(pbrt_rotate_y_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_rotate_z_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_rotate_z_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-rotateZ");
     const char *token = value.c_str();
     Float rotate = ParseFloat(&token);
@@ -264,8 +284,8 @@ ARGUMENT_PROCESS(pbrt_rotate_z_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_renderer){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_renderer){
+    pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-renderer");
     if(value == "pbrt"){
         opts->renderer = RENDERER_PBRT;
@@ -278,14 +298,14 @@ ARGUMENT_PROCESS(pbrt_renderer){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_legacy){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_legacy){
+    pbr_opts *opts = (pbr_opts *)config;
     opts->is_legacy = 1;
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_rotate_x_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_rotate_x_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-rotateX");
     const char *token = value.c_str();
     Float rotate = ParseFloat(&token);
@@ -293,8 +313,8 @@ ARGUMENT_PROCESS(pbrt_rotate_x_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_translate_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_translate_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     vec3f delta;
     std::string value = ParseNext(argc, argv, i, "-translate", 3);
     const char *token = value.c_str();
@@ -303,9 +323,9 @@ ARGUMENT_PROCESS(pbrt_translate_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_clip_arg){
+ARGUMENT_PROCESS(pbr_clip_arg){
     vec3f data;
-    pbrt_opts *opts = (pbrt_opts *)config;
+    pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-clip-plane", 3);
     const char *token = value.c_str();
     ParseV3(&data, &token);
@@ -316,8 +336,8 @@ ARGUMENT_PROCESS(pbrt_clip_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_clip_point_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_clip_point_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-clip-point", 7);
     const char *token = value.c_str();
     ParseV3(&opts->cutPointSource, &token);
@@ -327,107 +347,107 @@ ARGUMENT_PROCESS(pbrt_clip_point_arg){
     return 0;
 }
 
-ARGUMENT_PROCESS(pbrt_with_domain_arg){
-    pbrt_opts *opts = (pbrt_opts *)config;
+ARGUMENT_PROCESS(pbr_with_domain_arg){
+    pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "with-domain", 1);
     if(value.size() < 1) return -1;
     opts->domain = value;
     return 0;
 }
 
-std::map<const char *, arg_desc> pbrt_argument_map = {
+std::map<const char *, arg_desc> pbr_argument_map = {
     {"-in",
-        { .processor = pbrt_input_arg, 
-            .help = "Where to read input file." 
+        { .processor = pbr_input_arg,
+            .help = "Where to read input file."
         }
     },
     {"-legacy",
-        { .processor = pbrt_legacy,
+        { .processor = pbr_legacy,
             .help = "Inform the loader to use legacy format instead."
         }
     },
     {"-renderer",
-        { .processor = pbrt_renderer,
-            .help = "Inform target renderer for output generation (default: pbrt)"
+        { .processor = pbr_renderer,
+            .help = "Inform target renderer for output generation (default: lit)"
         }
     },
-    {"-out", 
-        { .processor = pbrt_output_arg, 
-            .help = "Where to write output." 
+    {"-out",
+        { .processor = pbr_output_arg,
+            .help = "Where to write output."
         }
     },
-    {"-radius", 
-        { .processor = pbrt_radius_arg, 
-            .help = "Radius to use for particle cloud. (default: 0.012)" 
+    {"-radius",
+        { .processor = pbr_radius_arg,
+            .help = "Radius to use for particle cloud. (default: 0.012)"
         }
     },
-    {"-inform", 
-        { .processor = pbrt_serializer_inform_arg, 
-            .help = "Input data format. (<p><n><m><b><d><o>)" 
+    {"-inform",
+        { .processor = pbr_serializer_inform_arg,
+            .help = "Input data format. (<p><n><m><b><d><o>)"
         }
     },
-    {"-layered", 
-        { .processor = pbrt_layered_arg, 
-            .help = "Generates geometry containing only LNM-based layered boundary particles." 
+    {"-layered",
+        { .processor = pbr_layered_arg,
+            .help = "Generates geometry containing only LNM-based layered boundary particles."
         }
     },
-    {"-filtered", 
-        { .processor = pbrt_filtered_arg, 
-            .help = "Generates geometry containing LNM-based layer and interior particles as gray." 
+    {"-filtered",
+        { .processor = pbr_filtered_arg,
+            .help = "Generates geometry containing LNM-based layer and interior particles as gray."
         }
     },
-    {"-level", 
-        { .processor = pbrt_level_arg, 
-            .help = "Generates geometry containing only a specific level of LNM classification." 
+    {"-level",
+        { .processor = pbr_level_arg,
+            .help = "Generates geometry containing only a specific level of LNM classification."
         }
     },
     {"-mat",
-        { .processor = pbrt_material_arg,
+        { .processor = pbr_material_arg,
             .help = "Sets a default material to be used instead of prompting for objects."
         }
     },
     {"-list-mats",
-        { .processor = pbrt_list_mats,
+        { .processor = pbr_list_mats,
             .help = "List available default materials and stop execution."
         }
     },
     {"-mat-value",
-        { .processor = pbrt_material_value,
+        { .processor = pbr_material_value,
             .help = "Sets a 3 dimensional vector as argument for the chosen material."
         }
     },
     {"-rotateY",
-        { .processor = pbrt_rotate_y_arg,
+        { .processor = pbr_rotate_y_arg,
             .help = "Rotate input in the Y direction. (degrees)"
         }
     },
     {"-rotateZ",
-        { .processor = pbrt_rotate_z_arg,
+        { .processor = pbr_rotate_z_arg,
             .help = "Rotate input in the Z direction. (degrees)"
         }
     },
     {"-rotateX",
-        { .processor = pbrt_rotate_x_arg,
+        { .processor = pbr_rotate_x_arg,
             .help = "Rotate input in the X direction. (degrees)"
         }
     },
     {"-translate",
-        { .processor = pbrt_translate_arg, 
+        { .processor = pbr_translate_arg,
             .help = "Translate input set."
         }
     },
     {"-clip-plane",
-        { .processor = pbrt_clip_arg,
+        { .processor = pbr_clip_arg,
             .help = "Specify parameters to perform plane clip, <source> <distance> <axis>."
         }
     },
     {"-clip-point",
-        { .processor = pbrt_clip_point_arg,
+        { .processor = pbr_clip_point_arg,
             .help = "Specify parameters to perform point clip, <source> <at> <distance>."
         }
     },
     {"-with-domain",
-        { .processor = pbrt_with_domain_arg,
+        { .processor = pbr_with_domain_arg,
             .help = "Writes a grid in the renderer format."
         }
     }
@@ -483,7 +503,7 @@ static std::string GetMaterialStringLayered(int layer){
     return GetStringColor(layer);
 }
 
-std::string GetMaterialString(int layer, pbrt_opts *opts){
+std::string GetMaterialString(int layer, pbr_opts *opts){
     std::string data("Material \"coateddiffuse\"\n\t\"rgb reflectance\" [ ");
     if(opts->renderer == RENDERER_LIT){
         data = "Material{ type [diffuse] name[layer_";
@@ -508,7 +528,7 @@ std::string GetMaterialString(int layer, pbrt_opts *opts){
     return data;
 }
 
-void default_pbrt_opts(pbrt_opts *opts){
+void default_pbr_opts(pbr_opts *opts){
     opts->output = "";
     opts->flags = SERIALIZER_POSITION;
     opts->radius = 0.012;
@@ -519,12 +539,12 @@ void default_pbrt_opts(pbrt_opts *opts){
     opts->cutAxis = -1;
     opts->cutDistance = FLT_MAX;
     opts->hasClipArgs = 0;
-    opts->warn_ply_mesh = 0;
-    opts->renderer = RENDERER_PBRT;
+    opts->warn_mesh = 0;
+    opts->renderer = RENDERER_LIT;
     opts->is_legacy = 0;
 }
 
-void print_configs(pbrt_opts *opts){
+void print_configs(pbr_opts *opts){
     std::cout << "Configs: " << std::endl;
     std::cout << "    * Target file : " << opts->input << std::endl;
     std::cout << "    * Render radius : " << opts->radius << std::endl;
@@ -536,7 +556,7 @@ void print_configs(pbrt_opts *opts){
     if(opts->mode == RenderMode::LEVEL){
         std::cout << "    * Level : " << opts->level << std::endl;
     }
-    
+
     if(opts->hasClipArgs == 1){
         std::cout << "    * Clip source : " << opts->cutSource << std::endl;
         std::cout << "    * Clip distance : " << opts->cutDistance << std::endl;
@@ -563,38 +583,38 @@ void print_configs(pbrt_opts *opts){
     }
 }
 
-int SplitByLayer(std::vector<SerializedParticle> **renderflags, 
+int SplitByLayer(std::vector<SerializedParticle> **renderflags,
                  std::vector<SerializedParticle> *pSet, int pCount,
-                 pbrt_opts *opts)
+                 pbr_opts *opts)
 {
     int mCount = 0;
     int max_layer = sizeof(Colors) / sizeof(Colors[0]);
     std::vector<SerializedParticle> *groups;
-    
+
     for(int i = 0; i < pCount; i++){
         SerializedParticle p = pSet->at(i);
         if((p.boundary + 1) > mCount) mCount = p.boundary + 1;
     }
-    
+
     if(mCount > max_layer){
         printf("Warning: Found too many layers (%d > %d), result will be flattened\n",
                 mCount, max_layer);
     }else{
         printf("Found %d layers\n", mCount);
     }
-    
+
     groups = new std::vector<SerializedParticle>[mCount];
     for(int i = 0; i < pCount; i++){
         SerializedParticle p = pSet->at(i);
         p.position = opts->transform.Point(p.position);
         groups[p.boundary].push_back(p);
     }
-    
+
     *renderflags = groups;
     return mCount;
 }
 
-int AcceptLayer(int layer, pbrt_opts *opts){
+int AcceptLayer(int layer, pbr_opts *opts){
     if(opts->mode == RenderMode::ALL || opts->mode == RenderMode::FILTERED) return 1;
     if(opts->mode == RenderMode::LAYERED) return (layer > 0 && layer < 3 ? 1 : 0);
     if(opts->mode == RenderMode::LEVEL) return (layer == opts->level ? 1 : 0);
@@ -602,8 +622,8 @@ int AcceptLayer(int layer, pbrt_opts *opts){
     exit(0);
 }
 
-void pbrt_insert_box(SerializedShape *shape, std::string &data, int depth,
-                     pbrt_opts *opts, Float of=0)
+void pbr_insert_box(SerializedShape *shape, std::string &data, int depth,
+                     pbr_opts *opts, Float of=0)
 {
     char t[30];
     vec3f points[8];
@@ -689,7 +709,7 @@ void pbrt_insert_box(SerializedShape *shape, std::string &data, int depth,
     }
 }
 
-std::string pbrt_build_material(pbrt_mat *mat, pbrt_opts *opts, int refname=-1){
+std::string pbr_build_material(pbr_mat *mat, pbr_opts *opts, int refname=-1){
     std::stringstream ss;
     vec3f v = opts->mat_value;
     if(!mat){
@@ -700,17 +720,17 @@ std::string pbrt_build_material(pbrt_mat *mat, pbrt_opts *opts, int refname=-1){
         ss << mat->mat << " [ ";
         ss << v.x << " " << v.y << " " << v.z << " ]";
     }else if(opts->renderer == RENDERER_LIT){
-        ss << "{";
+        //ss << "{";
         if(refname >= 0){
-            ss << "name[mat_ " << refname << "] ";
+            ss << "name[mat_" << refname << "] ";
         }
         ss << mat->mat << " [ ";
-        ss << v.x << " " << v.y << " " << v.z << " ] }";
+        ss << v.x << " " << v.y << " " << v.z << " ]";// }";
     }
     return ss.str();
 }
 
-void pbrt_insert_single_box(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
+void pbr_insert_single_box(SerializedShape *shape, pbr_mat *mat, pbr_opts *opts,
                             std::string strmat, std::string &data, int depth)
 {
     data += "AttributeBegin\n\t";
@@ -720,44 +740,99 @@ void pbrt_insert_single_box(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *op
         if(mat->built){
             data += "Material " + mat->mat + "\n";
         }else{
-            data += "Material " + pbrt_build_material(mat, opts) + " \n";
+            data += "Material " + pbr_build_material(mat, opts) + " \n";
         }
     }
 
-    pbrt_insert_box(shape, data, depth, opts);
+    pbr_insert_box(shape, data, depth, opts);
     data += "AttributeEnd\n";
 }
 
-void pbrt_insert_mesh(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
-                      std::string strmat, int depth, std::string refPath)
+static int meshId = 0;
+void pbr_insert_mesh_lit(SerializedShape *shape, pbr_mat *mat, pbr_opts *opts,
+                         std::string strmat, int depth, std::string bname,
+                         std::string path)
 {
-    static int meshId = 0;
-    std::string meshName = shape->strParameters["Name"];
-    std::string path = refPath + "/" + mesh_name_to_pbrt(meshName, opts);
-    std::string bname = mesh_base_name(meshName);
+    MeshMapDesc meshDesc;
     std::string data;
-    std::string mats("Material ");
-    std::string mate("\n");
-    if(opts->renderer == RENDERER_LIT){
-        mats = "Material { ";
-        mate = " }\n";
-    }
+    std::string meshName = shape->strParameters["Name"];
+    std::string mats("Material { ");
+    std::string mate(" }\n");
+    std::string matname = "mat_" + std::to_string(meshId);
+    std::string basename;
 
     if(opts->meshMap.find(meshName) != opts->meshMap.end()){
-        data = opts->meshMap[meshName];
+        meshDesc = opts->meshMap[meshName];
+        basename = meshDesc.basename;
+        data = meshDesc.data;
+    }
+
+    data += mats;
+    if(mat == nullptr){
+        data += strmat;
+    }else{
+        if(mat->built){
+            data += mat->mat;
+        }else{
+            data += pbr_build_material(mat, opts, meshId);
+        }
+    }
+
+    data += mate;
+
+    data += "Shape { ";
+    if(basename.size() > 0){
+        data += "type[instance] base[" + basename + "] ";
+    }else{
+        basename = "mesh_" + std::to_string(meshId);
+        data += "type[mesh] name[" + basename + "] geometry[";
+        data += path + "] ";
+    }
+
+    data += "mat[" + matname + "] ";
+    if(shape->transfParameters.find("Transform") != shape->transfParameters.end()){
+        Transform transform = shape->transfParameters["Transform"];
+        //Matrix4x4 m = Transpose(transform.m);
+        Matrix4x4 m = transform.m;
+        data += "\n\ttransform [ ";
+        for(int i = 0; i < 4; i++){
+            for(int j = 0; j < 4; j++){
+                data += std::to_string(m.m[i][j]);
+                data += " ";
+            }
+            if(i < 3){
+                data += "\n\t            ";
+            }
+        }
+
+        data += "] ";
+    }
+
+    data += "}\n";
+    opts->meshMap[meshName] = {data, basename};
+    meshId++;
+}
+
+void pbr_insert_mesh_pbrt(SerializedShape *shape, pbr_mat *mat, pbr_opts *opts,
+                         std::string strmat, int depth, std::string bname,
+                         std::string path)
+{
+    MeshMapDesc meshDesc;
+    std::string data;
+    std::string meshName = shape->strParameters["Name"];
+    std::string mats("Material ");
+    std::string mate("\n");
+    if(opts->meshMap.find(meshName) != opts->meshMap.end()){
+        meshDesc = opts->meshMap[meshName];
+        data = meshDesc.data;
     }else{
         if(mat == nullptr){
             data += mats + strmat + mate;
         }else{
             if(mat->built){
-                if(opts->renderer == RENDERER_LIT){
-                    mats += "name[mat_";
-                    mats += std::to_string(meshId);
-                    mats += "] ";
-                }
                 data += mats + mat->mat + mate;
             }else{
-                data += mats + pbrt_build_material(mat, opts, meshId) + mate;
+                data += mats + pbr_build_material(mat, opts, meshId) + mate;
             }
         }
 
@@ -768,21 +843,12 @@ void pbrt_insert_mesh(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
             data += path + "\" ]\n";
             data += "\tObjectEnd\n";
             data += "AttributeEnd\n";
-        }else if(opts->renderer == RENDERER_LIT){
-            data += "Shape{ type[mesh] geometry[";
-            data += path; data += "] name[";
-            data += bname; data += "]\n";
         }
 
         meshId++;
     }
 
-    if(opts->renderer == RENDERER_PBRT){
-        data += "AttributeBegin\n";
-    }
-
-    // In order to match PBRT rendering coordinates we need to transpose
-    // our transformations
+    data += "AttributeBegin\n";
     if(shape->transfParameters.find("Transform") != shape->transfParameters.end()){
         Transform transform = shape->transfParameters["Transform"];
         Matrix4x4 m = Transpose(transform.m);
@@ -797,20 +863,32 @@ void pbrt_insert_mesh(SerializedShape *shape, pbrt_mat *mat, pbrt_opts *opts,
         data += "]\n";
     }
 
-    if(opts->renderer == RENDERER_PBRT){
-        data += "\tObjectInstance \"" + bname + "\"\n";
-        data += "AttributeEnd\n";
-    }
-    opts->meshMap[meshName] = data;
+    data += "\tObjectInstance \"" + bname + "\"\n";
+    data += "AttributeEnd\n";
+    opts->meshMap[meshName] = {data, std::string()};
 }
 
-void pbrt_mesh_gather(pbrt_opts *opts, std::string &data){
+void pbr_insert_mesh(SerializedShape *shape, pbr_mat *mat, pbr_opts *opts,
+                      std::string strmat, int depth, std::string refPath)
+{
+    std::string meshName = shape->strParameters["Name"];
+    std::string path = refPath + "/" + mesh_name_to_pbr(meshName, opts);
+    std::string bname = mesh_base_name(meshName);
+    if(opts->renderer == RENDERER_LIT){
+        pbr_insert_mesh_lit(shape, mat, opts, strmat, depth, bname, path);
+    }else{
+        pbr_insert_mesh_pbrt(shape, mat, opts, strmat, depth, bname, path);
+    }
+}
+
+void pbr_mesh_gather(pbr_opts *opts, std::string &data){
     for(auto it = opts->meshMap.begin(); it != opts->meshMap.end(); it++){
-        data += it->second;
+        MeshMapDesc meshDesc = it->second;
+        data += meshDesc.data;
     }
 }
 
-void pbrt_write_domain(pbrt_opts *opts){
+void pbr_write_domain(pbr_opts *opts){
     std::stringstream ss;
     std::vector<vec3f> points;
     if(opts->domain.size() < 1) return;
@@ -844,8 +922,8 @@ void pbrt_write_domain(pbrt_opts *opts){
     }
 }
 
-void pbrt_command(int argc, char **argv){
-    pbrt_opts opts;
+void pbr_command(int argc, char **argv){
+    pbr_opts opts;
     std::vector<SerializedParticle> particles;
     std::vector<SerializedShape> shapes;
     std::vector<int> boundaries;
@@ -854,11 +932,11 @@ void pbrt_command(int argc, char **argv){
     int count = 0;
     int pAdded = 0;
     std::string radiusString;
-    
-    default_pbrt_opts(&opts);
-    argument_process(pbrt_argument_map, argc, argv, "pbrt", &opts);
+
+    default_pbr_opts(&opts);
+    argument_process(pbr_argument_map, argc, argv, "pbr", &opts);
     print_configs(&opts);
-    
+
     if(opts.input.size() == 0){
         printf("No input given\n");
         return;
@@ -893,23 +971,23 @@ void pbrt_command(int argc, char **argv){
         printf("This mode requires LNM-based boundary output from Bubbles\n");
         return;
     }
-    
+
     radiusString = __to_stringf(opts.radius);
-    
+
     if(count > 0){
         int total = count;
         std::string data;
         if(opts.output.size() == 0){
-            opts.output = opts.renderer == RENDERER_PBRT ? "geometry.pbrt" : "geometry.lit";
+            opts.output = opts.renderer == RENDERER_PBRT ? "geometry.pbr" : "geometry.lit";
         }
 
         std::ofstream ofs(opts.output, std::ofstream::out);
-        
+
         if(!ofs.is_open()){
             std::cout << "Failed to open output file: " << opts.output << std::endl;
             return;
         }
-        
+
         count = SplitByLayer(&rendergroups, &particles, total, &opts);
 
         std::string refPath(MESH_FOLDER);
@@ -918,24 +996,24 @@ void pbrt_command(int argc, char **argv){
         for(SerializedShape &sh : shapes){
             std::string mat;
             const char *ptr = SerializerGetShapeName(sh.type);
-            pbrt_mat *pmat = nullptr;
+            pbr_mat *pmat = nullptr;
             if(opts.pickedMat.size() == 0){
-                printf("[Object] Please enter material for type \'%s\': ", ptr);
+                printf("[Object] Please enter material for \'%s\' or re-run with material flags: ", ptr);
                 std::getline(std::cin, mat);
             }else{
                 int ok = -1;
-                mat = find_material(opts.pickedMat, &ok);
+                mat = find_material(opts.pickedMat, &opts, &ok);
                 if(ok < 0){
                     printf("Failed to find material\n");
                     exit(0);
                 }
 
-                pmat = &Materials[ok];
+                pmat = get_material_ref(ok, &opts);
             }
 
             if(sh.type == ShapeBox){
-                //pbrt_insert_dual_layer_box(&sh, pmat, &opts, mat, data, 1);
-                pbrt_insert_single_box(&sh, pmat, &opts, mat, data, 1);
+                //pbr_insert_dual_layer_box(&sh, pmat, &opts, mat, data, 1);
+                pbr_insert_single_box(&sh, pmat, &opts, mat, data, 1);
                 pAdded += 2;
             }else if(sh.type == ShapeMesh){
                 has_mesh = 1;
@@ -944,31 +1022,31 @@ void pbrt_command(int argc, char **argv){
                     std::getline(std::cin, refPath);
                 }
 
-                pbrt_insert_mesh(&sh, pmat, &opts, mat, 1, refPath);
+                pbr_insert_mesh(&sh, pmat, &opts, mat, 1, refPath);
                 pAdded += 1;
             }
         }
 
         if(has_mesh){
-            pbrt_mesh_gather(&opts, data);
+            pbr_mesh_gather(&opts, data);
         }
 
-        pbrt_write_domain(&opts);
+        pbr_write_domain(&opts);
 
         for(int i = 0; i < count; i++){
             std::vector<SerializedParticle> *layer = &rendergroups[i];
             printf("\rProcessing layer %d / %d ... ", i+1, count);
             fflush(stdout);
-            
+
             if(layer->size() > 0){
                 if(AcceptLayer(i, &opts) == 0) continue;
-                
+
                 data += std::string("###### Layer ");
                 data += __to_stringi(i);
                 data += " ("; data += __to_stringi(layer->size());
                 data += ")\n";
                 data += GetMaterialString(i, &opts);
-                
+
                 for(SerializedParticle &p : *layer){
                     if(opts.hasClipArgs == 1){
                         vec3f ref(0);
@@ -1019,10 +1097,10 @@ void pbrt_command(int argc, char **argv){
     }else{
         std::cout << "Empty file" << std::endl;
     }
-    
+
     if(rendergroups) delete[] rendergroups;
 
-    if(opts.warn_ply_mesh){
+    if(opts.warn_mesh){
         if(opts.renderer == RENDERER_PBRT){
             printf("* Warning: PBRT only supports ply objects but the given simulation contains\n");
             printf("           alternative formats. Make sure to convert to ply before rendering.\n");

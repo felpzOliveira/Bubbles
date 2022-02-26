@@ -37,7 +37,7 @@ __host__ void PciSphSolver2::SetViscosityCoefficient(Float viscosityCoefficient)
     solverData->sphData->viscosity = Max(0, viscosityCoefficient);
 }
 
-__host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep, 
+__host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep,
                               int use_cpu = 0)
 {
     SphSolverData2 *data = solver->solverData->sphData;
@@ -45,17 +45,17 @@ __host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep,
         UpdateGridDistributionCPU(data);
     else
         UpdateGridDistributionGPU(data);
-    
+
     if(use_cpu)
         ComputeDensityCPU(data);
     else
         ComputeDensityGPU(data);
-    
+
     if(use_cpu)
         ComputeNonPressureForceCPU(data);
     else
         ComputeNonPressureForceGPU(data);
-    
+
     Float delta = solver->ComputeDelta(timeStep);
     ComputePressureForceAndIntegrate(solver->solverData, timeStep, 0.01, delta, 5);
 }
@@ -81,11 +81,11 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     TimerList lnmTimer;
     unsigned int numberOfIntervals = 0;
     Float remainingTime = timeIntervalInSeconds;
-    
+
     SphSolverData2 *data = solverData->sphData;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     Float h = data->sphpSet->GetTargetSpacing();
-    
+
     ProfilerBeginStep();
     while(remainingTime > Epsilon){
         SphParticleSet2 *sphpSet = data->sphpSet;
@@ -97,13 +97,13 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
         remainingTime -= timeStep;
         ProfilerIncreaseStepIteration();
     }
-    
+
     ProfilerEndStep();
     stepInterval = ProfilerGetStepInterval();
-    
+
     pSet->ClearDataBuffer(&pSet->v0s);
     data->domain->UpdateQueryState();
-    
+
     lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h);
     //DiltsSpokeBoundary(pSet, data->domain);
@@ -111,7 +111,7 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     //XiaoweiBoundary(pSet, data->domain, h);
     //IntervalBoundary(pSet, data->domain, h);
     lnmTimer.Stop();
-    
+
     Float lnm = lnmTimer.GetElapsedGPU(0);
     Float pct = lnm * 100.0 / stepInterval;
     lnmStats.Add(LNMData(lnm, pct));
@@ -128,29 +128,29 @@ __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
     sphData->sphpSet->SetTargetDensity(targetDensity);
     sphData->sphpSet->SetTargetSpacing(targetSpacing);
     sphData->sphpSet->SetRelativeKernelRadius(relativeRadius);
-    
+
     ParticleSet2 *pData = sphData->sphpSet->GetParticleSet();
     Float rad  = pData->GetRadius();
     Float mass = pData->GetMass();
     int pCount = pData->GetReservedSize();
     int actualCount = pData->GetParticleCount();
-    
+
     SphSolverData2SetupFor(sphData, pCount);
-    
+
     solverData->refMemory = cudaAllocateVx(vec2f, 3 * pCount);
     solverData->densityErrors    = cudaAllocateVx(Float, 2 * pCount);
     solverData->densityPredicted = &solverData->densityErrors[pCount];
     solverData->tempPositions    = &solverData->refMemory[0];
     solverData->tempVelocities   = &solverData->refMemory[1*pCount];
     solverData->pressureForces   = &solverData->refMemory[2*pCount];
-    
+
     massOverTargetDensitySquared = mass / targetDensity;
     massOverTargetDensitySquared *= massOverTargetDensitySquared;
     deltaDenom = ComputeDeltaDenom();
-    
-    printf("[PCISPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d, Delta: %g\n", 
+
+    printf("[PCISPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d, Delta: %g\n",
            rad, targetSpacing, pCount, deltaDenom);
-    
+
     // Perform a particle distribution so that distribution
     // during simulation can be optmized
     for(int i = 0; i < sphData->domain->GetCellCount(); i++){
@@ -163,34 +163,34 @@ __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
 __host__ Float PciSphSolver2::ComputeDeltaDenom(){
     TrianglePointGenerator generator;
     std::vector<vec2f> points;
-    
+
     SphParticleSet2 *sphData = solverData->sphData->sphpSet;
     Float kernelRadius = sphData->GetKernelRadius();
     Float spacing = sphData->GetTargetSpacing();
     Float kernelRadius2 = kernelRadius * kernelRadius;
-    
+
     Bounds2f domain(vec2f(-1.5 * kernelRadius), vec2f(1.5 * kernelRadius));
     generator.Generate(domain, spacing, &points);
-    
+
     SphSpikyKernel2 kernel(kernelRadius);
     Float denom = 0;
     Float denom2 = 0;
     vec2f denom1;
-    
-    
+
+
     for(int i = 0; i < points.size(); i++){
         vec2f point = points[i];
         Float distanceSquared = point.LengthSquared();
         if(distanceSquared < kernelRadius2){
             Float distance = sqrt(distanceSquared);
             vec2f direction = (distance > 0) ? point / distance : vec2f(0,0);
-            
+
             vec2f gradij = kernel.gradW(distance, direction);
             denom1 += gradij;
             denom2 += Dot(gradij, gradij);
         }
     }
-    
+
     denom += -Dot(denom1, denom1) - denom2;
     return denom;
 }

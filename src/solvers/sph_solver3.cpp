@@ -47,7 +47,7 @@ __bidevice__ SphParticleSet3 *SphSolver3::GetSphParticleSet(){
     return solverData->sphpSet;
 }
 
-__host__ void AdvanceTimeStep(SphSolver3 *solver, Float timeStep, 
+__host__ void AdvanceTimeStep(SphSolver3 *solver, Float timeStep,
                               int use_cpu = 0)
 {
     SphSolverData3 *data = solver->solverData;
@@ -55,19 +55,19 @@ __host__ void AdvanceTimeStep(SphSolver3 *solver, Float timeStep,
         UpdateGridDistributionCPU(data);
     else
         UpdateGridDistributionGPU(data);
-    
+
     data->sphpSet->ResetHigherLevel();
-    
+
     if(use_cpu)
         ComputeDensityCPU(data);
     else
         ComputeDensityGPU(data);
-    
+
     if(use_cpu)
         ComputePressureForceCPU(data, timeStep);
     else
         ComputePressureForceGPU(data, timeStep);
-    
+
     if(use_cpu)
         ComputePseudoViscosityInterpolationCPU(data, timeStep);
     else
@@ -79,11 +79,11 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
     unsigned int numberOfIntervals = 0;
     unsigned int numberOfIntervalsRunned = 0;
     Float remainingTime = timeIntervalInSeconds;
-    
+
     SphSolverData3 *data = solverData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     Float h = data->sphpSet->GetTargetSpacing();
-    
+
     ProfilerBeginStep();
     while(remainingTime > Epsilon){
         SphParticleSet3 *sphpSet = solverData->sphpSet;
@@ -95,19 +95,19 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
         numberOfIntervalsRunned += 1;
         ProfilerIncreaseStepIteration();
     }
-    
+
     ProfilerEndStep();
     stepInterval = ProfilerGetStepInterval();
-    
+
     pSet->ClearDataBuffer(&pSet->v0s);
     data->domain->UpdateQueryState();
-    
+
     lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h, 0);
     lnmTimer.Stop();
 }
 
-__host__ void SphSolver3::Setup(Float targetDensity, Float targetSpacing, 
+__host__ void SphSolver3::Setup(Float targetDensity, Float targetSpacing,
                                 Float relativeRadius, Grid3 *dom, SphParticleSet3 *pSet)
 {
     solverData->domain = dom;
@@ -117,15 +117,15 @@ __host__ void SphSolver3::Setup(Float targetDensity, Float targetSpacing,
     solverData->sphpSet->SetTargetSpacing(targetSpacing);
     solverData->sphpSet->SetRelativeKernelRadius(relativeRadius);
     ParticleSet3 *pData = solverData->sphpSet->GetParticleSet();
-    
+
     Float rad  = pData->GetRadius();
     Float mass = pData->GetMass();
     int pCount = pData->GetReservedSize();
     SphSolverData3SetupFor(solverData, pCount);
-    
-    printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n", 
+
+    printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n",
            rad, targetSpacing, pCount);
-    
+
     // Perform a particle distribution so that distribution
     // during simulation can be optmized
     for(int i = 0; i < solverData->domain->GetCellCount(); i++){

@@ -14,7 +14,7 @@ typedef struct{
     std::string help;
 }arg_desc;
 
-inline void print_help_and_quit(const char *caller, 
+inline void print_help_and_quit(const char *caller,
                                 std::map<const char *, arg_desc> argument_map)
 {
     std::map<const char *, arg_desc>::iterator it;
@@ -27,7 +27,7 @@ inline void print_help_and_quit(const char *caller,
 }
 
 inline void argument_process(std::map<const char *, arg_desc> argument_map,
-                             int argc, char **argv, const char *caller, void *config, 
+                             int argc, char **argv, const char *caller, void *config,
                              int enforce=1, int start=1)
 {
     int argCount = argc - start;
@@ -46,12 +46,12 @@ inline void argument_process(std::map<const char *, arg_desc> argument_map,
                     break;
                 }
             }
-            
+
             if(ok < 0){
                 std::cout << "Failed processing \'" << arg << "\'" << std::endl;
                 exit(0);
             }
-            
+
             /* if return != 0 stop parsing (probably jumped to command) */
             if(ok != 0){ break; }
         }
@@ -61,7 +61,7 @@ inline void argument_process(std::map<const char *, arg_desc> argument_map,
     }
 }
 
-inline std::string ParseNext(int argc, char **argv, int &i, 
+inline std::string ParseNext(int argc, char **argv, int &i,
                              const char *arg, int count=1)
 {
     int ok = (argc > i+count) ? 1 : 0;
@@ -69,13 +69,13 @@ inline std::string ParseNext(int argc, char **argv, int &i,
         printf("Invalid argument for %s\n", arg);
         exit(0);
     }
-    
+
     std::string res;
     for(int n = 1; n < count+1; n++){
         res += std::string(argv[n+i]);
         if(n < count) res += " ";
     }
-    
+
     i += count;
     return res;
 }
@@ -108,7 +108,7 @@ inline bool FileExists(const char *path){
 
 void convert_command(int argc, char **argv);
 void sdf_command(int argc, char **argv);
-void pbrt_command(int argc, char **argv);
+void pbr_command(int argc, char **argv);
 void view_command(int argc, char **argv);
 void boundary_command(int argc, char **argv);
 void surface_command(int argc, char **argv);

@@ -624,7 +624,7 @@ void SerializerLoadSystem3(ParticleSetBuilder3 *builder,
 }
 
 int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &flags,
-                        int start, int end)
+                        int start, int end, int legacy)
 {
     // Get amount of particles in first
     std::string filename(basename);
@@ -636,7 +636,9 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &f
     std::string format;
     if(ifs){
         *data = new std::vector<vec3f>*[end-start];
-        pCount = SerializerFindFluidSection(ifs, format);
+        if(!legacy){
+            pCount = SerializerFindFluidSection(ifs, format);
+        }
         ifs.close();
 
         for(int i = 0; i < end-start; i++){
@@ -644,7 +646,11 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &f
             file += std::to_string(i + start);
             file += ".txt";
             (*data)[i] = new std::vector<vec3f>();
-            SerializerLoadPoints3((*data)[i], file.c_str(), flags);
+            if(!legacy){
+                SerializerLoadPoints3((*data)[i], file.c_str(), flags);
+            }else{
+                SerializerLoadLegacySystem3((*data)[i], file.c_str(), flags);
+            }
             printf("\rLoaded %d / %d", i, end-start);
             fflush(stdout);
             if(pCount < (*data)[i]->size()){

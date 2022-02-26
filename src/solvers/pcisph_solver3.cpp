@@ -39,7 +39,7 @@ __host__ void PciSphSolver3::SetViscosityCoefficient(Float viscosityCoefficient)
     solverData->sphData->viscosity = Max(0, viscosityCoefficient);
 }
 
-__host__ void AdvanceTimeStep(PciSphSolver3 *solver, Float timeStep, 
+__host__ void AdvanceTimeStep(PciSphSolver3 *solver, Float timeStep,
                               int use_cpu = 0)
 {
     SphSolverData3 *data = solver->solverData->sphData;
@@ -48,21 +48,21 @@ __host__ void AdvanceTimeStep(PciSphSolver3 *solver, Float timeStep,
         UpdateGridDistributionCPU(data);
     else
         UpdateGridDistributionGPU(data);
-    
+
     data->sphpSet->ResetHigherLevel();
-    
+
     if(use_cpu)
         ComputeDensityCPU(data);
     else
         ComputeDensityGPU(data);
-    
+
     if(use_cpu)
         ComputeNonPressureForceCPU(data);
     else
         ComputeNonPressureForceGPU(data);
-    
+
     Float delta = solver->ComputeDelta(timeStep);
-    ComputePressureForceAndIntegrate(solver->solverData, timeStep, 
+    ComputePressureForceAndIntegrate(solver->solverData, timeStep,
                                      0.01, delta, 5, use_cpu);
     ProfilerManualFinish();
 }
@@ -74,7 +74,7 @@ __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
     SphSolverData3 *data = solverData->sphData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     Float h = data->sphpSet->GetTargetSpacing();
-    
+
     ProfilerBeginStep();
     while(remainingTime > Epsilon){
         SphParticleSet3 *sphpSet = data->sphpSet;
@@ -86,18 +86,18 @@ __host__ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
         remainingTime -= timeStep;
         ProfilerIncreaseStepIteration();
     }
-    
+
     ProfilerEndStep();
     stepInterval = ProfilerGetStepInterval();
-    
+
     data->domain->UpdateQueryState();
     pSet->ClearDataBuffer(&pSet->v0s);
-    
+
     lnmTimer.Start();
     LNMBoundary(pSet, data->domain, h, 0);
     //DiltsSpokeBoundary(data->domain, pSet);
     lnmTimer.Stop();
-    
+
     Float lnm = lnmTimer.GetElapsedGPU(0);
     Float pct = lnm * 100.0 / ProfilerGetEvaluation("AdvanceTimeStep");
     lnmStats.Add(LNMData(lnm, pct));
@@ -126,30 +126,30 @@ __host__ void PciSphSolver3::Setup(Float targetDensity, Float targetSpacing,
     sphData->sphpSet->SetTargetDensity(targetDensity);
     sphData->sphpSet->SetTargetSpacing(targetSpacing);
     sphData->sphpSet->SetRelativeKernelRadius(relativeRadius);
-    
+
     ParticleSet3 *pData = sphData->sphpSet->GetParticleSet();
     vec3ui res = domain->GetIndexCount();
     Float mass = pData->GetMass();
     int pCount = pData->GetReservedSize();
     int actualCount = pData->GetParticleCount();
-    
+
     SphSolverData3SetupFor(sphData, pCount);
-    
+
     solverData->refMemory = cudaAllocateVx(vec3f, 3 * pCount);
     solverData->densityErrors    = cudaAllocateVx(Float, 2 * pCount);
     solverData->densityPredicted = &solverData->densityErrors[pCount];
     solverData->tempPositions    = &solverData->refMemory[0];
     solverData->tempVelocities   = &solverData->refMemory[1*pCount];
     solverData->pressureForces   = &solverData->refMemory[2*pCount];
-    
+
     massOverTargetDensitySquared = mass / targetDensity;
     massOverTargetDensitySquared *= massOverTargetDensitySquared;
     deltaDenom = ComputeDeltaDenom();
-    
-    printf("[PCISPH SOLVER]Spacing: %g, Particle Count: %d, Delta: %g\n" 
-           "               Grid Resolution: %d x %d x %d\n", targetSpacing, 
+
+    printf("[PCISPH SOLVER]Spacing: %g, Particle Count: %d, Delta: %g\n"
+           "               Grid Resolution: %d x %d x %d\n", targetSpacing,
            actualCount, deltaDenom, res.x, res.y, res.z);
-    
+
     // Perform a particle distribution so that distribution
     // during simulation can be optmized
     for(int i = 0; i < sphData->domain->GetCellCount(); i++){
@@ -163,33 +163,33 @@ __host__ void PciSphSolver3::Setup(Float targetDensity, Float targetSpacing,
 __host__ Float PciSphSolver3::ComputeDeltaDenom(){
     BccLatticePointGenerator generator;
     std::vector<vec3f> points;
-    
+
     SphParticleSet3 *sphData = solverData->sphData->sphpSet;
     Float kernelRadius = sphData->GetKernelRadius();
     Float spacing = sphData->GetTargetSpacing();
     Float kernelRadius2 = kernelRadius * kernelRadius;
-    
+
     Bounds3f domain(vec3f(-1.5 * kernelRadius), vec3f(1.5 * kernelRadius));
     generator.Generate(domain, spacing, &points);
-    
+
     SphSpikyKernel3 kernel(kernelRadius);
     Float denom = 0;
     Float denom2 = 0;
     vec3f denom1;
-    
+
     for(int i = 0; i < points.size(); i++){
         vec3f point = points[i];
         Float distanceSquared = point.LengthSquared();
         if(distanceSquared < kernelRadius2){
             Float distance = sqrt(distanceSquared);
             vec3f direction = (distance > 0) ? point / distance : vec3f(0);
-            
+
             vec3f gradij = kernel.gradW(distance, direction);
             denom1 += gradij;
             denom2 += Dot(gradij, gradij);
         }
     }
-    
+
     denom += -Dot(denom1, denom1) - denom2;
     return denom;
 }
@@ -206,14 +206,14 @@ __host__ Float PciSphSolver3::ComputeBeta(Float timeIntervalInSeconds){
 __host__ int EmptyCallback(int){ return 1; }
 
 __host__ void PciSphRunSimulation3(PciSphSolver3 *solver, Float spacing,
-                                   vec3f origin, vec3f target, 
+                                   vec3f origin, vec3f target,
                                    Float targetInterval, std::vector<Shape*> sdfs,
                                    const std::function<int(int )> &callback)
 {
     SphParticleSet3 *sphSet = solver->GetSphParticleSet();
     ParticleSet3 *pSet = sphSet->GetParticleSet();
-    return UtilRunSimulation3<PciSphSolver3, ParticleSet3>(solver, pSet,  spacing, 
-                                                           origin, target, 
+    return UtilRunSimulation3<PciSphSolver3, ParticleSet3>(solver, pSet,  spacing,
+                                                           origin, target,
                                                            targetInterval, sdfs,
                                                            callback);
 }

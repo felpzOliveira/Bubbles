@@ -2,7 +2,7 @@
 
 ![Alt text](/images/fluid.png)
 
-This is my personal fluid solver, it is heavily based on the [fluid-engine-development](https://fluidenginedevelopment.org/) book by Doyub Kim, but with GPU support using CUDA - I don't however make any claims of it's performance and quality.
+This is my personal fluid solver, it is heavily based on the [fluid-engine-development](https://fluidenginedevelopment.org/) book by Doyub Kim, but with GPU support using CUDA - I don't however make any claims of it's performance or quality.
 
 Currently it contain particle-based solvers for the following methods:
 * SPH - Smoothed Particle Hydrodynamics

@@ -281,6 +281,6 @@ Shape { type[quad] mat[ground2]
                 250.0 -1.24 -300.0   -250.0 -1.24 -300] }
 
 # fluid
-Shape{ type[mesh] name[mesh_0] geometry[models/fluid_2.obj]
+Shape{ type[mesh] name[fluid] geometry[models/fluid_2.obj]
        mat[water_mat] medium[volume null] }
 

@@ -217,7 +217,7 @@ View [0 1.25 5 # eye
       0  1   0 # up
       36.0]    # fov
 
-Medium{ type[homogenous] name[volume] asym_g[-0.7] scale[2.5]
+Medium{ type[homogeneous] name[volume] asym_g[-0.7] scale[5.0]
         sigma_s[0.00125 0.00125 0.000625] sigma_a[0.0125 0.0125 0.01] }
 
 set-image-resolution [1200 900]
@@ -233,11 +233,11 @@ Material{ texture[white] rough[0.01 0.01] transmission[1.0]
           eta[1.02] name[glass] type[disney] }
 
 # the light in this scene is based on the spd from Ledtech
-Material{ emission [spds/Ledtech.csv] name [light] type [diffuselight] scale [10.0] }
+Material{ emission [spds/Ledtech.csv] name [light] type [diffuselight] scale[10] }
 Material{ reflectance[0.6 0.6 0.6] name[ground2] type[diffuse] }
 
 # blue material for the dragons
-Material { name[mat_0] type [diffuse] reflectance  [ 0.249 0.347 0.643 ] scale [0.5] }
+Material { name[mat_0] type [diffuse] reflectance [ 0.249 0.347 0.643 ] scale [0.5] }
 
 # first dragon
 Shape { type[mesh] name[mesh_0] geometry[models/sssdragon.obj] mat[mat_0]
@@ -277,8 +277,8 @@ Shape{ type [quad] mat[light]
 
 # floor
 Shape { type[quad] mat[ground2]
-        vertex[-250.0 -1.24  300.0    250.0 -1.24  300
-                250.0 -1.24 -300.0   -250.0 -1.24 -300] }
+        vertex[-250.0 -1.25  300.0    250.0 -1.25  300
+                250.0 -1.25 -300.0   -250.0 -1.25 -300] }
 
 # fluid
 Shape{ type[mesh] name[fluid] geometry[models/fluid_2.obj]

@@ -4,7 +4,7 @@
 
 # In order to reproduce the images in the thesis you have to compile
 # Lit in Spectral mode, i.e.: on lit.h enable #define _RENDERER_SPECTRAL_
-# the original images were rendered using 4 wavelengths: #define NumWavelengths 4
+# the original images were rendered using 2 wavelengths: #define NumWavelengths 2
 
 # Uncomment the section you want and run lit with:
 #    ./lit -live fluid.lit    if you have graphy also, if not run:
@@ -217,8 +217,8 @@ View [0 1.25 5 # eye
       0  1   0 # up
       36.0]    # fov
 
-Medium{ type[homogeneous] name[volume] asym_g[-0.7] scale[5.0]
-        sigma_s[0.00125 0.00125 0.000625] sigma_a[0.0125 0.0125 0.01] }
+Medium{ type[homogeneous] name[volume] asym_g[0.7] scale[80.0]
+        sigma_s[0.00125 0.00125 0.000125] sigma_a[0.0225 0.0225 0.01] }
 
 set-image-resolution [1200 900]
 
@@ -234,7 +234,7 @@ Material{ texture[white] rough[0.01 0.01] transmission[1.0]
 
 # the light in this scene is based on the spd from Ledtech
 Material{ emission [spds/Ledtech.csv] name [light] type [diffuselight] scale[10] }
-Material{ reflectance[0.6 0.6 0.6] name[ground2] type[diffuse] }
+Material{ reflectance[0.3 0.3 0.6] name[ground2] type[diffuse] }
 
 # blue material for the dragons
 Material { name[mat_0] type [diffuse] reflectance [ 0.249 0.347 0.643 ] scale [0.5] }

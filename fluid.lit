@@ -202,12 +202,9 @@ Material{ reflectance[0.53 0.50 0.99] name[ground]
 # The following is a sample of how to render the two dragons scene, it
 # renders the image from the git. In order to make water we need to add mediums.
 # Lit currently only supports homogenous mediums based on Henyey-Greenstein
-# phase function. But the wavefront renderer does not yet handle mediums so we
-# need to use the volpath integrator, it also runs on the GPU but it does
-# not take advantage of the wavefront architecture. If you intend to copy
-# the locations of the dragons to PBRT please note that you need to transpose
-# the transformation for correct placement.
-set-integrator [volpath 1024]
+# phase function. If you intend to copy the locations of the dragons to PBRT
+# please note that you need to transpose the transformation for correct placement.
+set-integrator [wavefront 1024]
 
 # change to your directory to find the light's spd and the dragon model
 set-base-path [/home/felipe/Documents/CGStuff]

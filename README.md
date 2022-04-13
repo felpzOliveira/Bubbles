@@ -15,6 +15,7 @@ This code was also used for my master's thesis and the code used for boundary ro
 * Sandim's Method [SCN+16, SPd20]
 * Dilts [Dill00, HD07]
 * Randles-Doring/Marrone - partially [MCLTG10]
+* LNM - [OP22]
 
 Building this code is straightforward, simply use the given CMakeLists and make the project. You will need a CUDA capable device (and nvcc installed) and Qhull (for Samdim's Method). If you don't want to build with Qhull, you can set `CONVEXHULL_QHULL` to `OFF` when building.
 ```bash

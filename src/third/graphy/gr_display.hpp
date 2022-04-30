@@ -5,11 +5,11 @@
 gr_display *gr_new_display(int res_x, int res_y);
 gr_display *gr_new_display(int res_x, int res_y, float r, float g, float b, float a);
 
-void gr_display_set_view2d(gr_display *display, 
+void gr_display_set_view2d(gr_display *display,
                            float left, float right,
                            float top,  float bottom);
 
-void gr_display_set_view2d(gr_display *display, 
+void gr_display_set_view2d(gr_display *display,
                            float left, float right,
                            float top,  float bottom,
                            float near, float far);

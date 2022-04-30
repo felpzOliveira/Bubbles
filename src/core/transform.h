@@ -97,7 +97,7 @@ struct Matrix2x2{
 
 struct Matrix3x3{
     Float m[3][3];
-    
+
     __bidevice__ Matrix3x3(){
         m[0][0] = m[1][1] = m[2][2] = 1.f;
         m[0][1] = m[1][0] = m[0][2] = 0.f;
@@ -110,8 +110,8 @@ struct Matrix3x3{
         m[0][1] = mat[0][1]; m[1][1] = mat[1][1]; m[2][1] = mat[2][1];
         m[0][2] = mat[0][2]; m[1][2] = mat[1][2]; m[2][2] = mat[2][2];
     }
-    
-    __bidevice__ Matrix3x3(Float t00, Float t01, Float t02, 
+
+    __bidevice__ Matrix3x3(Float t00, Float t01, Float t02,
                            Float t10, Float t11, Float t12,
                            Float t20, Float t21, Float t22)
     {
@@ -127,13 +127,13 @@ struct Matrix3x3{
             }
         }
     }
-    
+
     __bidevice__ friend Matrix3x3 Transpose(const Matrix3x3 &o){
         return Matrix3x3(o.m[0][0], o.m[1][0], o.m[2][0],
                          o.m[0][1], o.m[1][1], o.m[2][1],
                          o.m[0][2], o.m[1][2], o.m[2][2]);
     }
-    
+
     __bidevice__ static Matrix3x3 Mul(const Matrix3x3 &m1, const Matrix3x3 &m2){
         Matrix3x3 r;
         for(int i = 0; i < 3; i++)
@@ -149,12 +149,12 @@ struct Matrix3x3{
     __bidevice__ friend Float Trace(const Matrix3x3 &o){
         return o.m[0][0] + o.m[1][1] + o.m[2][2];
     }
-    
+
     __bidevice__ friend Matrix3x3 Inverse(const Matrix3x3 &o){
         Float det = (o.m[0][0] * (o.m[1][1] * o.m[2][2] - o.m[1][2] * o.m[2][1]) -
                      o.m[0][1] * (o.m[1][0] * o.m[2][2] - o.m[1][2] * o.m[2][0]) +
                      o.m[0][2] * (o.m[1][0] * o.m[2][1] - o.m[1][1] * o.m[2][0]));
-        
+
         AssertA(!IsZero(det), "Zero determinant on matrix inverse");
         if(IsZero(det)) return o;
         Float invDet = 1.f / det;
@@ -210,7 +210,7 @@ struct Matrix3x3{
             for(int j = 0; j < 3; j++){
                 printf("%g ", m[i][j]);
             }
-            
+
             printf("]\n");
         }
     }
@@ -218,7 +218,7 @@ struct Matrix3x3{
 
 struct Matrix4x4{
     Float m[4][4];
-    
+
     __bidevice__ Matrix4x4(){
         m[0][0] = m[1][1] = m[2][2] = m[3][3] = 1.f;
         m[0][1] = m[0][2] = m[0][3] = m[1][0] = m[1][2] = m[1][3] = m[2][0] =
@@ -239,9 +239,9 @@ struct Matrix4x4{
     __bidevice__ Matrix4x4(Float t00, Float t01, Float t02, Float t03, Float t10, Float t11,
                            Float t12, Float t13, Float t20, Float t21, Float t22, Float t23,
                            Float t30, Float t31, Float t32, Float t33);
-    
+
     __bidevice__ friend Matrix4x4 Transpose(const Matrix4x4 &);
-    
+
     __bidevice__ static Matrix4x4 Mul(const Matrix4x4 &m1, const Matrix4x4 &m2) {
         Matrix4x4 r;
         for (int i = 0; i < 4; ++i)
@@ -256,14 +256,14 @@ struct Matrix4x4{
     }
 
     __bidevice__ friend Matrix4x4 Inverse(const Matrix4x4 &);
-    
+
     __bidevice__ void PrintSelf(){
         for(int i = 0; i < 4; ++i){
             printf("[ ");
             for(int j = 0; j < 4; ++j){
                 printf("%g  ", m[i][j]);
             }
-            
+
             printf("]\n");
         }
     }
@@ -278,14 +278,14 @@ class Transform2{
     __bidevice__ friend Transform2 Inverse(const Transform2 &t){
         return Transform2(t.mInv, t.m);
     }
-    
+
     __bidevice__ vec2f Vector(const vec2f &p) const{
         Float x = p.x, y = p.y;
         Float xp = m.m[0][0] * x + m.m[0][1] * y;
         Float yp = m.m[1][0] * x + m.m[1][1] * y;
         return vec2f(xp, yp);
     }
-    
+
     __bidevice__ vec2f Vector(const vec2f &p, vec2f *pError) const{
         Float x = p.x, y = p.y;
         Float xp = m.m[0][0] * x + m.m[0][1] * y;
@@ -295,13 +295,13 @@ class Transform2{
         *pError = gamma(3) * vec2f(xAbsSum, yAbsSum);
         return vec2f(xp, yp);
     }
-    
+
     __bidevice__ vec2f Point(const vec2f &p) const{
         Float x = p.x, y = p.y;
         Float xp = m.m[0][0] * x + m.m[0][1] * y + m.m[0][2];
         Float yp = m.m[1][0] * x + m.m[1][1] * y + m.m[1][2];
         Float wp = m.m[2][0] * x + m.m[2][1] * y + m.m[2][2];
-        
+
         if(IsZero(wp - 1.)){
             return vec2f(xp, yp);
         }else{
@@ -309,17 +309,17 @@ class Transform2{
             return vec2f(xp, yp) / wp;
         }
     }
-    
+
     __bidevice__ vec2f Point(const vec2f &p, vec2f *pError) const{
         Float x = p.x, y = p.y;
         Float xp = m.m[0][0] * x + m.m[0][1] * y + m.m[0][2];
         Float yp = m.m[1][0] * x + m.m[1][1] * y + m.m[1][2];
         Float wp = m.m[2][0] * x + m.m[2][1] * y + m.m[2][2];
-        
+
         Float xAbsSum = Absf(m.m[0][0] * x) + Absf(m.m[0][1] * y) + Absf(m.m[0][2]);
         Float yAbsSum = Absf(m.m[1][0] * x) + Absf(m.m[1][1] * y) + Absf(m.m[1][2]);
         *pError = gamma(3) * vec2f(xAbsSum, yAbsSum);
-        
+
         if(IsZero(wp - 1.)){
             return vec2f(xp, yp);
         }else{
@@ -327,7 +327,7 @@ class Transform2{
             return vec2f(xp, yp) / wp;
         }
     }
-    
+
     __bidevice__ Ray2 operator()(const Ray2 &r) const{
         vec2f oError, dError;
         vec2f o = Point(r.o, &oError);
@@ -337,10 +337,10 @@ class Transform2{
             Float dt = Dot(Abs(d), oError) / len2;
             o += d * dt;
         }
-        
+
         return Ray2(o, d, r.tMax);
     }
-    
+
     __bidevice__ Bounds2f operator()(const Bounds2f &b) const{
         Bounds2f ret(Point(vec2f(b.pMin.x, b.pMin.y)));
         ret = Union(ret, Point(vec2f(b.pMin.x, b.pMax.y)));
@@ -349,7 +349,7 @@ class Transform2{
         ret = Union(ret, Point(vec2f(b.pMax.x, b.pMin.y)));
         return ret;
     }
-    
+
     __bidevice__ SurfaceInteraction2 operator()(const SurfaceInteraction2 &si) const{
         SurfaceInteraction2 ret;
         ret.p = Point(si.p);
@@ -379,32 +379,32 @@ class Transform{
                       mat[3][3]);
         mInv = Inverse(m);
     }
-    
+
     __bidevice__ Transform(const Matrix4x4 &m) : m(m), mInv(Inverse(m)) {}
     __bidevice__ Transform(const Matrix4x4 &m, const Matrix4x4 &mInv) : m(m), mInv(mInv) {}
-    
+
     __bidevice__ friend Transform Inverse(const Transform &t) {
         return Transform(t.mInv, t.m);
     }
-    
+
     __bidevice__ friend Transform Transpose(const Transform &t) {
         return Transform(Transpose(t.m), Transpose(t.mInv));
     }
-    
+
     template<typename T> __bidevice__ vec3<T> Vector(const vec3<T> &v) const{
         T x = v.x, y = v.y, z = v.z;
         return vec3<T>(m.m[0][0] * x + m.m[0][1] * y + m.m[0][2] * z,
                        m.m[1][0] * x + m.m[1][1] * y + m.m[1][2] * z,
                        m.m[2][0] * x + m.m[2][1] * y + m.m[2][2] * z);
     }
-    
+
     template<typename T> __bidevice__ Normal3<T> Normal(const Normal3<T> &n) const{
         T x = n.x, y = n.y, z = n.z;
         return Normal3<T>(mInv.m[0][0] * x + mInv.m[1][0] * y + mInv.m[2][0] * z,
                           mInv.m[0][1] * x + mInv.m[1][1] * y + mInv.m[2][1] * z,
                           mInv.m[0][2] * x + mInv.m[1][2] * y + mInv.m[2][2] * z);
     }
-    
+
     template<typename T> __bidevice__ vec3<T> Vector(const vec3<T> &v, vec3<T> *absError) const{
         T x = v.x, y = v.y, z = v.z;
         absError->x =
@@ -420,7 +420,7 @@ class Transform{
                        m.m[1][0] * x + m.m[1][1] * y + m.m[1][2] * z,
                        m.m[2][0] * x + m.m[2][1] * y + m.m[2][2] * z);
     }
-    
+
     template<typename T> __bidevice__ vec3<T> Point(const vec3<T> &p) const{
         T x = p.x, y = p.y, z = p.z;
         T xp = m.m[0][0] * x + m.m[0][1] * y + m.m[0][2] * z + m.m[0][3];
@@ -434,14 +434,14 @@ class Transform{
             return vec3<T>(xp, yp, zp) / wp;
         }
     }
-    
+
     template<typename T> __bidevice__ vec3<T> Point(const vec3<T> &p, vec3<T> *pError) const{
         T x = p.x, y = p.y, z = p.z;
         T xp = (m.m[0][0] * x + m.m[0][1] * y) + (m.m[0][2] * z + m.m[0][3]);
         T yp = (m.m[1][0] * x + m.m[1][1] * y) + (m.m[1][2] * z + m.m[1][3]);
         T zp = (m.m[2][0] * x + m.m[2][1] * y) + (m.m[2][2] * z + m.m[2][3]);
         T wp = (m.m[3][0] * x + m.m[3][1] * y) + (m.m[3][2] * z + m.m[3][3]);
-        
+
         T xAbsSum = (Absf(m.m[0][0] * x) + Absf(m.m[0][1] * y) +
                      Absf(m.m[0][2] * z) + Absf(m.m[0][3]));
         T yAbsSum = (Absf(m.m[1][0] * x) + Absf(m.m[1][1] * y) +
@@ -456,7 +456,7 @@ class Transform{
             return vec3<T>(xp, yp, zp) / wp;
         }
     }
-    
+
     __bidevice__ Ray operator()(const Ray &r) const{
         vec3f oError, dError;
         vec3f o = Point(r.o, &oError);
@@ -466,10 +466,10 @@ class Transform{
             Float dt = Dot(Abs(d), oError) / len2;
             o += d * dt;
         }
-        
+
         return Ray(o, d, r.tMax);
     }
-    
+
     __bidevice__ SurfaceInteraction operator()(const SurfaceInteraction &si) const{
         SurfaceInteraction ret;
         ret.p = Point(si.p);
@@ -477,9 +477,9 @@ class Transform{
         ret.shape = si.shape;
         return ret;
     }
-    
+
     __bidevice__ void Mesh(ParsedMesh *mesh) const;
-    
+
     __bidevice__ bool IsIdentity() const {
         return (m.m[0][0] == 1.f && m.m[0][1] == 0.f && m.m[0][2] == 0.f &&
                 m.m[0][3] == 0.f && m.m[1][0] == 0.f && m.m[1][1] == 1.f &&
@@ -488,13 +488,13 @@ class Transform{
                 m.m[3][0] == 0.f && m.m[3][1] == 0.f && m.m[3][2] == 0.f &&
                 m.m[3][3] == 1.f);
     }
-    
+
     __bidevice__ const Matrix4x4 &GetMatrix() const { return m; }
     __bidevice__ const Matrix4x4 &GetInverseMatrix() const { return mInv; }
-    
+
     __bidevice__ Transform operator*(const Transform &t2) const;
     __bidevice__ bool SwapsHandedness() const;
-    
+
     __bidevice__ Bounds3f operator()(const Bounds3f &b) const;
 };
 

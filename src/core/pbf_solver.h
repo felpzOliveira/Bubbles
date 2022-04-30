@@ -35,7 +35,7 @@ class PbfSolver2{
     unsigned int predictIterations;
     Float stepInterval;
     LNMStats lnmStats;
-    
+
     __host__ PbfSolver2();
     __host__ void Initialize(SphSolverData2 *data);
     __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,

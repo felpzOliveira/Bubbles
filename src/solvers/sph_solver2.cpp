@@ -175,9 +175,31 @@ __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buff
     getchar();
 }
 
+#include <graphy-inl.h>
 __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer,
                                                  float *colors)
 {
+#if 0
+    static GWindow *gui = nullptr;
+    if(!gui) gui = new GWindow("Solver", 1000, 1000);
+    auto canvas = gui->get_canvas();
+    canvas.Radius(2.5);
+    canvas.Color(0x112F41);
+    ParallelFor((size_t)0, (size_t)pSet->GetParticleCount(), [&](size_t i) -> void{
+        vec2f pi = pSet->GetParticlePosition(i);
+        float r = colors[3 * i + 0];
+        float g = colors[3 * i + 1];
+        float b = colors[3 * i + 2];
+
+        Float x = (pi.x + 1.f) * 0.5;
+        Float y = (pi.y + 1.f) * 0.5;
+        if(b > g + 0.01)
+            canvas.circle(x, y).color(GVec4f(r, g, b, 1));
+        else
+            canvas.circle(x, y).color(GVec4f(r, g, b, 1));
+    });
+    gui->update();
+#else
     AssertA(pSet, "Invalid SPHParticle pointer for Debug Display");
     Float pSize = 2.5;
 
@@ -190,6 +212,7 @@ __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buff
 
     // TODO: Domain size
     graphy_render_points_size(buffer, colors, pSize, pSet->GetParticleCount(),-1,1,1,-1);
+#endif
 }
 
 __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet){

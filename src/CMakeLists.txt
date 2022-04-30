@@ -1,12 +1,12 @@
-file(GLOB BUBBLES_CORE boundaries/*.cpp 
-					   core/*.cpp 
-					   cuda/*.cpp 
-					   equations/*.cpp 
-					   generator/*.cpp 
-					   shapes/*.cpp 
-					   solvers/*.cpp 
+file(GLOB BUBBLES_CORE boundaries/*.cpp
+					   core/*.cpp
+					   cuda/*.cpp
+					   equations/*.cpp
+					   generator/*.cpp
+					   shapes/*.cpp
+					   solvers/*.cpp
                        reconstruction/*.cpp
-					   tests/*.cpp 
+					   tests/*.cpp
 					   third/*.cpp)
 
 file(GLOB BUBBLES_SRCS bubbles.cpp)

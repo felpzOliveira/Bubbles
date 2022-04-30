@@ -29,7 +29,7 @@ typedef enum{
 #define cudaDeviceAssert(fname) if(cudaKernelSynchronize()){ printf("Failure for %s\n", fname); cudaSafeExit(); }
 #define cudaAllocateUnregisterVx(type, n) (type *)_cudaAllocateUnregister(sizeof(type)*n, __LINE__, __FILE__, true)
 
-#define __bidevice__ __host__ __device__ 
+#define __bidevice__ __host__ __device__
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -137,18 +137,18 @@ class DataBuffer{
     public:
     T *data;
     int size;
-    
+
     __bidevice__ DataBuffer(){ size = 0; data = nullptr; }
-    
+
     __bidevice__ int GetSize(){
         return size;
     }
-    
+
     __host__ void SetSize(int n){
         size = n;
         data = cudaAllocateVx(T, size);
     }
-    
+
     __host__ int SetDataAt(T *values, int n, int at){
         int rv = 1;
         if(size >= at + n){
@@ -157,32 +157,32 @@ class DataBuffer{
         }else{
             printf("Warning: Invalid fill index {%d + %d >= %d}\n", at, n, size);
         }
-        
+
         return rv;
     }
-    
+
     __host__ void Clear(){
         memset(data, 0x0, sizeof(T) * size);
     }
-    
+
     __host__ void SetData(T *values, int n){
         size = n;
         data = cudaAllocateVx(T, size);
         memcpy(data, values, sizeof(T) * size);
     }
-    
+
     __bidevice__ T At(int i){
         if(i < size) return data[i];
         printf("Warning: Invalid query index {%d >= %d}\n", i, size);
         return T(0);
     }
-    
+
     __bidevice__ T *Get(int i){
         if(i < size) return &data[i];
         printf("Warning: Invalid get index {%d >= %d}\n", i, size);
         return nullptr;
     }
-    
+
     __bidevice__ void Set(T val, int i){
         if(i < size) data[i] = val;
         else printf("Warning: Invalid set index {%d >= %d}\n", i, size);
@@ -194,7 +194,7 @@ inline int GetBlockSize(F kernel, const char *fname){
     static std::map<std::type_index, int> kernelBlockSizes;
     std::type_index index = std::type_index(typeid(F));
     int blockSize = 0;
-    
+
     if(global_cuda_strategy.strategy == CudaLaunchStrategy::CustomizedBlockSize){
         blockSize = global_cuda_strategy.blockSize;
     }else if(global_cuda_strategy.strategy == CudaLaunchStrategy::MaxOccupancyBlockSize){
@@ -289,7 +289,7 @@ int GetSystemUseCPU();
  * perform a simple for loop for easier debug.
  */
 template<typename Index, typename Function>
-void ParallelFor(Index start, Index end, const Function &fn){
+void ParallelFor(Index start, Index end, Function fn){
     if(start > end) return;
     int userThreads = GetConfiguredCPUThreads();
 
@@ -333,5 +333,17 @@ void ParallelFor(Index start, Index end, const Function &fn){
         }
     }
 }
+
+/* Macro for auto-detection and parallelization */
+
+#define AutoLambda(...) GPU_LAMBDA(__VA_ARGS__)
+
+#define AutoParallelFor(title, items, fn) do{\
+    if(GetSystemUseCPU()){\
+        ParallelFor((size_t)0, (size_t)items, fn);\
+    }else{\
+        GPUParallelLambda(title, items, fn);\
+    }\
+}while(0)
 
 #endif

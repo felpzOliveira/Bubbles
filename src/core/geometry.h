@@ -40,6 +40,7 @@
 #define v2aA(v) __vec2_argsA(v)
 
 #define OneMinusEpsilon 0.99999994f
+#define OnePlusEpsilon 1.00000006f
 #define Epsilon 0.0001f
 #define Pi 3.14159265358979323846
 #define TwoPi 6.283185307179586
@@ -122,9 +123,8 @@ inline __bidevice__ bool IsHighpZero(Float a) { return Absf(a) < 1e-22; }
 inline __bidevice__ bool IsUnsafeHit(Float a){ return Absf(a) < 1e-6; }
 inline __bidevice__ bool IsUnsafeZero(Float a){ return Absf(a) < 1e-6; }
 inline __bidevice__ Float Sign(Float a){
-    if(IsZero(a)) return 0;
-    if(a > 0) return 1;
-    return -1;
+    int t = a < 0 ? -1 : 0;
+    return a > 0 ? 1 : t;
 }
 
 inline __bidevice__ Float LinearRemap(Float x, Float a, Float b, Float A, Float B){
@@ -134,6 +134,10 @@ inline __bidevice__ Float LinearRemap(Float x, Float a, Float b, Float A, Float 
 inline __bidevice__ Float Log2(Float x){
     const Float invLog2 = 1.442695040888963387004650940071;
     return std::log(x) * invLog2;
+}
+
+inline __bidevice__ void Swap(Float **a, Float **b){
+    Float *c = *a; *a = *b; *b = c;
 }
 
 inline __bidevice__ void Swap(Float *a, Float *b){
@@ -588,7 +592,7 @@ template<typename T> class vec3{
 template<typename T> class vec4{
     public:
     T x, y, z, w;
-    __bidevice__ vec4(){ x = y = z = (T)0; }
+    __bidevice__ vec4(){ x = y = z = w = (T)0; }
     __bidevice__ vec4(T a){ x = y = z = w = a; }
     __bidevice__ vec4(T a, T b, T c, T d): x(a), y(b), z(c), w(d){
         Assert(!HasNaN());
@@ -1797,3 +1801,4 @@ inline __host__ Float rand_float(){
 typedef enum{
     VertexCentered, CellCentered, FaceCentered
 }VertexType;
+

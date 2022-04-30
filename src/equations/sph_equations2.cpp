@@ -7,7 +7,7 @@ __bidevice__ Float ComputeAverageTemperature(SphSolverData2 *data){
     for(int i = 0; i < count; i++){
         Tt += pSet->GetParticleTemperature(i);
     }
-    
+
     return Tt / (Float)count;
 }
 
@@ -23,7 +23,7 @@ __bidevice__ Float ComputePressureValue(SphSolverData2 *data, Float di){
     if(p < 0){
         p *= data->negativePressureScale;
     }
-    
+
     return p;
 }
 
@@ -36,17 +36,17 @@ __bidevice__ Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &pi)
     int *neighbors = nullptr;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
-    
+
     int count = data->domain->GetNeighborsOf(cellId, &neighbors);
     Float sphRadius = data->sphpSet->GetKernelRadius();
     SphStdKernel2 kernel(sphRadius);
-    
+
     Float sum = 0;
     for(int i = 0; i < count; i++){
         Cell2 *cell = data->domain->GetCell(neighbors[i]);
         ParticleChain *pChain = cell->GetChain();
         int size = cell->GetChainLength();
-        
+
         for(int j = 0; j < size; j++){
             vec2f pj = pSet->GetParticlePosition(pChain->pId);
             Float distance = Distance(pi, pj);
@@ -54,7 +54,7 @@ __bidevice__ Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &pi)
             pChain = pChain->next;
         }
     }
-    
+
     Float di = sum * pSet->GetMass();
     return di;
 }
@@ -63,10 +63,10 @@ __bidevice__ Float ComputeDensityForParticle(SphSolverData2 *data, int particleI
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
     Bucket *bucket = pSet->GetParticleBucket(particleId);
-    
+
     Float sphRadius = data->sphpSet->GetKernelRadius();
     SphStdKernel2 kernel(sphRadius);
-    
+
     Float sum = 0;
     for(int i = 0; i < bucket->Count(); i++){
         int j = bucket->Get(i);
@@ -92,9 +92,9 @@ __bidevice__ void ComputeDensityFor(SphSolverData2 *data, int particleId,
     if(compute_pressure != 0){
         ComputePressureFor(data, particleId, di);
     }
-    
+
     AssertA(!IsZero(di), "Zero density");
-    
+
     pSet->SetParticleDensity(particleId, di);
 }
 
@@ -106,27 +106,27 @@ __bidevice__ void ComputeNonPressureForceFor(SphSolverData2 *data, int particleI
     vec2f pi = pSet->GetParticlePosition(particleId);
     vec2f vi = pSet->GetParticleVelocity(particleId);
     Bucket *bucket = pSet->GetParticleBucket(particleId);
-    
+
     Float mass = pSet->GetMass();
     Float mass2 = mass * mass;
     Float sphRadius = data->sphpSet->GetKernelRadius();
     SphSpikyKernel2 kernel(sphRadius);
-    
+
     vec2f fi(0,0);
     const vec2f Gravity2D(0, -9.8);
     fi += mass * Gravity2D;
     fi += -data->dragCoefficient * vi;
-    
+
     for(int i = 0; i < bucket->Count(); i++){
         int j = bucket->Get(i);
         vec2f pj = pSet->GetParticlePosition(j);
         vec2f vj = pSet->GetParticleVelocity(j);
         Float dj = pSet->GetParticleDensity(j);
-        
+
         Float dist = Distance(pi, pj);
         fi += data->viscosity * mass2 * (vj - vi) * kernel.d2W(dist) / dj;
     }
-    
+
     pSet->SetParticleForce(particleId, fi);
 }
 
@@ -134,17 +134,17 @@ __bidevice__ void ComputePressureForceFor(SphSolverData2 *data, int particleId){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
     Bucket *bucket = pSet->GetParticleBucket(particleId);
-    
+
     Float mass = pSet->GetMass();
     Float mass2 = pSet->GetMass() * pSet->GetMass();
     Float sphRadius = data->sphpSet->GetKernelRadius();
     SphSpikyKernel2 kernel(sphRadius);
-    
+
     vec2f fi = pSet->GetParticleForce(particleId);
     Float poi = pSet->GetParticlePressure(particleId);
     Float di = pSet->GetParticleDensity(particleId);
     Float di2 = di * di;
-    
+
     AssertA(!IsZero(di2), "Zero source density {ComputePressureForceFor}");
     vec2f ti(0,0);
     for(int i = 0; i < bucket->Count(); i++){
@@ -154,10 +154,10 @@ __bidevice__ void ComputePressureForceFor(SphSolverData2 *data, int particleId){
             Float dj = pSet->GetParticleDensity(j);
             Float dj2 = dj * dj;
             Float poj = pSet->GetParticlePressure(j);
-            
+
             Float dist = Distance(pi, pj);
             bool valid = IsWithinSpiky(dist, sphRadius);
-            
+
             if(valid){
                 AssertA(!IsZero(dj2), "Zero neighbor density {ComputePressureForceFor}");
                 if(dist > 0 && !IsZero(dist)){
@@ -168,37 +168,37 @@ __bidevice__ void ComputePressureForceFor(SphSolverData2 *data, int particleId){
             }
         }
     }
-    
+
     fi = fi - ti;
     pSet->SetParticleForce(particleId, fi);
 }
 
-__bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId, 
+__bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
                                       Float timeStep, int extended, int integrate)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
     Bucket *bucket = pSet->GetParticleBucket(particleId);
-    
+
     Float mass = pSet->GetMass();
     Float mass2 = pSet->GetMass() * pSet->GetMass();
     Float sphRadius = data->sphpSet->GetKernelRadius();
     SphSpikyKernel2 kernel(sphRadius);
-    
+
     vec2f fi(0,0);
     Float poi = pSet->GetParticlePressure(particleId);
     Float di = pSet->GetParticleDensity(particleId);
     Float di2 = di * di;
     Float Ti = 0;
     if(extended) Ti = pSet->GetParticleTemperature(particleId);
-    
+
     vec2f vi = pSet->GetParticleVelocity(particleId);
     Float Tout = Ti;
-    
+
     const vec2f Gravity2D(0, -9.8);
     fi += mass * Gravity2D;
     fi += -data->dragCoefficient * vi;
-    
+
     AssertA(!IsZero(di2), "Zero source density {ComputePressureForceFor}");
     vec2f ti(0,0);
     vec2f ni(0,0);
@@ -214,10 +214,10 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
             Float poj = pSet->GetParticlePressure(j);
             Float Tj = 0;
             if(extended) Tj = pSet->GetParticleTemperature(j);
-            
+
             Float dist = Distance(pi, pj);
             bool valid = IsWithinSpiky(dist, sphRadius);
-            
+
             if(valid){
                 AssertA(!IsZero(dj2), "Zero neighbor density {ComputePressureForceFor}");
                 if(dist > 0 && !IsZero(dist)){
@@ -225,7 +225,7 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
                     vec2f gradij = kernel.gradW(dist, dir);
                     ti += mass2 * (poi / di2 + poj / dj2) * gradij;
                     ni += (mass / dj) * gradij;
-                    
+
                     if(extended){
                         Float pdotgrad = Dot(pi - pj, gradij);
                         pdotgrad /= (dist * dist + 0.0001);
@@ -233,12 +233,12 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
                         Tidt += dt;
                     }
                 }
-                
+
                 fi += data->viscosity * mass2 * (vj - vi) * kernel.d2W(dist) / dj;
             }
         }
     }
-    
+
     if(extended){
         SphStdKernel2 iKernel(data->sphpSet->GetKernelRadius());
         Float dk = di;
@@ -247,10 +247,10 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
         Float pok = ComputePressureValue(data, dk);
         Float facK = 0.6 * data->sphpSet->GetKernelRadius(); // TODO: Fix this
         vec2f gradik = iKernel.gradW(facK, ni);
-        
+
         // TODO: Radiation term?
         // Tidt = -Ti / Dr ?
-        
+
         Float mk = v0 * di;
         Float pa = 1.0;
         vec2f pp = (mk * mass) * (poi / dk2 + pok / di2) * gradik;
@@ -260,12 +260,12 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
         AssertA(!IsNaN(Tout), "NaN temperature");
         pSet->SetParticleTemperature(particleId, Tout);
     }
-    
+
     fi = fi - ti;
     pSet->SetParticleForce(particleId, fi);
     if(pSet->HasNormal())
         pSet->SetParticleNormal(particleId, ni);
-    
+
     if(integrate)
         TimeIntegrationFor(data, particleId, timeStep, extended);
 }
@@ -273,7 +273,7 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
 /**************************************************************/
 //               T I M E    I N T E G R A T I O N             //
 /**************************************************************/
-__bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId, 
+__bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
                                      Float timeStep, int extended)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
@@ -283,18 +283,18 @@ __bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
     Float di = pSet->GetParticleDensity(particleId);
     Float mass = pSet->GetMass();
     vec2f oi = pi;
-    
+
     Float Cb = 100.0;
     vec2f aTi(0,0);
     if(extended){
         Float Ti = pSet->GetParticleTemperature(particleId);
         aTi = Cb * Ti * vec2f(0, 1);
     }
-    
+
     vec2f aFi = fi / mass;
-    
+
     vec2f at = aTi + aFi;
-    
+
     vi += timeStep * at;
     pi += timeStep * vi;
 
@@ -304,7 +304,7 @@ __bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
     if(dist >= minLen * 0.5){
         data->sphpSet->SetHigherLevel();
     }
-    
+
     //TODO: Figure out restitution coefficient
     data->collider->ResolveCollision(pSet->GetRadius(), 0.75, &pi, &vi);
     if(!Inside(pi, data->domain->bounds)){
@@ -324,7 +324,7 @@ __bidevice__ void ComputePseudoViscosityAggregationKernelFor(SphSolverData2 *dat
     Float mass = pSet->GetMass();
     Float sphRadius = data->sphpSet->GetKernelRadius();
     SphSpikyKernel2 kernel(sphRadius);
-    
+
     vec2f smoothedVi(0);
     Float weightSum = 0;
     for(int i = 0; i < bucket->Count(); i++){
@@ -335,14 +335,14 @@ __bidevice__ void ComputePseudoViscosityAggregationKernelFor(SphSolverData2 *dat
         Float dist = Distance(pi, pj);
         Float wj = mass / dj * kernel.W(dist);
         weightSum += wj;
-        
+
         smoothedVi += wj * vj;
     }
-    
+
     if(weightSum > 0){
         smoothedVi *= (1.0 / weightSum);
     }
-    
+
     data->smoothedVelocities[particleId] = smoothedVi;
 }
 
@@ -379,13 +379,13 @@ __host__ void UpdateGridDistributionCPU(SphSolverData2 *data){
             grid->SwapCellList(i);
         });
     }
-    
+
     int pCount = pSet->GetParticleCount();
     Float kernelRadius = data->sphpSet->GetKernelRadius();
     ParallelFor(0, pCount, [&](int i){
         grid->DistributeParticleBucket(pSet, i, kernelRadius);
     });
-    
+
     data->frame_index = 1;
 }
 
@@ -426,16 +426,16 @@ __host__ void UpdateGridDistributionGPU(SphSolverData2 *data){
         int N = grid->GetCellCount();
         int index = data->frame_index;
         GPULaunch(N, UpdateGridDistributionKernel, grid, pSet, index);
-        
+
         if(data->frame_index == 1){
             GPULaunch(N, SwapGridStatesKernel, grid);
         }
     }
-    
+
     int pCount = pSet->GetParticleCount();
     Float kernelRadius = data->sphpSet->GetKernelRadius();
     GPULaunch(pCount, UpdateParticlesBuckets, grid, pSet, kernelRadius);
-    
+
     data->frame_index = 1;
 }
 
@@ -487,7 +487,7 @@ __host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float
         ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
         int N = pSet->GetParticleCount();
         GPULaunch(N, ComputePseudoViscosityAggregationKernel, data);
-        
+
         GPULaunch(N, ComputePseudoViscosityInterpolationKernel, data, timeStep);
     }
 }
@@ -500,7 +500,7 @@ __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float
         ParallelFor(0, N, [&](int i){
             ComputePseudoViscosityAggregationKernelFor(data, i);
         });
-        
+
         ParallelFor(0, N, [&](int i){
             ComputePseudoViscosityInterpolationKernelFor(data, i, timeStep);
         });
@@ -597,7 +597,7 @@ __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particl
     AssertA(level > 0 && maxLevel > 1, "Zero level cell");
     Float alpha = (Float)(level - 1.0) / (Float)(maxLevel - 1.0);
     Float Ti = Lerp(alpha, Tmin, Tmax);
-    
+
     pSet->SetParticleTemperature(particleId, Ti);
 }
 
@@ -611,7 +611,7 @@ __host__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
     });
 }
 
-__global__ void ComputeInitialTemperatureMapKernel(SphSolverData2 *data, Float Tmin, 
+__global__ void ComputeInitialTemperatureMapKernel(SphSolverData2 *data, Float Tmin,
                                                    Float Tmax, int maxLevel)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -621,7 +621,7 @@ __global__ void ComputeInitialTemperatureMapKernel(SphSolverData2 *data, Float T
     }
 }
 
-__host__ void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin, 
+__host__ void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin,
                                               Float Tmax, int maxLevel)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();

@@ -27,3 +27,4 @@ __bidevice__ void ExplicitGrid2::Set(const vec2ui &res, const vec2f &h, const ve
     invSpacing2 = vec2f(invSpacing.x * invSpacing.x, invSpacing.y * invSpacing.y);
     bounds = Bounds2f(origin, origin + spacing * vec2f((Float)res.x, (Float)res.y));
 }
+

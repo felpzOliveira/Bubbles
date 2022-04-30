@@ -53,7 +53,7 @@ __host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform);
 * Generates a acceleration Grid for a domain given its bounds, the target spacing
 * of the simulation and the spacing scale to be used. This grid is uniform.
 */
-__host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing, 
+__host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
                                        Float spacingScale = 2.0);
 
 __host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
@@ -162,19 +162,19 @@ __host__ int UtilIsDomainContaining(Bounds3f domainBounds, std::vector<Bounds3f>
             S = center[i] + domainBounds.ExtentOn(i) * 0.5;
             s = otherCenter[i] + bound.ExtentOn(i) * 0.5;
             if(S < s) { rv = i; break; }
-            
+
             S = center[i] - domainBounds.ExtentOn(i) * 0.5;
             s = otherCenter[i] - bound.ExtentOn(i) * 0.5;
             if(S > s) { rv = i; break; }
         }
-        
+
         if(rv != -1){
             vec3f p0 = domainBounds.pMin;
             vec3f p1 = domainBounds.pMax;
             vec3f v0 = bound.pMin;
             vec3f v1 = bound.pMax;
             printf("*********************************************************\n");
-            printf("Warning: Domain {%g %g %g} x {%g %g %g} does not contain:\n" 
+            printf("Warning: Domain {%g %g %g} x {%g %g %g} does not contain:\n"
                    "\t{%g %g %g} x {%g %g %g}\n", p0.x, p0.y, p0.z, p1.x, p1.y, p1.z,
                    v0.x, v0.y, v0.z, v1.x, v1.y, v1.z);
             printf("Offending axis: %d\n", rv);
@@ -182,14 +182,14 @@ __host__ int UtilIsDomainContaining(Bounds3f domainBounds, std::vector<Bounds3f>
             return 0;
         }
     }
-    
+
     return 1;
 }
 
 /*
 * Compute the bounds of a given particle set.
 */
-inline 
+inline
 __host__ Bounds3f UtilComputeParticleSetBounds(ParticleSet3 *pSet){
     int count = pSet->GetParticleCount();
     vec3f pi = pSet->GetParticlePosition(0);
@@ -198,7 +198,7 @@ __host__ Bounds3f UtilComputeParticleSetBounds(ParticleSet3 *pSet){
         pi = pSet->GetParticlePosition(i);
         bounds = Union(bounds, pi);
     }
-    
+
     return bounds;
 }
 
@@ -221,7 +221,7 @@ inline __host__ Float UtilComputeMedian(DataAccessor *accessor, int size){
     for(int i = 0; i < size; i++){
         value += accessor[i];
     }
-    
+
     value /= (double)size;
     return (Float)value;
 }
@@ -233,7 +233,7 @@ inline __host__ int UtilFillBoundaryParticles(ParticleAccessor *pSet,
     int bCount = 0;
     int pCount = pSet->GetParticleCount();
     boundaries->clear();
-    
+
     for(int i = 0; i < pCount; i++){
         int L = pSet->GetParticleV0(i);
         if(L > 0){
@@ -243,7 +243,7 @@ inline __host__ int UtilFillBoundaryParticles(ParticleAccessor *pSet,
             boundaries->push_back(0);
         }
     }
-    
+
     return bCount;
 }
 
@@ -337,7 +337,7 @@ inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
     ptr = new float[2 * 3 * total];
     pos = &ptr[0];
     col = &ptr[3 * total];
-    
+
     memset(col, 0, sizeof(float) * 3 * total);
     visible = pSet->GetParticleCount();
     for(int j = 0; j < visible; j++){
@@ -345,8 +345,8 @@ inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
         pos[3 * j + 0] = pi.x; pos[3 * j + 1] = pi.y;
         pos[3 * j + 2] = 0;    col[3 * j + 0] = 1;
     }
-    
-    
+
+
     graphy_render_points_size(pos, col, pSize, visible,
                               lower.x, upper.x, upper.y, lower.y);
     int frame = 0;
@@ -362,7 +362,7 @@ inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
                                   lower.x, upper.x, upper.y, lower.y);
         frame++;
     }
-    
+
     graphy_close_display();
     delete[] ptr;
 }
@@ -391,7 +391,7 @@ inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
     ptr = new float[2 * 3 * total];
     pos = &ptr[0];
     col = &ptr[3 * total];
-    
+
     memset(col, 0, sizeof(float) * 3 * total);
     visible = pSet->GetParticleCount();
     for(int j = 0; j < visible; j++){
@@ -399,9 +399,9 @@ inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
         pos[3 * j + 0] = pi.x; pos[3 * j + 1] = pi.y;
         pos[3 * j + 2] = 0;
     }
-    
+
     setCol(col, visible);
-    
+
     graphy_render_points_size(pos, col, pSize, visible,
                               lower.x, upper.x, upper.y, lower.y);
     int frame = 0;
@@ -413,13 +413,13 @@ inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
             pos[3 * j + 0] = pi.x; pos[3 * j + 1] = pi.y;
             pos[3 * j + 2] = 0;
         }
-        
+
         setCol(col, visible);
         graphy_render_points_size(pos, col, pSize, visible,
                                   lower.x, upper.x, upper.y, lower.y);
         frame++;
     }
-    
+
     graphy_close_display();
     delete[] ptr;
 }
@@ -495,7 +495,7 @@ inline __host__ void UtilRunDynamicSimulation2(Solver *solver, ParticleAccessor 
 */
 template<typename Solver, typename ParticleAccessor>
 inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
-                                        Float spacing, vec3f origin, vec3f target, 
+                                        Float spacing, vec3f origin, vec3f target,
                                         Float targetInterval, std::vector<Shape*> sdfs,
                                         const std::function<int(int )> &callback)
 {
@@ -512,16 +512,16 @@ inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
     ptr = new float[2 * 3 * total];
     pos = &ptr[0];
     col = &ptr[3 * total];
-    
+
     memset(col, 0, sizeof(float) * 3 * total);
-    
+
     int it = 0;
     for(int i = 0; i < particles.size(); i++){
         vec3f pi = particles[it++];
         pos[3 * i + 0] = pi.x; pos[3 * i + 1] = pi.y;
         pos[3 * i + 2] = pi.z; col[3 * i + 2] = 1;
     }
-    
+
     int end = pSet->GetParticleCount();
     for(int i = 0; i < end; i++){
         vec3f pi = pSet->GetParticlePosition(i);
@@ -529,14 +529,14 @@ inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
         pos[3 * j + 0] = pi.x; pos[3 * j + 1] = pi.y;
         pos[3 * j + 2] = pi.z; col[3 * j + 0] = 1;
     }
-    
-    
+
+
     graphy_set_3d(origin.x, origin.y, origin.z, target.x, target.y, target.z,
                   45.0, 0.1f, 100.0f);
     int visible = particles.size() + pSet->GetParticleCount();
     graphy_render_points3f(pos, col, visible, spacing/2.0);
     int frame = 0;
-    
+
     while(callback(frame) != 0){
         solver->Advance(targetInterval);
         for(int j = 0; j < pSet->GetParticleCount(); j++){
@@ -545,12 +545,12 @@ inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
             pos[3 * k + 0] = pi.x; pos[3 * k + 1] = pi.y;
             pos[3 * k + 2] = pi.z; col[3 * k + 0] = 1;
         }
-        
+
         visible = particles.size() + pSet->GetParticleCount();
         graphy_render_points3f(pos, col, visible, spacing/2.0);
         frame++;
     }
-    
+
     graphy_close_display();
     delete[] ptr;
 }
@@ -564,7 +564,7 @@ inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
 */
 template<typename Solver, typename ParticleAccessor>
 inline __host__ void UtilRunDynamicSimulation3(Solver *solver, ParticleAccessor *pSet,
-                                               Float spacing, vec3f origin, vec3f target, 
+                                               Float spacing, vec3f origin, vec3f target,
                                                Float targetInterval, int extraParts,
                                                std::vector<Shape*> sdfs,
                                                const std::function<int(int )> &callback,
@@ -640,7 +640,7 @@ inline __host__ void UtilRunDynamicSimulation3(Solver *solver, ParticleAccessor 
 /*
 * Print LNM stats after a step of simulation.
 */
-template<typename Solver> 
+template<typename Solver>
 inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
                                            std::vector<int> refFrames={})
 {
@@ -657,7 +657,7 @@ inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
             break;
         }
     }
-    
+
     printf("\rStep (%d) : %d ms - Particles: %d - (LNM: %g ms %g%%) (Slower: %g ms %g%%) (Faster: %g ms %g%%)    ",
            step, (int)advTime, pCount, average.timeTaken, average.simPercentage,
            slower.timeTaken, slower.simPercentage, faster.timeTaken, faster.simPercentage);
@@ -690,7 +690,7 @@ int UtilGetBoundaryState(ParticleSetAccessor *pSet, std::vector<int> *boundaries
             b = v0;
             n++;
         }
-        
+
         boundaries->push_back(b);
     }
 

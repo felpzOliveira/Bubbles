@@ -17,7 +17,7 @@ void test_check(bool v, const char *name, const char *filename, int line, const 
             printf("Check: %s (%s:%d) : (No message)\n", name, filename, line);
         else
             printf("Check: %s (%s:%d) : (%s)\n", name, filename, line, msg);
-        
+
         cudaSafeExit();
     }
 }
@@ -25,7 +25,7 @@ void test_check(bool v, const char *name, const char *filename, int line, const 
 vec3f get_color_level(int level);
 
 // Utilities for coloring
-template<typename F> inline int 
+template<typename F> inline int
 set_poscol_lnm(float *pos, float *col, ParticleSet3 *pSet, Grid3 *grid, F accept){
     int it = 0;
     for(int i = 0; i < pSet->GetParticleCount(); i++){
@@ -41,7 +41,7 @@ set_poscol_lnm(float *pos, float *col, ParticleSet3 *pSet, Grid3 *grid, F accept
             it ++;
         }
     }
-    
+
     return it;
 }
 

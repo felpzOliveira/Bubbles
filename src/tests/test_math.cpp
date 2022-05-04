@@ -148,20 +148,64 @@ class FluidSolver {
     }
 };
 
+#include <interval.h>
+#define TypedPolygon PolygonSubdivisionGeometry
+void gui_tri(Graphy2DCanvas *canvas, TypedPolygon *sub,
+            GVec4f circ_color = GVec4f(0,0,1,1), GVec4f line_color = GVec4f(0,1,0,1))
+{
+    canvas->circle(sub->p0.x, sub->p0.y).color(circ_color);
+    canvas->circle(sub->p1.x, sub->p1.y).color(circ_color);
+    canvas->circle(sub->p2.x, sub->p2.y).color(circ_color);
+    canvas->circle(sub->p3.x, sub->p3.y).color(circ_color);
+    canvas->path(sub->p0.x, sub->p0.y, sub->p1.x, sub->p1.y).color(line_color).width(2.f);
+    canvas->path(sub->p1.x, sub->p1.y, sub->p2.x, sub->p2.y).color(line_color).width(2.f);
+    canvas->path(sub->p2.x, sub->p2.y, sub->p3.x, sub->p3.y).color(line_color).width(2.f);
+    canvas->path(sub->p3.x, sub->p3.y, sub->p0.x, sub->p0.y).color(line_color).width(2.f);
+}
+
 void test_mac(int argc, char **argv){
     GWindow gui("MAC Test");
     auto canvas = gui.get_canvas();
-
-    canvas.Radius(10);
-    while(1){
-        vec2f p = vec2f(0.5, 0.5);
-        canvas.Color(0x112F41);
-        canvas.circle(p.x, p.y).color(GVec4f(1,0,0,1)).border();
 #if 0
-        _Gfloat rx = 15. / 800.0;
-        _Gfloat ry = 15. / 600.0;
-        canvas.rect(GVec2f(p.x - rx, p.y - ry), GVec2f(p.x + rx, p.y + ry))
-                .color(GVec4f(1,1,1,1)).width(2);
+    TypedPolygon sub[8], div[6], subdivs[12];
+    int nSlabs = 8, nDivs = 2;
+    vec2f p = vec2f(0.5, 0.5);
+    Float h = 0.25;
+
+    TypedPolygon::SlabsForParticle(p, h, &sub[0], &nSlabs);
+    int divs = 0;
+    sub[0].Subdivide(&div[0], &nDivs, p, h); divs += nDivs;
+    sub[1].Subdivide(&div[2], &nDivs, p, h); divs += nDivs;
+    sub[2].Subdivide(&div[4], &nDivs, p, h); divs += nDivs;
+
+    int at = 0;
+    for(int i = 0; i < 6; i++){
+        int ns = 0;
+        div[i].Subdivide(&subdivs[at], &ns, p, h);
+        at += ns;
+    }
+#endif
+
+    VolumetricSubdivisionGeometry slabs[4];
+    int nSlabs = 4;
+    VolumetricSubdivisionGeometry::SlabsForParticle(vec3f(0), 0.05, slabs, &nSlabs);
+
+    return;
+    while(1){
+        canvas.Color(0x112F41);
+#if 0
+        canvas.Radius(4.f);
+        for(int i = 0; i < nSlabs; i++){
+            gui_tri(&canvas, &sub[i]);
+        }
+
+        for(int i = 0; i < divs; i++){
+            gui_tri(&canvas, &div[i], GVec4f(1,0,0,1), GVec4f(1,1,0,1));
+        }
+
+        for(int i = 0; i < at; i++){
+            gui_tri(&canvas, &subdivs[i], GVec4f(1,0,1,1), GVec4f(0,1,1,1));
+        }
 #endif
         gui.update();
     }

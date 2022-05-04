@@ -41,6 +41,7 @@ typedef struct{
     int use_cpu;
     int write_domain;
     int noout;
+    SubdivisionMethod interval_sub_method;
     BoundaryMethod method;
     bool unbounded;
     bool narrowband;
@@ -66,6 +67,7 @@ void default_boundary_opts(boundary_opts *opts){
     opts->doringMu = RDM_MU_3D;
     opts->unbounded = false;
     opts->narrowband = false;
+    opts->interval_sub_method = PolygonSubdivision;
 }
 
 void print_boundary_configs(boundary_opts *opts){
@@ -159,6 +161,20 @@ ARGUMENT_PROCESS(boundary_lnm_algo_args){
        opts->lnmalgo != 2 && opts->lnmalgo != 5)
     {
         printf("Unknown algorithm value\n");
+        return -1;
+    }
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_interval_method_args){
+    boundary_opts *opts = (boundary_opts *)config;
+    std::string val = ParseNext(argc, argv, i, "-imethod", 1);
+    if(val == "bb" || val == "BB")
+        opts->interval_sub_method = BoundingBoxSubdivision;
+    else if(val == "poly" || val == "POLY")
+        opts->interval_sub_method = PolygonSubdivision;
+    else{
+        printf("Unknown value\n");
         return -1;
     }
     return 0;
@@ -389,6 +405,13 @@ std::map<const char *, arg_desc> bounds_arg_map = {
         {
             .processor = boundary_legacy_out_args,
             .help = "Sets the loader to use legacy format for output."
+        }
+    },
+    {"-imethod",
+        {
+            .processor = boundary_interval_method_args,
+            .help = "Sets the method to use for space subdivision when "
+                    "running Sandim's Interval Method ( Choices: bb, poly (default) )."
         }
     },
     {"-write-domain",
@@ -677,7 +700,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
             "    [%g %g %g]  x  [%g %g %g]\n",
            p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
 
-    
+
     solver.Setup(WaterDensity, opts->spacing, opts->spacingScale, grid, sphpSet);
 
     UpdateGridDistributionGPU(solver.solverData);
@@ -801,6 +824,10 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         timer.Start();
         SandimBoundary(pSet, grid, vpWorkQ);
         timer.Stop();
+    }else if(opts->method == BOUNDARY_INTERVAL){
+        timer.Start();
+        IntervalBoundary(pSet, grid, opts->spacing, opts->interval_sub_method);
+        timer.Stop();
     }
     /*
         The following methods are implemented correctly
@@ -809,11 +836,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         and don't understand their papers or if there are missing information
         in the presentation, use at your own risk.
      */
-    else if(opts->method == BOUNDARY_INTERVAL){
-        timer.Start();
-        IntervalBoundary(pSet, grid, opts->spacing);
-        timer.Stop();
-    }else if(opts->method == BOUNDARY_DORING){
+    else if(opts->method == BOUNDARY_DORING){
         timer.Start();
         RandlesDoringBoundary(pSet, grid, opts->spacing, opts->doringMu);
         timer.Stop();

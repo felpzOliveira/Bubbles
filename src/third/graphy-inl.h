@@ -13,6 +13,7 @@
 
 #define GMIN(a, b) ((a) < (b) ? (a) : (b))
 #define GMAX(a, b) ((a) > (b) ? (a) : (b))
+#define GABS(a) ((a) < 0 ? -(a) : (a))
 
 typedef float _GraphyFPrecision;
 
@@ -678,14 +679,15 @@ class Graphy2DCanvas{
         GVec4f _border_color;
         _Gfloat _radius;
         int _border;
+        int _empty;
 
         inline Circle(Graphy2DCanvas &canvas, GVec2f center):
             canvas(canvas), _center(center), _color(canvas.context.color),
-            _radius(canvas.context.radius), _border(0) {}
+            _radius(canvas.context.radius), _border(0), _empty(0) {}
 
         inline Circle(Graphy2DCanvas &canvas, GVec2f center, GVec4f col):
             canvas(canvas), _center(center), _color(col),
-            _radius(canvas.context.radius), _border(0) {}
+            _radius(canvas.context.radius), _border(0), _empty(0) {}
 
         inline Circle &color(GVec4f color){
             _color = color;
@@ -708,11 +710,17 @@ class Graphy2DCanvas{
             return *this;
         }
 
+        inline Circle &empty(){
+            _empty = 1;
+            return *this;
+        }
+
         ~Circle(){
             GVec2f center = canvas.transform_point(_center);
             int c_i = (int)(center.x + 0.5f);
             int c_j = (int)(center.y + 0.5f);
             int radius_i = (int)std::ceil(_radius + 0.5f);
+            _Gfloat off = GMAX(0.98 * (_Gfloat)radius_i, 3.f);
             for(int i = -radius_i; i <= radius_i; i++){
                 for(int j = -radius_i; j <= radius_i; j++){
                     int cir = 1;
@@ -728,6 +736,8 @@ class Graphy2DCanvas{
                     if(cir){
                         GVec2f v = center - GVec2f(c_i, c_j) - GVec2f(i, j);
                         _Gfloat dist = v.Length();
+                        if(dist < off && _empty) continue;
+
                         _Gfloat alpha = _color.w * _GraphyClamp(_radius - dist, 0.f, 1.f);
                         GVec4f col = canvas.img.At(c_i + i, c_j + j);
                         canvas.img.At(c_i + i, c_j + j) = _GraphyLerp(alpha, col, _color);

@@ -94,8 +94,8 @@ int main(int argc, char **argv){
     /* Sets the default kernel launching parameters, 16 is good for my notebook */
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
 
-    test_pcisph2_water_block();
-    //test_mac(argc, argv);
+    //test_pcisph2_water_block();
+    test_mac(argc, argv);
 
     //test_pcisph2_double_dam_break();
     //test_pcisph2_water_block_lnm();

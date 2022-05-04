@@ -460,6 +460,7 @@ template<typename T> class vec3{
     T x, y, z;
     __bidevice__ vec3(){ x = y = z = (T)0; }
     __bidevice__ vec3(T a){ x = y = z = a; }
+
     __bidevice__ vec3(T a, T b, T c): x(a), y(b), z(c){
         Assert(!HasNaN());
     }

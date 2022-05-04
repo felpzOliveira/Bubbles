@@ -6,7 +6,7 @@
 
 /**************************************************************/
 //               I N T E R V A L   M E T H O D                //
-//                Geometrical AABB intersection               //
+//                  Geometrical intersection                  //
 /**************************************************************/
 
 /*
@@ -15,13 +15,18 @@
 *                       using interval analysis
 *
 * Sandim uses recursive methods for classification, since we are running
-* on GPU I'll implement a simple GPU friendly stack (not very efficient tho)
+* on GPU I'll implement a simple GPU stack (not very efficient tho)
 * and unroll the recursion to be stack-based.
 */
 
 #define INTERVAL_LABEL_COVERED 0
 #define INTERVAL_LABEL_UNCOVERED 1
 #define INTERVAL_LABEL_PARTIALLY_COVERED 2
+
+typedef enum{
+    PolygonSubdivision,
+    BoundingBoxSubdivision,
+}SubdivisionMethod;
 
 template<typename T>
 class Stack{
@@ -64,95 +69,403 @@ class Stack{
     __bidevice__ ~Stack(){}
 };
 
-template<typename T, typename Q> inline __bidevice__
-void IntervalBoundaryGetBoundsFor(ParticleSet<T> *pSet, int i,
-                                  Q *bounds, Float h)
-{
-    T p = pSet->GetParticlePosition(i);
-    *bounds = Q(p - T(h), p + T(h));
-}
+/*
+* Geometry representation for each method described in the paper.
+*/
 
-template<typename Q> struct IntervalData{
-    Q bq;
-    int depth;
+// The bouding box one:
+template<typename T, typename Q>
+class BBSubdivisionGeometry{
+    public:
+    BBSubdivisionGeometry() = default;
+    ~BBSubdivisionGeometry() = default;
+
+    /*
+    * Compute the amount of vertices of the Bounding Box that lie inside
+    * the circle centered at 'p' with radius 'h'.
+    */
+    __bidevice__ int CountVerticesInside(vec2f p, Float h, int *max_query){
+        int inside = 0;
+        vec2f points[] = {
+            bounds.pMin, bounds.pMax,
+            vec2f(bounds.pMin.x, bounds.pMax.y),
+            vec2f(bounds.pMax.x, bounds.pMin.y),
+        };
+
+        for(int i = 0; i < 4; i++){
+            Float dist = Distance(p, points[i]);
+            inside += (dist < h ? 1 : 0);
+        }
+
+        *max_query = 4;
+        return inside;
+    }
+
+    /*
+    * Compute the amount of vertices of the Bounding Box that lie inside
+    * the sphere centered at 'p' with radius 'h'.
+    */
+    __bidevice__ int CountVerticesInside(vec3f p, Float h, int *max_query){
+        int inside = 0;
+        vec3f p0 = bounds.pMin;
+        vec3f p1 = bounds.pMax;
+        vec3f points[] = {
+            p0,
+            vec3f(p1.x, p0.y, p0.z),
+            vec3f(p1.x, p0.y, p1.z),
+            vec3f(p0.x, p0.y, p1.z),
+            vec3f(p0.x, p1.y, p0.z),
+            vec3f(p1.x, p1.y, p0.z),
+            p1,
+            vec3f(p0.x, p1.y, p1.z)
+        };
+
+        for(int i = 0; i < 8; i++){
+            Float dist = Distance(p, points[i]);
+            inside += (dist < h ? 1 : 0);
+        }
+
+        *max_query = 8;
+        return inside;
+    }
+
+    /* External routines for the solver */
+    __bidevice__ void Subdivide(BBSubdivisionGeometry *slabs,
+                                int *nSlabs, T pi, Float h)
+    {
+        (void)pi;
+        (void)h;
+        Q inner[8];
+        int s = SplitBounds(bounds, &inner[0]);
+        for(int i = 0; i < s; i++){
+            slabs[i].bounds = inner[i];
+        }
+
+        *nSlabs = s;
+    }
+
+    __bidevice__ int BallIntersectionCount(T pj, Float h, int *max_query){
+        return CountVerticesInside(pj, h, max_query);
+    }
+
+    __bidevice__ bool IsGeometryClipped(T pi, Float h){
+        int m_query = 0;
+        int inside = CountVerticesInside(pi, h, &m_query);
+        return inside == m_query;
+    }
+
+    static __bidevice__
+    void SlabsForParticle(T p, Float h, BBSubdivisionGeometry *slabs, int *nSlabs){
+        slabs[0].bounds = Q(p - T(h), p + T(h));
+        *nSlabs = 1;
+    }
+
+    Q bounds;
 };
 
-inline __bidevice__ int IntervalIsBBInsideQuery(Bounds2f box, vec2f p,
-                                                Float h, int *max_query)
-{
-    int inside = 0;
-    vec2f points[] = {
-        box.pMin, box.pMax,
-        vec2f(box.pMin.x, box.pMax.y),
-        vec2f(box.pMax.x, box.pMin.y),
-    };
+// The method using 2D n-gon division
+class PolygonSubdivisionGeometry{
+    public:
+    PolygonSubdivisionGeometry() = default;
+    ~PolygonSubdivisionGeometry() = default;
 
-    for(int i = 0; i < 4; i++){
-        Float dist = Distance(p, points[i]);
-        inside += (dist < h ? 1 : 0);
+    __bidevice__ void Subdivide(PolygonSubdivisionGeometry *slabs,
+                                int *nSlabs, vec2f pi, Float h)
+    {
+        // We need to subdivide a segment that is a quad. The main idea is to generate
+        // the (2n)-gon, luckly we can avoid doing that because generating the (2n)
+        // vertices will be the same as splitting the segment in the middle and generating
+        // 2 new slabs. This also avoids the need to subdivide all segments, we only
+        // subdivide the relevant segments, allowing for faster (?) tests.
+
+        // Compute the midpoint and relative angles
+        Float tn = (t0 + t1) * 0.5; // half angle between p0 and p1
+        Float tm = (t1 + tn) * 0.5; // 1/4 angle between p0 and p1
+        Float tk = (t0 + tn) * 0.5; // 3/4 angle between p0 and p1
+
+        // offset from p0 and p1 the rect must be constructed
+        Float theta = Absf(t1-t0) * 0.25;
+        Float dh = h * (1.f - cos(Radians(theta)));
+
+        // actual relevant points
+        Float an = Radians(tn);
+        Float am = Radians(tm);
+        Float ak = Radians(tk);
+        vec2f pn = vec2f(cos(an), sin(an)) * h + pi; // midpoint for p0 and p1
+        vec2f pk = vec2f(cos(ak), sin(ak)) * h + pi; // midpoint for pn and p0
+        vec2f pm = vec2f(cos(am), sin(am)) * h + pi; // midpoint for pn and p1
+
+        // vectors for offset
+        vec2f dv = Normalize(pk - pi);
+        vec2f ds = Normalize(pm - pi);
+
+        // other points from the rect that are outside the circle
+        vec2f pfu = p0 + dv * dh;
+        vec2f pfd = pn + dv * dh;
+
+        vec2f puu = pn + ds * dh;
+        vec2f pud = p1 + ds * dh;
+
+        // finally, the two new slabs
+        slabs[0].p0 = p0;
+        slabs[0].p1 = pn;
+        slabs[0].p2 = pfd;
+        slabs[0].p3 = pfu;
+        slabs[0].t0 = t0;
+        slabs[0].t1 = tn;
+
+        slabs[1].p0 = pn;
+        slabs[1].p1 = p1;
+        slabs[1].p2 = pud;
+        slabs[1].p3 = puu;
+        slabs[1].t0 = tn;
+        slabs[1].t1 = t1;
+        *nSlabs = 2;
     }
 
-    *max_query = 4;
-    return inside;
-}
-
-inline __bidevice__ int IntervalIsBBInsideQuery(Bounds3f box, vec3f p,
-                                                Float h, int *max_query)
-{
-    int inside = 0;
-    vec3f p0 = box.pMin;
-    vec3f p1 = box.pMax;
-    vec3f points[] = {
-        p0,
-        vec3f(p1.x, p0.y, p0.z),
-        vec3f(p1.x, p0.y, p1.z),
-        vec3f(p0.x, p0.y, p1.z),
-        vec3f(p0.x, p1.y, p0.z),
-        vec3f(p1.x, p1.y, p0.z),
-        p1,
-        vec3f(p0.x, p1.y, p1.z)
-    };
-
-    for(int i = 0; i < 8; i++){
-        Float dist = Distance(p, points[i]);
-        inside += (dist < h ? 1 : 0);
+    __bidevice__ bool IsGeometryClipped(vec2f pi, Float h){
+        return false;
     }
 
-    *max_query = 8;
-    return inside;
-}
+    __bidevice__ int BallIntersectionCount(vec2f pj, Float h, int *max_query){
+        int inside = 0;
+        inside += (Distance(p0, pj) < h ? 1 : 0);
+        inside += (Distance(p1, pj) < h ? 1 : 0);
+        inside += (Distance(p2, pj) < h ? 1 : 0);
+        inside += (Distance(p3, pj) < h ? 1 : 0);
+        *max_query = 4;
+        return inside;
+    }
 
-template<typename T, typename U, typename Q> __bidevice__
+    static __bidevice__
+    void SlabsForParticle(vec2f p, Float h, PolygonSubdivisionGeometry *slabs, int *nSlabs){
+        // In the 2D circle we have P(t) = r(cos(t), sin(t)) + P
+        // we take the first point at 90 so we get P0 = (0, r) + P
+        // rotating this point 60 degrees we find that:
+        // P1 = r(cos(210), sin(210)) + P = (-sqrt(3)/2 r, -r/2) + P
+        // P2 = r(cos(-30), sin(-30)) + P = (sqrt(3)/2 r, -r/2) + P
+        // For each slab we compute the midpoint between each pair of
+        // vertices and offset by the vector d between P and midpoint:
+        // M0 = r(cos(150), sin(150)) + P = (-sqrt(3)/2 r, r/2) + P
+        // M1 = r(cos(270), sin(270)) + P = (0, -r) + P
+        // M2 = r(cos(30), sin(30)) + P = (sqrt(3)/2 r, r/2) + P
+        const Float h_sqrt3 = 0.866025404; // sqrt(3) / 2
+        const Float half = 0.5f;
+        const Float half_h = 0.5 * h;
+
+        //        p0
+        //       /  \
+        //    M0/    \M2
+        //     /      \
+        //    /________\
+        //    p1  M1   p2
+
+        const vec2f vertices[] = {
+            p + vec2f(0, 1) * h,
+            p + vec2f(-h_sqrt3, -half) * h,
+            p + vec2f(h_sqrt3, -half) * h
+        };
+
+        // the result of Normalize(Mn - Pn)
+        const vec2f directions[] = {
+            vec2f(-h_sqrt3, half),
+            vec2f(0, -1),
+            vec2f(h_sqrt3, half),
+        };
+
+        // we are also going to store the base angle so that we can
+        // easily subdivide the polygon
+        slabs[0].p0 = vertices[0];
+        slabs[0].p1 = vertices[1];
+        slabs[0].p2 = vertices[1] + directions[0] * half_h;
+        slabs[0].p3 = vertices[0] + directions[0] * half_h;
+        slabs[0].t0 = 90;
+        slabs[0].t1 = 210;
+
+        slabs[1].p0 = vertices[1];
+        slabs[1].p1 = vertices[2];
+        slabs[1].p2 = vertices[2] + directions[1] * half_h;
+        slabs[1].p3 = vertices[1] + directions[1] * half_h;
+        slabs[1].t0 = 210;
+        slabs[1].t1 = 330;
+
+        slabs[2].p0 = vertices[0];
+        slabs[2].p1 = vertices[2];
+        slabs[2].p2 = vertices[2] + directions[2] * half_h;
+        slabs[2].p3 = vertices[0] + directions[2] * half_h;
+        slabs[2].t0 = 90;
+        slabs[2].t1 = -30;
+
+        *nSlabs = 3;
+    }
+
+    vec2f p0, p1, p2, p3;
+    Float t0, t1;
+};
+
+// The method using 3D tetrahedron
+class VolumetricSubdivisionGeometry{
+    public:
+    VolumetricSubdivisionGeometry() = default;
+    ~VolumetricSubdivisionGeometry() = default;
+
+    __bidevice__ int BallIntersectionCount(vec3f pj, Float h, int *max_query){
+        int inside = 0;
+        inside += (Distance(p0, pj) < h ? 1 : 0);
+        inside += (Distance(p1, pj) < h ? 1 : 0);
+        inside += (Distance(p2, pj) < h ? 1 : 0);
+        inside += (Distance(a, pj) < h ? 1 : 0);
+        inside += (Distance(b, pj) < h ? 1 : 0);
+        inside += (Distance(c, pj) < h ? 1 : 0);
+        *max_query = 6;
+        return inside;
+    }
+
+    __bidevice__ bool IsGeometryClipped(vec3f pi, Float h){
+        return false;
+    }
+
+    __bidevice__ void Subdivide(VolumetricSubdivisionGeometry *slabs,
+                                int *nSlabs, vec3f pi, Float h)
+    {
+        // Subdividing a slab is simply taking the half point over all edges
+        // and creating three new triangles-slabs
+        vec3f M0 = (p0 + p1) * .5;
+        vec3f M1 = (p0 + p2) * .5;
+        vec3f M2 = (p1 + p2) * .5;
+
+        ComputeSlab(pi, h, p0, M0, M1, &slabs[0]);
+        ComputeSlab(pi, h, M0, p1, M2, &slabs[1]);
+        ComputeSlab(pi, h, M2, p2, M1, &slabs[2]);
+        ComputeSlab(pi, h, M0, M1, M2, &slabs[3]);
+        *nSlabs = 4;
+    }
+
+    static __bidevice__ void ComputeSlab(vec3f p, Float R, vec3f A, vec3f B, vec3f C,
+                                         VolumetricSubdivisionGeometry *slab)
+    {
+        // Computing a slab is about computing the frustum that is encapsulated by
+        // by the points A, B, C and the projections of A, B and C over the plane
+        // that is tangent to the sphere centered at p with radius R on the extension
+        // of the vector that goes from p to the barycenter of A, B and C.
+
+        // compute barycenter M and the vector that goes form p to it
+        const Float one_over_three = 0.333333333;
+        vec3f M = (A + B + C) * one_over_three;
+        vec3f dir = Normalize(M - p);
+
+        // the point where the vector touches the sphere is therefore
+        vec3f P = p + dir * R;
+
+        // since P touches the sphere we can define the local coordinates
+        // at P with normal 'dir', and we have our tangent plane as (P, dir).
+        // We now need the directions for the vertices
+        vec3f Vca = Normalize(A - p);
+        vec3f Vcb = Normalize(B - p);
+        vec3f Vcc = Normalize(C - p);
+
+        // do simple plane intersection now to get the next vertex
+        auto intersect = [&](vec3f o, vec3f d) -> vec3f{
+            Float denom = Dot(dir, d);
+            if(denom == 0){
+                printf("Zero denominator, invalid projection\n");
+                return o;
+            }
+
+            Float t = Dot(P - o, dir) / denom;
+            if(t < 0){
+                printf("Negative distance ( %g ), invalid projection\n", t);
+                return o;
+            }
+
+            return o + d * t;
+        };
+
+        slab->p0 = A;
+        slab->p1 = B;
+        slab->p2 = C;
+        slab->a = intersect(p, Vca);
+        slab->b = intersect(p, Vcb);
+        slab->c = intersect(p, Vcc);
+    }
+
+    static __bidevice__ void
+    SlabsForParticle(vec3f p, Float R, VolumetricSubdivisionGeometry *slabs, int *nSlabs){
+        // Building the tetrahedron over the sphere of center 'p' and radius R
+        // is kinda of annoying because there are infinite solutions so we would
+        // need to pick special vectors for moving around, which can be troublesome.
+
+        // Lets use the demicube with edge 2, this generates the tetrahedron
+        // given by (1,1,1), (1,−1,−1), (−1,1,−1), (−1,−1,1)
+        // we can take these points as directions from the origin to walk
+        // a standard distance 'd' and still arrive on a valid tetrahedron
+        // over the sphere centered at the origin and radius 'd'. Transforming
+        // these points into directions we get the following set:
+        const vec3f u0 = vec3f(0.57735, 0.57735, 0.57735);
+        const vec3f u1 = vec3f(0.57735, -0.57735, -0.57735);
+        const vec3f u2 = vec3f(-0.57735, 0.57735, -0.57735);
+        const vec3f u3 = vec3f(-0.57735, -0.57735, 0.57735);
+
+        // walk over these directions using the center 'p' and radius 'R',
+        // this always gives a valid regular tetrahedron
+        vec3f A = p + R * u0;
+        vec3f B = p + R * u1;
+        vec3f C = p + R * u2;
+        vec3f D = p + R * u3;
+
+        // The faces of the tetrahedron are given by: ABD, ABC, BCD and ACD.
+        // for each of these faces we need to construct the frustum based
+        // on the vector that goes through the center of the particle 'p' and the
+        // barycenter of each of these triangles, call it O.
+        // The frustum is built by computing the plane where the vector O intersects
+        // the sphere centered at 'p' and radius 'R'.
+        ComputeSlab(p, R, A, B, D, &slabs[0]);
+        ComputeSlab(p, R, A, B, C, &slabs[1]);
+        ComputeSlab(p, R, B, C, D, &slabs[2]);
+        ComputeSlab(p, R, A, C, D, &slabs[3]);
+        *nSlabs = 4;
+    }
+
+    vec3f p0, p1, p2;
+    vec3f a, b, c;
+};
+
+
+// The method
+template<typename T, typename U, typename Q, typename Geometry> __bidevice__
 bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
                                 int max_depth, Float h, int pId)
 {
-    Q Bi;
-    Stack<IntervalData<Q>> stack;
-    T pi = pSet->GetParticlePosition(pId);
-    IntervalBoundaryGetBoundsFor<T, Q>(pSet, pId, &Bi, h);
+    struct IntervalData{
+        Geometry bq;
+        int depth;
+    };
+
+    Geometry Bq;
+    Geometry initial[8];
+    int initialSlabs = 8;
+    Stack<IntervalData> stack;
     int q = INTERVAL_LABEL_UNCOVERED;
 
-    Q Bq = Bi;
+    T pi = pSet->GetParticlePosition(pId);
+    Geometry::SlabsForParticle(pi, h, &initial[0], &initialSlabs);
 
-    stack.push({Bi, 0});
+    for(int i = 0; i < initialSlabs; i++){
+        stack.push({initial[i], 0});
+    }
+
     bool reached_max_depth = false;
     while(!stack.empty()){
-        IntervalData<Q> iBq;
+        IntervalData iBq;
         stack.top(&iBq);
         stack.pop();
 
         // start query on the given depth, assume it is uncovered, i.e.: boundary
         Bq = iBq.bq;
 
-        // check if the query is being made from a 'useless' bounding box, i.e.:
+        // check if the query is being made from a 'useless' geometry, i.e.:
         // completely inside the original particle
-
-        int m_query = 0;
-        int inside = IntervalIsBBInsideQuery(Bq, pi, h, &m_query);
-        if(inside == m_query){
-            // this bounding box will not give any usefull information
-            continue;
-        }
+        if(Bq.IsGeometryClipped(pi, h)) continue;
 
         q = INTERVAL_LABEL_UNCOVERED;
 
@@ -160,16 +473,16 @@ bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
         ForAllNeighbors(domain, pSet, pId, [&](int j) -> int{
             int max_query = 0;
             T pj = pSet->GetParticlePosition(j);
-            int inside = IntervalIsBBInsideQuery(Bq, pj, h, &max_query);
+            int inside = Bq.BallIntersectionCount(pj, h, &max_query);
             // Possible cases:
-            // 1- inside = max_query => the BB is entirely inside the ball
+            // 1- inside = max_query => the Geometry is entirely inside the ball
             //                          this means we don't need to continue
             if(inside == max_query){
                 q = INTERVAL_LABEL_COVERED;
                 return 1;
             }
 
-            // 2- inside > 0 => the BB is partially covered we need to continue
+            // 2- inside > 0 => the Geometry is partially covered we need to continue
             if(inside > 0){
                 q = INTERVAL_LABEL_PARTIALLY_COVERED;
             }
@@ -179,28 +492,29 @@ bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
 
         // if the label changed, adjust accordingly
         if(q == INTERVAL_LABEL_COVERED){
-            // if the current bounding box is covered we need to inspect
+            // if the current geometry is covered we need to inspect
             // others but not subdivide this one
         }else if(q == INTERVAL_LABEL_UNCOVERED){
-            // if we found a bounding box that is completely uncovered
+            // if we found a geometry that is completely uncovered
             // than it means we are done, because there is a portion of the
             // particle that is not being touched by its neighboors
             return false;
         }else{
-            // we need to subdivide and further query the BBs, if depth allows
+            // we need to subdivide and further query the subdivisons, if depth allows
             if(iBq.depth < max_depth){
-                Q inner[8];
-                int s = SplitBounds(Bq, &inner[0]);
-                // push the new bounding box into the stack
-                for(int k = 0; k < s; k++){
+                Geometry inner[8];
+                int n = 0;
+                Bq.Subdivide(&inner[0], &n, pi, h);
+                // push the new slabs into the stack
+                for(int k = 0; k < n; k++){
                     stack.push({inner[k], iBq.depth+1});
                 }
             }else{
                 // if we are unsure about the result and depth is already too large
                 // assume it is a boundary particle. Since the query is always
                 // exclusive I think this means we can terminate the query
-                // as there will always be one portion of the BB that will be
-                // unresolved
+                // as there will always be one portion of the original geometry
+                // that will be unresolved
                 reached_max_depth = true;
                 break;
             }
@@ -208,35 +522,116 @@ bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
     }
 
     // i'm not really sure what reaching here means. One idea might be
-    // that if too many bounding boxes are completely covered it loops
+    // that if too many slabs are completely covered it loops
     // with label 'INTERVAL_LABEL_COVERED' and the exit is the exhaust
-    // of all BBs. In this situation I guess this particle is interior.
+    // of all subdivisions. In this situation I guess this particle is interior.
     // However we need to account for the order in which the stack is
     // processed. If we reach the max depth it means we were subdividing
-    // and we are unsure about a segment of the BB, for this case it is
+    // and we are unsure about a segment of the geometry, for this case it is
     // best to mark the particle as boundary.
     return !reached_max_depth;
 }
 
-template<typename T, typename U, typename Q> __global__
-void IntervalBoundaryKernel(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
-                            Float h, int max_depth)
+static __global__
+void IntervalBoundaryKernel2DPolygon(Grid2 *domain, ParticleSet2 *pSet,
+                                     Float h, int max_depth)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < pSet->GetParticleCount()){
-        int is_interior = IntervalParticleIsInterior<T, U, Q>(domain, pSet,
-                                                              max_depth, h, i);
+        using T = vec2f;
+        using U = vec2ui;
+        using Q = Bounds2f;
+        int is_interior =
+                IntervalParticleIsInterior<T, U, Q, PolygonSubdivisionGeometry>
+                            (domain, pSet, max_depth, h, i);
         if(!is_interior){
             pSet->SetParticleV0(i, 1);
         }
     }
 }
 
-template<typename T, typename U, typename Q>
-__host__ void IntervalBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                               Float h, int max_depth = 4)
+
+static __global__
+void IntervalBoundaryKernel2DBoundingBox(Grid2 *domain, ParticleSet2 *pSet,
+                                         Float h, int max_depth)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < pSet->GetParticleCount()){
+        using T = vec2f;
+        using U = vec2ui;
+        using Q = Bounds2f;
+        int is_interior =
+                IntervalParticleIsInterior<T, U, Q, BBSubdivisionGeometry<T, Q>>
+                            (domain, pSet, max_depth, h, i);
+        if(!is_interior){
+            pSet->SetParticleV0(i, 1);
+        }
+    }
+}
+
+static __global__
+void IntervalBoundaryKernel3DBoundingBox(Grid3 *domain, ParticleSet3 *pSet,
+                                         Float h, int max_depth)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < pSet->GetParticleCount()){
+        using T = vec3f;
+        using U = vec3ui;
+        using Q = Bounds3f;
+        int is_interior =
+                IntervalParticleIsInterior<T, U, Q, BBSubdivisionGeometry<T, Q>>
+                            (domain, pSet, max_depth, h, i);
+        if(!is_interior){
+            pSet->SetParticleV0(i, 1);
+        }
+    }
+}
+
+static __global__
+void IntervalBoundaryKernel3DVolumetric(Grid3 *domain, ParticleSet3 *pSet,
+                                        Float h, int max_depth)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < pSet->GetParticleCount()){
+        using T = vec3f;
+        using U = vec3ui;
+        using Q = Bounds3f;
+        int is_interior =
+                IntervalParticleIsInterior<T, U, Q, VolumetricSubdivisionGeometry>
+                            (domain, pSet, max_depth, h, i);
+        if(!is_interior){
+            pSet->SetParticleV0(i, 1);
+        }
+    }
+}
+
+inline __host__
+void IntervalBoundary(ParticleSet2 *pSet, Grid2 *domain,
+                      Float h, SubdivisionMethod method = PolygonSubdivision,
+                      int max_depth = 4)
 {
     int N = pSet->GetParticleCount();
-    GPULaunch(N, GPUKernel(IntervalBoundaryKernel<T, U, Q>),
-                           domain, pSet, h, max_depth);
+    if(method == PolygonSubdivision){
+        GPULaunch(N, GPUKernel(IntervalBoundaryKernel2DPolygon),
+                            domain, pSet, h, max_depth);
+    }else{
+        GPULaunch(N, GPUKernel(IntervalBoundaryKernel2DBoundingBox),
+                            domain, pSet, h, max_depth);
+    }
 }
+
+inline __host__
+void IntervalBoundary(ParticleSet3 *pSet, Grid3 *domain,
+                      Float h, SubdivisionMethod method = PolygonSubdivision,
+                      int max_depth = 4)
+{
+    int N = pSet->GetParticleCount();
+    if(method == PolygonSubdivision){
+        GPULaunch(N, GPUKernel(IntervalBoundaryKernel3DVolumetric),
+                            domain, pSet, h, max_depth);
+    }else{
+        GPULaunch(N, GPUKernel(IntervalBoundaryKernel3DBoundingBox),
+                            domain, pSet, h, max_depth);
+    }
+}
+

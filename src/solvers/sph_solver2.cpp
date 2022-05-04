@@ -181,7 +181,7 @@ __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buff
 {
 #if 0
     static GWindow *gui = nullptr;
-    if(!gui) gui = new GWindow("Solver", 1000, 1000);
+    if(!gui) gui = new GWindow("Solver", 800, 600);
     auto canvas = gui->get_canvas();
     canvas.Radius(2.5);
     canvas.Color(0x112F41);

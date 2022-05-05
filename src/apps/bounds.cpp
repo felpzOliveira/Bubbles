@@ -704,7 +704,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     solver.Setup(WaterDensity, opts->spacing, opts->spacingScale, grid, sphpSet);
 
     UpdateGridDistributionGPU(solver.solverData);
-    /* compute density just in case algorithm picked needs it */
+    /* compute density and normal just in case algorithm picked needs it */
     ComputeDensityGPU(solver.solverData);
 
     grid->UpdateQueryState();
@@ -827,6 +827,11 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     }else if(opts->method == BOUNDARY_INTERVAL){
         timer.Start();
         IntervalBoundary(pSet, grid, opts->spacing, opts->interval_sub_method);
+        timer.Stop();
+    }else if(opts->method == BOUNDARY_MARRONE){
+        ComputeNormalGPU(solver.solverData);
+        timer.Start();
+        MarroneBoundary(pSet, grid, opts->spacing);
         timer.Stop();
     }
     /*

@@ -165,8 +165,10 @@ void test_pcisph2_water_block(){
         }
 
         vpWorkQ->Reset();
+        ComputeNormalGPU(data);
 
-        IntervalBoundary(set2, grid, sphRadius);
+        //IntervalBoundary(set2, grid, sphRadius);
+        MarroneBoundary(set2, grid, sphRadius);
         //DiltsSpokeBoundary(set2, grid);
         //CFBoundary(set2, grid, spacing);
         //XiaoweiBoundary(set2, grid, spacing);
@@ -177,6 +179,7 @@ void test_pcisph2_water_block(){
 
         set_colors_lnm(col, data, 0, 0);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
+        if(i == 180) getchar();
         //getchar();
     }
 

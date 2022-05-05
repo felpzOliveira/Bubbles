@@ -164,6 +164,128 @@ void gui_tri(Graphy2DCanvas *canvas, TypedPolygon *sub,
 }
 
 void test_mac(int argc, char **argv){
+    VolumetricSubdivisionGeometry slabs[4];
+    int nSlabs = 4;
+    vec3f pos = vec3f(0);
+    VolumetricSubdivisionGeometry::SlabsForParticle(pos, 1.f, slabs, &nSlabs);
+
+    float *p = new float[nSlabs * 6 * 3 * 2];
+    float *rgb = new float[nSlabs * 6 * 3 * 2];
+    int it = 0, ic = 0;
+    vec3f a = slabs[0].a;
+    vec3f b = slabs[0].b;
+    vec3f c = slabs[0].c;
+    printf("{%g %g %g}\n", a.x, a.y, a.z);
+    printf("{%g %g %g}\n", b.x, b.y, b.z);
+    printf("{%g %g %g}\n", c.x, c.y, c.z);
+    printf("{%g %g %g}\n", pos.x, pos.y, pos.z);
+    vec3f f0 = pos - a;
+    vec3f f1 = b - a;
+    vec3f f2 = c - a;
+    Matrix3x3 m(f0.x, f0.y, f0.z,
+                f1.x, f1.y, f1.z,
+                f2.x, f2.y, f2.z);
+    Float det = Determinant(m);
+    printf("Det = %g\n", det);
+
+#if 1
+    p[it++] = pos.x;
+    p[it++] = pos.y;
+    p[it++] = pos.z;
+
+    rgb[ic++] = 0;
+    rgb[ic++] = 1;
+    rgb[ic++] = 0;
+#endif
+    for(int i = 0; i < 1; i++){
+#if 0
+        p[it++] = pos.x;
+        p[it++] = pos.y;
+        p[it++] = pos.z;
+
+        p[it++] = slabs[i].p0.x;
+        p[it++] = slabs[i].p0.y;
+        p[it++] = slabs[i].p0.z;
+
+        p[it++] = pos.x;
+        p[it++] = pos.y;
+        p[it++] = pos.z;
+
+        p[it++] = slabs[i].p1.x;
+        p[it++] = slabs[i].p1.y;
+        p[it++] = slabs[i].p1.z;
+
+        p[it++] = pos.x;
+        p[it++] = pos.y;
+        p[it++] = pos.z;
+
+        p[it++] = slabs[i].p2.x;
+        p[it++] = slabs[i].p2.y;
+        p[it++] = slabs[i].p2.z;
+
+        p[it++] = pos.x;
+        p[it++] = pos.y;
+        p[it++] = pos.z;
+
+        p[it++] = slabs[i].a.x;
+        p[it++] = slabs[i].a.y;
+        p[it++] = slabs[i].a.z;
+
+        p[it++] = pos.x;
+        p[it++] = pos.y;
+        p[it++] = pos.z;
+
+        p[it++] = slabs[i].b.x;
+        p[it++] = slabs[i].b.y;
+        p[it++] = slabs[i].b.z;
+
+        p[it++] = pos.x;
+        p[it++] = pos.y;
+        p[it++] = pos.z;
+
+        p[it++] = slabs[i].c.x;
+        p[it++] = slabs[i].c.y;
+        p[it++] = slabs[i].c.z;
+#else
+        p[it++] = slabs[i].p0.x;
+        p[it++] = slabs[i].p0.y;
+        p[it++] = slabs[i].p0.z;
+        rgb[ic++] = 1;
+        rgb[ic++] = 0;
+        rgb[ic++] = 0;
+
+        p[it++] = slabs[i].p1.x;
+        p[it++] = slabs[i].p1.y;
+        p[it++] = slabs[i].p1.z;
+        rgb[ic++] = 1;
+        rgb[ic++] = 0;
+        rgb[ic++] = 0;
+
+        p[it++] = slabs[i].p2.x;
+        p[it++] = slabs[i].p2.y;
+        p[it++] = slabs[i].p2.z;
+        rgb[ic++] = 1;
+        rgb[ic++] = 0;
+        rgb[ic++] = 0;
+
+        p[it++] = slabs[i].a.x;
+        p[it++] = slabs[i].a.y;
+        p[it++] = slabs[i].a.z;
+        rgb[ic++] = 0;
+        rgb[ic++] = 0;
+        rgb[ic++] = 1;
+#endif
+    }
+
+    vec3f origin(0, 0, -5);
+    vec3f target(0);
+    graphy_vector_set(origin, target);
+    while(1){
+        //graphy_render_lines(p, rgb, it/3);
+        graphy_render_points3f(p, rgb, it / 3, 0.05);
+    }
+
+    return;
     GWindow gui("MAC Test");
     auto canvas = gui.get_canvas();
 #if 0
@@ -186,11 +308,6 @@ void test_mac(int argc, char **argv){
     }
 #endif
 
-    VolumetricSubdivisionGeometry slabs[4];
-    int nSlabs = 4;
-    VolumetricSubdivisionGeometry::SlabsForParticle(vec3f(0), 0.05, slabs, &nSlabs);
-
-    return;
     while(1){
         canvas.Color(0x112F41);
 #if 0
@@ -223,7 +340,7 @@ void test_mac(int argc, char **argv){
     Float timestep = 0.005;
     FluidSolver *solver = new FluidSolver(_w, _h, density, timestep);
 
-    int it = 0;
+    //int it = 0;
     canvas.Color(0x112F41);
 
     auto fetcher = [&](int x, int y) -> GVec4f{ return solver->ValueAt(x, y); };

@@ -179,7 +179,7 @@ __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buff
 __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer,
                                                  float *colors)
 {
-#if 0
+#if 1
     static GWindow *gui = nullptr;
     if(!gui) gui = new GWindow("Solver", 800, 600);
     auto canvas = gui->get_canvas();

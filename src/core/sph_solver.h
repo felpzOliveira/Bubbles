@@ -42,7 +42,7 @@ typedef struct{
 }SphSolverData3;
 
 
-__host__ void SphSolverData2SetupFor(SphSolverData2 *solverData, 
+__host__ void SphSolverData2SetupFor(SphSolverData2 *solverData,
                                      int expectedParticleCount);
 __host__ void SphSolverData3SetupFor(SphSolverData3 *solverData,
                                      int expectedParticleCount);
@@ -53,14 +53,14 @@ class SphSolver2{
     Float stepInterval;
     __bidevice__ SphSolver2();
     __bidevice__ void Initialize(SphSolverData2 *data);
-    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius, 
+    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
                         Grid2 *domain, SphParticleSet2 *pSet);
-    
+
     __host__ void SetColliders(ColliderSet2 *colliders);
     __bidevice__ SphSolverData2 *GetSphSolverData();
     __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
     __host__ void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);
-    
+
     __bidevice__ Float GetKernelRadius();
     __bidevice__ SphParticleSet2 *GetSphParticleSet();
     __host__ void UpdateDensity();
@@ -73,42 +73,42 @@ class SphSolver3{
     Float stepInterval;
     __bidevice__ SphSolver3();
     __bidevice__ void Initialize(SphSolverData3 *data);
-    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius, 
+    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
                         Grid3 *domain, SphParticleSet3 *pSet);
-    
+
     __host__ void SetColliders(ColliderSet3 *colliders);
     __host__ ColliderSet3 *GetColliders();
 
     __bidevice__ SphSolverData3 *GetSphSolverData();
     __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
     __host__ void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);
-    
+
     __bidevice__ Float GetKernelRadius();
     __bidevice__ SphParticleSet3 *GetSphParticleSet();
-    
+
     __host__ void Advance(Float timeIntervalInSeconds);
 };
 
 class SphGasSolver2{
     public:
     SphSolver2 *solver;
-    
+
     __bidevice__ SphGasSolver2();
-    
+
     __host__ void Initialize();
-    
-    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius, 
+
+    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
                         Grid2 *domain, SphParticleSet2 *pSet);
-    
+
     __host__ void SetColliders(ColliderSet2 *colliders);
-    
+
     __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
     __host__ void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);
-    
+
     __bidevice__ Float GetKernelRadius();
-    
+
     __bidevice__ SphSolverData2 *GetSphSolverData();
-    
+
     __host__ void UpdateDensity();
     __host__ void Advance(Float timeIntervalInSeconds);
 };
@@ -135,9 +135,9 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
 __bidevice__ void ComputeAllForcesFor(SphSolverData3 *data, int particleId,
                                       Float timeStep, int extended = 0);
 // Evolve particles
-__bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId, 
+__bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
                                      Float timeStep, int extended);
-__bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId, 
+__bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId,
                                      Float timeStep, int extended);
 __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particleId,
                                                Float Tmin, Float Tmax, int maxLevel);
@@ -147,6 +147,7 @@ __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particl
 __host__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure = 1);
 __host__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure = 1);
 __host__ void ComputeNormalCPU(SphSolverData3 *data);
+__host__ void ComputeNormalCPU(SphSolverData2 *data);
 __host__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
                                           int integrate=1);
 __host__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
@@ -163,6 +164,7 @@ __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData3 *data, Float
 __host__ void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure = 1);
 __host__ void ComputeDensityGPU(SphSolverData3 *data, int compute_pressure = 1);
 __host__ void ComputeNormalGPU(SphSolverData3 *data);
+__host__ void ComputeNormalGPU(SphSolverData2 *data);
 __host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep,
                                       int integrate=1);
 __host__ void ComputePressureForceGPU(SphSolverData3 *data, Float timeStep);
@@ -170,7 +172,7 @@ __host__ void ComputeNonPressureForceGPU(SphSolverData2 *data);
 __host__ void ComputeNonPressureForceGPU(SphSolverData3 *data);
 __host__ void TimeIntegrationGPU(SphSolverData2 *data, Float timeStep, int extended=0);
 __host__ void TimeIntegrationGPU(SphSolverData3 *data, Float timeStep, int extended=0);
-__host__ void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin, 
+__host__ void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin,
                                               Float Tmax, int maxLevel);
 __host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float timeStep);
 __host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData3 *data, Float timeStep);
@@ -196,5 +198,5 @@ __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet);
 __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer);
 __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer,
                                                  float *colors);
-__host__ void Debug_GraphyDisplayParticles(int n, float *buffer, float *colors, 
+__host__ void Debug_GraphyDisplayParticles(int n, float *buffer, float *colors,
                                            Float pSize = 5.0);

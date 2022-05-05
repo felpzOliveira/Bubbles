@@ -173,6 +173,36 @@ __bidevice__ void ComputePressureForceFor(SphSolverData2 *data, int particleId){
     pSet->SetParticleForce(particleId, fi);
 }
 
+__bidevice__ void ComputeNormalFor(SphSolverData2 *data, int particleId){
+    vec2f ni(0);
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    vec2f pi = pSet->GetParticlePosition(particleId);
+    Bucket *bucket = pSet->GetParticleBucket(particleId);
+
+    Float sphRadius = data->sphpSet->GetKernelRadius();
+    SphStdKernel2 kernel(sphRadius);
+
+    for(int i = 0; i < bucket->Count(); i++){
+        int j = bucket->Get(i);
+        if(particleId == j) continue;
+
+        vec2f pj = pSet->GetParticlePosition(j);
+        Float dist = Distance(pi, pj);
+        if(!IsZero(dist)){
+            vec2f dir = (pj - pi) / dist;
+            vec2f gradij = kernel.gradW(dist, dir);
+            ni += gradij;
+        }
+    }
+
+    ni = -ni;
+    if(ni.LengthSquared() > 1e-8){
+        ni = Normalize(ni);
+    }
+    pSet->SetParticleNormal(particleId, ni);
+}
+
+
 __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
                                       Float timeStep, int extended, int integrate)
 {
@@ -584,6 +614,29 @@ __host__ void TimeIntegrationGPU(SphSolverData2 *data, Float timeStep, int exten
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, TimeIntegrationKernel, data, timeStep, extended);
+}
+
+__host__ void ComputeNormalCPU(SphSolverData2 *data){
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    AssertA(pSet, "SphSolver2 has no valid particle set for ComputeDensity");
+    AssertA(pSet->GetParticleCount() > 0, "SphSolver2 has no particles for ComputeDensity");
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
+        ComputeNormalFor(data, i);
+    });
+}
+
+__global__ void ComputeNormalKernel(SphSolverData2 *data){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    if(i < pSet->GetParticleCount()){
+        ComputeNormalFor(data, i);
+    }
+}
+
+__host__ void ComputeNormalGPU(SphSolverData2 *data){
+    ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
+    int N = pSet->GetParticleCount();
+    GPULaunch(N, ComputeNormalKernel, data);
 }
 
 __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particleId,

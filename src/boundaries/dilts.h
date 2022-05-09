@@ -152,32 +152,11 @@ int DiltsSpokeParticleIsBoundary(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, in
     return 0;
 }
 
-template<typename T, typename U, typename Q>
-__global__ void DiltsComputeKernel(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        int b = DiltsSpokeParticleIsBoundary(domain, pSet, i);
-        pSet->SetParticleV0(i, b);
-    }
-}
-
-template<typename T, typename U, typename Q> __host__
-void DiltsComputeCPU(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, int i){
-    if(i < pSet->GetParticleCount()){
-        int b = DiltsSpokeParticleIsBoundary(domain, pSet, i);
-        pSet->SetParticleV0(i, b);
-    }
-}
-
 template<typename T, typename U, typename Q> __host__
 void DiltsSpokeBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
-    int use_cpu = GetSystemUseCPU();
     int N = pSet->GetParticleCount();
-    if(!use_cpu){
-        GPULaunch(N, GPUKernel(DiltsComputeKernel<T, U, Q>), domain, pSet);
-    }else{
-        ParallelFor(0, N, [&](int i)->void{
-            DiltsComputeCPU(domain, pSet, i);
-        });
-    }
+    AutoParallelFor("DiltsSpokeBoundary", N, AutoLambda(int i){
+        int b = DiltsSpokeParticleIsBoundary(domain, pSet, i);
+        pSet->SetParticleV0(i, b);
+    });
 }

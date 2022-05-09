@@ -335,15 +335,15 @@ void ParallelFor(Index start, Index end, Function fn){
 }
 
 /* Macro for auto-detection and parallelization */
-
 #define AutoLambda(...) GPU_LAMBDA(__VA_ARGS__)
 
-#define AutoParallelFor(title, items, fn) do{\
-    if(GetSystemUseCPU()){\
-        ParallelFor((size_t)0, (size_t)items, fn);\
-    }else{\
-        GPUParallelLambda(title, items, fn);\
-    }\
-}while(0)
+template<typename Index, typename Function>
+void AutoParallelFor(const char *title, Index items, Function fn){
+    if(GetSystemUseCPU()){
+        ParallelFor((size_t)0, (size_t)items, fn);
+    }else{
+        GPUParallelLambda(title, items, fn);
+    }
+}
 
 #endif

@@ -74,6 +74,7 @@ class WorkQueue{
 };
 
 typedef WorkQueue<int> LNMWorkQueue;
+typedef WorkQueue<int> IntWorkQueue;
 typedef WorkQueue<vec3f> SandimWorkQueue3;
 typedef WorkQueue<vec2f> SandimWorkQueue2;
 

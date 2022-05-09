@@ -79,7 +79,7 @@ void LNMBoundaryL2GeomKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 }
 
 template<typename T, typename U, typename Q>
-__global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, 
+__global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                     Float preDelta, Float h, int algorithm,
                                     LNMWorkQueue *workQ)
 {
@@ -102,7 +102,7 @@ __global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                     }else{
                         printf("Warning: Not sure what to do with L2\n");
                     }
-                    
+
                     break;
                 }
             }
@@ -354,7 +354,7 @@ __bidevice__ bool LNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned i
         for(int i = 0; i < count; i++){
             if(cellId != neighbors[i]){
                 Cell<Q> *cell = domain->GetCell(neighbors[i]);
-                
+
                 if(cell->GetLevel() == refLevel - 1){
                     self->SetLevel(refLevel);
                     return true;
@@ -362,7 +362,7 @@ __bidevice__ bool LNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned i
             }
         }
     }
-    
+
     return false;
 }
 
@@ -392,11 +392,11 @@ __host__ int LNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1, int startL
     bool done = false;
     int level = startLevel;
     int N = domain->GetCellCount();
-    
+
     while(!done){
         domain->indicator = 0;
         GPULaunch(N, GPUKernel(LNMOnceKernel<T, U, Q>), domain, level);
-        
+
         if(domain->indicator == 0){
             done = true;
         }
@@ -409,9 +409,9 @@ __host__ int LNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1, int startL
             level++;
         }
     }
-    
+
     domain->SetLNMMaxLevel(level);
-    
+
     return level;
 }
 
@@ -431,7 +431,7 @@ __global__ void LNMParticleAttributesKernel(Grid<T, U, Q> *domain, ParticleSet<T
     }
 }
 
-template<typename T, typename U, typename Q> __host__ 
+template<typename T, typename U, typename Q> __host__
 void LNMAssignParticlesAttributesGPU(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
     int N = pSet->GetParticleCount();
     GPULaunch(N, GPUKernel(LNMParticleAttributesKernel<T, U, Q>), domain, pSet);

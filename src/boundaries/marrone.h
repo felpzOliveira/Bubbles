@@ -17,10 +17,15 @@
 * and also in:
 *  A fast algorithm for free-surface particles detection in 2D and 3D SPH methods
 *
-* The method is partially implemented here. The implementation here does not compute
-* the eigenvalues described in the paper, because of the issues when computing the
-* invertible tensor B, see 'doring.h'. Here we perform a complete geometric test
-* based on the scan test described in the paper.
+* Here we also implement the method present in:
+*  Simple free-surface detection in two and three-dimensional SPH solver
+*
+* as an adaptation to Marrone however we use the same formulation as Marrone but
+* with the cover vector presented and the small radius considerations.
+*
+* The implementation here does not compute the eigenvalues described in the paper,
+* because of the issues when computing the invertible tensor B, see 'doring.h'.
+* Here we perform a complete geometric test based on the scan test described in the paper.
 */
 
 
@@ -63,18 +68,12 @@ bool MarroneConeArcCheck(vec3f pji, vec3f pjt, vec3f tau, vec3f ni, Float pji_le
 // Note that Bubbles can have normal vector as (0,0,0) since normal vectors
 // are computed using SPH.
 template<typename T, typename U, typename Q> inline __bidevice__
-int MarroneBoundaryIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                                      Float h, int pId)
+int MarroneBoundaryConeCheck(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                             Float h, T pi, T ni, int pId)
 {
     T t, tau;
     int inside = 0;
     Float h_sqrt2 = 1.414213562 * h;
-    T pi = pSet->GetParticlePosition(pId);
-    T ni = pSet->GetParticleNormal(pId);
-
-    // [NaN Handling] 1- In case the particle is really interior
-    //                   sph cannot compute the normal vector, give up.
-    if(ni.Length() < 0.98) return 1;
 
     // Compute τ and T
     MarroneAuxiliarVectors(pi, ni, t, tau, h);
@@ -90,8 +89,8 @@ int MarroneBoundaryIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domai
         Float pji_len = pji.Length();
         Float pjt_len = pjt.Length();
 
-        // [NaN Handling] 2- In case particle are too close the sphere
-        //                   scan test presented by Marrone is impossible, give up.
+        // [NaN Handling] In case particle are too close the sphere
+        //                scan test presented by Marrone is impossible, give up.
         if(IsZero(pji_len)){
             return 0;
         }
@@ -113,24 +112,152 @@ int MarroneBoundaryIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domai
     return inside;
 }
 
-template<typename T, typename U, typename Q> __global__
-void MarroneBoundaryKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        int inside = MarroneBoundaryIsInteriorParticle(pSet, domain, h, i);
-        pSet->SetParticleV0(i, 1-inside);
-    }
+template<typename T, typename U, typename Q> inline __bidevice__
+int MarroneBoundaryIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                                      Float h, int pId)
+{
+    T t, tau;
+    T pi = pSet->GetParticlePosition(pId);
+    T ni = pSet->GetParticleNormal(pId);
+
+    // [NaN Handling] In case the particle is really interior or has a symmetric
+    //                neighborhood, sph cannot compute the normal vector, give up.
+    if(ni.Length() < 0.92) return 1;
+
+    return MarroneBoundaryConeCheck(pSet, domain, h, pi, ni, pId);
 }
 
 template<typename T, typename U, typename Q> inline __host__
 void MarroneBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
     int N = pSet->GetParticleCount();
-    if(!GetSystemUseCPU()){
-        GPULaunch(N, GPUKernel(MarroneBoundaryKernel<T, U, Q>), pSet, domain, h);
-    }else{
-        ParallelFor(0, N, [&](int i) -> void{
-            int inside = MarroneBoundaryIsInteriorParticle(pSet, domain, h, i);
-            pSet->SetParticleV0(i, 1-inside);
-        });
+
+    AutoParallelFor("MarroneBoundary", N, AutoLambda(int i){
+        int inside = MarroneBoundaryIsInteriorParticle(pSet, domain, h, i);
+        pSet->SetParticleV0(i, 1-inside);
+    });
+}
+
+/************************************************************************/
+//                A D A P T E D   V E R S I O N                         //
+/************************************************************************/
+template<typename T, typename U, typename Q> inline __bidevice__
+T MarroneAdaptComputeCoverVector(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                                 Float h, T pi, int pId, int &n_counter)
+{
+    T bi(0);
+    Float bilen = 0;
+    Float h2 = 2.0 * h;
+    n_counter = 0;
+
+    // compute the cover vector, equation 6, page 5.
+    ForAllNeighbors(domain, pSet, pi, [&](int j) -> int{
+        if(j == pId) return 0;
+        T pj = pSet->GetParticlePosition(j);
+
+        T xij = pi - pj;
+        Float len = xij.Length();
+        if(IsZero(len)){
+            return 0;
+        }
+
+        if(len < h2){
+            n_counter += 1;
+            bi = bi + xij / len;
+        }
+
+        return 0;
+    });
+
+    if(n_counter > 0){
+        bilen = bi.Length();
+        if(!IsZero(bilen)){
+            bi = bi / bilen;
+        }
     }
+
+    return bi;
+}
+
+/*
+* Adaptation from Marrone using the cover vector and small radius considerations.
+*/
+template<typename T, typename U, typename Q> inline __bidevice__
+int MarroneAdaptIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                                   Float h, int pId)
+{
+    T pi = pSet->GetParticlePosition(pId);
+
+    // nth values from equation 8, page 6.
+    int threshold = domain->GetDimensions() == 2 ? 4 : 15;
+
+    int n_counter = 0;
+    T bi = MarroneAdaptComputeCoverVector(pSet, domain, h, pi, pId, n_counter);
+
+    if(n_counter <= threshold) return 0;
+
+    return MarroneBoundaryConeCheck(pSet, domain, h, pi, bi, pId);
+}
+
+template<typename T, typename U, typename Q> inline __bidevice__
+void MarroneAdaptComputeWorkQueue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                                  WorkQueue<vec4f> *workQ, Float h, int pId)
+{
+    T pi = pSet->GetParticlePosition(pId);
+    pSet->SetParticleV0(pId, 0);
+
+    // nth values from equation 8, page 6.
+    int threshold = domain->GetDimensions() == 2 ? 4 : 15;
+
+    int n_counter = 0;
+    T bi = MarroneAdaptComputeCoverVector(pSet, domain, h, pi, pId, n_counter);
+
+    if(n_counter <= threshold){
+        pSet->SetParticleV0(pId, 1);
+    }else{
+        vec4f val(0);
+        for(int i = 0; i < domain->GetDimensions(); i++){
+            val[i] = bi[i];
+        }
+        val[3] = pId;
+        workQ->Push(val);
+    }
+}
+
+template<typename T, typename U, typename Q> inline __bidevice__
+void MarroneAdaptProcessWorkQueue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                                  WorkQueue<vec4f> *workQ, Float h)
+{
+    T bi;
+    vec4f val = workQ->Fetch();
+    int pId = (int)val[3];
+    for(int i = 0; i < domain->GetDimensions(); i++){
+        bi[i] = val[i];
+    }
+
+    T pi = pSet->GetParticlePosition(pId);
+    int inside = MarroneBoundaryConeCheck(pSet, domain, h, pi, bi, pId);
+    pSet->SetParticleV0(pId, 1-inside);
+}
+
+template<typename T, typename U, typename Q> inline __host__
+void MarroneAdaptBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h,
+                          WorkQueue<vec4f> *workQ)
+{
+    int N = pSet->GetParticleCount();
+    AutoParallelFor("MarroneAdaptWorkQ", N, AutoLambda(int i){
+        MarroneAdaptComputeWorkQueue(pSet, domain, workQ, h, i);
+    });
+
+    AutoParallelFor("MarroneAdaptWorkQBoundary", workQ->size, AutoLambda(int i){
+        MarroneAdaptProcessWorkQueue(pSet, domain, workQ, h);
+    });
+}
+
+template<typename T, typename U, typename Q> inline __host__
+void MarroneAdaptBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
+    int N = pSet->GetParticleCount();
+    AutoParallelFor("MarroneAdaptBoundary", N, AutoLambda(int i){
+        int inside = MarroneAdaptIsInteriorParticle(pSet, domain, h, i);
+        pSet->SetParticleV0(i, 1-inside);
+    });
 }

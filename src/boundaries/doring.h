@@ -250,27 +250,6 @@ int RandlesDoringIsBoundaryParticle(Float *L, Float mu, Float Lmax,
     return ref < mu ? 1 : 0;
 }
 
-template<typename T, typename U, typename Q, typename M> __global__
-void RandlesDoringEigenvalueKernel(ParticleSet<T> *pSet,
-                                   Grid<T, U, Q> *domain, Float h, Float *L)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        RandlesDoringEigenvalue<T, U, Q, M>(pSet, domain, h, L, i);
-    }
-}
-
-template<typename T>
-__global__ void RandlesDoringGetBoundaryKernel(ParticleSet<T> *pSet, Float mu,
-                                               Float *L, vec2f Lrange)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        int b = RandlesDoringIsBoundaryParticle(L, mu, Lrange.y, Lrange.x, i);
-        pSet->SetParticleV0(i, b);
-    }
-}
-
 inline vec2f RandlesDoringGetEigenvalueLimits(Float *L, int N){
     Float Lmin = Infinity;
     Float Lmax = -Infinity;
@@ -283,36 +262,26 @@ inline vec2f RandlesDoringGetEigenvalueLimits(Float *L, int N){
     return vec2f(Lmin, Lmax);
 }
 
-inline __host__
-void RandlesDoringEigenvalueImpl(ParticleSet2 *pSet, Grid2 *domain,
-                                 Float h, Float *L)
+inline __bidevice__ void
+RandlesDoringEigenvalueDecl(ParticleSet3 *pSet, Grid3 *domain, Float h, Float *L, int i)
 {
-    int N = pSet->GetParticleCount();
-    if(!GetSystemUseCPU()){
-        GPULaunch(N,
-        GPUKernel(RandlesDoringEigenvalueKernel<vec2f, vec2ui, Bounds2f, Matrix2x2>),
-                  pSet, domain, h, L);
-    }else{
-        ParallelFor(0, N, [&](int i) -> void{
-            RandlesDoringEigenvalue<vec2f, vec2ui, Bounds2f, Matrix2x2>(pSet, domain, h, L, i);
-        });
-    }
+    RandlesDoringEigenvalue<vec3f, vec3ui, Bounds3f, Matrix3x3>(pSet, domain, h, L, i);
 }
 
-inline __host__
-void RandlesDoringEigenvalueImpl(ParticleSet3 *pSet, Grid3 *domain,
+inline __bidevice__ void
+RandlesDoringEigenvalueDecl(ParticleSet2 *pSet, Grid2 *domain, Float h, Float *L, int i)
+{
+    RandlesDoringEigenvalue<vec2f, vec2ui, Bounds2f, Matrix2x2>(pSet, domain, h, L, i);
+}
+
+template<typename T, typename U, typename Q> inline __host__
+void RandlesDoringEigenvalueImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                  Float h, Float *L)
 {
     int N = pSet->GetParticleCount();
-    if(!GetSystemUseCPU()){
-        GPULaunch(N,
-        GPUKernel(RandlesDoringEigenvalueKernel<vec3f, vec3ui, Bounds3f, Matrix3x3>),
-                  pSet, domain, h, L);
-    }else{
-        ParallelFor(0, N, [&](int i) -> void{
-            RandlesDoringEigenvalue<vec3f, vec3ui, Bounds3f, Matrix3x3>(pSet, domain, h, L, i);
-        });
-    }
+    AutoParallelFor("RandlesDoringEigenvalue", N, AutoLambda(int i){
+        RandlesDoringEigenvalueDecl(pSet, domain, h, L, i);
+    });
 }
 
 template<typename T, typename U, typename Q> inline __host__
@@ -338,16 +307,10 @@ void RandlesDoringBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     RandlesDoringEigenvalueImpl(pSet, domain, h, L);
 
     vec2f Ls = RandlesDoringGetEigenvalueLimits(L, N);
-
-    if(!GetSystemUseCPU()){
-        GPULaunch(N, GPUKernel(RandlesDoringGetBoundaryKernel<T>),
-                  pSet, mu, L, Ls);
-    }else{
-        ParallelFor(0, N, [&](int i) -> void{
-            int b = RandlesDoringIsBoundaryParticle(L, mu, Ls.y, Ls.x, i);
-            pSet->SetParticleV0(i, b);
-        });
-    }
+    AutoParallelFor("RandlesDoringIsBoundaryParticle", N, AutoLambda(int i){
+        int b = RandlesDoringIsBoundaryParticle(L, mu, Ls.y, Ls.x, i);
+        pSet->SetParticleV0(i, b);
+    });
     //printf("[RDM] Range [λmin, λmax] : [%g, %g]\n", Ls.x, Ls.y);
 
     cudaFree(L);

@@ -148,8 +148,8 @@ ARGUMENT_PROCESS(boundary_in_args){
     boundary_opts *opts = (boundary_opts *)config;
     opts->input = ParseNext(argc, argv, i, "-in", 1);
     if(!FileExists(opts->input.c_str())){
-        //printf("Input file does not exist\n");
-        //return -1;
+        printf("Input file '%s' does not exist\n", opts->input.c_str());
+        return -1;
     }
     return 0;
 }
@@ -832,6 +832,13 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         ComputeNormalGPU(solver.solverData);
         timer.Start();
         MarroneBoundary(pSet, grid, opts->spacing);
+        timer.Stop();
+    }else if(opts->method == BOUNDARY_MARRONE_ALT){
+        WorkQueue<vec4f> *marroneWorkQ = cudaAllocateVx(WorkQueue<vec4f>, 1);
+        marroneWorkQ->SetSlots(pSet->GetParticleCount());
+        ComputeNormalGPU(solver.solverData);
+        timer.Start();
+        MarroneAdaptBoundary(pSet, grid, opts->spacing, marroneWorkQ);
         timer.Stop();
     }
     /*

@@ -67,32 +67,11 @@ int CFParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     return 0;
 }
 
-template<typename T, typename U, typename Q> __global__
-void CFBoundaryKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        int b = CFParticleIsBoundary(pSet, domain, h, i);
-        pSet->SetParticleV0(i, b);
-    }
-}
-
-template<typename T, typename U, typename Q> __host__
-void CFBoundaryCPU(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h, int i){
-    if(i < pSet->GetParticleCount()){
-        int b = CFParticleIsBoundary(pSet, domain, h, i);
-        pSet->SetParticleV0(i, b);
-    }
-}
-
 template<typename T, typename U, typename Q> __host__
 void CFBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
-    int use_cpu = GetSystemUseCPU();
     int N = pSet->GetParticleCount();
-    if(!use_cpu){
-        GPULaunch(N, GPUKernel(CFBoundaryKernel<T, U, Q>), pSet, domain, h);
-    }else{
-        ParallelFor(0, N, [&](int i) -> void{
-            CFBoundaryCPU(pSet, domain, h, i);
-        });
-    }
+    AutoParallelFor("CFParticleIsBoundary", N, AutoLambda(int i){
+        int b = CFParticleIsBoundary(pSet, domain, h, i);
+        pSet->SetParticleV0(i, b);
+    });
 }

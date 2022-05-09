@@ -155,6 +155,8 @@ void test_pcisph2_water_block(){
     SandimWorkQueue2 *vpWorkQ = cudaAllocateVx(SandimWorkQueue2, 1);
     vpWorkQ->SetSlots(grid->GetCellCount());
     Float sphRadius = data->sphpSet->GetKernelRadius();
+    WorkQueue<vec4f> *marroneWorkQ = cudaAllocateVx(WorkQueue<vec4f>, 1);
+    marroneWorkQ->SetSlots(set2->GetParticleCount());
 
     for(int i = 0; i < 20 * 26; i++){
         solver.Advance(targetInterval);
@@ -165,10 +167,12 @@ void test_pcisph2_water_block(){
         }
 
         vpWorkQ->Reset();
+        marroneWorkQ->Reset();
         ComputeNormalGPU(data);
 
         //IntervalBoundary(set2, grid, sphRadius);
-        MarroneBoundary(set2, grid, sphRadius);
+        //MarroneBoundary(set2, grid, sphRadius);
+        MarroneAdaptBoundary(set2, grid, sphRadius, marroneWorkQ);
         //DiltsSpokeBoundary(set2, grid);
         //CFBoundary(set2, grid, spacing);
         //XiaoweiBoundary(set2, grid, spacing);

@@ -20,6 +20,7 @@ typedef enum{
     BOUNDARY_SANDIM,
     BOUNDARY_INTERVAL,
     BOUNDARY_MARRONE,
+    BOUNDARY_MARRONE_ALT,
     BOUNDARY_NONE
 }BoundaryMethod;
 
@@ -33,6 +34,7 @@ inline std::string GetBoundaryMethodName(BoundaryMethod method){
         case BOUNDARY_SANDIM : return "Sandim";
         case BOUNDARY_INTERVAL : return "Interval";
         case BOUNDARY_MARRONE: return "Marrone";
+        case BOUNDARY_MARRONE_ALT: return "MarroneAlt";
         default:{
             return "NONE";
         }
@@ -57,6 +59,8 @@ inline BoundaryMethod GetBoundaryMethod(std::string method){
         return BOUNDARY_DORING;
     if(method == "Marrone" || method == "marrone" || method == "MARRONE")
         return BOUNDARY_MARRONE;
+    if(method == "MarroneAlt" || method == "marronealt" || method == "MARRONEALT")
+        return BOUNDARY_MARRONE_ALT;
 
     return BOUNDARY_NONE;
 }

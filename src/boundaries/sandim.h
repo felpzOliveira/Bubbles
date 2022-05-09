@@ -74,21 +74,12 @@ void SandimComputeWorkQueueFor(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     workQ[pId] = minCandidate;
 }
 
-template<typename T, typename U, typename Q> __global__
-void SandimComputeWorkQueueKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                                  int *workQ)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        SandimComputeWorkQueueFor(pSet, domain, workQ, i);
-    }
-}
-
 template<typename T, typename U, typename Q> inline __host__
 void SandimComputeWorkQueue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *workQ){
     int N = pSet->GetParticleCount();
-    GPULaunch(N, GPUKernel(SandimComputeWorkQueueKernel<T, U, Q>),
-                pSet, domain, workQ);
+    AutoParallelFor("SandimComputeWorkQueue", N, AutoLambda(int i){
+        SandimComputeWorkQueueFor(pSet, domain, workQ, i);
+    });
 }
 
 /*
@@ -132,23 +123,14 @@ void SandimComputeVP(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     }
 }
 
-template<typename T, typename U, typename Q, typename SandimWorkQueue> __global__
-void SandimComputeVPKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                           SandimWorkQueue *vpWorkQ)
-{
-    unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < domain->GetCellCount()){
-        SandimComputeVP(pSet, domain, vpWorkQ, i);
-    }
-}
-
 template<typename T, typename U, typename Q, typename SandimWorkQueue> inline __host__
 void SandimComputeViewPointsImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                  SandimWorkQueue *vpWorkQ)
 {
     unsigned int N = domain->GetCellCount();
-    GPULaunch(N, GPUKernel(SandimComputeVPKernel<T, U, Q, SandimWorkQueue>),
-                pSet, domain, vpWorkQ);
+    AutoParallelFor("SandimComputeVP", N, AutoLambda(int i){
+        SandimComputeVP(pSet, domain, vpWorkQ, i);
+    });
 }
 
 inline __host__ void SandimComputeViewPoints(ParticleSet3 *pSet, Grid3 *domain,
@@ -272,17 +254,6 @@ void SandimComputeVPFlip(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *partQ
     vp_count[where] = n;
 }
 
-template<typename T, typename U, typename Q, typename SandimWorkQ> __global__
-void SandimComputeFlipKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *partQ,
-                             SandimWorkQ *vpWorkQ, IndexedParticle<T> *points,
-                             int *vp_count, int maxp)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < vpWorkQ->size){
-        SandimComputeVPFlip(pSet, domain, partQ, vpWorkQ, points, vp_count, maxp);
-    }
-}
-
 /*
  * Simple JarvisMarch for the 2D case where solving in the GPU is easy.
  */
@@ -330,18 +301,15 @@ void ConvexHullJarvisMarch2D(IndexedParticle<vec2f> *points, int length,
     }while(chosen != source);
 }
 
-static __global__
-void SandimComputeConvexHull2(IndexedParticle<vec2f> *points, int *vp_count,
-                              SandimWorkQueue2 *vpWorkQ, ParticleSet2 *pSet, int maxp)
+static __bidevice__
+void SandimComputeConvexHull2D(IndexedParticle<vec2f> *points, int *vp_count,
+                               SandimWorkQueue2 *vpWorkQ, ParticleSet2 *pSet, int maxp)
 {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < vpWorkQ->size){
-        int where = 0;
-        vec2f vp = vpWorkQ->Fetch(&where);
-        IndexedParticle<vec2f> *invPoints = &points[where * maxp];
-        int len = vp_count[where];
-        ConvexHullJarvisMarch2D(invPoints, len, pSet);
-    }
+    int where = 0;
+    vec2f vp = vpWorkQ->Fetch(&where);
+    IndexedParticle<vec2f> *invPoints = &points[where * maxp];
+    int len = vp_count[where];
+    ConvexHullJarvisMarch2D(invPoints, len, pSet);
 }
 
 /*
@@ -392,18 +360,17 @@ void SandimComputeHPRImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *part
            //totalLen, mb, N, maxN);
     IndexedParticle<T> *points = cudaAllocateUnregisterVx(IndexedParticle<T>, len);
     int *vp_count = cudaAllocateUnregisterVx(int, N);
-
-    GPULaunch(N, GPUKernel(SandimComputeFlipKernel<T, U, Q, SandimWorkQ>), pSet,
-                domain, partQ, vpWorkQ, points, vp_count, maxN);
+    AutoParallelFor("SandimComputeFlip", N, AutoLambda(int i){
+        SandimComputeVPFlip(pSet, domain, partQ, vpWorkQ, points, vp_count, maxN);
+    });
 
     vpWorkQ->ResetEntry();
     *pts = points;
     *vps = vp_count;
 }
 
-template<typename T> __global__
-void SandimRemapUnboundedParticlesKernel(ParticleSet<T> *pSet, int *partQ){
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
+template<typename T> inline __bidevice__
+void SandimRemapUnboundedParticles(ParticleSet<T> *pSet, int *partQ, int i){
     if(i < pSet->GetParticleCount()){
         int id = partQ[i];
         if(id < 0){
@@ -426,7 +393,9 @@ void SandimComputeHPR(ParticleSet3 *pSet, Grid3 *domain, int *partQ,
     SandimConvexHull3(points, vp_count, vpWorkQ, pSet, maxN);
 
     int N = pSet->GetParticleCount();
-    GPULaunch(N, GPUKernel(SandimRemapUnboundedParticlesKernel<vec3f>), pSet, partQ);
+    AutoParallelFor("SandimRemapUnboundedParticles", N, AutoLambda(int i){
+        SandimRemapUnboundedParticles<vec3f>(pSet, partQ, i);
+    });
 
     cudaFree(points);
     cudaFree(vp_count);
@@ -439,14 +408,17 @@ void SandimComputeHPR(ParticleSet2 *pSet, Grid2 *domain, int *partQ,
     IndexedParticle<vec2f> *points;
     int *vp_count;
     const int maxN = maxFlipSlots;
+    int N = pSet->GetParticleCount();
     SandimComputeHPRImpl<vec2f, vec2ui, Bounds2f, SandimWorkQueue2>(pSet, domain,
                 partQ, vpWorkQ, &points, &vp_count, maxN);
 
-    GPULaunch(vpWorkQ->size, SandimComputeConvexHull2,
-              points, vp_count, vpWorkQ, pSet, maxN);
+    AutoParallelFor("SandimComputeConvexHull2D", vpWorkQ->size, AutoLambda(int i){
+        SandimComputeConvexHull2D(points, vp_count, vpWorkQ, pSet, maxN);
+    });
 
-    int N = pSet->GetParticleCount();
-    GPULaunch(N, GPUKernel(SandimRemapUnboundedParticlesKernel<vec2f>), pSet, partQ);
+    AutoParallelFor("SandimRemapUnboundedParticles", N, AutoLambda(int i){
+        SandimRemapUnboundedParticles<vec2f>(pSet, partQ, i);
+    });
 
     cudaFree(points);
     cudaFree(vp_count);

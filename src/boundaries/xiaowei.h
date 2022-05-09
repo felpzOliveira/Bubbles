@@ -71,39 +71,18 @@ int XiaoweiParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     Float asymmetry = Distance(pi, sum);
 
     // I don't quite understand how this const is picked
-    if(asymmetry > 0.1 * rho){
+    if(asymmetry > 0.15 * rho){
         return 1;
     }
 
     return 0;
 }
 
-template<typename T, typename U, typename Q> __global__
-void XiaoweiBoundaryKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        int b = XiaoweiParticleIsBoundary(pSet, domain, h, i);
-        pSet->SetParticleV0(i, b);
-    }
-}
-
-template<typename T, typename U, typename Q> __host__
-void XiaoweiBoundaryCPU(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h, int i){
-    if(i < pSet->GetParticleCount()){
-        int b = XiaoweiParticleIsBoundary(pSet, domain, h, i);
-        pSet->SetParticleV0(i, b);
-    }
-}
-
 template<typename T, typename U, typename Q> __host__
 void XiaoweiBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
-    int use_cpu = GetSystemUseCPU();
     int N = pSet->GetParticleCount();
-    if(!use_cpu){
-        GPULaunch(N, GPUKernel(XiaoweiBoundaryKernel<T, U, Q>), pSet, domain, h);
-    }else{
-        ParallelFor(0, N, [&](int i) -> void{
-            XiaoweiBoundaryCPU(pSet, domain, h, i);
-        });
-    }
+    AutoParallelFor("XiaoweiParticleIsBoundary", N, AutoLambda(int i){
+        int b = XiaoweiParticleIsBoundary(pSet, domain, h, i);
+        pSet->SetParticleV0(i, b);
+    });
 }

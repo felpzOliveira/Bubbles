@@ -521,92 +521,29 @@ bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
     return !reached_max_depth;
 }
 
-static __global__
-void IntervalBoundaryKernel2DPolygon(Grid2 *domain, ParticleSet2 *pSet,
-                                     Float h, int max_depth)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        using T = vec2f;
-        using U = vec2ui;
-        using Q = Bounds2f;
-        int is_interior =
-                IntervalParticleIsInterior<T, U, Q, PolygonSubdivisionGeometry>
-                            (domain, pSet, max_depth, h, i);
-        if(!is_interior){
-            pSet->SetParticleV0(i, 1);
-        }
-    }
-}
-
-
-static __global__
-void IntervalBoundaryKernel2DBoundingBox(Grid2 *domain, ParticleSet2 *pSet,
-                                         Float h, int max_depth)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        using T = vec2f;
-        using U = vec2ui;
-        using Q = Bounds2f;
-        int is_interior =
-                IntervalParticleIsInterior<T, U, Q, BBSubdivisionGeometry<T, Q, 2>>
-                            (domain, pSet, max_depth, h, i);
-        if(!is_interior){
-            pSet->SetParticleV0(i, 1);
-        }
-    }
-}
-
-static __global__
-void IntervalBoundaryKernel3DBoundingBox(Grid3 *domain, ParticleSet3 *pSet,
-                                         Float h, int max_depth)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        using T = vec3f;
-        using U = vec3ui;
-        using Q = Bounds3f;
-        int is_interior =
-                IntervalParticleIsInterior<T, U, Q, BBSubdivisionGeometry<T, Q, 3>>
-                            (domain, pSet, max_depth, h, i);
-        if(!is_interior){
-            pSet->SetParticleV0(i, 1);
-        }
-    }
-}
-
-static __global__
-void IntervalBoundaryKernel3DVolumetric(Grid3 *domain, ParticleSet3 *pSet,
-                                        Float h, int max_depth)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if(i < pSet->GetParticleCount()){
-        using T = vec3f;
-        using U = vec3ui;
-        using Q = Bounds3f;
-        int is_interior =
-                IntervalParticleIsInterior<T, U, Q, VolumetricSubdivisionGeometry>
-                            (domain, pSet, max_depth, h, i);
-        if(!is_interior){
-            pSet->SetParticleV0(i, 1);
-        }
-    }
-}
-
 inline __host__
 void IntervalBoundary(ParticleSet2 *pSet, Grid2 *domain,
                       Float h, SubdivisionMethod method = PolygonSubdivision,
                       int max_depth = 4)
 {
+    using T = vec2f;
+    using U = vec2ui;
+    using Q = Bounds2f;
     int N = pSet->GetParticleCount();
-    if(method == PolygonSubdivision){
-        GPULaunch(N, GPUKernel(IntervalBoundaryKernel2DPolygon),
-                            domain, pSet, h, max_depth);
-    }else{
-        GPULaunch(N, GPUKernel(IntervalBoundaryKernel2DBoundingBox),
-                            domain, pSet, h, max_depth);
-    }
+    AutoParallelFor("IntervalBoundary2D", N, AutoLambda(int i){
+        int is_interior = 0;
+        if(method == PolygonSubdivision){
+            is_interior =
+                IntervalParticleIsInterior<T, U, Q, PolygonSubdivisionGeometry>
+                    (domain, pSet, max_depth, h, i);
+        }else{
+            is_interior =
+                IntervalParticleIsInterior<T, U, Q, BBSubdivisionGeometry<T, Q, 2>>
+                    (domain, pSet, max_depth, h, i);
+        }
+
+        pSet->SetParticleV0(i, 1-is_interior);
+    });
 }
 
 inline __host__
@@ -614,13 +551,23 @@ void IntervalBoundary(ParticleSet3 *pSet, Grid3 *domain,
                       Float h, SubdivisionMethod method = PolygonSubdivision,
                       int max_depth = 4)
 {
+    using T = vec3f;
+    using U = vec3ui;
+    using Q = Bounds3f;
     int N = pSet->GetParticleCount();
-    if(method == PolygonSubdivision){
-        GPULaunch(N, GPUKernel(IntervalBoundaryKernel3DVolumetric),
-                            domain, pSet, h, max_depth);
-    }else{
-        GPULaunch(N, GPUKernel(IntervalBoundaryKernel3DBoundingBox),
-                            domain, pSet, h, max_depth);
-    }
+    AutoParallelFor("IntervalBoundary3D", N, AutoLambda(int i){
+        int is_interior = 0;
+        if(method == PolygonSubdivision){
+            is_interior =
+                IntervalParticleIsInterior<T, U, Q, VolumetricSubdivisionGeometry>
+                    (domain, pSet, max_depth, h, i);
+        }else{
+            is_interior =
+                IntervalParticleIsInterior<T, U, Q, BBSubdivisionGeometry<T, Q, 3>>
+                    (domain, pSet, max_depth, h, i);
+        }
+
+        pSet->SetParticleV0(i, 1-is_interior);
+    });
 }
 

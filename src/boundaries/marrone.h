@@ -140,6 +140,10 @@ void MarroneBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
 /************************************************************************/
 //                A D A P T E D   V E R S I O N                         //
 /************************************************************************/
+/*
+* Adaptation from Marrone using the cover vector and small radius considerations from:
+*    Simple free-surface detection in two and three-dimensional SPH solver
+*/
 template<typename T, typename U, typename Q> inline __bidevice__
 T MarroneAdaptComputeCoverVector(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                  Float h, T pi, int pId, int &n_counter)
@@ -178,9 +182,6 @@ T MarroneAdaptComputeCoverVector(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     return bi;
 }
 
-/*
-* Adaptation from Marrone using the cover vector and small radius considerations.
-*/
 template<typename T, typename U, typename Q> inline __bidevice__
 int MarroneAdaptIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                    Float h, int pId)

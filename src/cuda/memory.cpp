@@ -34,7 +34,7 @@ void CudaMemoryManagerInsertRegion(const char *key){
     Region *entry = new Region;
     entry->size = 0;
     entry->key = key;
-    
+
     manager.globalMap[key] = entry;
     manager.activeEntry = entry;
     manager.activeKey = strkey;
@@ -70,12 +70,12 @@ void *_cudaAllocator(size_t bytes, int line, const char *filename, bool abort){
         std::cout << "[ERROR] : Cannot allocate " << bytes << " bytes ( "
                   << mb << " Mb )" << std::endl;
     }
-    
+
     if(!ptr && abort){
         getchar();
         cudaSafeExit();
     }
-    
+
     return ptr;
 }
 
@@ -114,7 +114,7 @@ __host__ void CudaMemoryManagerClearCurrent(){
             void *ptr = manager.activeEntry->addresses.at(i);
             cudaFree(ptr);
         }
-        
+
         delete manager.activeEntry;
         manager.globalMap.erase(manager.activeKey);
 #if defined(PRINT_MEMORY)
@@ -134,7 +134,7 @@ __host__ void CudaMemoryManagerStart(const char *key){
         CudaMemoryManagerEmpty();
         CudaMemoryManagerInsertRegion(globalKey.c_str());
     }
-    
+
     if(manager.globalMap.find(strKey) == manager.globalMap.end()){
         CudaMemoryManagerInsertRegion(key);
     }else{
@@ -182,11 +182,11 @@ __host__ void CudaMemoryManagerClearAll(){
             void *ptr = region->addresses.at(i);
             cudaFree(ptr);
         }
-        
+
         delete region;
         it = manager.globalMap.erase(it);
     }
-    
+
     CudaMemoryManagerEmpty();
     initialized = 0;
 #if defined(PRINT_MEMORY)

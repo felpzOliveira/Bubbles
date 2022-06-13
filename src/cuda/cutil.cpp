@@ -51,7 +51,7 @@ std::string time_to_string(std::string val, int size){
                 break;
             }
         }
-        
+
         if(has_dot){
             for(int i = 0; i < dif; i++) resp += "0";
         }else{
@@ -61,7 +61,7 @@ std::string time_to_string(std::string val, int size){
             resp = out;
         }
     }
-    
+
     return resp;
 }
 
@@ -76,12 +76,12 @@ std::string get_time_unit(double *inval){
         unit = "min";
         val /= 60.0;
     }
-    
+
     if(val > 60){
         unit = "h";
         val /= 60;
     }
-    
+
     *inval = val;
     return unit;
 }
@@ -91,7 +91,7 @@ void cudaInitEx(){
 }
 
 int cudaInit(){
-    int nDevices;    
+    int nDevices;
     int dev;
     cudaGetDeviceCount(&nDevices);
     for (int i = 0; i < nDevices; i++) {
@@ -107,7 +107,7 @@ int cudaInit(){
                2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
 #endif
     }
-    
+
     if(nDevices > 0){
         cudaDeviceProp prop;
         memset(&prop, 0, sizeof(cudaDeviceProp));
@@ -116,36 +116,36 @@ int cudaInit(){
         CUCHECK(cudaGetDeviceProperties(&prop, dev));
         global_memory.allocated = 0;
 #if defined(PRINT_INIT)
-        std::cout << "Using device " << prop.name << " [ " <<  prop.major << "." << prop.minor << " ]" << std::endl; 
+        std::cout << "Using device " << prop.name << " [ " <<  prop.major << "." << prop.minor << " ]" << std::endl;
 #endif
         clock_t start = clock();
         cudaFree(0);
 		clock_t mid = clock();
-        
+
         cudaDeviceReset();
         clock_t end = clock();
-        
+
         double cpu_time_mid = to_cpu_time(start, mid);
         double cpu_time_reset = to_cpu_time(mid, end);
         double cpu_time_end = to_cpu_time(start, end);
-        
+
         std::string unitAlloc = get_time_unit(&cpu_time_mid);
         std::string unitReset = get_time_unit(&cpu_time_reset);
         std::string unitTotal = get_time_unit(&cpu_time_end);
-        
+
         std::string state("[OK]");
         if(cpu_time_end > 1.5){
             state = "[SLOW]";
         }
 #if defined(PRINT_INIT)
-        std::cout << "GPU init stats " << state << "\n" <<  
+        std::cout << "GPU init stats " << state << "\n" <<
             " > Allocation: " << cpu_time_mid << " " << unitAlloc << std::endl;
         std::cout << " > Reset: " << cpu_time_reset << " " << unitReset << std::endl;
         std::cout << " > Global: " << cpu_time_end << " " << unitTotal << std::endl;
 #endif
-        
+
     }
-    
+
 	return dev;
 }
 
@@ -156,17 +156,17 @@ void cudaPrintMemoryTaken(){
         amount /= 1024.f;
         unity = "KB";
     }
-    
+
     if(amount > 1024){
         amount /= 1024.f;
         unity = "MB";
     }
-    
+
     if(amount > 1024){
         amount /= 1024.f;
         unity = "GB";
     }
-    
+
     std::cout << "Took " << amount << " " << unity << " of GPU memory" << std::endl;
 }
 
@@ -182,7 +182,7 @@ int cudaKernelSynchronize(){
         std::cout << "Async kernel error: " << cudaGetErrorString(errAsync) << std::endl;
 		rv = 1;
     }
-    
+
     return rv;
 }
 
@@ -196,7 +196,7 @@ DeviceMemoryStats cudaReportMemoryUsage(){
         memStats.used_bytes = memStats.total_bytes - memStats.free_bytes;
         memStats.valid = 1;
     }
-    
+
     return memStats;
 }
 
@@ -211,7 +211,7 @@ int cudaHasMemory(size_t bytes){
     if(mem.valid){
         ok = mem.free_bytes > bytes ? 1 : 0;
     }
-    
+
     return ok;
 }
 

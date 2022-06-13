@@ -16,7 +16,11 @@
 *
 * Sandim uses recursive methods for classification, since we are running
 * on GPU I'll implement a simple GPU stack (not very efficient tho)
-* and unroll the recursion to be stack-based.
+* and unroll the recursion to be stack-based. An alternative is to use
+* multiqueues for unrolling the stack in a GPU friendly way, should be
+* very efficient but handling the different geometry as templates becomes
+* annoying so I'll left this as a future todo as performance for this is not
+* important right now.
 */
 
 #define INTERVAL_LABEL_COVERED 0
@@ -522,9 +526,8 @@ bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
 }
 
 inline __host__
-void IntervalBoundary(ParticleSet2 *pSet, Grid2 *domain,
-                      Float h, SubdivisionMethod method = PolygonSubdivision,
-                      int max_depth = 4)
+void IntervalBoundary(ParticleSet2 *pSet, Grid2 *domain, Float h,
+                      SubdivisionMethod method = PolygonSubdivision, int max_depth = 4)
 {
     using T = vec2f;
     using U = vec2ui;
@@ -547,9 +550,8 @@ void IntervalBoundary(ParticleSet2 *pSet, Grid2 *domain,
 }
 
 inline __host__
-void IntervalBoundary(ParticleSet3 *pSet, Grid3 *domain,
-                      Float h, SubdivisionMethod method = PolygonSubdivision,
-                      int max_depth = 4)
+void IntervalBoundary(ParticleSet3 *pSet, Grid3 *domain, Float h,
+                      SubdivisionMethod method = PolygonSubdivision, int max_depth = 4)
 {
     using T = vec3f;
     using U = vec3ui;

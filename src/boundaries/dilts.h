@@ -40,6 +40,7 @@ bool DoesSpheresIntersect(T pi, T pj, Float ri, Float rj){
     return !(d > (ri + rj) - Epsilon);
 }
 
+/* TODO: These spoke routines should be for_each templated routines. */
 /*
 * Uniformly samples the circle around pi in 2D.
 */

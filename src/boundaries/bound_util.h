@@ -73,6 +73,78 @@ class WorkQueue{
     }
 };
 
+template<typename BaseQueue, unsigned int N>
+class MultiWorkQueue{
+    public:
+    BaseQueue *qs[N];
+    size_t count = 0;
+
+    __bidevice__ MultiWorkQueue(){
+        for(size_t i = 0; i < N; i++){
+            qs[i] = nullptr;
+        }
+    }
+
+    __host__ void SetSlots(int maxItems, int id){
+        if(qs[id] == nullptr){
+            qs[id] = cudaAllocateVx(BaseQueue, 1);
+            qs[id]->SetSlots(maxItems);
+        }
+    }
+
+    __bidevice__ BaseQueue *FetchQueueFor(int id){
+        return qs[id];
+    }
+
+    __host__ void Reset(int id=-1){
+        if(id >= 0) qs[id]->Reset();
+        else{
+            for(size_t i = 0; i < count; i++){
+                qs[i]->Reset();
+            }
+        }
+    }
+};
+
+template<typename T>
+class DualWorkQueue{
+    public:
+    MultiWorkQueue<WorkQueue<T>, 2> mQueue;
+    int active = 0;
+
+    DualWorkQueue() = default;
+
+    __host__ void SetSlots(int maxItems){
+        mQueue.SetSlots(maxItems, 0);
+        mQueue.SetSlots(maxItems, 1);
+        active = 0;
+    }
+
+    __bidevice__ WorkQueue<T> *ActiveQueue(){
+        return mQueue.FetchQueueFor(active);
+    }
+
+    __bidevice__ WorkQueue<T> *NextQueue(){
+        return mQueue.FetchQueueFor(1-active);
+    }
+
+    __host__ void Flip(int reset=1){
+        WorkQueue<T> *Q = ActiveQueue();
+        Q->Reset();
+        active = 1 - active;
+    }
+
+    __bidevice__ void Push(T id){
+        WorkQueue<T> *Q = NextQueue();
+        Q->Push(id);
+    }
+
+    __bidevice__ T Fetch(int *where=nullptr){
+        WorkQueue<T> *Q = ActiveQueue();
+        return Q->Fetch(where);
+    }
+};
+
 typedef WorkQueue<int> LNMWorkQueue;
 typedef WorkQueue<int> IntWorkQueue;
 typedef WorkQueue<vec3f> SandimWorkQueue3;

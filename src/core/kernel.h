@@ -4,7 +4,7 @@
 class SphStdKernel2{
     public:
     Float h, h2, h3, h4;
-    
+
     __bidevice__ SphStdKernel2();
     __bidevice__ SphStdKernel2(Float r);
     __bidevice__ void SetRadius(Float r);
@@ -18,7 +18,7 @@ class SphStdKernel2{
 class SphSpikyKernel2{
     public:
     Float h, h2, h3, h4;
-    
+
     __bidevice__ SphSpikyKernel2();
     __bidevice__ SphSpikyKernel2(Float r);
     __bidevice__ void SetRadius(Float r);
@@ -32,7 +32,7 @@ class SphSpikyKernel2{
 class SphStdKernel3{
     public:
     Float h, h2, h3, h5;
-    
+
     __bidevice__ SphStdKernel3();
     __bidevice__ SphStdKernel3(Float r);
     __bidevice__ void SetRadius(Float r);
@@ -46,7 +46,7 @@ class SphStdKernel3{
 class SphSpikyKernel3{
     public:
     Float h, h2, h3, h4, h5;
-    
+
     __bidevice__ SphSpikyKernel3();
     __bidevice__ SphSpikyKernel3(Float r);
     __bidevice__ void SetRadius(Float r);

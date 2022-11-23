@@ -15,7 +15,11 @@
 # set rendering globals
 set-image-resolution [1000 1000] # output image resolution
 set-integrator [wavefront 1024] # use gpu integrator and 1024 samples per pixel
-set-global-light [interpolated] # add the cute interpolated skylight
+#set-global-light [interpolated] # add the cute interpolated skylight
+set-global-light [atmospheric]
+set-sky-intensity [50.0]
+#set-sky-rayleigh [2.24 1.3 0.55]
+set-sky-sundir [0 1 0]
 set-ray-depth[50] # set the maximum ray depth for the integrator
 
 # set the filter sampling to use Zirr's cascade buffer, from the paper:
@@ -43,25 +47,25 @@ Material{ reflectance[0.53 0.50 0.99] name[ground]
 # ./bbtool boundary -in out_N.txt -inform pvm -legacy -outform pb -method cf
 
 #View [1.5 3  6 # eye
-      #1.5 1.1  1 # at
-      #0   1  0 # up
-      #35.0]    # fov
+ #     1.5 1.1  1 # at
+  #    0   1  0 # up
+   #   35.0]    # fov
 
 # upper rect (blue)
 #set-render-window [0.70 0.90 # x range
-                   #0.55 0.75]# y range
+ #                  0.55 0.75] # y range
 
 # lower rect (yellow)
 #set-render-window [0.02 0.20 # x range
-                   #0.47 0.65]# y range
+ #                  0.47 0.65] # y range
 
 # center rect (orange)
 #set-render-window [0.40 0.65 # x range
                    #0.50 0.75]# y range
 
 #Shape { type[quad] mat[ground]
-        #vertex[-50.0 0.02  100.0    50.0 0.02  100
-                #50.0 0.02 -100.0   -50.0 0.02 -100] }
+ #       vertex[-50.0 0.02  100.0    50.0 0.02  100
+  #              50.0 0.02 -100.0   -50.0 0.02 -100] }
 ################################################
 
 ############ Rendering props for Xiaowei section - water drop
@@ -90,10 +94,10 @@ Material{ reflectance[0.53 0.50 0.99] name[ground]
 #./bbtool boundary -in quadruple_out/sim_data/out_N.txt \
 #                  -inform p -legacy -outform pb -method sandim
 
-#View [6 3 0 # eye
-      #0 -1.6 0 # at
-      #0   1  0 # up
-      #35.0]    # fov
+View [6 3 0 # eye
+      0 -1.6 0 # at
+      0   1  0 # up
+      35.0]    # fov
 
 # center/bottom rect (blue)
 #set-render-window [0.40 0.60 # x range
@@ -107,9 +111,9 @@ Material{ reflectance[0.53 0.50 0.99] name[ground]
 #set-render-window [0.46 0.65 # x range
                    #0.68 0.87]# y range
 
-#Shape { type[quad] mat[ground]
-        #vertex[-50.0 -2.0  100.0    50.0 -2.0  100
-                #50.0 -2.0 -100.0   -50.0 -2.0 -100] }
+Shape { type[quad] mat[ground]
+        vertex[-50.0 -2.0  100.0    50.0 -2.0  100
+                50.0 -2.0 -100.0   -50.0 -2.0 -100] }
 ################################################
 
 ############ Rendering props for LNM section - fluid in ball
@@ -163,7 +167,7 @@ Material{ reflectance[0.53 0.50 0.99] name[ground]
 # DON'T FORGET TO INCLUDE THIS
 # include the simulation description
 # bubbles cmd: ./bbtool pbr -in output.txt -inform pb -legacy -filtered -renderer lit
-#Include [geometry.lit]
+Include [geometry.lit]
 
 ############ Mesh images for presentation uses this
 # marching cubes bubbles cmd:
@@ -204,80 +208,83 @@ Material{ reflectance[0.53 0.50 0.99] name[ground]
 # Lit currently only supports homogenous mediums based on Henyey-Greenstein
 # phase function. If you intend to copy the locations of the dragons to PBRT
 # please note that you need to transpose the transformation for correct placement.
-set-integrator [wavefront 1024]
+#set-integrator [wavefront 1024]
 
 # change to your directory to find the light's spd and the dragon model
-set-base-path [/home/felipe/Documents/CGStuff]
+#set-base-path [/home/felipe/Documents/CGStuff]
 
-View [0 1.25 5 # eye
-      0 -0.5 0 # at
-      0  1   0 # up
-      36.0]    # fov
+#View [0 1.25 5 # eye
+      #0 -0.5 0 # at
+      #0  1   0 # up
+      #36.0]    # fov
 
-Medium{ type[homogeneous] name[volume] asym_g[0.7] scale[80.0]
-        sigma_s[0.00125 0.00125 0.000125] sigma_a[0.0225 0.0225 0.01] }
+#Medium{ type[homogeneous] name[volume] asym_g[0.7] scale[80.0]
+        #sigma_s[0.00125] sigma_a[0.0225] albedo[1 1 0.45] }
 
-set-image-resolution [1200 900]
+#set-image-resolution [1200 900]
 
 # for a complete white glass we need to use a white texture because
 # spectral upsampling will turn colored white glass into blue
-Texture{ name[white] value[1] type[float] }
-Material{ texture[white] type[dielectric] dispersion[water] name[water_mat] }
+#Texture{ name[white] value[1] type[float] }
+#Material{ texture[white] type[dielectric] dispersion[water] name[water_mat] }
 
 # approximate glass with disney bsdf for the box, I give small eta just to make small
 # highlights
-Material{ texture[white] rough[0.01 0.01] transmission[1.0]
-          eta[1.02] name[glass] type[disney] }
+#Material{ texture[white] rough[0.01 0.01] transmission[1.0]
+          #eta[1.02] name[glass] type[disney] }
 
 # the light in this scene is based on the spd from Ledtech
-Material{ emission [spds/Ledtech.csv] name [light] type [diffuselight] scale[10] }
-Material{ reflectance[0.3 0.3 0.6] name[ground2] type[diffuse] }
+#Material{ emission [spds/Ledtech.csv] name [light] type [diffuselight] scale[10] }
+
+#Texture{ name[uv_tex] type[checkerboard] reflectance[0.9 0.9 0.9]
+         #reflectance[0.2 0.2 0.2] uv-scale[450 450] }
+#Material{ texture[uv_tex] name[ground2] type[diffuse] }
 
 # blue material for the dragons
-Material { name[mat_0] type [diffuse] reflectance [ 0.249 0.347 0.643 ] scale [0.5] }
+#Material { name[mat_0] type [diffuse] reflectance [ 0.249 0.347 0.643 ] scale [0.5] }
 
 # first dragon
-Shape { type[mesh] name[mesh_0] geometry[models/sssdragon.obj] mat[mat_0]
-    transform [ 0.007695 0.000000 0.001919 0.200000
-                0.000000 0.007931 0.000000 -0.940880
-                -0.001919 0.000000 0.007695 0.000000
-                0.000000 0.000000 0.000000 1.000000 ] }
+#Shape { type[mesh] name[mesh_0] geometry[models/sssdragon.obj] mat[mat_0]
+    #transform [ 0.007695 0.000000 0.001919 0.200000
+                #0.000000 0.007931 0.000000 -0.940880
+                #-0.001919 0.000000 0.007695 0.000000
+                #0.000000 0.000000 0.000000 1.000000 ] }
 
 # second dragon
-Shape { type[instance] base[mesh_0] mat[mat_0]
-    transform [ 0.007931 0.000000 0.000000 -1.000000
-                0.000000 0.007931 0.000000 -0.940880
-                0.000000 0.000000 0.007931 0.000000
-                0.000000 0.000000 0.000000 1.000000 ] }
+#Shape { type[instance] base[mesh_0] mat[mat_0]
+    #transform [ 0.007931 0.000000 0.000000 -1.000000
+                #0.000000 0.007931 0.000000 -0.940880
+                #0.000000 0.000000 0.007931 0.000000
+                #0.000000 0.000000 0.000000 1.000000 ] }
 
 # box
-Shape{ type[quad] mat[glass]
-       vertex[ 1.75  1.25 -1 -1.75  1.25 -1
-              -1.75 -1.25 -1  1.75 -1.25 -1] }
+#Shape{ type[quad] mat[glass]
+       #vertex[ 1.75  1.25 -1 -1.75  1.25 -1
+              #-1.75 -1.25 -1  1.75 -1.25 -1] }
 
-Shape{ type[quad] mat[glass]
-       vertex[ 1.75  1.25 1 -1.75  1.25 1
-              -1.75 -1.25 1  1.75 -1.25 1] }
+#Shape{ type[quad] mat[glass]
+       #vertex[ 1.75  1.25 1 -1.75  1.25 1
+              #-1.75 -1.25 1  1.75 -1.25 1] }
 
-Shape{ type[quad] mat[glass]
-       vertex[ 1.75  1.25  1  1.75  1.25 -1
-               1.75 -1.25 -1  1.75 -1.25  1] }
+#Shape{ type[quad] mat[glass]
+       #vertex[ 1.75  1.25  1  1.75  1.25 -1
+               #1.75 -1.25 -1  1.75 -1.25  1] }
 
-Shape{ type[quad] mat[glass]
-       vertex[ -1.75  1.25  1  -1.75  1.25 -1
-               -1.75 -1.25 -1  -1.75 -1.25  1] }
+#Shape{ type[quad] mat[glass]
+       #vertex[ -1.75  1.25  1  -1.75  1.25 -1
+               #-1.75 -1.25 -1  -1.75 -1.25  1] }
 
 # light
-Shape{ type [quad] mat[light]
-       vertex [543.0 948.7 532.0  13.0 948.7 532.0
-               13.0  948.7 27.0   543.0 948.7 27.0] }
+#Shape{ type [quad] mat[light]
+       #vertex [543.0 948.7 532.0  13.0 948.7 532.0
+               #13.0  948.7 27.0   543.0 948.7 27.0] }
 
 # floor
-Shape { type[quad] mat[ground2]
-        vertex[-250.0 -1.25  300.0    250.0 -1.25  300
-                250.0 -1.25 -300.0   -250.0 -1.25 -300] }
+#Shape { type[quad] mat[ground2]
+        #vertex[-250.0 -1.25  300.0    250.0 -1.25  300
+                #250.0 -1.25 -300.0   -250.0 -1.25 -300] }
 
 # fluid
-Shape{ type[mesh] name[fluid] geometry[models/fluid_2.obj]
-       mat[water_mat] medium[volume null] }
+#Shape{ type[mesh] name[fluid] geometry[models/fluid_2.obj]
+       #mat[water_mat] medium[volume null] }
 

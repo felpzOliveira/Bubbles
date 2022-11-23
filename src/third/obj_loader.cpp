@@ -57,7 +57,7 @@ static bool _ParseDouble(const char *s, const char *s_end, Float *result){
     if (s >= s_end) {
         return false;
     }
-    
+
     double mantissa = 0.0;
     // This exponent is base 2 rather than 10.
     // However the exponent we parse is supposed to be one of ten,
@@ -67,22 +67,22 @@ static bool _ParseDouble(const char *s, const char *s_end, Float *result){
     // To get the final double we will use ldexp, it requires the
     // exponent to be in base 2.
     int exponent = 0;
-    
+
     // NOTE: THESE MUST BE DECLARED HERE SINCE WE ARE NOT ALLOWED
     // TO JUMP OVER DEFINITIONS.
     char sign = '+';
     char exp_sign = '+';
     char const *curr = s;
-    
+
     // How many characters were read in a loop.
     int read = 0;
     // Tells whether a loop terminated due to reaching s_end.
     bool end_not_reached = false;
-    
+
     /*
             BEGIN PARSING.
     */
-    
+
     // Find out what sign we've got.
     if (*curr == '+' || *curr == '-') {
         sign = *curr;
@@ -91,7 +91,7 @@ static bool _ParseDouble(const char *s, const char *s_end, Float *result){
     } else {
         goto fail;
     }
-    
+
     // Read the integer part.
     end_not_reached = (curr != s_end);
     while (end_not_reached && IS_DIGIT(*curr)) {
@@ -101,12 +101,12 @@ static bool _ParseDouble(const char *s, const char *s_end, Float *result){
         read++;
         end_not_reached = (curr != s_end);
     }
-    
+
     // We must make sure we actually got something.
     if (read == 0) goto fail;
     // We allow numbers of form "#", "###" etc.
     if (!end_not_reached) goto assemble;
-    
+
     // Read the decimal part.
     if (*curr == '.') {
         curr++;
@@ -117,7 +117,7 @@ static bool _ParseDouble(const char *s, const char *s_end, Float *result){
                 1.0, 0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001, 0.0000001,
             };
             const int lut_entries = sizeof pow_lut / sizeof pow_lut[0];
-            
+
             // NOTE: Don't use powf here, it will absolutely murder precision.
             mantissa += static_cast<int>(*curr - 0x30) *
                 (read < lut_entries ? pow_lut[read] : std::pow(10.0, -read));
@@ -129,9 +129,9 @@ static bool _ParseDouble(const char *s, const char *s_end, Float *result){
     } else {
         goto assemble;
     }
-    
+
     if (!end_not_reached) goto assemble;
-    
+
     // Read the exponent part.
     if (*curr == 'e' || *curr == 'E') {
         curr++;
@@ -145,7 +145,7 @@ static bool _ParseDouble(const char *s, const char *s_end, Float *result){
             // Empty E is not allowed.
             goto fail;
         }
-        
+
         read = 0;
         end_not_reached = (curr != s_end);
         while (end_not_reached && IS_DIGIT(*curr)) {
@@ -158,7 +158,7 @@ static bool _ParseDouble(const char *s, const char *s_end, Float *result){
         exponent *= (exp_sign == '+' ? 1 : -1);
         if (read == 0) goto fail;
     }
-    
+
     assemble:
     *result = (sign == '+' ? 1 : -1) *
         (exponent ? std::ldexp(mantissa * std::pow(5.0, exponent), exponent)
@@ -173,22 +173,22 @@ static inline bool fixIndex(int idx, int n, int *ret){
     if(!ret){
         return false;
     }
-    
+
     if(idx > 0){
         (*ret) = idx - 1;
         return true;
     }
-    
+
     if(idx == 0){
         // zero is not allowed according to the spec.
         return false;
     }
-    
+
     if(idx < 0){
         (*ret) = n + idx;  // negative value = relative
         return true;
     }
-    
+
     return false;  // never reach here.
 }
 
@@ -198,20 +198,20 @@ static bool parseTriple(const char **token, int vsize, int vnsize, int vtsize,
     if(!ret){
         return false;
     }
-    
+
     vertex_index_t vi(-1);
-    
+
     if(!fixIndex(atoi((*token)), vsize, &(vi.v_idx))){
         return false;
     }
-    
+
     (*token) += strcspn((*token), "/ \t\r");
     if((*token)[0] != '/'){
         (*ret) = vi;
         return true;
     }
     (*token)++;
-    
+
     // i//k
     if((*token)[0] == '/'){
         (*token)++;
@@ -222,27 +222,27 @@ static bool parseTriple(const char **token, int vsize, int vnsize, int vtsize,
         (*ret) = vi;
         return true;
     }
-    
+
     // i/j/k or i/j
     if(!fixIndex(atoi((*token)), vtsize, &(vi.vt_idx))){
         return false;
     }
-    
+
     (*token) += strcspn((*token), "/ \t\r");
     if((*token)[0] != '/'){
         (*ret) = vi;
         return true;
     }
-    
+
     // i/j/k
     (*token)++;  // skip '/'
     if(!fixIndex(atoi((*token)), vnsize, &(vi.vn_idx))){
         return false;
     }
     (*token) += strcspn((*token), "/ \t\r");
-    
+
     (*ret) = vi;
-    
+
     return true;
 }
 
@@ -263,7 +263,7 @@ std::istream &GetLine(std::istream &is, std::string &t){
             }
         }
     }
-    
+
     return is;
 }
 
@@ -332,7 +332,7 @@ static inline void FreePack(pack_data_t *pack){
     if(pack->pickedU) delete[] pack->pickedU;
 }
 
-static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v, 
+static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v,
                             std::vector<vec3f> *vn, std::vector<vec2f> *vt,
                             pack_data_t *pack, std::vector<vertex_index_t> *indexes)
 {
@@ -340,12 +340,12 @@ static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v,
     std::vector<Point3f> p2;
     std::vector<Point2f> uv;
     std::vector<Normal3f> nor;
-    
+
     AssurePackInit(pack, v->size(), vn->size(), vt->size());
     int *picked  = pack->pickedV;
     int *pickedN = pack->pickedN;
     int *pickedU = pack->pickedU;
-    
+
     for(int i = 0; i < indexes->size(); i++){
         int whichV = indexes->operator[](i).v_idx;
         int whichN = indexes->operator[](i).vn_idx;
@@ -356,7 +356,7 @@ static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v,
             p2.push_back(p);
             cV++;
         }
-        
+
         if(whichN > -1){
             if(pickedN[whichN] == -1){
                 pickedN[whichN] = cN;
@@ -365,7 +365,7 @@ static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v,
                 cN++;
             }
         }
-        
+
         if(whichU > -1){
             if(pickedU[whichU] == -1){
                 pickedU[whichU] = cU;
@@ -375,7 +375,7 @@ static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v,
             }
         }
     }
-    
+
     mesh->p = AllocType(Point3f, p2.size());
     mesh->indices = AllocType(Point3i, indexes->size());
     mesh->nTriangles = indexes->size() / 3;
@@ -383,24 +383,24 @@ static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v,
     mesh->nUvs = 0;
     mesh->nNormals = 0;
     memcpy(mesh->p, p2.data(), p2.size() * sizeof(Point3f));
-    
+
     if(cN > 0){
         mesh->n = AllocType(Normal3f, cN);
         memcpy(mesh->n, nor.data(), cN * sizeof(Normal3f));
         mesh->nNormals = cN;
     }
-    
+
     if(cU > 0){
         mesh->uv = AllocType(Point2f, cU);
         memcpy(mesh->uv, uv.data(), cU * sizeof(Point2f));
         mesh->nUvs = cU;
     }
-    
+
     for(int i = 0; i < indexes->size(); i++){
         int ip = indexes->operator[](i).v_idx;
         int in = indexes->operator[](i).vn_idx;
         int it = indexes->operator[](i).vt_idx;
-        
+
         int iip = picked[ip];
         int iin = (in > -1) ? pickedN[in] : -1;
         int iit = (it > -1) ? pickedU[it] : -1;
@@ -409,16 +409,16 @@ static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v,
                 printf("[OBJ LOADER]Invalid index for normal [%d > %d]\n", iin, cN);
                 iin = -1;
             }
-            
+
             if(iit > cU){
                 printf("[OBJ LOADER]Invalid index for uv [%d > %d]\n", iit, cU);
                 iit = -1;
             }
         }
-        
+
         mesh->indices[i] = Point3i(iip, iin, iit);
     }
-    
+
 }
 
 __host__ int FindName(const char *path){
@@ -451,54 +451,54 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
     int p = FindName(path);
 
     MemoryCheck();
-    
+
     vertex_index_t face[4];
     int facen = 0;
-    
+
     pack_data_t pack;
     printf("[OBJ LOADER] Attempting to parse %s\n", &path[p]);
-    
+
     std::ifstream ifs(path);
     if(!ifs){
         printf("[OBJ LOADER] Could not open file %s\n", path);
         return meshes;
     }
-    
+
     std::string linebuf;
-    
+
     int making_mesh = 0;
     std::string currentMtlFile;
     std::string currentMaterialName;
     int matNameCounter = 0;
-    
+
     clock_t start = clock();
-    
+
     while(ifs.peek() != -1){
         GetLine(ifs, linebuf);
-        
+
         if(linebuf.size() > 0){ //remove '\n'
             if(linebuf[linebuf.size()-1] == '\n') linebuf.erase(linebuf.size() - 1);
         }
-        
+
         if(linebuf.size() > 0){ //remove '\r'
             if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
         }
-        
+
         // skip empty
         if(linebuf.empty()) continue;
         const char *token = linebuf.c_str();
         token += strspn(token, " \t");
-        
+
         Assert(token);
         if(token[0] == '\0') continue; //empty line
         if(token[0] == '#') continue; //comment line
-        
+
         //if we just ended a mesh
         if(token[0] != 'f' && making_mesh && split_mesh){
             making_mesh = 0;
             FillMesh(currentMesh, &v, &vn, &vt, &pack, &indexes);
         }
-        
+
         if(token[0] == 'o' && IS_SPACE((token[1]))){
             //TODO: grab name
             token += 2;
@@ -506,7 +506,7 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
             ss << token;
             //printf("Found %s\n", token);
         }
-        
+
         if(token[0] == 'v' && IS_SPACE((token[1]))){
             token += 2;
             vec3f vertex;
@@ -514,7 +514,7 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
             v.push_back(vertex);
             continue;
         }
-        
+
         if(token[0] == 'v' && token[1] == 'n' && IS_SPACE((token[2]))){
             token += 3;
             vec3f normal;
@@ -522,7 +522,7 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
             vn.push_back(normal);
             continue;
         }
-        
+
         if(token[0] == 'v' && token[1] == 't' && IS_SPACE((token[2]))){
             token += 3;
             vec2f uv;
@@ -530,14 +530,14 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
             vt.push_back(uv);
             continue;
         }
-        
+
         if((0 == strncmp(token, "mtllib", 6)) && IS_SPACE((token[6]))){
             token += 7;
             currentMtlFile = std::string(token);
             //printf("Materials to lookup here: %s\n", currentMtlFile.c_str());
             continue;
         }
-        
+
         if((0 == strncmp(token, "usemtl", 6)) && IS_SPACE((token[6]))){
             token += 7;
             std::stringstream ss;
@@ -547,7 +547,7 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
             //printf("Found material %s\n", currentMaterialName.c_str());
             continue;
         }
-        
+
         if(token[0] == 'f' && IS_SPACE((token[1]))){
             //NOTE: entering here means we discovered a new mesh
             if(!making_mesh){
@@ -569,7 +569,7 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
                 indexes.clear();
                 making_mesh = 1;
             }
-            
+
             token += 2;
             token += strspn(token, " \t");
             facen = 0;
@@ -577,51 +577,51 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
                 vertex_index_t vi;
                 if (!parseTriple(&token, static_cast<int>(v.size()),
                                  static_cast<int>(vn.size()),
-                                 static_cast<int>(vt.size()), &vi)) 
+                                 static_cast<int>(vt.size()), &vi))
                 {
                     printf("[OBJ LOADER] Failed parsing face\n");
                     break;
                 }
-                
+
                 size_t n = strspn(token, " \t\r");
                 token += n;
                 if(facen >= 4){
                     printf("[OBJ LOADER] Error: Not a supported face description\n");
                     exit(0);
                 }
-                
+
                 face[facen++] = vi;
             }
-            
+
             if(facen == 3){
                 indexes.push_back(face[0]); indexes.push_back(face[1]);
                 indexes.push_back(face[2]);
             }else if(facen == 4){
                 indexes.push_back(face[0]); indexes.push_back(face[1]);
-                indexes.push_back(face[2]); indexes.push_back(face[0]); 
+                indexes.push_back(face[2]); indexes.push_back(face[0]);
                 indexes.push_back(face[2]); indexes.push_back(face[3]);
             }else{
                 printf("[OBJ LOADER] Warning unsupported face with %d vertices\n", facen);
             }
-            
+
             continue;
         }
     }
-    
+
     if(making_mesh){
         making_mesh = 0;
         FillMesh(currentMesh, &v, &vn, &vt, &pack, &indexes);
     }
-    
+
     FreePack(&pack);
-    
+
     clock_t end = clock();
-    
+
     double time_taken = to_cpu_time(start, end);
     printf("[OBJ LOADER] Took %g seconds, #v [%d] #vn [%d] #vt [%d]. Decomposed in %d meshe(s)\n",
            time_taken, (int)v.size(), (int)vn.size(), (int)vt.size(),
            (int)meshes->size());
-    
+
     return meshes;
 }
 
@@ -648,33 +648,33 @@ __host__ ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props){
                 center += vec3f(mesh->p[i]);
                 w += 1.f;
             }
-            
+
             Float invW = 1.f / w;
             center = center * invW;
         }
-        
+
         if(mesh->uv){
             duplicated->uv = AllocType(Point2f, mesh->nUvs);
         }
-        
+
         if(mesh->indices){
             duplicated->indices = AllocType(Point3i, mesh->nTriangles * 3);
         }
-        
+
         //TODO:Tangents
         duplicated->s = nullptr;
-        
+
         if(mesh->n){
             duplicated->n = AllocType(Normal3f, mesh->nNormals);
         }
-        
+
         int ia = mesh->nTriangles * 3;
         int ib = mesh->nVertices;
         int ic = mesh->nNormals;
         int id = mesh->nUvs;
-        
+
         int maxl = Max(ia, Max(ib, Max(ic, id)));
-        
+
         for(int i = 0; i < maxl; i++){
             if(i < mesh->nVertices){
                 Point3f p = mesh->p[i];
@@ -688,24 +688,24 @@ __host__ ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props){
                                     wp.z + center.z);
                     }
                 }
-                
+
                 duplicated->p[i] = p;
             }
-            
+
             if(i < mesh->nUvs){
                 duplicated->uv[i] = mesh->uv[i];
             }
-            
+
             if(i < mesh->nNormals){
                 duplicated->n[i] = mesh->n[i];
             }
-            
+
             if(i < ia){
                 duplicated->indices[i] = mesh->indices[i];
             }
         }
     }
-    
+
     return duplicated;
 }
 
@@ -717,7 +717,7 @@ __host__ void UseDefaultAllocatorFor(AllocatorType type){
         memoryAlloc = GPUMemAlloc;
         memoryFree  = GPUMemFree;
     }
-    
+
     memoryType = type;
     memoryInitialized = 1;
 }
@@ -757,16 +757,6 @@ void writeObj(HostTriangleMesh3 *mesh, std::ostream *strm){
             (*strm) << ' ';
         }
         (*strm) << std::endl;
-    }
-}
-
-void HostTriangleMesh3::writeToDisk(const char *filename){
-    std::ofstream file(filename);
-    if(file){
-        writeObj(this, &file);
-        file.close();
-    }else{
-        printf("[OBJ_LOADER] Cannot open file %s\n", filename);
     }
 }
 

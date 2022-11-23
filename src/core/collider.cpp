@@ -1,7 +1,7 @@
 #include <collider.h>
 
 template<class Collider, class T, class PointQuery>
-__bidevice__ bool CollisionHandle(Collider *collider, Float radius, 
+__bidevice__ bool CollisionHandle(Collider *collider, Float radius,
                                   Float restitutionCoefficient,
                                   Float frictionCoefficient,
                                   T *position, T *velocity)
@@ -18,11 +18,11 @@ __bidevice__ bool CollisionHandle(Collider *collider, Float radius,
         T targetPoint  = colliderPoint.point + radius * targetNormal;
         T colliderVelocity = colliderPoint.velocity;
         T relativeVel = *velocity - colliderVelocity;
-        
+
         Float normalDotRel = Dot(targetNormal, relativeVel);
         T relativeVelN = normalDotRel * targetNormal;
         T relativeVelT = relativeVel - relativeVelN;
-        
+
         if(normalDotRel < 0){
             T deltaRelN = (-1.0 - restitutionCoefficient) * relativeVelN;
             relativeVelN *= -restitutionCoefficient;
@@ -32,14 +32,14 @@ __bidevice__ bool CollisionHandle(Collider *collider, Float radius,
                 Float frictionScale = Max(0, fScale);
                 relativeVelT *= frictionScale;
             }
-            
+
             *velocity = relativeVelN + relativeVelT + colliderVelocity;
         }
-        
+
         *position = targetPoint;
         collided = true;
     }
-    
+
     return collided;
 }
 
@@ -137,7 +137,7 @@ __bidevice__ bool Collider3::ResolveCollision(Float radius, Float restitutionCoe
 {
     AssertA(shape, "Invalid shape pointer for Collider::ResolveCollision");
     if(!isActive) return false;
-    return CollisionHandle<Collider3, vec3f, ClosestPointQuery>(this, radius, 
+    return CollisionHandle<Collider3, vec3f, ClosestPointQuery>(this, radius,
                                                                 restitutionCoefficient,
                                                                 frictionCoefficient,
                                                                 position, velocity);
@@ -194,10 +194,10 @@ __bidevice__ bool ColliderSet2::ResolveCollision(Float radius, Float restitution
     if(targetCollider < 0){
         return false;
     }
-    
-    AssertA(targetCollider >= 0 && targetCollider < nColiders, 
+
+    AssertA(targetCollider >= 0 && targetCollider < nColiders,
             "Invalid collider id for ColliderSet2::ResolveCollision");
-    return colliders[targetCollider]->ResolveCollision(radius, restitutionCoefficient, 
+    return colliders[targetCollider]->ResolveCollision(radius, restitutionCoefficient,
                                                        position, velocity);
 }
 
@@ -257,9 +257,9 @@ __bidevice__ bool ColliderSet3::ResolveCollision(Float radius, Float restitution
         return false;
     }
 
-    AssertA(targetCollider >= 0 && targetCollider < nColiders, 
+    AssertA(targetCollider >= 0 && targetCollider < nColiders,
             "Invalid collider id for ColliderSet2::ResolveCollision");
-    return colliders[targetCollider]->ResolveCollision(radius, restitutionCoefficient, 
+    return colliders[targetCollider]->ResolveCollision(radius, restitutionCoefficient,
                                                        position, velocity);
 }
 
@@ -294,7 +294,7 @@ __host__ ColliderSet2 *ColliderSetBuilder2::GetColliderSet(){
     for(int i = 0; i < colliders.size(); i++){
         colliderList[i] = colliders[i];
     }
-    
+
     setReference->Initialize(colliderList, colliders.size());
     printf("Initialized collider list with #%ld shapes\n", colliders.size());
     return setReference;
@@ -321,7 +321,7 @@ __host__ ColliderSet3 *ColliderSetBuilder3::GetColliderSet(){
     for(int i = 0; i < colliders.size(); i++){
         colliderList[i] = colliders[i];
     }
-    
+
     setReference->Initialize(colliderList, colliders.size());
     printf("Initialized collider list with #%ld shapes\n", colliders.size());
     return setReference;

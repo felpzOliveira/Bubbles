@@ -7,7 +7,7 @@
 //                   2 D    S H A P E S                      //
 /*************************************************************/
 __bidevice__ Shape2::Shape2(const Transform2 &toWorld, bool reverseOrientation)
-: ObjectToWorld(toWorld), WorldToObject(Inverse(toWorld)), 
+: ObjectToWorld(toWorld), WorldToObject(Inverse(toWorld)),
 reverseOrientation(reverseOrientation), linearVelocity(vec2f(0)), angularVelocity(0){}
 
 __bidevice__ bool Shape2::IsInside(const vec2f &point) const{
@@ -30,11 +30,11 @@ __bidevice__ Bounds2f Shape2::GetBounds(){
         case ShapeType::ShapeSphere2:{
             return Sphere2GetBounds();
         } break;
-        
+
         case ShapeType::ShapeRectangle2:{
             return Rectangle2GetBounds();
         } break;
-        
+
         default:{
             printf("Unknown shape for Shape2::GetBounds\n");
             return Bounds2f();
@@ -49,11 +49,11 @@ __bidevice__ bool Shape2::Intersect(const Ray2 &ray, SurfaceInteraction2 *isect,
         case ShapeType::ShapeSphere2:{
             return Sphere2Intersect(ray, isect, tShapeHit);
         } break;
-        
+
         case ShapeType::ShapeRectangle2:{
             return Rectangle2Intersect(ray, isect, tShapeHit);
         } break;
-        
+
         default:{
             printf("Unknown shape for Shape2::Intersect\n");
             return false;
@@ -66,7 +66,7 @@ __bidevice__ Float Shape2::ClosestDistance(const vec2f &point) const{
         case ShapeType::ShapeSphere2:{
             return Sphere2ClosestDistance(point);
         } break;
-        
+
         case ShapeType::ShapeRectangle2:{
             return Rectangle2ClosestDistance(point);
         } break;
@@ -76,7 +76,7 @@ __bidevice__ Float Shape2::ClosestDistance(const vec2f &point) const{
             ClosestPointBySDF(point, &query);
             return query.signedDistance;
         } break;
-        
+
         default:{
             printf("Unknown shape for Shape2::ClosestDistance\n");
             return Infinity;
@@ -84,7 +84,7 @@ __bidevice__ Float Shape2::ClosestDistance(const vec2f &point) const{
     }
 }
 
-__bidevice__ void Shape2::ClosestPoint(const vec2f &point, 
+__bidevice__ void Shape2::ClosestPoint(const vec2f &point,
                                        ClosestPointQuery2 *query) const
 {
     if(grid){
@@ -94,11 +94,11 @@ __bidevice__ void Shape2::ClosestPoint(const vec2f &point,
             case ShapeType::ShapeSphere2:{
                 return Sphere2ClosestPoint(point, query);
             } break;
-            
+
             case ShapeType::ShapeRectangle2:{
                 return Rectangle2ClosestPoint(point, query);
             } break;
-            
+
             default:{
                 printf("Unknown shape for Shape2::ClosestPoint\n");
             }
@@ -135,11 +135,11 @@ __bidevice__ bool Shape::CanSolveSdf() const{
         case ShapeType::ShapeSphere:{
             return true;
         } break;
-        
+
         case ShapeType::ShapeBox:{
             return true;
         } break;
-        
+
         case ShapeType::ShapeMesh:{
             return false;
         } break;
@@ -147,7 +147,7 @@ __bidevice__ bool Shape::CanSolveSdf() const{
         case ShapeType::ShapeSDF:{
             return true;
         } break;
-        
+
         default:{
             printf("Unknown shape for Shape::CanSolveSdf\n");
             return false;
@@ -160,11 +160,11 @@ __bidevice__ Bounds3f Shape::GetBounds(){
         case ShapeType::ShapeSphere:{
             return SphereGetBounds();
         } break;
-        
+
         case ShapeType::ShapeBox:{
             return BoxGetBounds();
         } break;
-        
+
         case ShapeType::ShapeMesh:{
             return MeshGetBounds();
         } break;
@@ -172,7 +172,7 @@ __bidevice__ Bounds3f Shape::GetBounds(){
         case ShapeType::ShapeSDF:{
             return bounds;
         } break;
-        
+
         default:{
             printf("Unknown shape for Shape::GetBounds\n");
             return Bounds3f();
@@ -187,15 +187,15 @@ __bidevice__ bool Shape::Intersect(const Ray &ray, SurfaceInteraction *isect,
         case ShapeType::ShapeSphere:{
             return SphereIntersect(ray, isect, tShapeHit);
         } break;
-        
+
         case ShapeType::ShapeBox:{
             return BoxIntersect(ray, isect, tShapeHit);
         } break;
-        
+
         case ShapeType::ShapeMesh:{
             return MeshIntersect(ray, isect, tShapeHit);
         } break;
-        
+
         default:{
             printf("Unknown shape for Shape::Intersect\n");
             return false;
@@ -208,11 +208,11 @@ __bidevice__ Float Shape::ClosestDistance(const vec3f &point) const{
         case ShapeType::ShapeSphere:{
             return SphereClosestDistance(point);
         } break;
-        
+
         case ShapeType::ShapeBox:{
             return BoxClosestDistance(point);
         } break;
-        
+
         case ShapeType::ShapeMesh:{
             return MeshClosestDistance(point);
         } break;
@@ -222,7 +222,7 @@ __bidevice__ Float Shape::ClosestDistance(const vec3f &point) const{
             ClosestPointBySDF(point, &query);
             return query.signedDistance;
         } break;
-        
+
         default:{
             printf("Unknown shape for Shape::ClosestDistance\n");
             return Infinity;
@@ -230,7 +230,7 @@ __bidevice__ Float Shape::ClosestDistance(const vec3f &point) const{
     }
 }
 
-__bidevice__ void Shape::ClosestPoint(const vec3f &point, 
+__bidevice__ void Shape::ClosestPoint(const vec3f &point,
                                       ClosestPointQuery *query) const
 {
     if(grid){
@@ -240,11 +240,11 @@ __bidevice__ void Shape::ClosestPoint(const vec3f &point,
             case ShapeType::ShapeSphere:{
                 SphereClosestPoint(point, query);
             } break;
-            
+
             case ShapeType::ShapeBox:{
                 return BoxClosestPoint(point, query);
             } break;
-            
+
             default:{
                 printf("Unknown shape for Shape::ClosestPoint\n");
             }
@@ -342,7 +342,7 @@ __bidevice__ vec3f GenerateMinimalRayDirection(const vec3f &origin, const Bounds
         vec4f(Absf(bound.ExtentOn(1) - dy), 0, -1, 0),
         vec4f(Absf(bound.ExtentOn(2) - dz), 0, 0, -1)
     };
-    
+
     Float mind = Infinity;
     for(int i = 0; i < 6; i++){
         if(mind > ref[i].x){
@@ -350,7 +350,7 @@ __bidevice__ vec3f GenerateMinimalRayDirection(const vec3f &origin, const Bounds
             mind = ref[i].x;
         }
     }
-    
+
     return dir;
 }
 
@@ -361,7 +361,7 @@ __bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
     bool hit_anything = false;
     vec3f direction = GenerateMinimalRayDirection(point, bounds);
     Ray ray(point, direction);
-    
+
     do{
         SurfaceInteraction isect;
         Float tHit = 0;
@@ -391,10 +391,10 @@ __bidevice__ void SetNodeSDFKernel(FieldGrid3f *grid, Shape *shape, int i){
     bool interior = false;
     /* For meshes we need to perform a full BVH query, for others we can check orientation*/
     if(shape->type == ShapeType::ShapeMesh)
-        interior = MeshIsPointInside(p, shape, shape->GetBounds()); 
+        interior = MeshIsPointInside(p, shape, shape->GetBounds());
     else
         interior = shape->IsInside(p);
-    
+
     Float psd = Max(Absf(d), 0.00001);
     grid->SetValueAt(interior ? -psd : psd, u);
 }
@@ -413,7 +413,7 @@ __global__ void CreateShapeSDFGPU2D(Shape2 *shape){
     }
 }
 
-__bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p, 
+__bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p,
                                          Float radius, Float offset)
 {
     if(meshShape == nullptr) return false;
@@ -431,21 +431,21 @@ __host__ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
     vec2f scale(bounds.ExtentOn(0), bounds.ExtentOn(1));
     bounds.pMin -= margin * scale;
     bounds.pMax += margin * scale;
-    
+
     Float width = bounds.ExtentOn(0);
     Float height = bounds.ExtentOn(1);
-    
+
     resolution = (int)std::ceil(width / dx);
     dx = width / (Float)resolution;
     int resolutionY = (int)std::ceil(resolution * height / width);
-    
+
     shape->grid = cudaAllocateVx(FieldGrid2f, 1);
-    shape->grid->Build(vec2ui(resolution, resolutionY), vec2f(dx), 
+    shape->grid->Build(vec2ui(resolution, resolutionY), vec2f(dx),
                        bounds.pMin, VertexCentered);
-    
+
     printf("Generating SDF for shape: [%d x %d] ... ",
            resolution, resolutionY);
-    
+
     GPULaunch(shape->grid->total, CreateShapeSDFGPU2D, shape);
     shape->grid->MarkFilled();
     printf("OK\n");
@@ -459,24 +459,24 @@ __host__ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
     vec3f scale(bounds.ExtentOn(0), bounds.ExtentOn(1), bounds.ExtentOn(2));
     bounds.pMin -= margin * scale;
     bounds.pMax += margin * scale;
-    
+
     Float width = bounds.ExtentOn(0);
     Float height = bounds.ExtentOn(1);
     Float depth = bounds.ExtentOn(2);
-    
+
     resolution = (int)std::ceil(width / dx);
-    
+
     dx = width / (Float)resolution;
     int resolutionY = (int)std::ceil(resolution * height / width);
     int resolutionZ = (int)std::ceil(resolution * depth / width);
-    
+
     shape->grid = cudaAllocateVx(FieldGrid3f, 1);
-    shape->grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx), 
+    shape->grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx),
                        bounds.pMin, VertexCentered);
-    
+
     printf("Generating SDF for shape %s: [%d x %d x %d] ... ",
            shape->mesh->name, resolution, resolutionY, resolutionZ);
-    
+
     GPULaunch(shape->grid->total, CreateShapeSDFGPU, shape);
     shape->grid->MarkFilled();
     printf("OK\n");

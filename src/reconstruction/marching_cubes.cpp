@@ -66,12 +66,6 @@ inline bool queryVertexId(const MarchingCubeVertexMap& vertexMap,
     }
 }
 
-inline vec3f grad2(FieldGrid3f *grid, size_t i, size_t j, size_t k, const vec3f &invSize)
-{
-    vec3f p = grid->GetDataPosition(vec3ui(i, j, k));
-    return grid->Gradient(p);
-}
-
 inline vec3f grad(FieldGrid3f *grid, size_t i, size_t j, size_t k, const vec3f &invSize)
 {
     vec3f ret;
@@ -217,7 +211,7 @@ static void singleSquare(const std::array<Float, 4> &data,
                 alpha = 0.999999f;
             }
 
-            pos = Lerp(pos0, pos1, alpha);//((1.f - alpha) * pos0 + alpha * pos1);
+            pos = Lerp(pos0, pos1, alpha);
 
             // What is the position of this vertex of the edge?
             e[itrEdge] = pos;
@@ -352,8 +346,7 @@ static void singleCube(const std::array<Float, 8> &data,
             } else {
                 // If vertex does not exist from the map
                 face[j] = mesh->numberOfPoints();
-                mesh->addNormal(safeNormalize(
-                    n[triangleConnectionTable3D[idxFlagSize][k]]));
+                mesh->addNormal(safeNormalize(n[triangleConnectionTable3D[idxFlagSize][k]]));
                 mesh->addPoint(e[triangleConnectionTable3D[idxFlagSize][k]]);
                 mesh->addUv(vec2f());
                 vertexMap->insert(std::make_pair(vKey, face[j]));
@@ -363,11 +356,11 @@ static void singleCube(const std::array<Float, 8> &data,
     }
 }
 
-void MarchingCubes(FieldGrid3f *grid, const vec3f &gridSize, const vec3f &origin,
-                   HostTriangleMesh3 *mesh, Float isoValue,
+void MarchingCubes(FieldGrid3f *grid, HostTriangleMesh3 *mesh, Float isoValue,
                    std::function<void(vec3ui u)> fn, int bndClose, int bndConnectivity)
 {
     MarchingCubeVertexMap vertexMap;
+    vec3f gridSize = grid->GetSpacing();
 
     const vec3ui dim = grid->GetResolution();
     const vec3f invGridSize(1.0 / (Float)gridSize.x,

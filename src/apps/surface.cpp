@@ -4,6 +4,7 @@
 #include <grid.h>
 #include <util.h>
 #include <memory.h>
+#include <host_mesh.h>
 
 typedef struct{
     Float kernel;
@@ -13,15 +14,17 @@ typedef struct{
     std::string output;
     int inflags;
     int legacy;
+    TriangleMeshFormat outformat;
 }surface_opts;
 
 void default_surface_opts(surface_opts *opts){
-    opts->output = "surface.obj";
+    opts->output = "surface.out";
     opts->legacy = 0;
     opts->inflags = SERIALIZER_POSITION;
     opts->kernel = 0.04;
     opts->spacing = 0.02;
     opts->marchingCubeSpacing = 0.01;
+    opts->outformat = FORMAT_OBJ;
 }
 
 void print_surface_configs(surface_opts *opts){
@@ -32,6 +35,7 @@ void print_surface_configs(surface_opts *opts){
     std::cout << "    * Kernel : " << opts->kernel << std::endl;
     std::cout << "    * Mesh Spacing : " << opts->marchingCubeSpacing << std::endl;
     std::cout << "    * Legacy : " << opts->legacy << std::endl;
+    std::cout << "    * Output Format: " << FormatString(opts->outformat) << std::endl;
 }
 
 ARGUMENT_PROCESS(surface_in_args){
@@ -91,6 +95,17 @@ ARGUMENT_PROCESS(surface_cubes_spacing_args){
     return 0;
 }
 
+ARGUMENT_PROCESS(surface_outform_args){
+    surface_opts *opts = (surface_opts *)config;
+    std::string fmt = ParseNext(argc, argv, i, "-outformat", 1);
+    opts->outformat = FormatFromString(fmt);
+    if(opts->outformat == FORMAT_NONE){
+        printf("Invalid or unsupported output format\n");
+        return -1;
+    }
+    return 0;
+}
+
 ARGUMENT_PROCESS(surface_legacy_args){
     surface_opts *opts = (surface_opts *)config;
     opts->legacy = 1;
@@ -134,7 +149,13 @@ std::map<const char *, arg_desc> surface_arg_map = {
             .help = "Sets the kernel radius to use."
         }
     },
-    {"-sspacing",
+    {"-outform",
+        {
+            .processor = surface_outform_args,
+            .help = "Sets format of the output (Options: ply, obj (default))."
+        }
+    },
+    {"-cspacing",
         {
             .processor = surface_cubes_spacing_args,
             .help = "Sets the spacing to use for surface reconstruction (invert resolution)."
@@ -144,7 +165,7 @@ std::map<const char *, arg_desc> surface_arg_map = {
 
 template <typename T>
 __bidevice__ T cubic(T x){ return x * x * x; }
-__bidevice__ double k(double s) { return Max(0.0, cubic(1.0 - s * s)); }
+__bidevice__ double k_cub(double s) { return Max(0.0, cubic(1.0 - s * s)); }
 
 __bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
                                  Float kernelRadius, Float threshold)
@@ -167,7 +188,7 @@ __bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
             vec3f xi = pSet->GetParticlePosition(pChain->pId);
             Float dist = Distance(p, xi);
             if(dist < kernelRadius){
-                const Float wi = k((p - xi).Length() / kernelRadius);
+                const Float wi = k_cub((p - xi).Length() / kernelRadius);
                 wSum += wi;
                 xAvg += wi * xi;
             }
@@ -227,6 +248,7 @@ FieldGrid3f *ParticlesToSDF(ParticleSetBuilder3 *pBuilder, Float spacing,
 
     SphSolver3 solver;
 
+    std::cout << "Domain: " << bounds << std::endl;
     solver.Initialize(DefaultSphSolverData3());
     solver.Setup(WaterDensity, queryRadius, spacingScale, domainGrid, sphSet);
 
@@ -323,7 +345,6 @@ void surface_command(int argc, char **argv){
     FieldGrid3f *grid = ParticlesToSDF(&builder, spacing, mcSpacing, kernel);
 
     HostTriangleMesh3 mesh;
-    vec3f sp = grid->GetSpacing();
 
     printf("Running Marching Cubes\n");
 
@@ -346,10 +367,10 @@ void surface_command(int argc, char **argv){
         }
     };
 
-    MarchingCubes(grid, sp, grid->minPoint, &mesh, 0.0, reporter);
+    MarchingCubes(grid, &mesh, 0.0, reporter);
     std::cout << std::endl;
 
-    mesh.writeToDisk(opts.output.c_str());
+    mesh.writeToDisk(opts.output.c_str(), opts.outformat);
 
     printf("Finished, triangle count: %ld\n", mesh.numberOfTriangles());
     std::cout << "**********************************" << std::endl;

@@ -10,20 +10,20 @@
 //#define PRINT_TIMER
 
 #ifdef DEBUG
-#define DBG_PRINT(...) printf(__VA_ARGS__)
+    #define DBG_PRINT(...) printf(__VA_ARGS__)
 #else
-#define DBG_PRINT(...)
+    #define DBG_PRINT(...)
 #endif
 
 #define Assure(x) __assert_check_host((x), #x, __FILE__, __LINE__, "Safe exit")
 #define AssureA(x, msg) __assert_check_host((x), #x, __FILE__, __LINE__, msg)
 
 #ifdef ASSERT_ENABLE
-#define Assert(x) __assert_check((x), #x, __FILE__, __LINE__, NULL)
-#define AssertA(x, msg) __assert_check((x), #x, __FILE__, __LINE__, msg)
+    #define Assert(x) __assert_check((x), #x, __FILE__, __LINE__, NULL)
+    #define AssertA(x, msg) __assert_check((x), #x, __FILE__, __LINE__, msg)
 #else
-#define Assert(x)
-#define AssertA(x, msg)
+    #define Assert(x)
+    #define AssertA(x, msg)
 #endif
 
 #define AssertAEx(x, msg) AssertA(x, msg)
@@ -142,6 +142,10 @@ inline __bidevice__ void Swap(Float **a, Float **b){
 
 inline __bidevice__ void Swap(Float *a, Float *b){
     Float c = *a; *a = *b; *b = c;
+}
+
+inline __bidevice__ void Swap(int &a, int &b){
+    int c = a; a = b; b = c;
 }
 
 inline __bidevice__ bool Quadratic(Float a, Float b, Float c, Float *t0, Float *t1){
@@ -269,6 +273,10 @@ template<typename T> class vec1{
         return IsNaN(x);
     }
 
+    __bidevice__ bool operator==(const vec1<T> &n) const{
+        return x == n.x;
+    }
+
     __bidevice__ T operator[](int i) const{
         Assert(i == 0);
         return x;
@@ -367,6 +375,10 @@ template<typename T> class vec2{
     }
 
     __bidevice__ int Dimensions() const{ return 2; }
+
+    __bidevice__ bool operator==(const vec2<T> &n) const{
+        return x == n.x && y == n.y;
+    }
 
     __bidevice__ T operator[](int i) const{
         Assert(i >= 0 && i < 2);
@@ -486,6 +498,10 @@ template<typename T> class vec3{
     }
 
     __bidevice__ int Dimensions() const{ return 3; }
+
+    __bidevice__ bool operator==(const vec3<T> &n) const{
+        return x == n.x && y == n.y && z == n.z;
+    }
 
     __bidevice__ T operator[](int i) const{
         Assert(i >= 0 && i < 3);
@@ -1514,12 +1530,29 @@ class Bounds3 {
     }
 };
 
+template<typename T>
+inline std::ostream &operator<<(std::ostream &out, const vec2<T> &v){
+    return out << "[ " << v.x << " " << v.y << " ]";
+}
+
+template<typename T>
+inline std::ostream &operator<<(std::ostream &out, const vec3<T> &v){
+    return out << "[ " << v.x << " " << v.y << " " << v.z << " ]";
+}
+
 typedef Bounds1<Float> Bounds1f;
 typedef Bounds1<int> Bounds1i;
 typedef Bounds2<Float> Bounds2f;
 typedef Bounds2<int> Bounds2i;
 typedef Bounds3<Float> Bounds3f;
 typedef Bounds3<int> Bounds3i;
+
+template<typename T>
+inline std::ostream &operator<<(std::ostream &out, const Bounds3<T> &bounds){
+    return out << "[ " << bounds.pMin.x << " " << bounds.pMin.y << " " << bounds.pMin.z
+               << " ] [ " << bounds.pMax.x << " " << bounds.pMax.y << " " << bounds.pMax.z
+               << " ]";
+}
 
 template<typename T> inline __bidevice__
 int SplitBounds(const Bounds2<T> &bounds, Bounds2<T> *split){
@@ -1802,4 +1835,3 @@ inline __host__ Float rand_float(){
 typedef enum{
     VertexCentered, CellCentered, FaceCentered
 }VertexType;
-

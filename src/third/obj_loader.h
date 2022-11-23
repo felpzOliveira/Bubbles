@@ -37,17 +37,35 @@
 //#define WITH_MTL
 //#define WITH_TRANSFORM
 //#define WITH_SHAPE
+#define WITH_WRITE
+
+/*
+* Allows for loader to write obj files using a 'class HostTriangleMesh3'.
+* This class must have vector<vec2f/vec3f/vec3ui> for points, normals, uvs:
+*    class HostTriangleMesh3{
+*    public:
+*    std::vector<vec3f> points;
+*    std::vector<vec3f> normals;
+*    std::vector<vec2f> uvs;
+*    std::vector<vec3ui> pointIndices;
+*    std::vector<vec3ui> normalIndices;
+*    std::vector<vec3ui> uvIndices;
+*    ...
+*/
+#if defined(WITH_WRITE)
+    #include <host_mesh.h>
+#endif
 
 #if defined(WITH_TRANSFORM)
-#include <transform.h>
+    #include <transform.h>
 #endif
 
 #if defined(WITH_SHAPE)
-#include <shape.h>
+    #include <shape.h>
 #endif
 
 #if defined(WITH_MTL)
-#include <mtl.h>
+    #include <mtl.h>
 #else
 struct MeshMtl{
     std::string file;
@@ -66,35 +84,6 @@ struct MeshProperties{
 
 typedef void*(*MemoryAllocator)(long size);
 typedef void(*MemoryFree)(void *);
-
-class HostTriangleMesh3{
-    public:
-    std::vector<vec3f> points;
-    std::vector<vec3f> normals;
-    std::vector<vec2f> uvs;
-    std::vector<vec3ui> pointIndices;
-    std::vector<vec3ui> normalIndices;
-    std::vector<vec3ui> uvIndices;
-
-    HostTriangleMesh3(){}
-
-    size_t numberOfPoints(){ return points.size(); }
-    size_t numberOfTriangles(){ return pointIndices.size(); }
-
-    bool hasUvs(){ return uvs.size() > 0; }
-    bool hasNormals(){ return normals.size() > 0; }
-
-    void addPoint(vec3f p){ points.push_back(p); }
-    void addNormal(vec3f n){ normals.push_back(n); }
-    void addUv(vec2f uv){ uvs.push_back(uv); }
-    void addPointUvNormalTriangle(vec3ui np, vec3ui nuv, vec3ui nno){
-        pointIndices.push_back(np);
-        uvIndices.push_back(nuv);
-        normalIndices.push_back(nno);
-    }
-
-    void writeToDisk(const char *path);
-};
 
 /*
 * NOTE: Heavily based on tiny_obj_loader. I'm basically splitting the mesh
@@ -181,3 +170,10 @@ __host__ void ParseV3(vec3f *v, const char **token);
 * Parses a transform and move token head.
 */
 __host__ void ParseTransform(Transform *t, const char **token);
+
+/*
+* Writes a HostTriangleMesh3 into a stream as an obj if WITH_WRITE is enabled.
+*/
+#if defined(WITH_WRITE)
+    void writeObj(HostTriangleMesh3 *mesh, std::ostream *strm);
+#endif

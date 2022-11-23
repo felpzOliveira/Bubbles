@@ -68,10 +68,6 @@ void test_node_grid_2D();
 void test_particle_to_node_2D();
 void test_grid_face_centered_2D();
 void test_grid_face_centered_3D();
-void test_explicit_grid_build_2D();
-void test_explicit_grid_minimal_build_2D();
-void test_explicit_vector_grid_build_2D();
-void test_explicit_face_vector_grid_2D();
 
 void test_kernels_2D();
 void test_kernels_3D();
@@ -147,3 +143,5 @@ void test_espic_1D();
 void test_espic_particles_2D();
 
 void test_field_grid();
+
+void test_virtual_grid();

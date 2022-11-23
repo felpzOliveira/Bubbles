@@ -170,9 +170,9 @@ void test_pcisph2_water_block(){
         marroneWorkQ->Reset();
         ComputeNormalGPU(data);
 
-        //IntervalBoundary(set2, grid, sphRadius);
+        IntervalBoundary(set2, grid, sphRadius);
         //MarroneBoundary(set2, grid, sphRadius);
-        MarroneAdaptBoundary(set2, grid, sphRadius, marroneWorkQ);
+        //MarroneAdaptBoundary(set2, grid, sphRadius, marroneWorkQ);
         //DiltsSpokeBoundary(set2, grid);
         //CFBoundary(set2, grid, spacing);
         //XiaoweiBoundary(set2, grid, spacing);

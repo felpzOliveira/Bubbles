@@ -1,6 +1,14 @@
 #include <serializer.h>
 #include <geometry.h>
 #include <util.h>
+#include <gDel3D/GpuDelaunay.h>
+#include <gDel3D/CPU/PredWrapper.h>
+#include <gDel3D/CommonTypes.h>
+#include <deque>
+#include <fstream>
+#include <sstream>
+#include <unordered_set>
+#include <unordered_map>
 
 #define PushPosition(p, c, pp, pc, id) do{\
     pp[3 * id + 0] = p.x;\
@@ -205,7 +213,7 @@ __bidevice__ int ParticleBySDF(const vec3f &p, FieldGrid3f *sdf, Float sdfThresh
     }else{
         rv = sample < sdfThreshold ? 1 : 0;
     }
-    
+
     return rv;
 }
 
@@ -239,7 +247,7 @@ __host__ Bounds3f _UtilComputePointsBounds(vec3f *points, int size){
         pi = points[i];
         bounds = Union(bounds, pi);
     }
-    
+
     return bounds;
 }
 
@@ -259,7 +267,7 @@ __host__ Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLe
     return Scale(scale);
 }
 
-__host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing, 
+__host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
                                        Float spacingScale)
 {
     vec3f pMin(0), pMax(0), half(0);
@@ -272,7 +280,7 @@ __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
     mx += (mx % 2) * length;
     my += (my % 2) * length;
     mz += (mz % 2) * length;
-    
+
     half = vec3f(mx * hlen, my * hlen, mz * hlen);
     pMin = domain.Center() - half;
     pMax = domain.Center() + half;
@@ -290,7 +298,7 @@ __host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
     int my = (int)std::ceil(domain.ExtentOn(1) * invLen);
     mx += (mx % 2) * length;
     my += (my % 2) * length;
-    
+
     half = vec2f(mx * hlen, my * hlen);
     pMin = domain.Center() - half;
     pMax = domain.Center() + half;
@@ -325,16 +333,16 @@ __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBui
     }
     size = points.size();
     printf("Psize : %d\n", (int)size);
-    
+
     // compute bounds center and generates the transformed particles
     Bounds3f bounds = _UtilComputePointsBounds(points.data(), size);
     Transform gtransform = Translate(centerAt - bounds.Center()) * transform;
-    
+
     for(int i = 0; i < size; i++){
         vec3f pi = points[i];
         builder->AddParticle(gtransform.Point(pi), initialVelocity);
     }
-    
+
     return gtransform(bounds);
 }
 
@@ -345,7 +353,7 @@ __host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform){
         pi = transform.Point(mesh->p[i]);
         bounds = Union(bounds, pi);
     }
-    
+
     return bounds;
 }
 
@@ -362,7 +370,7 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitter3 *emitter,
             break;
         }
     }
-    
+
     return emitter_collider_overlaps;
 }
 
@@ -374,7 +382,7 @@ __host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *
     // Compute density, make sure this thing has a density value
     UpdateGridDistributionCPU(solverData);
     ComputeDensityCPU(solverData);
-    
+
     // Build the field
     Float scale = 0.5;
     Float invScale = 1.0 / scale;
@@ -382,12 +390,12 @@ __host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *
     origin = solverData->domain->minPoint;
     resolution = solverData->domain->GetIndexCount() * invScale;
     field->Build(resolution, gridSpacing, origin, VertexCentered);
-    
+
     for(int i = 0; i < field->total; i++){
         vec2ui u = DimensionalIndex(i, field->resolution, 2);
         vec2f pi = field->GetDataPosition(u);
         Float di = ComputeDensityForPoint(solverData, pi);
-        
+
         Float methodDi = 0.5 - di;//TODO
         field->SetValueAt(methodDi, u);
     }
@@ -399,7 +407,7 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
     int emitter_overlaps = 0;
     int emitter_collider_overlaps = 0;
     std::vector<VolumeParticleEmitter3 *> emitters = emitterSet->emitters;
-    
+
     for(int i = 0; i < emitters.size() && !emitter_overlaps; i++){
         VolumeParticleEmitter3 *emitter = emitters[i];
         Bounds3f boundi = emitter->shape->GetBounds();
@@ -414,7 +422,7 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
             }
         }
     }
-    
+
     for(int i = 0; i < emitters.size() && !emitter_collider_overlaps; i++){
         VolumeParticleEmitter3 *emitter = emitters[i];
         Bounds3f boundi = emitter->shape->GetBounds();
@@ -427,20 +435,160 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
             }
         }
     }
-    
+
     if(emitter_overlaps){
-        printf("***********************************************************\n");
+        printf("**************************************************************************\n");
         printf("Warning: You have overlapping emitters, while this is not\n");
         printf("         an error it might make particles too close and forces to scale up\n");
-        printf("***********************************************************\n");
+        printf("**************************************************************************\n");
     }
-    
+
     if(emitter_collider_overlaps){
         printf("********************************************************************\n");
         printf("Warning: You have overlapping emitter x collider, this will trigger\n");
         printf("         unexpected behaviour during distribution, consider adjusting.\n");
         printf("********************************************************************\n");
     }
-    
+
     return emitter_collider_overlaps + emitter_overlaps;
+}
+
+#define PLY_ADD_TRI(a, b, c, triSet, stream)do{\
+    if(triSet.find(i3(a, b, c)) == triSet.end()){\
+        stream << "3 " << a << " " << b << " " << c << " \n";\
+        triSet.insert(i3(a, b, c));\
+    }\
+}while(0)
+
+static __host__ uint32_t GDel3D_GetRealTetraCount(GDelOutput *output, uint32_t pLen){
+    uint32_t tetraNo = 0;
+    GDel3D_ForEachRealTetra(output, pLen, [&](Tet tet, TetOpp botOpp, int i) -> void{
+        tetraNo += 1;
+    });
+    return tetraNo;
+}
+
+inline void GDel3D_WriteVertex(PredWrapper *predWrapper, std::ofstream &ofs){
+    for(int i = 0; i < (int)predWrapper->pointNum(); i++){
+        const Point3 pt = predWrapper->getPoint(i);
+        for(int vi = 0; vi < 3; vi++){
+            ofs << pt._p[vi] << " ";
+        }
+        ofs << "\n";
+    }
+}
+
+__host__ void UtilGDel3DWritePly(std::vector<i3> *tris, Point3HVec *pointVec,
+                                 GDelOutput *output, const char *path)
+{
+    PredWrapper predWrapper;
+    predWrapper.init(*pointVec, output->ptInfty);
+    std::ofstream ofs(path);
+    ofs << "ply\n";
+    ofs << "format ascii 1.0\n";
+    ofs << "element vertex " << (int) predWrapper.pointNum() << "\n";
+    ofs << "property double x\n";
+    ofs << "property double y\n";
+    ofs << "property double z\n";
+    ofs << "element face " << tris->size() << "\n";
+    ofs << "property list uchar int vertex_index\n";
+    ofs << "end_header\n";
+
+    GDel3D_WriteVertex(&predWrapper, ofs);
+
+    for(int i = 0; i < tris->size(); i++){
+        i3 val = tris->at(i);
+        ofs << "3 " << val.t[0] << " " << val.t[1] << " " << val.t[2] << " \n";
+    }
+    ofs.close();
+}
+
+__host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
+                                 const char *path, bool tetras)
+{
+    PredWrapper predWrapper;
+    std::unordered_set<i3, i3Hasher, i3IsSame> triSet;
+    predWrapper.init(*pointVec, output->ptInfty);
+
+    // - write header
+    std::ofstream ofs(path);
+    ofs << "ply\n";
+    ofs << "format ascii 1.0\n";
+    ofs << "element vertex " << (int) predWrapper.pointNum() << "\n";
+    ofs << "property double x\n";
+    ofs << "property double y\n";
+    ofs << "property double z\n";
+
+    // - write geometry
+    if(tetras){
+        static int warned = 0;
+        if(warned == 0){
+            std::cout << "[PLY] Warning: Output is 4-indexed and " <<
+                        "represents a tetrahedron, NOT a quad." << std::endl;
+            warned = 1;
+        }
+        ofs << "element face " << GDel3D_GetRealTetraCount(output, pLen) << "\n";
+        ofs << "property list uchar int vertex_index\n";
+        ofs << "end_header\n";
+
+        // write vertices
+        GDel3D_WriteVertex(&predWrapper, ofs);
+
+        GDel3D_ForEachRealTetra(output, pLen, [&](Tet tet, TetOpp botOpp, int i) -> void{
+            ofs << "4 "<< tet._v[0] << " " << tet._v[1] << " " << tet._v[2] << " "
+                    << tet._v[3] << std::endl;
+        });
+    }else{
+        std::stringstream ss;
+        GDel3D_ForEachRealTetra(output, pLen, [&](Tet tet, TetOpp botOpp, int i) -> void{
+            uint32_t A = tet._v[0], B = tet._v[1],
+                     C = tet._v[2], D = tet._v[3];
+            // triangles are: ACB, ABD, ADC, BDC
+            PLY_ADD_TRI(A, C, B, triSet, ss);
+            PLY_ADD_TRI(A, B, D, triSet, ss);
+            PLY_ADD_TRI(A, D, C, triSet, ss);
+            PLY_ADD_TRI(B, D, C, triSet, ss);
+        });
+
+        ofs << "element face " << triSet.size() << "\n";
+        ofs << "property list uchar int vertex_index\n";
+        ofs << "end_header\n";
+
+        // write vertices
+        GDel3D_WriteVertex(&predWrapper, ofs);
+
+        ofs << ss.str();
+    }
+
+    ofs.close();
+}
+
+#define TRI_MAP_ADD(a, b, c, u_map)do{\
+    i3 i_val(a, b, c);\
+    if(u_map.find(i_val) == u_map.end()){\
+        u_map[i_val] = 1;\
+    }else{\
+        u_map[i_val] += 1;\
+    }\
+}while(0)
+
+__host__ void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
+                                   GDelOutput *output, int pLen)
+{
+    std::unordered_map<i3, int, i3Hasher, i3IsSame> triMap;
+    GDel3D_ForEachRealTetra(output, pLen, [&](Tet tet, TetOpp botOpp, int i) -> void{
+        uint32_t A = tet._v[0], B = tet._v[1],
+                 C = tet._v[2], D = tet._v[3];
+            // triangles are: ACB, ABD, ADC, BDC
+            TRI_MAP_ADD(A, C, B, triMap);
+            TRI_MAP_ADD(A, B, D, triMap);
+            TRI_MAP_ADD(A, D, C, triMap);
+            TRI_MAP_ADD(B, D, C, triMap);
+    });
+
+    for(auto it = triMap.begin(); it != triMap.end(); it++){
+        if(it->second == 1){
+            tris.push_back(it->first);
+        }
+    }
 }

@@ -16,9 +16,6 @@
 
 void run_self_tests(){
     test_uniform_grid2D();
-    test_explicit_grid_minimal_build_2D();
-    test_explicit_grid_build_2D();
-    test_explicit_vector_grid_build_2D();
     test_uniform_grid3D();
     test_distribute_uniform_grid2D();
     test_distribute_uniform_grid3D();
@@ -75,6 +72,8 @@ void run_self_tests(){
     test_pcisph3_happy_whale();
     test_pcisph3_dragon_pool();
     test_pcisph3_sdf();
+
+    test_virtual_grid();
 }
 #endif
 
@@ -92,15 +91,16 @@ int main(int argc, char **argv){
     cudaInitEx();
 
     /* Sets the default kernel launching parameters, 16 is good for my notebook */
-    cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
+    cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 64);
 
+    //test_virtual_grid();
     //test_pcisph2_water_block();
-    //test_mac(argc, argv);
+    test_mac(argc, argv);
 
     //test_pcisph2_double_dam_break();
     //test_pcisph2_water_block_lnm();
     //test_pcisph3_sdf();
-    test_pcisph3_rotating_water_box();
+    //test_pcisph3_rotating_water_box();
     //test_pcisph3_dam_break_double_dragon();
     //test_pcisph3_quadruple_dam();
     //test_pcisph3_pathing();

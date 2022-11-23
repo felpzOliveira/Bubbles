@@ -65,7 +65,7 @@ int SerializerFlagsFromString(const char *spec){
             return -1;
         }
     }
-    
+
     return flags;
 }
 
@@ -190,11 +190,11 @@ void SerializerLoadPoints3(std::vector<vec3f> *points,
 
         while(ifs.peek() != -1){
             GetLine(ifs, linebuf);
-            
+
             if(linebuf.size() > 0){ //remove '\n'
                 if(linebuf[linebuf.size()-1] == '\n') linebuf.erase(linebuf.size() - 1);
             }
-            
+
             if(linebuf.size() > 0){ //remove '\r'
                 if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
             }
@@ -214,22 +214,22 @@ void SerializerLoadPoints3(std::vector<vec3f> *points,
                 ParseV3(&pos, &token);
                 while(CAN_SKIP(token[0])) token++;
             }
-            
+
             if(flags & SERIALIZER_VELOCITY){
                 ParseV3(&vel, &token);
                 while(CAN_SKIP(token[0])) token++;
             }
-            
+
             if(flags & SERIALIZER_DENSITY){
                 (void)ParseFloat(&token);
                 while(CAN_SKIP(token[0])) token++;
             }
-            
+
             if(flags & SERIALIZER_MASS){
                 (void)ParseFloat(&token);
                 while(CAN_SKIP(token[0])) token++;
             }
-            
+
             if(flags & SERIALIZER_BOUNDARY){
                 boundary = (int)ParseFloat(&token);
                 while(CAN_SKIP(token[0])) token++;
@@ -237,7 +237,7 @@ void SerializerLoadPoints3(std::vector<vec3f> *points,
                     continue;
                 }
             }
-            
+
             points->push_back(pos);
         }
     }
@@ -441,21 +441,21 @@ int _SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
 
     while(ifs.peek() != -1){
         GetLine(ifs, linebuf);
-        
+
         if(linebuf.size() > 0){ //remove '\n'
             if(linebuf[linebuf.size()-1] == '\n') linebuf.erase(linebuf.size() - 1);
         }
-        
+
         if(linebuf.size() > 0){ //remove '\r'
             if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
         }
-        
-        
+
+
         // skip empty
         if(linebuf.empty()) continue;
         const char *token = linebuf.c_str();
         token += strspn(token, " \t");
-        
+
         Assert(token);
         if(token[0] == '\0') continue; //empty line
         if(token[0] == '#') continue; //comment line
@@ -483,22 +483,22 @@ int _SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
             ParseV3(&particle.position, &token);
             while(CAN_SKIP(token[0])) token++;
         }
-        
+
         if(flags & SERIALIZER_VELOCITY){ // get velocity
             ParseV3(&particle.velocity, &token);
             while(CAN_SKIP(token[0])) token++;
         }
-        
+
         if(flags & SERIALIZER_DENSITY){ // get density
             particle.density = ParseFloat(&token);
             while(CAN_SKIP(token[0])) token++;
         }
-        
+
         if(flags & SERIALIZER_MASS){ // get mass
             particle.mass = ParseFloat(&token);
             while(CAN_SKIP(token[0])) token++;
         }
-        
+
         if(flags & SERIALIZER_BOUNDARY){ // get boundary
             particle.boundary = (int)ParseFloat(&token);
             while(CAN_SKIP(token[0])) token++;
@@ -508,12 +508,12 @@ int _SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
                 continue;
             }
         }
-        
+
         if(flags & SERIALIZER_NORMAL){
             ParseV3(&particle.normal, &token); // get normal
             while(CAN_SKIP(token[0])) token++;
         }
-        
+
         pSet->push_back(particle);
         size += 1;
     }
@@ -522,9 +522,9 @@ int _SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
         printf("Error: Unterminated fluid description, missing \'DataEnd\'\n");
         exit(0);
     }
-    
+
     if(size != pCount) printf(" found %d\n", size);
-    
+
     return size;
 }
 
@@ -553,14 +553,14 @@ int SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder,
 {
     std::vector<SerializedParticle> particles;
     int pCount = SerializerLoadParticles3(&particles, filename, flags);
-    
+
     for(int i = 0; i < pCount; i++){
         builder->AddParticle(particles[i].position, particles[i].velocity);
         if(boundary){
             boundary->push_back(particles[i].boundary);
         }
     }
-    
+
     return pCount;
 }
 
@@ -618,7 +618,9 @@ void SerializerLoadSystem3(ParticleSetBuilder3 *builder,
             _SerializerLoadShape(&shp, ifs);
             shapes->push_back(shp);
         }else{
-            printf("Unknown token %s\n", token.c_str());
+            printf("[SERIALIZER] Unknown token %s\n", token.c_str());
+            printf("[SERIALIZER] Maybe content is in different format?\n");
+            exit(0);
         }
     }
 }
@@ -662,7 +664,7 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &f
         printf("Failed to open file %s\n", filename.c_str());
         exit(0);
     }
-    
+
     return pCount;
 }
 
@@ -866,7 +868,7 @@ void PushParticleSetToFile(ParticleSet *pSet, const char *filename, int flags,
     }
 }
 
-template<typename SolverData = SphSolverData3, typename ParticleSet = ParticleSet3, 
+template<typename SolverData = SphSolverData3, typename ParticleSet = ParticleSet3,
 typename Domain = Grid3, typename T>
 void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
                         std::vector<int> *boundary = nullptr)
@@ -1009,7 +1011,7 @@ void SerializerSaveSphDataSet3Legacy(SphSolverData3 *pSet, const char *filename,
 void SerializerSaveSphDataSet3(SphSolverData3 *pSet, const char *filename,
                                int flags, std::vector<int> *boundary)
 {
-    SaveSphParticleSet<SphSolverData3, ParticleSet3, Grid3, vec3f>(pSet, filename, 
+    SaveSphParticleSet<SphSolverData3, ParticleSet3, Grid3, vec3f>(pSet, filename,
                                                                    flags, boundary);
 }
 
@@ -1028,9 +1030,9 @@ void SerializerSaveSphDataSet2Legacy(SphSolverData2 *pSet, const char *filename,
                                                                          flags, boundary);
 }
 
-void SerializerSaveSphDataSet2(SphSolverData2 *pSet, const char *filename, 
+void SerializerSaveSphDataSet2(SphSolverData2 *pSet, const char *filename,
                                int flags, std::vector<int> *boundary)
 {
-    SaveSphParticleSet<SphSolverData2, ParticleSet2, Grid2, vec2f>(pSet, filename, 
+    SaveSphParticleSet<SphSolverData2, ParticleSet2, Grid2, vec2f>(pSet, filename,
                                                                    flags, boundary);
 }

@@ -9,5 +9,5 @@ constexpr int kDirectionUp = 1 << 3;
 constexpr int kDirectionBack = 1 << 4;
 constexpr int kDirectionFront = 1 << 5;
 
-void MarchingSquares(FieldGrid2f *grid, Float isovalue, 
+void MarchingSquares(FieldGrid2f *grid, Float isovalue,
                      std::vector<vec3f> *triangles);

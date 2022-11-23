@@ -225,7 +225,7 @@ __host__ void GPUParallelLambda(const char *desc, int nItems, F fn){
     int gridSize = (nItems + blockSize - 1) / blockSize;
     ProfilerPrepare(desc);
     kernel<<<gridSize, blockSize>>>(fn, nItems);
-    //cudaDeviceAssert(desc);
+    cudaDeviceAssert(desc);
     cudaDeviceSynchronize();
     ProfilerFinish();
 }

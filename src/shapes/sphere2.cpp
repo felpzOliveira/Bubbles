@@ -30,21 +30,21 @@ __bidevice__ bool Shape2::Sphere2Intersect(const Ray2 &ray, SurfaceInteraction2 
     Ray2 r = WorldToObject(ray);
     Float ox = r.o.x, oy = r.o.y;
     Float dx = r.d.x, dy = r.d.y;
-    
+
     Float a = dx * dx + dy * dy;
     Float b = 2 * (ox * dx + oy * dy);
     Float c = ox * ox + oy * oy - radius * radius;
-    
+
     Float t0, t1;
     if(!Quadratic(a, b, c, &t0, &t1)) return false;
-    
+
     if(t0 > r.tMax || t1 <= 0) return false;
     Float tHit = t0;
     if(tHit <= 0 || IsUnsafeHit(tHit)){
         tHit = t1;
         if(tHit > r.tMax) return false;
     }
-    
+
     pHit = r(tHit);
     pHit *= radius / Distance(pHit, vec2f(0, 0));
     vec2f nHit = pHit / radius;
@@ -52,7 +52,7 @@ __bidevice__ bool Shape2::Sphere2Intersect(const Ray2 &ray, SurfaceInteraction2 
     *isect = ObjectToWorld(SurfaceInteraction2(pHit, nHit, pError, this));
     if(reverseOrientation) isect->n *= -1;
     *tShapeHit = tHit;
-    
+
     return true;
 }
 
@@ -61,7 +61,7 @@ __bidevice__ Float Shape2::Sphere2ClosestDistance(const vec2f &point) const{
     return Distance(pLocal, vec2f(0, 0)) - radius;
 }
 
-__bidevice__ void Shape2::Sphere2ClosestPoint(const vec2f &point, 
+__bidevice__ void Shape2::Sphere2ClosestPoint(const vec2f &point,
                                               ClosestPointQuery2 *query) const
 {
     Float d = Absf(Sphere2ClosestDistance(point));
@@ -71,9 +71,9 @@ __bidevice__ void Shape2::Sphere2ClosestPoint(const vec2f &point,
     if(!pLocal.IsZeroVector()){
         N = Normalize(pLocal);
     }
-    
+
     vec2f pN = N * radius;
-    
+
     if(reverseOrientation){
         N *= -1;
     }

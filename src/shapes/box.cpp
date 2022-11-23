@@ -3,7 +3,7 @@
 #include <collider.h>
 #include <sstream>
 
-__host__ Shape *MakeBox(const Transform &toWorld, const vec3f &size, 
+__host__ Shape *MakeBox(const Transform &toWorld, const vec3f &size,
                         bool reverseOrientation)
 {
     Shape *shape = cudaAllocateVx(Shape, 1);
@@ -24,7 +24,7 @@ __bidevice__ void Plane3::Set(const vec3f &p, const Normal3f &n){
 __bidevice__ vec3f Plane3::ClosestPoint(const vec3f &p) const{
     vec3f r = p - point;
     vec3f vn = ToVec3(normal);
-    return r - Dot(r, vn) * vn + point; 
+    return r - Dot(r, vn) * vn + point;
 }
 
 
@@ -83,7 +83,7 @@ __bidevice__ Float Shape::BoxClosestDistance(const vec3f &point) const{
     Bounds3f localBound(vec3f(-hx, -hy, -hz), vec3f(hx, hy, hz));
     vec3f closest;
     int isNeg = 0;
-    
+
     if(Inside(pLocal, localBound)){
         Plane3 planes[6] = {
             Plane3(localBound.pMax, Normal3f(1, 0, 0)),
@@ -93,7 +93,7 @@ __bidevice__ Float Shape::BoxClosestDistance(const vec3f &point) const{
             Plane3(localBound.pMin, Normal3f(0, -1, 0)),
             Plane3(localBound.pMin, Normal3f(0, 0, -1))
         };
-        
+
         closest = planes[0].ClosestPoint(pLocal);
         Float distanceSquared = (closest - pLocal).LengthSquared();
         for(int i = 1; i < 6; i++){
@@ -108,11 +108,11 @@ __bidevice__ Float Shape::BoxClosestDistance(const vec3f &point) const{
     }else{
         closest = Clamp(pLocal, localBound.pMin, localBound.pMax);
     }
-    
+
     return isNeg ? -Distance(pLocal, closest) : Distance(pLocal, closest);
 }
 
-__bidevice__ void Shape::BoxClosestPoint(const vec3f &point, 
+__bidevice__ void Shape::BoxClosestPoint(const vec3f &point,
                                          ClosestPointQuery *query) const
 {
     vec3f pLocal = WorldToObject.Point(point);
@@ -123,7 +123,7 @@ __bidevice__ void Shape::BoxClosestPoint(const vec3f &point,
     vec3f closest;
     Normal3f normal;
     int isNeg = 0;
-    
+
     Plane3 planes[6] = {
         Plane3(localBound.pMax, Normal3f(1, 0, 0)),
         Plane3(localBound.pMax, Normal3f(0, 1, 0)),
@@ -132,7 +132,7 @@ __bidevice__ void Shape::BoxClosestPoint(const vec3f &point,
         Plane3(localBound.pMin, Normal3f(0, -1, 0)),
         Plane3(localBound.pMin, Normal3f(0, 0, -1))
     };
-    
+
     normal = planes[0].normal;
     if(Inside(pLocal, localBound)){
         closest = planes[0].ClosestPoint(pLocal);
@@ -151,7 +151,7 @@ __bidevice__ void Shape::BoxClosestPoint(const vec3f &point,
         closest = Clamp(pLocal, localBound.pMin, localBound.pMax);
         vec3f cov = pLocal - closest;
         Float maxCosine = Dot(cov, ToVec3(normal));
-        
+
         for(int i = 1; i < 6; i++){
             Float cosine = Dot(ToVec3(planes[i].normal), cov);
             if(cosine > maxCosine){
@@ -160,17 +160,17 @@ __bidevice__ void Shape::BoxClosestPoint(const vec3f &point,
             }
         }
     }
-    
+
     Float distance = Distance(closest, pLocal);
-    
+
     if(isNeg){
         distance *= -1;
     }
-    
+
     if(reverseOrientation){
         normal *= -1;
     }
-    
+
     *query = ClosestPointQuery(ObjectToWorld.Point(closest),
                                ObjectToWorld.Normal(normal), distance);
 }

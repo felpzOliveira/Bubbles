@@ -38,7 +38,7 @@ class Collider2{
     Shape2 *shape;
     Float frictionCoefficient;
     bool isActive;
-    
+
     __bidevice__ Collider2();
     __bidevice__ Collider2(Shape2 *shape);
     __bidevice__ void Initialize(Shape2 *shape, Float frictionCoef=0);
@@ -75,7 +75,7 @@ class ColliderSet2{
     public:
     Collider2 **colliders;
     int nColiders;
-    
+
     __bidevice__ ColliderSet2();
     __bidevice__ void Initialize(Collider2 **colls, int count);
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
@@ -89,7 +89,7 @@ class ColliderSet3{
     public:
     Collider3 **colliders;
     int nColiders;
-    
+
     __bidevice__ ColliderSet3();
     __bidevice__ void Initialize(Collider3 **colls, int count);
     __bidevice__ bool ResolveCollision(Float radius, Float restitutionCoefficient,
@@ -103,7 +103,7 @@ class ColliderSetBuilder2{
     public:
     std::vector<Collider2*> colliders;
     ColliderSet2 *setReference;
-    
+
     __host__ ColliderSetBuilder2();
     __host__ void AddCollider2(Collider2 *collider);
     __host__ void AddCollider2(Shape2 *shape, Float frictionCoef=0.);
@@ -114,7 +114,7 @@ class ColliderSetBuilder3{
     public:
     std::vector<Collider3*> colliders;
     ColliderSet3 *setReference;
-    
+
     __host__ ColliderSetBuilder3();
     __host__ void AddCollider3(Collider3 *collider);
     __host__ void AddCollider3(Shape *shape, Float frictionCoef=0.);

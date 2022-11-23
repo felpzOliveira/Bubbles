@@ -12,17 +12,17 @@ __bidevice__ void ComputePredictedPositionsFor(PbfSolverData2 *data, int particl
     vec2f vi = pSet->GetParticleVelocity(particleId);
     vec2f fi = pSet->GetParticleForce(particleId);
     Float mass = pSet->GetMass();
-    
+
     data->originalPositions[particleId] = pi;
-    
+
     vec2f ai = fi / mass;
     vi += timeIntervalInSeconds * ai;
     pi += timeIntervalInSeconds * vi;
-    
+
     data->sphData->collider->ResolveCollision(pSet->GetRadius(), 0.75, &pi, &vi);
     pSet->SetParticlePosition(particleId, pi);
     pSet->SetParticleVelocity(particleId, vi);
-    
+
     vec2f len = data->sphData->domain->GetCellSize();
     Float minLen = MinComponent(len);
     Float traveled = Distance(pi, oi);
@@ -67,10 +67,10 @@ __bidevice__ void ComputeLambdaFor(PbfSolverData2 *data, int particleId){
     Float di = pSet->GetParticleDensity(particleId);
     Float pho0 = data->sphData->sphpSet->GetTargetDensity();
     Bucket *bucket = pSet->GetParticleBucket(particleId);
-    
+
     Float sphRadius = data->sphData->sphpSet->GetKernelRadius();
     SphSpikyKernel2 spiky(sphRadius);
-    
+
     vec2f sumGrad(0);
     Float sumGradNorm = 0;
     Float ci = di / pho0 - 1.0;
@@ -86,10 +86,10 @@ __bidevice__ void ComputeLambdaFor(PbfSolverData2 *data, int particleId){
                 sumGradNorm += Dot(gradW, gradW);
         }
     }
-    
+
     sumGradNorm += Dot(sumGrad, sumGrad);
     sumGradNorm  = sumGradNorm / pho0;
-    
+
     data->lambdas[particleId] = -ci / (sumGradNorm + data->lambdaRelax);
 }
 
@@ -127,7 +127,7 @@ __bidevice__ void ComputeDeltaPFor(PbfSolverData2 *data, int particleId,
     vec2f vi = pSet->GetParticleVelocity(particleId);
     Float pho0 = data->sphData->sphpSet->GetTargetDensity();
     Bucket *bucket = pSet->GetParticleBucket(particleId);
-    
+
     SphStdKernel2 kernel(sphRadius);
     SphSpikyKernel2 spiky(sphRadius);
     Float Wdq = kernel.W(data->antiClustDenom * h);
@@ -144,19 +144,19 @@ __bidevice__ void ComputeDeltaPFor(PbfSolverData2 *data, int particleId,
             Float sCorr = -data->antiClustStr * mult;
             vec2f dir = (pj - pi) / distance;
             vec2f gradW = spiky.gradW(distance, dir);
-            
+
             sum += (lambdai + lambdaj + sCorr) * gradW;
         }
     }
-    
+
     pi += sum / pho0;
     data->sphData->collider->ResolveCollision(pSet->GetRadius(), 0.75, &pi, &vi);
-    
+
     vi = (pi - data->originalPositions[particleId]) / timeIntervalInSeconds;
-    
+
     pSet->SetParticlePosition(particleId, pi);
     pSet->SetParticleVelocity(particleId, vi);
-    
+
     vec2f len = data->sphData->domain->GetCellSize();
     Float minLen = MinComponent(len);
     Float traveled = Distance(pi, data->originalPositions[particleId]);
@@ -197,9 +197,9 @@ __bidevice__ void ComputeVorticityFor(PbfSolverData2 *data, int particleId){
     Float sphRadius = data->sphData->sphpSet->GetKernelRadius();
     Float pho0 = data->sphData->sphpSet->GetTargetDensity();
     Float mass = pSet->GetMass();
-    
+
     SphSpikyKernel2 spiky(sphRadius);
-    
+
     Float wi = 0;
     for(int i = 0; i < bucket->Count(); i++){
         int j = bucket->Get(i);
@@ -213,13 +213,13 @@ __bidevice__ void ComputeVorticityFor(PbfSolverData2 *data, int particleId){
             wi += Cross(vij, gradW);
         }
     }
-    
+
     /*
 * NOTE: Paper does not claim this is normalized, but not normalizing
 *       will simply break simulation.
 */
     wi *= mass / pho0;
-    
+
     data->w[particleId] = wi;
 }
 
@@ -231,7 +231,7 @@ __bidevice__ void ComputeVorticityForceFor(PbfSolverData2 *data, int particleId)
     Float mass = pSet->GetMass();
     Float sphRadius = data->sphData->sphpSet->GetKernelRadius();
     SphSpikyKernel2 spiky(sphRadius);
-    
+
     vec2f gradVorticity(0);
     Float wi = Absf(data->w[particleId]);
     for(int i = 0; i < bucket->Count(); i++){
@@ -245,14 +245,14 @@ __bidevice__ void ComputeVorticityForceFor(PbfSolverData2 *data, int particleId)
             gradVorticity += wi * gradW;
         }
     }
-    
+
     gradVorticity *= mass / pho0;
     if(gradVorticity.LengthSquared() > 0){
         vec2f fi = pSet->GetParticleForce(particleId);
         Float d = 1.0 / gradVorticity.Length();
         vec2f n = gradVorticity * d;
         fi += data->vorticityStr * data->w[particleId] * vec2f(n.y, -n.x);
-        
+
         pSet->SetParticleForce(particleId, fi);
     }
 }
@@ -312,7 +312,7 @@ __host__ void AdvancePBF(PbfSolverData2 *data, Float timeIntervalInSeconds,
             ComputeVorticityForceGPU(data);
         }
     }
-    
+
     if(use_cpu){
         ComputePredictedPositionsCPU(data, timeIntervalInSeconds);
         UpdateGridDistributionCPU(data->sphData);
@@ -322,9 +322,9 @@ __host__ void AdvancePBF(PbfSolverData2 *data, Float timeIntervalInSeconds,
         UpdateGridDistributionGPU(data->sphData);
         //ComputeDensityGPU(data->sphData);
     }
-    
+
     data->sphData->sphpSet->ResetHigherLevel();
-    
+
     for(unsigned int i = 0; i < predictIterations; i++){
         if(use_cpu){
             ComputeLambdaCPU(data);
@@ -334,7 +334,7 @@ __host__ void AdvancePBF(PbfSolverData2 *data, Float timeIntervalInSeconds,
             ComputeDeltaPGPU(data, timeIntervalInSeconds);
         }
     }
-    
+
     if(use_cpu)
         ComputePseudoViscosityInterpolationCPU(data->sphData, timeIntervalInSeconds);
     else

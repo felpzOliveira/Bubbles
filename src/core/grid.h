@@ -896,7 +896,7 @@ class NodeEdgeGrid{
         * the 'ParticleToNodes' computation. It performs a interpolation
         * between the 4 nodes to the particle based on the volume referenced
         * by each node, i.e.: NodesToParticle^-1 != ParticleToNodes
-*/
+        */
         F value = 0;
         for(int i = 0; i < count; i++){
             T nP;

@@ -34,9 +34,9 @@ __bidevice__ bool Shape2::Rectangle2Intersect(const Ray2 &ray, SurfaceInteractio
     int it = 0;
     Float mind = Infinity;
     if(!rect.Intersect(r, &t0, &t1)) return false;
-    
+
     pHit = r(t0);
-    
+
     // I'm not proud of this
     Float dd[4] = {
         Absf(rect.pMax.x - pHit.x),
@@ -44,22 +44,22 @@ __bidevice__ bool Shape2::Rectangle2Intersect(const Ray2 &ray, SurfaceInteractio
         Absf(rect.pMax.y - pHit.y),
         Absf(rect.pMin.y - pHit.y)
     };
-    
+
     vec2f nd[4] = { vec2f(1, 0), vec2f(-1, 0), vec2f(0, 1), vec2f(0, -1) };
-    
+
     for(int i = 0; i < 4; i++){
         if(mind > dd[i]){
             mind = dd[i];
             it = i;
         }
     }
-    
+
     vec2f pError(0);
     vec2f nHit = nd[it];
     *isect = ObjectToWorld(SurfaceInteraction2(pHit, nHit, pError, this));
     if(reverseOrientation) isect->n *= -1;
     *tShapeHit = t0;
-    
+
     return true;
 }
 
@@ -70,7 +70,7 @@ __bidevice__ Float Shape2::Rectangle2ClosestDistance(const vec2f &point) const{
     return Max(pRef, vec2f(0,0)).Length() + Min(MaxComponent(pRef), 0);
 }
 
-__bidevice__ void Shape2::Rectangle2ClosestPoint(const vec2f &point, 
+__bidevice__ void Shape2::Rectangle2ClosestPoint(const vec2f &point,
                                                  ClosestPointQuery2 *query) const
 {
     Float d = Absf(Rectangle2ClosestDistance(point));
@@ -86,7 +86,7 @@ __bidevice__ void Shape2::Rectangle2ClosestPoint(const vec2f &point,
             vec3f(half.x + pLocal.x, -1, 0),
             vec3f(half.y + pLocal.y, 0, -1)
         };
-        
+
         Float mind = Infinity;
         for(int i = 0; i < 4; i++){
             if(mind > dd[i].x){
@@ -107,18 +107,18 @@ __bidevice__ void Shape2::Rectangle2ClosestPoint(const vec2f &point,
             closest = vec2f(half.x, half.y);
             normal = q.x > q.y ? vec2f(1, 0) : vec2f(0, 1);
         }
-        
+
         if(pLocal.x < 0){
             closest.x *= -1;
             normal.x *= -1;
         }
-        
+
         if(pLocal.y < 0){
             closest.y *= -1;
             normal.y *= -1;
         }
     }
-    
+
     if(reverseOrientation){
         normal *= -1;
     }

@@ -13,322 +13,21 @@
 #include <doring.h>
 #include <algorithm>
 #include <explicit_grid.h>
+#include <mac_solver.h>
+#include <util.h>
+#include <memory.h>
 
-#define SolverGrid2 CatmullMarkerAndCellGrid2
-//#define SolverGrid2 LinearMarkerAndCellGrid2
-
-class FluidSolver {
-    public:
-    /* Fluid quantities */
-    SolverGrid2 *_d;
-    SolverGrid2 *_u;
-    SolverGrid2 *_v;
-    PressureSolver *pSolver;
-
-    /* Width and height */
-    int _w;
-    int _h;
-
-    /* Grid cell size and fluid density */
-    Float _hx;
-    Float _density;
-
-    /* Arrays for: */
-    Float *_r; /* Right hand side of pressure solve */
-    Float *_p; /* Pressure solution */
-
-    /* Conjugate gradients solver */
-    void project(int limit, Float timestep){
-        pSolver->SolvePressure(_u, _v, limit, _p, _density, timestep);
-        //pSolver->Update(limit, _p, _density, timestep);
-    }
-
-    /* Applies the computed pressure to the velocity field */
-    void applyPressure(Float timestep) {
-        Float scale = timestep/(_density*_hx);
-        int w = _w;
-        int h = _h;
-        size_t items = w * h;
-
-        Float *p = _p;
-        SolverGrid2 *u = _u;
-        SolverGrid2 *v = _v;
-
-        ParallelFor((size_t)0, items, [&](int i) -> void
-        //AutoParallelFor("Apply_Pressure", items, AutoLambda(size_t i)
-        {
-            int x = i % _w;
-            int y = i / _w;
-            Float pi = p[i];
-            Float pxpy = 0;
-            Float pxyp = 0;
-            if(x >= 1){
-                pxpy = Accessor2D(p, x-1, y, w);
-            }
-
-            if(y >= 1){
-                pxyp = Accessor2D(p, x, y-1, w);
-            }
-
-            u->at(x, y) -= scale*(pi - pxpy);
-            v->at(x, y) -= scale*(pi - pxyp);
-        });
-
-        for(int i = 0; i < Max(_h, _w); i++){
-            if(i < _h){
-                _u->at(0, i) = _u->at(_w, i) = 0.0;
-            }
-            if(i < _w){
-                _v->at(i, 0) = _v->at(i, _h) = 0.0;
-            }
-        }
-    }
-
-    FluidSolver(int w, int h, Float density, Float targetTimestep) :
-      _w(w), _h(h), _density(density)
-    {
-        size_t n = _w * _h;
-        _hx = 1.0/min(w, h);
-
-        _d = SolverGrid2::Create(_w,     _h,     0.5, 0.5, _hx);
-        _u = SolverGrid2::Create(_w + 1, _h,     0.0, 0.5, _hx);
-        _v = SolverGrid2::Create(_w,     _h + 1, 0.5, 0.0, _hx);
-
-        _p = cudaAllocateVx(Float, n);
-
-        pSolver = new PressureSolverJacobi;
-        pSolver->BuildSolver(n, _hx, vec2ui(_w, _h));
-
-        memset(_p, 0, _w*_h*sizeof(Float));
-        _r = pSolver->RHS();
-    }
-
-    ~FluidSolver(){
-        delete pSolver;
-    }
-
-    void update(Float timestep) {
-        //PressureSolverBuildRHS(_u, _v, _hx, _r, vec2ui(_w, _h));
-        project(600, timestep);
-        applyPressure(timestep);
-
-        Advect(timestep, _d, _u, _v);
-        Advect(timestep, _u, _u, _v);
-        Advect(timestep, _v, _u, _v);
-
-        /* Make effect of advection visible, since it's not an in-place operation */
-        _d->flip();
-        _u->flip();
-        _v->flip();
-    }
-
-    /* Set density and x/y velocity in given rectangle to d/u/v, respectively */
-    void addInflow(Float x, Float y, Float w, Float h, Float d, Float u, Float v){
-        _d->addInflow(x, y, x + w, y + h, d);
-        _u->addInflow(x, y, x + w, y + h, u);
-        _v->addInflow(x, y, x + w, y + h, v);
-    }
-
-    /* Convert fluid density to RGBA image */
-    void toImage(float *rgb) {
-        for (int i = 0; i < _w*_h; i++) {
-            float shade = ((1.0 - _d->src()[i]));
-            shade = max(min(shade, 1.f), 0.f);
-
-            rgb[i*3 + 0] = shade;
-            rgb[i*3 + 1] = shade;
-            rgb[i*3 + 2] = shade;
-        }
-    }
-
-    GVec4f ValueAt(int i, int j){
-        int f = i + j * _w;
-        float shade = ((1.0 - _d->src()[f]));
-        return GVec4f(shade, shade, shade, 1.f);
-    }
-};
-
-#include <interval.h>
-#define TypedPolygon PolygonSubdivisionGeometry
-void gui_tri(Graphy2DCanvas *canvas, TypedPolygon *sub,
-            GVec4f circ_color = GVec4f(0,0,1,1), GVec4f line_color = GVec4f(0,1,0,1))
-{
-    canvas->circle(sub->p0.x, sub->p0.y).color(circ_color);
-    canvas->circle(sub->p1.x, sub->p1.y).color(circ_color);
-    canvas->circle(sub->p2.x, sub->p2.y).color(circ_color);
-    canvas->circle(sub->p3.x, sub->p3.y).color(circ_color);
-    canvas->path(sub->p0.x, sub->p0.y, sub->p1.x, sub->p1.y).color(line_color).width(2.f);
-    canvas->path(sub->p1.x, sub->p1.y, sub->p2.x, sub->p2.y).color(line_color).width(2.f);
-    canvas->path(sub->p2.x, sub->p2.y, sub->p3.x, sub->p3.y).color(line_color).width(2.f);
-    canvas->path(sub->p3.x, sub->p3.y, sub->p0.x, sub->p0.y).color(line_color).width(2.f);
-}
+void test_routine();
 
 void test_mac(int argc, char **argv){
-    VolumetricSubdivisionGeometry slabs[4];
-    int nSlabs = 4;
-    vec3f pos = vec3f(0);
-    VolumetricSubdivisionGeometry::SlabsForParticle(pos, 1.f, slabs, &nSlabs);
+    CudaMemoryManagerStart(__FUNCTION__);
 
-    float *p = new float[nSlabs * 6 * 3 * 2];
-    float *rgb = new float[nSlabs * 6 * 3 * 2];
-    int it = 0, ic = 0;
-    vec3f a = slabs[0].a;
-    vec3f b = slabs[0].b;
-    vec3f c = slabs[0].c;
-    printf("{%g %g %g}\n", a.x, a.y, a.z);
-    printf("{%g %g %g}\n", b.x, b.y, b.z);
-    printf("{%g %g %g}\n", c.x, c.y, c.z);
-    printf("{%g %g %g}\n", pos.x, pos.y, pos.z);
-    vec3f f0 = pos - a;
-    vec3f f1 = b - a;
-    vec3f f2 = c - a;
-    Matrix3x3 m(f0.x, f0.y, f0.z,
-                f1.x, f1.y, f1.z,
-                f2.x, f2.y, f2.z);
-    Float det = Determinant(m);
-    printf("Det = %g\n", det);
+    test_routine();
+    CudaMemoryManagerClearCurrent();
+    exit(0);
 
-#if 1
-    p[it++] = pos.x;
-    p[it++] = pos.y;
-    p[it++] = pos.z;
-
-    rgb[ic++] = 0;
-    rgb[ic++] = 1;
-    rgb[ic++] = 0;
-#endif
-    for(int i = 0; i < 1; i++){
-#if 0
-        p[it++] = pos.x;
-        p[it++] = pos.y;
-        p[it++] = pos.z;
-
-        p[it++] = slabs[i].p0.x;
-        p[it++] = slabs[i].p0.y;
-        p[it++] = slabs[i].p0.z;
-
-        p[it++] = pos.x;
-        p[it++] = pos.y;
-        p[it++] = pos.z;
-
-        p[it++] = slabs[i].p1.x;
-        p[it++] = slabs[i].p1.y;
-        p[it++] = slabs[i].p1.z;
-
-        p[it++] = pos.x;
-        p[it++] = pos.y;
-        p[it++] = pos.z;
-
-        p[it++] = slabs[i].p2.x;
-        p[it++] = slabs[i].p2.y;
-        p[it++] = slabs[i].p2.z;
-
-        p[it++] = pos.x;
-        p[it++] = pos.y;
-        p[it++] = pos.z;
-
-        p[it++] = slabs[i].a.x;
-        p[it++] = slabs[i].a.y;
-        p[it++] = slabs[i].a.z;
-
-        p[it++] = pos.x;
-        p[it++] = pos.y;
-        p[it++] = pos.z;
-
-        p[it++] = slabs[i].b.x;
-        p[it++] = slabs[i].b.y;
-        p[it++] = slabs[i].b.z;
-
-        p[it++] = pos.x;
-        p[it++] = pos.y;
-        p[it++] = pos.z;
-
-        p[it++] = slabs[i].c.x;
-        p[it++] = slabs[i].c.y;
-        p[it++] = slabs[i].c.z;
-#else
-        p[it++] = slabs[i].p0.x;
-        p[it++] = slabs[i].p0.y;
-        p[it++] = slabs[i].p0.z;
-        rgb[ic++] = 1;
-        rgb[ic++] = 0;
-        rgb[ic++] = 0;
-
-        p[it++] = slabs[i].p1.x;
-        p[it++] = slabs[i].p1.y;
-        p[it++] = slabs[i].p1.z;
-        rgb[ic++] = 1;
-        rgb[ic++] = 0;
-        rgb[ic++] = 0;
-
-        p[it++] = slabs[i].p2.x;
-        p[it++] = slabs[i].p2.y;
-        p[it++] = slabs[i].p2.z;
-        rgb[ic++] = 1;
-        rgb[ic++] = 0;
-        rgb[ic++] = 0;
-
-        p[it++] = slabs[i].a.x;
-        p[it++] = slabs[i].a.y;
-        p[it++] = slabs[i].a.z;
-        rgb[ic++] = 0;
-        rgb[ic++] = 0;
-        rgb[ic++] = 1;
-#endif
-    }
-
-    vec3f origin(0, 0, -5);
-    vec3f target(0);
-    graphy_vector_set(origin, target);
-    while(1){
-        //graphy_render_lines(p, rgb, it/3);
-        graphy_render_points3f(p, rgb, it / 3, 0.05);
-    }
-
-    return;
     GWindow gui("MAC Test");
     auto canvas = gui.get_canvas();
-#if 0
-    TypedPolygon sub[8], div[6], subdivs[12];
-    int nSlabs = 8, nDivs = 2;
-    vec2f p = vec2f(0.5, 0.5);
-    Float h = 0.25;
-
-    TypedPolygon::SlabsForParticle(p, h, &sub[0], &nSlabs);
-    int divs = 0;
-    sub[0].Subdivide(&div[0], &nDivs, p, h); divs += nDivs;
-    sub[1].Subdivide(&div[2], &nDivs, p, h); divs += nDivs;
-    sub[2].Subdivide(&div[4], &nDivs, p, h); divs += nDivs;
-
-    int at = 0;
-    for(int i = 0; i < 6; i++){
-        int ns = 0;
-        div[i].Subdivide(&subdivs[at], &ns, p, h);
-        at += ns;
-    }
-#endif
-
-    while(1){
-        canvas.Color(0x112F41);
-#if 0
-        canvas.Radius(4.f);
-        for(int i = 0; i < nSlabs; i++){
-            gui_tri(&canvas, &sub[i]);
-        }
-
-        for(int i = 0; i < divs; i++){
-            gui_tri(&canvas, &div[i], GVec4f(1,0,0,1), GVec4f(1,1,0,1));
-        }
-
-        for(int i = 0; i < at; i++){
-            gui_tri(&canvas, &subdivs[i], GVec4f(1,0,1,1), GVec4f(0,1,1,1));
-        }
-#endif
-        gui.update();
-    }
-
-    return;
-
     int res = 128;
     if(argc > 1){
         res = atoi(argv[1]);
@@ -338,31 +37,35 @@ void test_mac(int argc, char **argv){
     int _w = res, _h = res;
     Float density = 0.1;
     Float timestep = 0.005;
-    FluidSolver *solver = new FluidSolver(_w, _h, density, timestep);
 
-    //int it = 0;
+    MacSolver2 solver;
+    //PressureSolverEigen2 pSolver;
+    //PressureSolverJacobi2 pSolver;
+    PressureSolverPCG2 pSolver;
+    solver.Initialize(vec2ui(_w, _h), density, &pSolver);
+
     canvas.Color(0x112F41);
 
-    auto fetcher = [&](int x, int y) -> GVec4f{ return solver->ValueAt(x, y); };
-    while(1){
-        solver->addInflow(0.45, 0.2, 0.15, 0.03, 1.6, 2.0, 4.0);
-        solver->update(timestep);
+    MacSolverData2 *data = solver.GetSolverData();
+    auto fetcher = [&](int x, int y) -> GVec4f{
+        int f = x + y * solver.domain.x;
+        float s = data->d->src()[f];
+        float shade = ((1.0 - s));
+        return GVec4f(shade, shade, shade, 1.f);
+    };
 
+    size_t frame = 0;
+    while(1){
+        if(frame++ < 400)
+            solver.AddInflow(vec2f(0.45, 0.2), vec2f(0.15, 0.03), 1.6, -2.0, 4.0);
+        solver.Advance(timestep);
         canvas.for_each_pixel([&](int x, int y) -> GVec4f{
             return canvas.upsample_from(x, y, _w, _h, fetcher, GUpsampleMode::Bilinear);
         });
-
         gui.update();
-
-        //solver->toImage(colors);
-        //graphy_display_pixels();
-        if(it++ == 181){
-            //graphy_write_image(nullptr, 0, 0, 0, "image180.png");
-            //printf("*Saved*\n");
-        }
     }
 
-    delete solver;
+    CudaMemoryManagerClearCurrent();
 }
 
 // God, float point precision is hard. Don't want to use double but accumulating

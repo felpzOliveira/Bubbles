@@ -278,7 +278,7 @@ void test_pcisph3_rotating_water_box(){
     vec3f origin(4);
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
-    Float spacing = 0.02;
+    Float spacing = 0.06;
     Float spacingScale = 2.0;
     int steps = 500;
     Float targetInterval =  1.0 / 240.0;
@@ -355,12 +355,12 @@ void test_pcisph3_rotating_water_box(){
             container->Update(g_transform * transform);
             container->SetVelocities(linear, angular * 50.0);
         }
-#if 0
+#if 1
         std::vector<int> bounds;
         int n = UtilGetBoundaryState(pSet, &bounds);
         printf("Boundary %d / %d\n", (int)n, (int)pSet->GetParticleCount());
 
-        std::string path("/home/felipe/Documents/Bubbles/simulations/box_rotate/out_");
+        std::string path("/home/felipe/Documents/Bubbles/simulations/box_rotate2/out_");
         path += std::to_string(step-1);
         path += ".txt";
         int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);

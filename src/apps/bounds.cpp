@@ -9,6 +9,7 @@
 #include <sstream>
 #include <map>
 #include <narrowband.h>
+#include <delaunay.h>
 
 typedef struct{
     int count;
@@ -706,6 +707,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     UpdateGridDistributionGPU(solver.solverData);
     /* compute density and normal just in case algorithm picked needs it */
     ComputeDensityGPU(solver.solverData);
+    ComputeNormalGPU(solver.solverData);
 
     grid->UpdateQueryState();
     LNMInvalidateCells(grid);
@@ -829,14 +831,12 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         IntervalBoundary(pSet, grid, opts->spacing, opts->interval_sub_method);
         timer.Stop();
     }else if(opts->method == BOUNDARY_MARRONE){
-        ComputeNormalGPU(solver.solverData);
         timer.Start();
         MarroneBoundary(pSet, grid, opts->spacing);
         timer.Stop();
     }else if(opts->method == BOUNDARY_MARRONE_ALT){
         WorkQueue<vec4f> *marroneWorkQ = cudaAllocateVx(WorkQueue<vec4f>, 1);
         marroneWorkQ->SetSlots(pSet->GetParticleCount());
-        ComputeNormalGPU(solver.solverData);
         timer.Start();
         MarroneAdaptBoundary(pSet, grid, opts->spacing, marroneWorkQ);
         timer.Stop();
@@ -854,13 +854,27 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         timer.Stop();
     }
     else{
-        // TODO: 3D Interval seems dubious and others methods
+
     }
 
     Float interval = timer.GetElapsedGPU(0);
 
     int n = UtilGetBoundaryState(pSet, &boundary);
     printf("Got %d / %d - %g ms\n", n, (int)boundary.size(), interval);
+
+#if 0
+    DelaunayTriangulation triangulation;
+    printf("Computing raw triangulation ... "); fflush(stdout);
+    DelaunayTriangulate(triangulation, sphpSet, grid);
+
+    printf("Done.\nFiltering ... "); fflush(stdout);
+
+    DelaunayShrink(triangulation, sphpSet, boundary);
+
+    DelaunayWritePly(triangulation, "delaunay.ply");
+
+    printf("Done.\n");
+#endif
 
     if(opts->narrowband){
         boundary.clear();
@@ -889,18 +903,19 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     if(dump_to_file){
         printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout);
         UtilEraseFile(opts->output.c_str());
-        printf("OK\n");
 
         opts->outflags |= SERIALIZER_BOUNDARY;
 
         if(opts->legacy_out){
             SerializerSaveSphDataSet3Legacy(solver.solverData, opts->output.c_str(),
-            opts->outflags, &boundary);
+                                            opts->outflags, &boundary);
         }else{
             SerializerWriteShapes(&shapes, opts->output.c_str());
             SerializerSaveSphDataSet3(solver.solverData, opts->output.c_str(),
-            opts->outflags, &boundary);
+                                      opts->outflags, &boundary);
         }
+
+        printf("OK\n");
 
         if(opts->write_domain){
             printf("Writting domain grid to 'domain.txt'... "); fflush(stdout);

@@ -11,12 +11,100 @@
 #include <serializer.h>
 #include <sph_solver.h>
 #include <sstream>
+#include <gDel3D/GpuDelaunay.h>
+#include <gDel3D/CPU/PredWrapper.h>
+#include <gDel3D/CommonTypes.h>
 
 #if defined(DEBUG)
     #define BB_MSG(name) printf("* %s - Built %s at %s [DEBUG] *\n", name, __DATE__, __TIME__)
 #else
     #define BB_MSG(name) printf("* %s - Built %s at %s *\n", name, __DATE__, __TIME__)
 #endif
+
+// Structures for hashing triangles for delaunay
+template<int N>
+struct iN{
+    public:
+    int t[N];
+
+    iN(){
+        for(int i = 0; i < N; i++) t[i] = 0;
+    }
+
+    iN(std::vector<int> f){
+        bool sorting = false;
+        if(f.size() != N){
+            printf("INVALID INITIALIZATION\n");
+        }else{
+            for(int i = 0; i < N; i++){
+                t[i] = f[i];
+            }
+        }
+
+        for(int i = 0; i < N-1; i++){
+            for(int j = 0; j < N - i - 1; j++){
+                if(t[j] > t[j+1]){
+                    Swap(t[j], t[j+1]);
+                }
+            }
+        }
+    }
+};
+
+
+template<int N> struct iNHasher{
+    public:
+    size_t operator()(const iN<N> &a) const{
+        int f = 0;
+        for(int i = 0; i < N; i++){
+            f += a.t[i];
+        }
+        return std::hash<int>()(f);
+    }
+};
+
+template<int N> struct iNIsSame{
+    public:
+    bool operator()(const iN<N> &a, const iN<N> &b) const{
+        for(int i = 0; i < N; i++){
+            if(b.t[i] != a.t[i]) return false;
+        }
+        return true;
+    }
+};
+
+
+struct i3{
+    public:
+    int t[3];
+
+    i3(){ t[0] = 0; t[1] = 0; t[2] = 0; }
+
+    i3(int a, int b, int c){
+        if(a > c) Swap(a, c);
+        if(a > b) Swap(a, b);
+        if(b > c) Swap(b, c);
+        t[0] = a;
+        t[1] = b;
+        t[2] = c;
+    }
+};
+
+
+struct i3Hasher{
+    public:
+    size_t operator()(const i3 &a) const{
+        int f = a.t[0] + a.t[1] + a.t[2];
+        return std::hash<int>()(f);
+    }
+};
+
+struct i3IsSame{
+    public:
+    bool operator()(const i3 &a, const i3 &b) const{
+        return b.t[0] == a.t[0] && b.t[1] == a.t[1] && b.t[2] == a.t[2];
+    }
+};
 
 /*
 * So... our simulator is looking great! However is very hard to perform
@@ -118,6 +206,47 @@ __host__ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f 
 */
 __host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
                                    vec3f length, int nPoints, Transform transform);
+
+/*
+* Writes the output of GDel3D to a ply file.
+*/
+__host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
+                                 const char *path, bool tetras=true);
+
+/*
+* Writes a ply file from a specific set of triangles from a given GDel3D output.
+*/
+__host__ void UtilGDel3DWritePly(std::vector<i3> *tris, Point3HVec *pointVec,
+                                 GDelOutput *output, const char *path);
+
+template<typename Fn>
+__host__ void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
+    const TetHVec tetVec      = output->tetVec;
+    const TetOppHVec oppVec   = output->tetOppVec;
+    const CharHVec tetInfoVec = output->tetInfoVec;
+
+    for(int i = 0; i < tetVec.size(); i++){
+        bool valid = true;
+        Tet tet = tetVec[i];
+        const TetOpp botOpp = oppVec[i];
+        if(!isTetAlive(tetInfoVec[i])) valid = false;
+
+        for(int s = 0; s < 4; s++){
+            if(botOpp._t[s] == -1) valid = false;
+            if(tet._v[s] == pLen) valid = false; // inf point
+        }
+
+        if(valid)
+            fn(tet, botOpp, i);
+    }
+}
+
+
+/*
+* Find all triangles that are unique.
+*/
+__host__ void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
+                                   GDelOutput *output, int pLen);
 
 template<typename T, typename U, typename Q> inline __host__
 int UtilIsDistributionConsistent(ParticleSet<T> *pSet, Grid<T, U, Q> *grid){

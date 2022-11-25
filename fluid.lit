@@ -238,7 +238,7 @@ Material{ texture[white] rough[0.01 0.01] transmission[1.0]
 # the light in this scene is based on the spd from Ledtech
 Material{ emission [spds/Ledtech.csv] name [light] type [diffuselight] scale[10] }
 
-Material{ reflectance[0.3 0.3 0.6] name[ground2] type[diffuse] }
+Material{ reflectance[0.6 0.6 0.6] name[ground2] type[diffuse] }
 
 # blue material for the dragons
 Material { name[mat_0] type [diffuse] reflectance [ 0.249 0.347 0.643 ] scale [0.5] }

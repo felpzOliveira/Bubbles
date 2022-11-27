@@ -237,25 +237,6 @@ class PressureSolver2{
     __bidevice__ Float *Pressure(){ return p; }
 };
 
-class PressureSolverEigen2 : public PressureSolver2{
-    public:
-    void *memory = nullptr;
-
-    PressureSolverEigen2();
-    ~PressureSolverEigen2();
-
-    virtual __host__ bool NeedsVelocity(){ return true; }
-    virtual __host__ void BuildSolver(size_t n, Float _dx, vec2ui res) override;
-    virtual __host__ void Update(int limit, Float *p, Float density,
-                                 Float timestep, Float maxErr=1e-5) override;
-
-    virtual __host__ void UpdateFull(int limit, Float *p, Float density,
-                                     Float timestep, Float maxErr,
-                                     std::function<Float(int,int)> uSampler,
-                                     std::function<Float(int,int)> vSampler,
-                                     std::function<Float(int,int)> dSampler) override;
-};
-
 /*
  * You would think PCG is much better than simple-old Jacobi. However
  * Jacobi with 600 iterations runs faster than PCG on GPU and achieves

@@ -91,7 +91,7 @@ int main(int argc, char **argv){
     cudaInitEx();
 
     /* Sets the default kernel launching parameters, 16 is good for my notebook */
-    cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 64);
+    cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
 
     //test_virtual_grid();
     //test_pcisph2_water_block();

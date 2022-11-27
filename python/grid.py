@@ -44,6 +44,11 @@ def advect_rk3(vf: ti.template(), qf: ti.template(),
         p_prev = p - (_dt / 9.0) * (2.0 * k1 + 3.0 * k2 + 4.0 * k3)
         new_qf[i, j] = qf_sample_value(qf, p_prev, 0.5, 0.5)
 
+# do advection over the velocity field described by explicit components 'u' and 'v'
+# considering the offset of data points in the layout of the MAC grid. Quantity 'qf'
+# is allowed to have any offset 'ox', 'oy' in the range [0.0, 1.0]. Note that this
+# routine (like others) work on grid coordinates and not world coordinates, it is
+# assumed that grids are on top of each other and no translation/scaling is present
 @ti.kernel
 def advect_rk3_mac(vf_u: ti.template(), vf_v: ti.template(),
                    qf: ti.template(), new_qf: ti.template(), _dt: float,
@@ -71,8 +76,17 @@ def addInflow(qf: ti.template(), rect: ti.template(), value: ti.template()):
         if lower_x <= i <= upper_x and lower_y <= j <= upper_y:
             qf[i, j] = value
 
-# Slabs do the job of handling the double buffering nature
-# of the solver
+# it is kinda stupid that going to GPU with atomics is faster than python
+@ti.kernel
+def buffer_average(buf: ti.template()) -> ti.f32:
+    avg = 0.0
+    counter = 0.0
+    for i, j in buf:
+        avg += buf[i, j]
+        counter += 1.0
+    return avg / counter
+
+# Slabs do the job of handling the double buffering nature of grid solvers
 @ti.data_oriented
 class Slab:
     def __init__(self, nx, ny, n_channels, outOfBoundsValue=0):
@@ -102,10 +116,14 @@ class Slab:
     def set_inflow(self, rect, value):
         addInflow(self.curr, rect, value)
 
+    def average(self):
+        return buffer_average(self.curr)
+
 
 ################################################################################
 # Boundary stuff
 ################################################################################
+
 # apply boundary conditions to velocity field
 @ti.kernel
 def velocity_bc(vf: ti.template(), nx: int, ny: int):
@@ -166,7 +184,6 @@ def pressure_bc(pf: ti.template(), nx: int, ny: int):
         elif j == ny-1:
             pf[i, j] = pf[i,j-1]
 
-
 @ti.data_oriented
 class BoundarySolver:
     def __init__(self):
@@ -196,4 +213,5 @@ class BoundarySolver:
     def update_pressure(self):
         pressure_bc(self.pressure_slab.curr, self.pressure_slab.curr.shape[0],
                     self.pressure_slab.curr.shape[1])
+
 

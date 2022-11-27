@@ -1,5 +1,6 @@
 #include <explicit_grid.h>
 
+#if 0
 // eigen has a const infinity somewhere that clashes with our define
 #if defined(Infinity)
     #undef Infinity
@@ -175,3 +176,4 @@ __host__ void PressureSolverEigen2::Update(int limit, Float *p, Float density,
 {
     printf("Invoked invalid pressure solver\n");
 }
+#endif

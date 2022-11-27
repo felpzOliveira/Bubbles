@@ -347,7 +347,7 @@ void test_routine(){
     vec4f area = vec4f(pixel_mid - ix_length, 8, pixel_mid + ix_length, 8 + iy_length);
     vec2f inflow_velocity = vec2f(0.0, 3.0);
     vec3f temp_dye = vec3f(0.5, 0.7, 0.5);
-    Float dt = 0.02;
+    Float dt = 0.05;
 
     GWindow gui("MAC Test");
     auto canvas = gui.get_canvas();
@@ -363,7 +363,7 @@ void test_routine(){
     };
 
     while(true){
-        for(int i = 0; i < 30; i++){
+        for(int i = 0; i < 15; i++){
             velocities->set_inflow(area, inflow_velocity);
             densities->set_inflow(area, temp_dye);
 

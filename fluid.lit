@@ -19,7 +19,7 @@ set-global-light [interpolated] # add the cute interpolated skylight
 #set-global-light [atmospheric]
 set-sky-intensity [50.0]
 #set-sky-rayleigh [2.24 1.3 0.55]
-set-sky-sundir [0 1 1]
+set-sky-sundir [0 0 1]
 set-ray-depth[50] # set the maximum ray depth for the integrator
 
 # set the filter sampling to use Zirr's cascade buffer, from the paper:
@@ -38,10 +38,10 @@ Denoiser [Oidn]
 #Denoiser [ATrous]
 
 # ground material is a microfacet reflection based on disney bsdf
-#Material{ reflectance[0.50 0.50 0.99] name[ground]
-          #rough[0.2 0.2] metallic[1.0] type[disney] }
+Material{ reflectance[0.50 0.50 0.99] name[ground]
+          rough[0.2 0.2] metallic[1.0] type[disney] }
 
-Material{ reflectance[0.99 0.99 0.99] name[ground] type[diffuse] }
+#Material{ reflectance[0.99 0.99 0.99] name[ground] type[diffuse] }
 
 ############ Rendering props for Color Field section - double dam break
 # Frames: 0, 40, 120
@@ -238,7 +238,7 @@ Material{ texture[white] rough[0.01 0.01] transmission[1.0]
 # the light in this scene is based on the spd from Ledtech
 Material{ emission [spds/Ledtech.csv] name [light] type [diffuselight] scale[10] }
 
-Material{ reflectance[0.6 0.6 0.6] name[ground2] type[diffuse] }
+Material{ reflectance[0.3 0.3 0.6] name[ground2] type[diffuse] }
 
 # blue material for the dragons
 Material { name[mat_0] type [diffuse] reflectance [ 0.249 0.347 0.643 ] scale [0.5] }

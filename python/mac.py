@@ -7,7 +7,7 @@ ti.init(arch=ti.gpu)
 res = 512
 pixels = ti.Vector.field(3, float, shape=(res, res))
 #pixels = ti.field(dtype=float, shape=(res,res))
-dt = 0.02
+timestep = 0.01
 pixel_mid = res // 2
 ix_length = 15 * res / 512
 iy_length = 10
@@ -17,8 +17,7 @@ inflow_density = ti.Vector([0.7, 0.7, 0.7])
 
 density = 1.0
 dx = 1.0
-pScale = (dt / dx * density)
-pApplyScale = (dt / dx * density)
+USE_MAC_GRID = 1
 
 @ti.kernel
 def apply_pressure(vf: ti.template(), vf_new: ti.template(), pf: ti.template()):
@@ -60,7 +59,7 @@ def divergence_mac(vf_u: ti.template(), vf_v: ti.template(), divf: ti.template()
         scale = 1.0#1.0 / dx
         div_u = vel_at(vf_u,i+1,j) - vel_at(vf_u,i,j)
         div_v = vel_at(vf_v,i,j+1) - vel_at(vf_v,i,j)
-        divf[i, j] = (div_u + div_v) * scale
+        divf[i, j] = 0.5 * (div_u + div_v) * scale
 
 @ti.kernel
 def velocity_magnitude(vf_u: ti.template(), vf_v: ti.template(), vm: ti.template()):
@@ -69,28 +68,64 @@ def velocity_magnitude(vf_u: ti.template(), vf_v: ti.template(), vm: ti.template
         vel_v = (vel_at(vf_v,i,j+1) + vel_at(vf_v,i,j)) * 0.5
         vm[i, j] = ti.sqrt(vel_u ** 2 + vel_v ** 2)
 
+@ti.kernel
+def apply_temperature(vf: ti.template(), den: ti.template(),
+                      tp: ti.template(), dt: float, tamb: float):
+    for i, j in vf:
+        p = ti.Vector([i, j]) + ti.Vector([0.5, 0.5])
+        d = grid.qf_sample_value(den, p, 0.5, 0.5)[0]
+        tempij = grid.qf_sample_value(tp, p, 0.5, 0.5)
+        alpha = 0.06
+        beta = 5.0
+        up = ti.Vector([0.0, 1.0])
+        if tempij > tamb:
+            delta_temp = tempij - tamb
+            fbuo = -alpha * d + beta * delta_temp
+            vf[i, j] += fbuo * dt * up
+
+@ti.kernel
+def apply_temperature_mac(vf_v: ti.template(), den: ti.template(),
+                          tp: ti.template(), dt: float, tamb: float):
+    for i, j in vf_v:
+        p = ti.Vector([i, j]) + ti.Vector([0.5, 0.0])
+        d = grid.qf_sample_value(den, p, 0.5, 0.5)[0]
+        tempij = grid.qf_sample_value(tp, p, 0.5, 0.5)
+        alpha = 0.5
+        beta = 5.0
+        up = 1
+        if tempij > tamb:
+            delta_temp = tempij - tamb
+            fbuo = -alpha * d + beta * delta_temp
+            vf_v[i, j] += fbuo * dt * up
+
+@ti.kernel
+def decay_temperature(tp: ti.template(), alpha: float):
+    for i, j in tp:
+        tp[i, j] *= ti.max(0.0, (1.0 - alpha))
+
 @ti.data_oriented
 class Solver:
     def __init__(self, nx, ny):
         self.bSolver = grid.BoundarySolver()
         self.velocity_divs = ti.field(float, shape=(res, res))
-        self.diff_pressures = ti.field(float, shape=(res, res))
         self.velocity_slab = grid.Slab(res, res, 2)
         self.pressure_slab = grid.Slab(res, res, 1)
         self.density_slab = grid.Slab(res, res, 3)
         self.velocity_mag = ti.field(float, shape=(res, res))
+        self.temperature_slab = grid.Slab(res, res, 1)
 
         self.velocity_u_slab = grid.Slab(res+1, res, 1)
         self.velocity_v_slab = grid.Slab(res, res+1, 1)
         self.velocity_u_slab.set_origin(0.0, 0.5)
         self.velocity_v_slab.set_origin(0.5, 0.0)
 
-        #self.is_mac = 0
-        #self.bSolver.setup(self.velocity_slab, self.pressure_slab)
+        if USE_MAC_GRID == 0:
+            self.bSolver.setup(self.velocity_slab, self.pressure_slab)
+        else:
+            self.bSolver.setup_mac(self.velocity_u_slab, self.velocity_v_slab,
+                                   self.pressure_slab)
 
-        self.is_mac = 1
-        self.bSolver.setup_mac(self.velocity_u_slab, self.velocity_v_slab,
-                               self.pressure_slab)
+        self.is_mac = USE_MAC_GRID
 
     def handle_inflow(self, area, inflow_vel, inflow_density):
         self.density_slab.set_inflow(area, inflow_density)
@@ -99,6 +134,8 @@ class Solver:
         else:
             self.velocity_u_slab.set_inflow(area, inflow_vel[0])
             self.velocity_v_slab.set_inflow(area, inflow_vel[1])
+
+        self.temperature_slab.set_inflow(area, 70)
 
     def advect_velocities(self, dt):
         if self.is_mac == 0:
@@ -116,6 +153,13 @@ class Solver:
             self.density_slab.advect_mac(self.velocity_u_slab.curr,
                                          self.velocity_v_slab.curr, dt)
 
+    def advect_temperature(self, dt):
+        if self.is_mac == 0:
+            self.temperature_slab.advect(self.velocity_slab.curr, dt)
+        else:
+            self.temperature_slab.advect_mac(self.velocity_u_slab.curr,
+                                             self.velocity_v_slab.curr, dt)
+
     def velocity_bc(self):
         self.bSolver.update_velocity()
 
@@ -128,6 +172,16 @@ class Solver:
         else:
             self.velocity_u_slab.flip()
             self.velocity_v_slab.flip()
+
+    def apply_temperature(self, dt):
+        decay_temperature(self.temperature_slab.curr, 0.03)
+        tamb = self.temperature_slab.average()
+        if self.is_mac == 0:
+            apply_temperature(self.velocity_slab.curr, self.density_slab.curr,
+                              self.temperature_slab.curr, dt, tamb)
+        else:
+            apply_temperature_mac(self.velocity_v_slab.curr, self.density_slab.curr,
+                                  self.temperature_slab.curr, dt, tamb)
 
     def apply_pressure(self):
         if self.is_mac == 0:
@@ -190,7 +244,6 @@ def p_bounds(pf: ti.template(), i: int, j: int) -> ti.f32:
 def pressure_jacobi_iter(pf: ti.template(), pf_new: ti.template(), divf: ti.template()) -> ti.f32:
     norm_new = 0.0
     norm_diff = 0.0
-    scale = dt / (density * dx * dx)
     for i, j in pf:
         pf_new[i, j] = 0.25 * (p_bounds(pf, i+1, j) + p_bounds(pf, i-1, j) +
                                p_bounds(pf, i, j+1) + p_bounds(pf, i, j-1) - divf[i, j])
@@ -222,12 +275,13 @@ def fill_color(ipixels: ti.template(), idyef: ti.template()):
 
 def fill_color_vel():
     #fill_color_vel_kern(ipixels, vf)
-    velocity_magnitude(solver.velocity_u_slab.curr, solver.velocity_v_slab.curr,
-                       solver.velocity_mag)
-    V_np = solver.velocity_mag.to_numpy()
+    #velocity_magnitude(solver.velocity_u_slab.curr, solver.velocity_v_slab.curr,
+                       #solver.velocity_mag)
+    #V_np = solver.velocity_mag.to_numpy()
+    V_np = solver.temperature_slab.curr.to_numpy()
     return cm.jet(V_np)
 
-gui = ti.GUI('Advection schemes', (res, res))
+gui = ti.GUI('Basic Smoke Solver 2D', (res, res))
 while gui.running:
     while gui.get_event(ti.GUI.PRESS):
         if gui.event.key in [ti.GUI.ESCAPE, ti.GUI.EXIT]: exit(0)
@@ -237,14 +291,16 @@ while gui.running:
         # Advection:
         solver.velocity_bc()
 
-        solver.advect_velocities(dt)
-        solver.advect_density(dt)
+        solver.advect_velocities(timestep)
+        solver.advect_density(timestep)
+        solver.advect_temperature(timestep)
         solver.flip_velocities()
+        solver.temperature_slab.flip()
         solver.density_slab.flip()
 
-        solver.velocity_bc()
         # External forces:
-
+        solver.apply_temperature(timestep)
+        solver.velocity_bc()
         # Projection:
         solver.divergence()
         pressure_jacobi(solver.pressure_slab, solver.velocity_divs)

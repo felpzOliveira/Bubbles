@@ -290,6 +290,7 @@ __host__ void pressure_jacobi(DoubleBuffer1f *pressures, Float *divf,
         pressures->flip();
         counter ++;
         if(counter > 10) break;
+        printf("Erro = %g\n", residual);
     }
 
     apply_p_bc(pressures->cur, nx, ny);

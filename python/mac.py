@@ -31,7 +31,7 @@ def apply_pressure(vf: ti.template(), vf_new: ti.template(), pf: ti.template()):
 @ti.kernel
 def apply_pressure_u(vf_u: ti.template(), vf_u_new: ti.template(), pf: ti.template()):
     for i, j in vf_u:
-        scale = 1.0#dt / (density * dx)
+        scale = timestep / (density * dx)
         pf_ipj = p_at(pf, i, j)
         pf_inj = p_at(pf, i-1, j)
         vf_u_new[i, j] = vf_u[i, j] - (pf_ipj - pf_inj) * scale
@@ -39,7 +39,7 @@ def apply_pressure_u(vf_u: ti.template(), vf_u_new: ti.template(), pf: ti.templa
 @ti.kernel
 def apply_pressure_v(vf_v: ti.template(), vf_v_new: ti.template(), pf: ti.template()):
     for i, j, in vf_v:
-        scale = 1.0#dt / (density * dx)
+        scale = timestep / (density * dx)
         pf_ipj = p_at(pf, i, j)
         pf_inj = p_at(pf, i, j-1)
         vf_v_new[i, j] = vf_v[i, j] - (pf_ipj - pf_inj) * scale
@@ -75,7 +75,7 @@ def apply_temperature(vf: ti.template(), den: ti.template(),
         p = ti.Vector([i, j]) + ti.Vector([0.5, 0.5])
         d = grid.qf_sample_value(den, p, 0.5, 0.5)[0]
         tempij = grid.qf_sample_value(tp, p, 0.5, 0.5)
-        alpha = 0.06
+        alpha = 0.0006
         beta = 5.0
         up = ti.Vector([0.0, 1.0])
         if tempij > tamb:
@@ -90,7 +90,7 @@ def apply_temperature_mac(vf_v: ti.template(), den: ti.template(),
         p = ti.Vector([i, j]) + ti.Vector([0.5, 0.0])
         d = grid.qf_sample_value(den, p, 0.5, 0.5)[0]
         tempij = grid.qf_sample_value(tp, p, 0.5, 0.5)
-        alpha = 0.5
+        alpha = 0.0006
         beta = 5.0
         up = 1
         if tempij > tamb:
@@ -135,7 +135,7 @@ class Solver:
             self.velocity_u_slab.set_inflow(area, inflow_vel[0])
             self.velocity_v_slab.set_inflow(area, inflow_vel[1])
 
-        self.temperature_slab.set_inflow(area, 70)
+        self.temperature_slab.set_inflow(area, 100)
 
     def advect_velocities(self, dt):
         if self.is_mac == 0:
@@ -255,17 +255,18 @@ def pressure_jacobi_iter(pf: ti.template(), pf_new: ti.template(), divf: ti.temp
         residual = 0.0
     return residual
 
-
 def pressure_jacobi(pf_pair, divf: ti.template()):
     residual = 10.0
     counter = 0
     max_it = 1
+    #pf_pair.curr.fill(0.0)
     while residual > 0.0001:
         residual = pressure_jacobi_iter(pf_pair.curr, pf_pair.next, divf)
         pf_pair.flip()
         counter += 1
         if counter > max_it:
             break
+    print("Res = " + str(residual))
 
 @ti.kernel
 def fill_color(ipixels: ti.template(), idyef: ti.template()):
@@ -282,6 +283,9 @@ def fill_color_vel():
     return cm.jet(V_np)
 
 gui = ti.GUI('Basic Smoke Solver 2D', (res, res))
+pSolver = grid.RedBlackSORSolver(solver.pressure_slab)
+#pSolver = grid.JacobiSolver(solver.pressure_slab)
+
 while gui.running:
     while gui.get_event(ti.GUI.PRESS):
         if gui.event.key in [ti.GUI.ESCAPE, ti.GUI.EXIT]: exit(0)
@@ -302,10 +306,11 @@ while gui.running:
         solver.apply_temperature(timestep)
         solver.velocity_bc()
         # Projection:
-        solver.divergence()
-        pressure_jacobi(solver.pressure_slab, solver.velocity_divs)
+        #solver.divergence()
+        #pressure_jacobi(solver.pressure_slab, solver.velocity_divs)
 
-        solver.pressure_bc()
+        #solver.pressure_bc()
+        pSolver.update(solver.velocity_u_slab, solver.velocity_v_slab, timestep)
 
         solver.apply_pressure()
         solver.flip_velocities()

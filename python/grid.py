@@ -215,3 +215,123 @@ class BoundarySolver:
                     self.pressure_slab.curr.shape[1])
 
 
+@ti.kernel
+def pressure_boundary_condition(pf: ti.template()):
+    for i, j in pf:
+        nx = pf.shape[0]
+        ny = pf.shape[1]
+        if (i == j == 0) or (i == nx-1 and j == ny-1) or (i == 0 and j == ny-1) or (i == nx-1 and j == 0):
+            pf[i, j] = 0.0
+        elif i == 0:
+            pf[i, j] = pf[i+1, j]
+        elif j == 0:
+            pf[i, j] = pf[i, j+1]
+        elif i == nx-1:
+            pf[i, j] = pf[i-1, j]
+        elif j == ny-1:
+            pf[i, j] = pf[i, j-1]
+
+@ti.func
+def predict_p(pf, v_u, v_v, dt, i, j):
+    dx = 0.5 * (qf_near_value(v_u, i+1, j) - qf_near_value(v_u, i, j))
+    dy = 0.5 * (qf_near_value(v_v, i, j+1) - qf_near_value(v_v, i, j))
+    pred = ((pf[i+1, j] + pf[i-1, j] + pf[i, j+1] + pf[i, j-1])
+            - (dx + dy) / dt) * 0.25
+    return pred
+
+
+v2 = ti.types.vector(2, ti.f32)
+@ti.data_oriented
+class RedBlackSORSolver:
+    def __init__(self, pressure_slab):
+        self.pressure_slab = pressure_slab
+        self.rel = 1.3
+
+    def _update(self, p_next: ti.template(), p_curr: ti.template(),
+                u_curr: ti.template(), v_curr: ti.template()) -> ti.f32:
+        odd_res = self._update_odd(p_next, p_curr, u_curr, v_curr)
+        even_res = self._update_even(p_next, p_curr, u_curr, v_curr)
+        return ti.sqrt((odd_res[1] + even_res[1]) / (odd_res[0] + even_res[0]))
+
+    @ti.func
+    def _pn_ij(self, pc, uc, vc, i, j):
+        return (1.0 - self.rel) * pc[i, j] + self.rel * predict_p(pc, uc, vc, self.dt, i, j)
+
+    @ti.kernel
+    def _update_odd(self, p_next: ti.template(), p_curr: ti.template(),
+                    u_curr: ti.template(), v_curr: ti.template()) -> v2:
+        norm_new = 0.0
+        norm_diff = 0.0
+        for i, j in p_next:
+            if (i + j) % 2 == 1:
+                nx = p_next.shape[0]
+                ny = p_next.shape[1]
+                if not (i == 0 or i == nx-1 or j == 0 or j == ny-1):
+                    p_next[i, j] = self._pn_ij(p_curr, u_curr, v_curr, i, j)
+                    pf_diff = ti.abs(p_next[i, j] - p_curr[i, j])
+                    norm_new += (p_next[i, j] * p_next[i, j])
+                    norm_diff += (pf_diff * pf_diff)
+        return v2([norm_new, norm_diff])
+
+    @ti.kernel
+    def _update_even(self, p_next: ti.template(), p_curr: ti.template(),
+                     u_curr: ti.template(), v_curr: ti.template()) -> v2:
+        norm_new = 0.0
+        norm_diff = 0.0
+        for i, j in p_next:
+            if (i + j) % 2 == 0:
+                nx = p_next.shape[0]
+                ny = p_next.shape[1]
+                if not (i == 0 or i == nx-1 or j == 0 or j == ny-1):
+                    p_next[i, j] = self._pn_ij(p_next, u_curr, v_curr, i, j)
+                    pf_diff = ti.abs(p_next[i, j] - p_curr[i, j])
+                    norm_new += (p_next[i, j] * p_next[i, j])
+                    norm_diff += (pf_diff * pf_diff)
+        return v2([norm_new, norm_diff])
+
+    def update(self, u_slab, v_slab, dt):
+        n_iters = 2
+        self.dt = dt
+        residual = 10.0
+        for _ in range(n_iters):
+            pressure_boundary_condition(self.pressure_slab.curr)
+            residual = self._update(self.pressure_slab.next, self.pressure_slab.curr,
+                                    u_slab.curr, v_slab.curr)
+            self.pressure_slab.flip()
+        pressure_boundary_condition(self.pressure_slab.curr)
+        print("Error = " + str(residual))
+
+@ti.data_oriented
+class JacobiSolver:
+    def __init__(self, pressure_slab):
+        self.pressure_slab = pressure_slab
+
+    @ti.kernel
+    def _update(self, p_next: ti.template(), p_curr: ti.template(),
+                u_curr: ti.template(), v_curr: ti.template()) -> ti.f32:
+        norm_new = 0.0
+        norm_diff = 0.0
+        nx = p_next.shape[0]
+        ny = p_next.shape[1]
+        for i, j in p_next:
+            if not (i == 0 or i == nx-1 or j == 0 or j == ny-1):
+                p_next[i, j] = predict_p(p_curr, u_curr, v_curr, self.dt, i, j)
+                pf_diff = ti.abs(p_next[i, j] - p_curr[i, j])
+                norm_new += (p_next[i, j] * p_next[i, j])
+                norm_diff += (pf_diff * pf_diff)
+        residual = ti.sqrt(norm_diff / norm_new)
+        if norm_new == 0:
+            residual = 0.0
+        return residual
+
+    def update(self, u_slab, v_slab, dt):
+        n_iters = 10
+        self.dt = dt
+        residual = 10.0
+        for _ in range(n_iters):
+            pressure_boundary_condition(self.pressure_slab.curr)
+            residual = self._update(self.pressure_slab.next, self.pressure_slab.curr,
+                                    u_slab.curr, v_slab.curr)
+            self.pressure_slab.flip()
+        pressure_boundary_condition(self.pressure_slab.curr)
+        print("Error = " + str(residual))

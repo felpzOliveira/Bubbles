@@ -695,11 +695,13 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     }
 
     Bounds3f dBounds = grid->GetBounds();
+    vec3ui res = grid->GetIndexCount();
     vec3f p0 = dBounds.pMin;
     vec3f p1 = dBounds.pMax;
     printf("Built domain with extension:\n"
+            "    [%u x %u x %u]\n"
             "    [%g %g %g]  x  [%g %g %g]\n",
-           p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
+           res.x, res.y, res.z, p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
 
 
     solver.Setup(WaterDensity, opts->spacing, opts->spacingScale, grid, sphpSet);

@@ -223,14 +223,6 @@ __bidevice__ Float p_with_boundary(Float *pf, int i, int j, int nx, int ny){
     return pf[I2(i, j, nx)];
 }
 
-#if 0
-__device__ inline void atomicAdd(float *address, float value){
-  float old = value;
-  while ((old = atomicExch(address, atomicExch(address, 0.0f)+old))!=0.0f);
-
-};
-#endif
-
 __host__ void apply_vel_bc(vec2f *vf, int nx, int ny){
     size_t items = nx * ny;
     AutoParallelFor("vel bound", items, AutoLambda(size_t index){
@@ -289,7 +281,7 @@ __host__ void pressure_jacobi(DoubleBuffer1f *pressures, Float *divf,
                                         ny, norm_new, norm_diff);
         pressures->flip();
         counter ++;
-        if(counter > 10) break;
+        if(counter > 2) break;
         printf("Erro = %g\n", residual);
     }
 

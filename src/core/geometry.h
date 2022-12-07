@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 //#define DEBUG
-//#define ASSERT_ENABLE
+#define ASSERT_ENABLE
 //#define PRINT_TIMER
 
 #ifdef DEBUG
@@ -366,6 +366,10 @@ template<typename T> class vec2{
         Assert(!HasNaN());
     }
 
+    template<typename V> __bidevice__ vec2<V> As(){
+        return vec2<V>(V(x), V(y));
+    }
+
     __bidevice__ bool IsZeroVector() const{
         return IsZero(x) && IsZero(y);
     }
@@ -485,6 +489,10 @@ template<typename T> class vec3{
         Assert(!HasNaN());
     }
 
+    template<typename V> __bidevice__ vec3<V> As(){
+        return vec3<V>(V(x), V(y), V(z));
+    }
+
     __bidevice__ bool IsZeroVector() const{
         return IsZero(x) && IsZero(y) && IsZero(z);
     }
@@ -601,7 +609,7 @@ template<typename T> class vec3{
     __bidevice__ Float LengthSquared() const{ return x * x + y * y + z * z; }
     __bidevice__ Float Length() const{ return sqrt(LengthSquared()); }
     __bidevice__ void PrintSelf() const{
-        printf("P = {x : %g, y :  %g, z : %g}\n", x, y, z);
+        printf("P = {x : %g, y : %g, z : %g}\n", x, y, z);
     }
 };
 

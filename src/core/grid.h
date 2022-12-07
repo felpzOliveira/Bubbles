@@ -958,7 +958,6 @@ class FieldGrid{
 
     unsigned int total; // the total amount of elements
     // the actual value stored in each node for VertexCentered and CellCentered
-    // 1D array of (u,v,w) data for FaceCentered
     F *field;
     F *fieldUVW[3]; // easier access
     int perComponent[3]; // easier access to per component count

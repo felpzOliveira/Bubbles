@@ -5,6 +5,13 @@
 #include <util.h>
 #include <memory.h>
 #include <host_mesh.h>
+#include <counting.h>
+
+typedef enum{
+    SDF_ZHU_BRIDSON,
+    SDF_PARTICLE_COUNT,
+    SDF_NONE,
+}SurfaceSDFMethod;
 
 typedef struct{
     Float kernel;
@@ -12,13 +19,33 @@ typedef struct{
     Float marchingCubeSpacing;
     std::string input;
     std::string output;
+    SurfaceSDFMethod method;
     int inflags;
     int legacy;
     TriangleMeshFormat outformat;
 }surface_opts;
 
+SurfaceSDFMethod SDFMethodFromString(std::string method){
+    if(method == "zhu")
+        return SDF_ZHU_BRIDSON;
+    else if(method == "pcount")
+        return SDF_PARTICLE_COUNT;
+    return SDF_NONE;
+}
+
+std::string StringFromSDFMethod(SurfaceSDFMethod method){
+    switch(method){
+        case SDF_ZHU_BRIDSON: return "zhu";
+        case SDF_PARTICLE_COUNT: return "pcount";
+        default:{
+            return "none";
+        }
+    }
+}
+
 void default_surface_opts(surface_opts *opts){
     opts->output = "surface.out";
+    opts->method = SDF_ZHU_BRIDSON;
     opts->legacy = 0;
     opts->inflags = SERIALIZER_POSITION;
     opts->kernel = 0.04;
@@ -32,6 +59,7 @@ void print_surface_configs(surface_opts *opts){
     std::cout << "    * Input : " << opts->input << std::endl;
     std::cout << "    * Output : " << opts->output << std::endl;
     std::cout << "    * Spacing : " << opts->spacing << std::endl;
+    std::cout << "    * SDF Method : " << StringFromSDFMethod(opts->method) << std::endl;
     std::cout << "    * Kernel : " << opts->kernel << std::endl;
     std::cout << "    * Mesh Spacing : " << opts->marchingCubeSpacing << std::endl;
     std::cout << "    * Legacy : " << opts->legacy << std::endl;
@@ -112,11 +140,28 @@ ARGUMENT_PROCESS(surface_legacy_args){
     return 0;
 }
 
+ARGUMENT_PROCESS(surface_method){
+    surface_opts *opts = (surface_opts *)config;
+    std::string method = ParseNext(argc, argv, i, "-method", 1);
+    opts->method = SDFMethodFromString(method);
+    if(opts->method == SDF_NONE){
+        printf("Invalid or unsupported SDF extraction method\n");
+        return -1;
+    }
+    return 0;
+}
+
 std::map<const char *, arg_desc> surface_arg_map = {
     {"-in",
         {
             .processor = surface_in_args,
             .help = "Sets the input file for mesh computation."
+        }
+    },
+    {"-method",
+        {
+            .processor = surface_method,
+            .help = "Sets the method to use for reconstruction (Options: zhu (default), count)."
         }
     },
     {"-out",
@@ -210,8 +255,24 @@ __bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
     }
 }
 
-FieldGrid3f *ParticlesToSDF(ParticleSetBuilder3 *pBuilder, Float spacing,
-                            Float sdfSpacing, Float radius)
+FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, Float sdfSpacing){
+    CountingGrid3D countSdf;
+    Float spacingScale = 2.0;
+    countSdf.Build(pBuilder, sdfSpacing * spacingScale);
+
+    std::cout << "Generating SDF... " << std::flush;
+    countSdf.Build(countSdf.grid);
+
+    FieldGrid3f *sdfGrid = countSdf.Solve();
+    vec3ui res = sdfGrid->GetResolution();
+    std::cout << "OK [ Resolution: " << res.x << " x " << res.y << " x " << res.z
+              << " ]" << std::endl;
+
+    return sdfGrid;
+}
+
+FieldGrid3f *ParticlesToSDF_Zhu(ParticleSetBuilder3 *pBuilder, Float spacing,
+                                Float sdfSpacing, Float radius)
 {
     Float spacingScale = 1.5;
     Float threshold = 0.25;
@@ -219,7 +280,8 @@ FieldGrid3f *ParticlesToSDF(ParticleSetBuilder3 *pBuilder, Float spacing,
     Float queryRadius = radius;
     vec3f sp(sdfSpacing);
 
-    Bounds3f bounds;
+    vec3f p0 = pBuilder->positions[0];
+    Bounds3f bounds(p0, p0);
     for(vec3f &p : pBuilder->positions){
         bounds = Union(bounds, p);
     }
@@ -242,13 +304,14 @@ FieldGrid3f *ParticlesToSDF(ParticleSetBuilder3 *pBuilder, Float spacing,
 
     Grid3 *domainGrid = UtilBuildGridForDomain(bounds, queryRadius, spacingScale);
     vec3f cellSize = domainGrid->GetCellSize();
+
+    //std::cout << "Domain Bounds: " << bounds << std::endl;
     // Cell size must be able to fetch particles up to 'kernelRadius'
     AssureA(MinComponent(cellSize) >= queryRadius,
             "Cell size must be larger than smoothing radius");
 
     SphSolver3 solver;
 
-    std::cout << "Domain: " << bounds << std::endl;
     solver.Initialize(DefaultSphSolverData3());
     solver.Setup(WaterDensity, queryRadius, spacingScale, domainGrid, sphSet);
 
@@ -258,6 +321,7 @@ FieldGrid3f *ParticlesToSDF(ParticleSetBuilder3 *pBuilder, Float spacing,
     std::cout << "OK" << std::endl;
 
     std::cout << "Generating SDF... " << std::flush;
+
     FieldGrid3f *sdfGrid = CreateSDF(sdfBounds, sp, GPU_LAMBDA(vec3f p){
         return ZhuBridsonSDF(p, domainGrid, pSet, kernelRadius, threshold);
     });
@@ -339,10 +403,19 @@ void surface_command(int argc, char **argv){
 
     std::cout << "OK [ Particles: " << builder.positions.size() << " ]" << std::endl;
 
+    FieldGrid3f *grid;
     Float spacing = opts.spacing;
     Float kernel = opts.kernel;
     Float mcSpacing = opts.marchingCubeSpacing;
-    FieldGrid3f *grid = ParticlesToSDF(&builder, spacing, mcSpacing, kernel);
+    if(opts.method == SDF_ZHU_BRIDSON)
+        grid = ParticlesToSDF_Zhu(&builder, spacing, mcSpacing, kernel);
+    else if(opts.method == SDF_PARTICLE_COUNT)
+        grid = ParticlesToSDF_Pcount(&builder, mcSpacing);
+    else{
+        printf("Invalid method selected\n");
+        CudaMemoryManagerClearCurrent();
+        return;
+    }
 
     HostTriangleMesh3 mesh;
 
@@ -356,18 +429,23 @@ void surface_command(int argc, char **argv){
         processed += 1.0;
         if(i > res.x){
             std::cout << "\r" << res.x << " / " << res.y << " / " << res.z;
-            std::cout << " ( 100.00% )" << std::flush;
+            std::cout << " ( 100.00% )     " << std::flush;
         }else{
             char a[4], b[4], c[4], d[7];
             fill_number(i, a); fill_number(j, b); fill_number(k, c);
             double frac = processed * 100.0 / total;
             fill_pct(frac, d);
             std::cout << "\r" << a << " / " << b << " / " << c;
-            std::cout << " ( " << d << "% )" << std::flush;
+            std::cout << " ( " << d << "% )    " << std::flush;
         }
     };
 
-    MarchingCubes(grid, &mesh, 0.0, reporter);
+    if(opts.method == SDF_PARTICLE_COUNT)
+        MarchingCubes(grid, &mesh, 0.25, reporter, kDirectionAll,
+                      kDirectionNone, false);
+    else
+        MarchingCubes(grid, &mesh, 0.0, reporter);
+
     std::cout << std::endl;
 
     mesh.writeToDisk(opts.output.c_str(), opts.outformat);

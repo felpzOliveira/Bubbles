@@ -18,4 +18,4 @@ constexpr int kDirectionAll = kDirectionLeft | kDirectionRight |
 
 void MarchingCubes(FieldGrid3f *grid, HostTriangleMesh3* mesh, Float isoValue,
                    std::function<void(vec3ui u)> fn, int bndClose=kDirectionAll,
-                   int bndConnectivity=kDirectionNone);
+                   int bndConnectivity=kDirectionNone, bool solveBoundaries=true);

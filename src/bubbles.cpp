@@ -95,7 +95,8 @@ int main(int argc, char **argv){
 
     //test_virtual_grid();
     //test_pcisph2_water_block();
-    test_mac(argc, argv);
+    //test_mac(argc, argv);
+    test_pcisph2_marching_squares();
 
     //test_pcisph2_double_dam_break();
     //test_pcisph2_water_block_lnm();

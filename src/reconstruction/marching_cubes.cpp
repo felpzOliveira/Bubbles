@@ -357,7 +357,8 @@ static void singleCube(const std::array<Float, 8> &data,
 }
 
 void MarchingCubes(FieldGrid3f *grid, HostTriangleMesh3 *mesh, Float isoValue,
-                   std::function<void(vec3ui u)> fn, int bndClose, int bndConnectivity)
+                   std::function<void(vec3ui u)> fn, int bndClose, int bndConnectivity,
+                   bool solveBoundaries)
 {
     MarchingCubeVertexMap vertexMap;
     vec3f gridSize = grid->GetSpacing();
@@ -417,6 +418,10 @@ void MarchingCubes(FieldGrid3f *grid, HostTriangleMesh3 *mesh, Float isoValue,
     }          // k
 
     fn(inf);
+
+    // terminate when boundaries are not required
+    if(!solveBoundaries)
+        return;
 
     // Construct boundaries parallel to x-y plane
     if(bndClose & (kDirectionBack | kDirectionFront)){

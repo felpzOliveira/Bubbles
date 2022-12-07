@@ -1,5 +1,5 @@
 import taichi as ti
-import vmath
+import core.vmath
 
 ################################################################################
 # Buffer manipulation
@@ -27,22 +27,7 @@ def qf_sample_value(qf: ti.template(), p: ti.template(), ox: float, oy: float):
     f10 = qf_near_value(qf, iu + 1, iv + 0)
     f01 = qf_near_value(qf, iu + 0, iv + 1)
     f11 = qf_near_value(qf, iu + 1, iv + 1)
-    return vmath.bilerp(f00, f10, f01, f11, fu, fv)
-
-# do advection over the velocity field 'vf' of the quantity 'qf' under timestep
-# '_dt' and store the results under 'new_qf'. Advection is performed using RK3
-# backtrace. This assumes that both the vector field vf (2d) and the quantity qf
-# are measured at the center with ox = oy = 0.5
-@ti.kernel
-def advect_rk3(vf: ti.template(), qf: ti.template(),
-               new_qf: ti.template(), _dt: float):
-    for i, j in qf:
-        p = ti.Vector([i, j]) + ti.Vector([0.5, 0.5])
-        k1 = qf_sample_value(vf, p, 0.5, 0.5)
-        k2 = qf_sample_value(vf, p - 0.50 * _dt * k1, 0.5, 0.5)
-        k3 = qf_sample_value(vf, p - 0.75 * _dt * k2, 0.5, 0.5)
-        p_prev = p - (_dt / 9.0) * (2.0 * k1 + 3.0 * k2 + 4.0 * k3)
-        new_qf[i, j] = qf_sample_value(qf, p_prev, 0.5, 0.5)
+    return core.vmath.bilerp(f00, f10, f01, f11, fu, fv)
 
 # do advection over the velocity field described by explicit components 'u' and 'v'
 # considering the offset of data points in the layout of the MAC grid. Quantity 'qf'
@@ -50,7 +35,7 @@ def advect_rk3(vf: ti.template(), qf: ti.template(),
 # routine (like others) work on grid coordinates and not world coordinates, it is
 # assumed that grids are on top of each other and no translation/scaling is present
 @ti.kernel
-def advect_rk3_mac(vf_u: ti.template(), vf_v: ti.template(),
+def advect_rk3(vf_u: ti.template(), vf_v: ti.template(),
                    qf: ti.template(), new_qf: ti.template(), _dt: float,
                    ox: float, oy: float):
     for i,j in qf:
@@ -107,11 +92,8 @@ class Slab:
     def flip(self):
         self.curr, self.next = self.next, self.curr
 
-    def advect(self, vf, _dt):
-        advect_rk3(vf, self.curr, self.next, _dt)
-
-    def advect_mac(self, vf_u, vf_v, _dt):
-        advect_rk3_mac(vf_u, vf_v, self.curr, self.next, _dt, self.ox, self.oy)
+    def advect(self, vf_u, vf_v, _dt):
+        advect_rk3(vf_u, vf_v, self.curr, self.next, _dt, self.ox, self.oy)
 
     def set_inflow(self, rect, value):
         addInflow(self.curr, rect, value)
@@ -124,28 +106,8 @@ class Slab:
 # Boundary stuff
 ################################################################################
 
-# apply boundary conditions to velocity field
 @ti.kernel
 def velocity_bc(vf: ti.template(), nx: int, ny: int):
-    for i, j in vf:
-        # corners
-        if (i == j == 0) or (i == nx-1 and j == ny-1) or (i == 0 and j == ny-1) or (i == nx-1 and j == 0):
-            vf[i,j] = ti.Vector([0.0, 0.0])
-        # left wall
-        elif i == 0:
-            vf[i, j] = -vf[i+1,j]
-        # bottom wall
-        elif j == 0:
-            vf[i, j] = -vf[i,j+1]
-        # right wall
-        elif i == nx-1:
-            vf[i, j] = -vf[i-1,j]
-        # top wall
-        elif j == ny-1:
-            vf[i, j] = -vf[i,j-1]
-
-@ti.kernel
-def velocity_bc_mac(vf: ti.template(), nx: int, ny: int):
     for i, j in vf:
         # corners
         if (i == j == 0) or (i == nx-1 and j == ny-1) or (i == 0 and j == ny-1) or (i == nx-1 and j == 0):
@@ -163,57 +125,24 @@ def velocity_bc_mac(vf: ti.template(), nx: int, ny: int):
         elif j == ny-1:
             vf[i, j] = -vf[i,j-1]
 
-
-# apply boundary conditions to pressure field
-@ti.kernel
-def pressure_bc(pf: ti.template(), nx: int, ny: int):
-    for i, j in pf:
-        # corners
-        if (i == j == 0) or (i == nx-1 and j == ny-1) or (i == 0 and j == ny-1) or (i == nx-1 and j == 0):
-            pf[i,j] = 0.0
-        # left wall
-        elif i == 0:
-            pf[i, j] = pf[i+1,j]
-        # bottom wall
-        elif j == 0:
-            pf[i, j] = pf[i,j+1]
-        # right wall
-        elif i == nx-1:
-            pf[i, j] = pf[i-1,j]
-        # top wall
-        elif j == ny-1:
-            pf[i, j] = pf[i,j-1]
-
 @ti.data_oriented
 class BoundarySolver:
     def __init__(self):
         pass
 
-    def setup_mac(self, vel_slab_u, vel_slab_v, pressure_slab):
+    def setup(self, vel_slab_u, vel_slab_v):
         self.vel_slab_u = vel_slab_u
         self.vel_slab_v = vel_slab_v
-        self.pressure_slab = pressure_slab
-        self.is_mac = 1
-
-    def setup(self, vel_slab, pressure_slab):
-        self.vel_slab = vel_slab
-        self.pressure_slab = pressure_slab
-        self.is_mac = 0
 
     def update_velocity(self):
-        if self.is_mac == 0:
-            velocity_bc(self.vel_slab.curr, self.vel_slab.curr.shape[0],
-                        self.vel_slab.curr.shape[1])
-        else:
-            velocity_bc_mac(self.vel_slab_u.curr, self.vel_slab_u.curr.shape[0],
-                            self.vel_slab_u.curr.shape[1])
-            velocity_bc_mac(self.vel_slab_v.curr, self.vel_slab_v.curr.shape[0],
-                            self.vel_slab_v.curr.shape[1])
+        velocity_bc(self.vel_slab_u.curr, self.vel_slab_u.curr.shape[0],
+                    self.vel_slab_u.curr.shape[1])
+        velocity_bc(self.vel_slab_v.curr, self.vel_slab_v.curr.shape[0],
+                    self.vel_slab_v.curr.shape[1])
 
-    def update_pressure(self):
-        pressure_bc(self.pressure_slab.curr, self.pressure_slab.curr.shape[0],
-                    self.pressure_slab.curr.shape[1])
-
+################################################################################
+# Pressure stuff
+################################################################################
 
 @ti.kernel
 def pressure_boundary_condition(pf: ti.template()):
@@ -231,13 +160,36 @@ def pressure_boundary_condition(pf: ti.template()):
         elif j == ny-1:
             pf[i, j] = pf[i, j-1]
 
+# Compute the pressure based on the velocity field and the base stencil, i.e.:
+# on the MAC grid:
+#        |            |
+#        |    Pi,j+1  |
+#________|___Vi+1,j___|____________
+#        |            |
+#    Ui,j|    Pi,j    |Ui+1,j
+# Pi-1,j |            |    Pi+1,j
+#________|____________|____________
+#        |   Vi,j     |
+#        |    Pi,j-1  |
+#        |            |
+#
+# pressure at index (i, j) is given by the *pressure* at (i+1,j), (i-1,j),
+# (i,j+1) and (i,j-1), the *velocities U/V* at the faces, i.e.:
+# (i,j), (i+1,j), (i,j+1), so we have:
+#
+#        Pi,j ~ (Pi+1,j + Pi-1,j + Pi,j+1 + Pi,j-1)
+# The usual jacobi iteration is then:
+#    x(k+1) = (1/aii) (bi - Σ aij x(k))
+# the matrix A has aii = 4 in 2D and bi = Divi,j
+# Because we sample velocities at faces we have:
+#    Divi,j = ((Ui+1,j - Ui,j) + (Vi,j+1, - Vi,j)) * 0.5
+# so we can simply write:
+#    Pi,j(k) = ((Pi+1,j + Pi-1,j + Pi,j+1 + Pi,j-1) - (Divi,j)) * 0.25
 @ti.func
-def predict_p(pf, v_u, v_v, dt, i, j):
+def p_at_cell(pf, v_u, v_v, dt, i, j):
     dx = 0.5 * (qf_near_value(v_u, i+1, j) - qf_near_value(v_u, i, j))
     dy = 0.5 * (qf_near_value(v_v, i, j+1) - qf_near_value(v_v, i, j))
-    pred = ((pf[i+1, j] + pf[i-1, j] + pf[i, j+1] + pf[i, j-1])
-            - (dx + dy) / dt) * 0.25
-    return pred
+    return ((pf[i+1, j] + pf[i-1, j] + pf[i, j+1] + pf[i, j-1]) - (dx + dy) / dt) * 0.25
 
 
 v2 = ti.types.vector(2, ti.f32)
@@ -254,8 +206,8 @@ class RedBlackSORSolver:
         return ti.sqrt((odd_res[1] + even_res[1]) / (odd_res[0] + even_res[0]))
 
     @ti.func
-    def _pn_ij(self, pc, uc, vc, i, j):
-        return (1.0 - self.rel) * pc[i, j] + self.rel * predict_p(pc, uc, vc, self.dt, i, j)
+    def compute_pij(self, pc, uc, vc, i, j):
+        return (1.0 - self.rel) * pc[i, j] + self.rel * p_at_cell(pc, uc, vc, self.dt, i, j)
 
     @ti.kernel
     def _update_odd(self, p_next: ti.template(), p_curr: ti.template(),
@@ -267,7 +219,7 @@ class RedBlackSORSolver:
                 nx = p_next.shape[0]
                 ny = p_next.shape[1]
                 if not (i == 0 or i == nx-1 or j == 0 or j == ny-1):
-                    p_next[i, j] = self._pn_ij(p_curr, u_curr, v_curr, i, j)
+                    p_next[i, j] = self.compute_pij(p_curr, u_curr, v_curr, i, j)
                     pf_diff = ti.abs(p_next[i, j] - p_curr[i, j])
                     norm_new += (p_next[i, j] * p_next[i, j])
                     norm_diff += (pf_diff * pf_diff)
@@ -283,7 +235,7 @@ class RedBlackSORSolver:
                 nx = p_next.shape[0]
                 ny = p_next.shape[1]
                 if not (i == 0 or i == nx-1 or j == 0 or j == ny-1):
-                    p_next[i, j] = self._pn_ij(p_next, u_curr, v_curr, i, j)
+                    p_next[i, j] = self.compute_pij(p_next, u_curr, v_curr, i, j)
                     pf_diff = ti.abs(p_next[i, j] - p_curr[i, j])
                     norm_new += (p_next[i, j] * p_next[i, j])
                     norm_diff += (pf_diff * pf_diff)
@@ -315,7 +267,7 @@ class JacobiSolver:
         ny = p_next.shape[1]
         for i, j in p_next:
             if not (i == 0 or i == nx-1 or j == 0 or j == ny-1):
-                p_next[i, j] = predict_p(p_curr, u_curr, v_curr, self.dt, i, j)
+                p_next[i, j] = p_at_cell(p_curr, u_curr, v_curr, self.dt, i, j)
                 pf_diff = ti.abs(p_next[i, j] - p_curr[i, j])
                 norm_new += (p_next[i, j] * p_next[i, j])
                 norm_diff += (pf_diff * pf_diff)

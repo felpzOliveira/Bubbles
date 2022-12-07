@@ -7,6 +7,7 @@
 #include <marching_squares.h>
 #include <interval.h>
 #include <boundary.h>
+#include <counting.h>
 
 void test_pcisph2_marching_squares(){
     printf("===== PCISPH Solver 2D -- Marching Squares\n");
@@ -56,18 +57,17 @@ void test_pcisph2_marching_squares(){
 
     SphSolverData2 *data = solver.GetSphSolverData();
 
-    for(int i = 0; i < 125; i++){
+    for(int i = 0; i < 1; i++){
         solver.Advance(targetInterval);
         set_colors_pressure(col, data);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
     }
 
     FieldGrid2f *field = cudaAllocateVx(FieldGrid2f, 1);
-
     UtilSphDataToFieldGrid2f(data, field);
 
     std::vector<vec3f> triangles;
-    MarchingSquares(field, 0, &triangles);
+    MarchingSquares(field, 0.0, &triangles);
     int totalLines = triangles.size() * 3;
     float *poss = new float[totalLines * 3];
 

@@ -330,7 +330,42 @@ class CountingGrid{
     __host__ void SetDimension(vec2f){ dimensions = 2; }
     __host__ void SetDimension(vec3f){ dimensions = 3; }
 
-    __host__ void Build(ParticleSetBuilder<T> *pBuilder, Float spacing){
+    __host__ void BuildByResolution(ParticleSetBuilder<T> *pBuilder, U u){
+        Q bounds;
+        T half;
+        T ds;
+        U resolution = u;
+        for(T &p : pBuilder->positions){
+            bounds = Union(bounds, p);
+        }
+
+        SetDimension(T(0));
+        Float spacing = 0;
+        for(int i = 0; i < dimensions; i++){
+            ds[i] = bounds.ExtentOn(i) / (Float)u[i];
+            spacing = Max(spacing, ds[i]);
+        }
+
+        bounds.Expand(5.0 * spacing);
+        for(int i = 0; i < dimensions; i++){
+            ds[i] = bounds.ExtentOn(i) / (Float)u[i];
+            half[i] = resolution[i] * 0.5 * ds[i];
+        }
+
+        T pMin = bounds.Center() - half;
+        T pMax = bounds.Center() + half;
+        grid = MakeLightweightGrid(resolution, pMin, pMax);
+
+        // NOTE: Is there a way to avoid having to do a double loop over this?
+        for(T &p : pBuilder->positions){
+            unsigned int h = grid->GetLinearHashedPosition(p);
+            grid->stored[h] += 1;
+        }
+
+        Build(grid);
+    }
+
+    __host__ void BuildBySpacing(ParticleSetBuilder<T> *pBuilder, Float spacing){
         Q bounds;
         U resolution;
         T half;

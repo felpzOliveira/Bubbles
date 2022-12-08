@@ -23,6 +23,8 @@ typedef struct{
     SurfaceSDFMethod method;
     int inflags;
     int legacy;
+    bool byResolution;
+    vec3ui resolution;
     TriangleMeshFormat outformat;
 }surface_opts;
 
@@ -65,6 +67,8 @@ void default_surface_opts(surface_opts *opts){
     opts->spacing = 0.02;
     opts->marchingCubeSpacing = 0.01;
     opts->outformat = FORMAT_OBJ;
+    opts->byResolution = false;
+    opts->resolution = vec3ui(0);
 }
 
 void print_surface_configs(surface_opts *opts){
@@ -77,6 +81,10 @@ void print_surface_configs(surface_opts *opts){
     std::cout << "    * Mesh Spacing : " << opts->marchingCubeSpacing << std::endl;
     std::cout << "    * Legacy : " << opts->legacy << std::endl;
     std::cout << "    * Output Format: " << FormatString(opts->outformat) << std::endl;
+    if(opts->byResolution){
+        std::cout << "    * Forcing Resolution : " << opts->resolution.x
+              << " x " << opts->resolution.y << " x " << opts->resolution.z << std::endl;
+    }
 }
 
 ARGUMENT_PROCESS(surface_in_args){
@@ -127,7 +135,7 @@ ARGUMENT_PROCESS(surface_kernel_args){
 
 ARGUMENT_PROCESS(surface_cubes_spacing_args){
     surface_opts *opts = (surface_opts *)config;
-    opts->marchingCubeSpacing = ParseNextFloat(argc, argv, i, "-resolution");
+    opts->marchingCubeSpacing = ParseNextFloat(argc, argv, i, "-cspacing");
     if(opts->marchingCubeSpacing < 0.001){
         printf("Invalid mesh resolution\n");
         return -1;
@@ -161,6 +169,26 @@ ARGUMENT_PROCESS(surface_method){
         printf("Invalid or unsupported SDF extraction method\n");
         return -1;
     }
+    return 0;
+}
+
+ARGUMENT_PROCESS(surface_resolution_args){
+    surface_opts *opts = (surface_opts *)config;
+    unsigned int nx = ParseNextFloat(argc, argv, i, "-res");
+    unsigned int ny = ParseNextFloat(argc, argv, i, "-res");
+    unsigned int nz = ParseNextFloat(argc, argv, i, "-res");
+    if(nx * ny * nz == 0){
+        printf("Invalid resolution given\n");
+        return -1;
+    }
+
+    if(nx < 2 || ny < 2 || nz < 2){
+        printf("Resolution must be > 1\n");
+        return -1;
+    }
+
+    opts->byResolution = true;
+    opts->resolution = vec3ui(nx, ny, nz);
     return 0;
 }
 
@@ -217,6 +245,12 @@ std::map<const char *, arg_desc> surface_arg_map = {
         {
             .processor = surface_cubes_spacing_args,
             .help = "Sets the spacing to use for surface reconstruction (invert resolution)."
+        }
+    },
+    {"-res",
+        {
+            .processor = surface_resolution_args,
+            .help = "Sets the resolution to be used (overwrites spacing properties)."
         }
     }
 };
@@ -307,13 +341,17 @@ __bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
     }
 }
 
-FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, Float sdfSpacing){
+FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *opts){
     CountingGrid3D countSdf;
-    Float spacingScale = 2.0;
-    countSdf.Build(pBuilder, sdfSpacing * spacingScale);
+    if(!opts->byResolution){
+        Float spacingScale = 2.0;
+        Float sdfSpacing = opts->marchingCubeSpacing;
+        countSdf.BuildBySpacing(pBuilder, sdfSpacing * spacingScale);
+    }else{
+        countSdf.BuildByResolution(pBuilder, opts->resolution);
+    }
 
     std::cout << "Generating SDF... " << std::flush;
-    countSdf.Build(countSdf.grid);
 
     FieldGrid3f *sdfGrid = countSdf.Solve();
     vec3ui res = sdfGrid->GetResolution();
@@ -323,13 +361,15 @@ FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, Float sdfSpaci
     return sdfGrid;
 }
 
-FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, Float spacing,
-                                    Float sdfSpacing, Float radius,
-                                    SurfaceSDFMethod method)
-{
+FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *opts){
     /* Build a domain for the particles */
     Float spacingScale = 2.0;
     Float threshold = 0.25;
+    Float spacing = opts->spacing;
+    Float radius = opts->kernel;
+    Float sdfSpacing = opts->marchingCubeSpacing;
+    SurfaceSDFMethod method = opts->method;
+
     Grid3 *grid = UtilBuildGridForBuilder(pBuilder, spacing, spacingScale);
     Bounds3f dBounds = grid->GetBounds();
     vec3ui res = grid->GetIndexCount();
@@ -358,13 +398,24 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, Float spacing
 
     /* build sdf grid */
     FieldGrid3f *sdfGrid = cudaAllocateVx(FieldGrid3f, 1);
-    sdfSpacing *= spacingScale;
-    p0 = dBounds.pMin + 0.5 * vec3f(sdfSpacing);
+    if(!opts->byResolution){
+        sdfSpacing *= spacingScale;
+        p0 = dBounds.pMin + 0.5 * vec3f(sdfSpacing);
 
-    int nx = std::ceil(dBounds.ExtentOn(0) / sdfSpacing);
-    int ny = std::ceil(dBounds.ExtentOn(1) / sdfSpacing);
-    int nz = std::ceil(dBounds.ExtentOn(2) / sdfSpacing);
-    sdfGrid->Build(vec3ui(nx, ny, nz), sdfSpacing, p0, VertexCentered);
+        int nx = std::ceil(dBounds.ExtentOn(0) / sdfSpacing);
+        int ny = std::ceil(dBounds.ExtentOn(1) / sdfSpacing);
+        int nz = std::ceil(dBounds.ExtentOn(2) / sdfSpacing);
+        sdfGrid->Build(vec3ui(nx, ny, nz), sdfSpacing, p0, VertexCentered);
+    }else{
+        // since we are doing vertex centered we need a minus 1 here
+        opts->resolution = opts->resolution - vec3ui(1);
+        Float dx = dBounds.ExtentOn(0) / (Float)opts->resolution.x;
+        Float dy = dBounds.ExtentOn(1) / (Float)opts->resolution.y;
+        Float dz = dBounds.ExtentOn(2) / (Float)opts->resolution.z;
+        Float ds = Max(dx, Max(dy, dz));
+        vec3f p0 = dBounds.pMin + 0.5 * vec3f(ds);
+        sdfGrid->Build(opts->resolution, ds, p0, VertexCentered);
+    }
 
     Float inf = grid->GetBounds().Diagonal().Length();
     std::cout << "Generating SDF... " << std::flush;
@@ -472,13 +523,10 @@ void surface_command(int argc, char **argv){
     std::cout << "OK [ Particles: " << builder.positions.size() << " ]" << std::endl;
 
     FieldGrid3f *grid;
-    Float spacing = opts.spacing;
-    Float kernel = opts.kernel;
-    Float mcSpacing = opts.marchingCubeSpacing;
     if(opts.method == SDF_PARTICLE_COUNT)
-        grid = ParticlesToSDF_Pcount(&builder, mcSpacing);
+        grid = ParticlesToSDF_Pcount(&builder, &opts);
     else if(opts.method < SDF_PARTICLE_COUNT)
-        grid = ParticlesToSDF_Surface(&builder, spacing, mcSpacing, kernel, opts.method);
+        grid = ParticlesToSDF_Surface(&builder, &opts);
     else{
         printf("Invalid method selected\n");
         CudaMemoryManagerClearCurrent();

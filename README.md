@@ -34,7 +34,7 @@ Several other helper routines for narrow-band extraction and different methods a
 ```bash
 ./bbtool surface -in <bubbles_output> -out mesh.ply -outform ply -method zhu
 ```
-The following image shows three of such methods: SPH-based reconstruction, Zhu-Bridson reconstruction and the Counting Particles method [QP22].
+The following image shows the three supported methods sampled at 256³: SPH-based, Zhu-Bridson and the Counting Particles method [QP22].
 ![Alt text](images/surface.png)
 
 Bbtool can also be used for generating files that can be used with [PBRT-v4](https://github.com/mmp/pbrt-v4) for rendering the particle systems that are exported, and also my own renderer [Lit](https://github.com/felpzOliveira/Lit) with:

@@ -8,7 +8,8 @@
 #include <counting.h>
 
 typedef enum{
-    SDF_ZHU_BRIDSON,
+    SDF_ZHU_BRIDSON = 0,
+    SDF_SPH,
     SDF_PARTICLE_COUNT,
     SDF_NONE,
 }SurfaceSDFMethod;
@@ -28,6 +29,8 @@ typedef struct{
 SurfaceSDFMethod SDFMethodFromString(std::string method){
     if(method == "zhu")
         return SDF_ZHU_BRIDSON;
+    else if(method == "sph")
+        return SDF_SPH;
     else if(method == "pcount")
         return SDF_PARTICLE_COUNT;
     return SDF_NONE;
@@ -37,9 +40,19 @@ std::string StringFromSDFMethod(SurfaceSDFMethod method){
     switch(method){
         case SDF_ZHU_BRIDSON: return "zhu";
         case SDF_PARTICLE_COUNT: return "pcount";
+        case SDF_SPH: return "sph";
         default:{
             return "none";
         }
+    }
+}
+
+void GetSDFMethodNames(std::vector<std::string> &names){
+    int sdf_0 = SDF_ZHU_BRIDSON;
+    int sdf_n = SDF_NONE;
+    for(int s = sdf_0; s < sdf_n; s++){
+        SurfaceSDFMethod method = (SurfaceSDFMethod)s;
+        names.push_back(StringFromSDFMethod(method));
     }
 }
 
@@ -161,7 +174,7 @@ std::map<const char *, arg_desc> surface_arg_map = {
     {"-method",
         {
             .processor = surface_method,
-            .help = "Sets the method to use for reconstruction (Options: zhu (default), count)."
+            .help = "Sets the method to be executed."
         }
     },
     {"-out",
@@ -212,12 +225,47 @@ template <typename T>
 __bidevice__ T cubic(T x){ return x * x * x; }
 __bidevice__ double k_cub(double s) { return Max(0.0, cubic(1.0 - s * s)); }
 
+__bidevice__ Float SphSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet, Float kernelRadius){
+    const Float cutOff = 0.5; // ??
+    int *neighbors = nullptr;
+    Float inf = grid->GetBounds().Diagonal().Length();
+    if(!grid->Contains(p)){
+        return inf;
+    }
+
+    unsigned int cellId = grid->GetLinearHashedPosition(p);
+
+    int count = grid->GetNeighborsOf(cellId, &neighbors);
+    Float wSum = 0.0;
+    SphStdKernel3 kernel(kernelRadius);
+    Float mass = pSet->GetMass();
+
+    for(int i = 0; i < count; i++){
+        Cell3 *cell = grid->GetCell(neighbors[i]);
+        ParticleChain *pChain = cell->GetChain();
+        int size = cell->GetChainLength();
+        for(int j = 0; j < size; j++){
+            vec3f xi = pSet->GetParticlePosition(pChain->pId);
+            Float di = pSet->GetParticleDensity(pChain->pId);
+            Float dist = Distance(p, xi);
+
+            wSum += (mass / di) * kernel.W(dist);
+
+            pChain = pChain->next;
+        }
+    }
+
+    return cutOff - wSum;
+}
+
 __bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
                                  Float kernelRadius, Float threshold)
 {
     int *neighbors = nullptr;
     Float inf = grid->GetBounds().Diagonal().Length();
-    if(!grid->Contains(p)) return inf;
+    if(!grid->Contains(p)){
+        return inf;
+    }
 
     unsigned int cellId = grid->GetLinearHashedPosition(p);
 
@@ -246,7 +294,11 @@ __bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
         // In case wSum is too low, i.e.: < 1e-8, I'm not sure
         // we should continue computation or simply assume it is 0
         // but anyways we need to invert computation to avoid the
-        // error dividing by ε < 1e-8
+        // error dividing by ε < 1e-8. As long as it is not a NaN
+        // we can continue as everything will simply go to Infinity
+        // and the point 'p' is outside the fluid, however having
+        // Infinity here can become an issue as the marching cubes algorithm
+        // find an error, it would be best to swap this value for inf (?)
         Float inv = 1.0 / wSum;
         xAvg = xAvg * inv;
         return (p - xAvg).Length() - kernelRadius * threshold;
@@ -271,65 +323,67 @@ FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, Float sdfSpaci
     return sdfGrid;
 }
 
-FieldGrid3f *ParticlesToSDF_Zhu(ParticleSetBuilder3 *pBuilder, Float spacing,
-                                Float sdfSpacing, Float radius)
+FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, Float spacing,
+                                    Float sdfSpacing, Float radius,
+                                    SurfaceSDFMethod method)
 {
-    Float spacingScale = 1.5;
+    /* Build a domain for the particles */
+    Float spacingScale = 2.0;
     Float threshold = 0.25;
-    Float kernelRadius = radius;
-    Float queryRadius = radius;
-    vec3f sp(sdfSpacing);
-
-    vec3f p0 = pBuilder->positions[0];
-    Bounds3f bounds(p0, p0);
-    for(vec3f &p : pBuilder->positions){
-        bounds = Union(bounds, p);
-    }
-
-    int minAxis = bounds.MinimumExtent();
-    Float minAxisSize = bounds.ExtentOn(minAxis);
-    for(int i = 0; i < 3; i++){
-        if(i != minAxis){
-            Float axisSize = bounds.ExtentOn(i);
-            sp[i] = sdfSpacing * (axisSize / minAxisSize);
-        }
-    }
-
-    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(pBuilder);
-    ParticleSet3 *pSet = sphSet->GetParticleSet();
-    Bounds3f sdfBounds = bounds;
-
-    sdfBounds.Expand(5.0 * spacing);
-    bounds.Expand(10.0 * spacing);
-
-    Grid3 *domainGrid = UtilBuildGridForDomain(bounds, queryRadius, spacingScale);
-    vec3f cellSize = domainGrid->GetCellSize();
-
-    //std::cout << "Domain Bounds: " << bounds << std::endl;
-    // Cell size must be able to fetch particles up to 'kernelRadius'
-    AssureA(MinComponent(cellSize) >= queryRadius,
-            "Cell size must be larger than smoothing radius");
+    Grid3 *grid = UtilBuildGridForBuilder(pBuilder, spacing, spacingScale);
+    Bounds3f dBounds = grid->GetBounds();
+    vec3ui res = grid->GetIndexCount();
+    vec3f p0 = dBounds.pMin;
+    vec3f p1 = dBounds.pMax;
+    printf("Built domain with extension:\n"
+            "    [%u x %u x %u]\n"
+            "    [%g %g %g]  x  [%g %g %g]\n",
+           res.x, res.y, res.z, p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
 
     SphSolver3 solver;
+    SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(pBuilder);
+    ParticleSet3 *pSet = sphpSet->GetParticleSet();
 
     solver.Initialize(DefaultSphSolverData3());
-    solver.Setup(WaterDensity, queryRadius, spacingScale, domainGrid, sphSet);
+    solver.Setup(WaterDensity, spacing, spacingScale, grid, sphpSet);
 
-    std::cout << "Distributing particles... " << std::flush;
+    /* distribute particles */
     UpdateGridDistributionGPU(solver.solverData);
-    domainGrid->UpdateQueryState();
-    std::cout << "OK" << std::endl;
 
+    /* check if density is needed */
+    if(method == SDF_SPH)
+        ComputeDensityGPU(solver.solverData);
+
+    grid->UpdateQueryState();
+
+    /* build sdf grid */
+    FieldGrid3f *sdfGrid = cudaAllocateVx(FieldGrid3f, 1);
+    sdfSpacing *= spacingScale;
+    p0 = dBounds.pMin + 0.5 * vec3f(sdfSpacing);
+
+    int nx = std::ceil(dBounds.ExtentOn(0) / sdfSpacing);
+    int ny = std::ceil(dBounds.ExtentOn(1) / sdfSpacing);
+    int nz = std::ceil(dBounds.ExtentOn(2) / sdfSpacing);
+    sdfGrid->Build(vec3ui(nx, ny, nz), sdfSpacing, p0, VertexCentered);
+
+    Float inf = grid->GetBounds().Diagonal().Length();
     std::cout << "Generating SDF... " << std::flush;
-
-    FieldGrid3f *sdfGrid = CreateSDF(sdfBounds, sp, GPU_LAMBDA(vec3f p){
-        return ZhuBridsonSDF(p, domainGrid, pSet, kernelRadius, threshold);
+    /* compute sdf */
+    AutoParallelFor("SDF", sdfGrid->total, AutoLambda(int i){
+        vec3ui u = DimensionalIndex(i, sdfGrid->resolution, 3);
+        vec3f p = sdfGrid->GetDataPosition(u);
+        Float estimate = inf;
+        if(method == SDF_ZHU_BRIDSON)
+            estimate = ZhuBridsonSDF(p, grid, pSet, radius, threshold);
+        else if(method == SDF_SPH)
+            estimate = SphSDF(p, grid, pSet, radius);
+        sdfGrid->SetValueAt(estimate, u);
     });
 
-    vec3ui res = sdfGrid->GetResolution();
+    sdfGrid->MarkFilled();
+    res = sdfGrid->GetResolution();
     std::cout << "OK [ Resolution: " << res.x << " x " << res.y << " x " << res.z
               << " ]" << std::endl;
-
     return sdfGrid;
 }
 
@@ -371,6 +425,20 @@ void surface_command(int argc, char **argv){
     ParticleSetBuilder3 builder;
 
     default_surface_opts(&opts);
+    arg_desc desc = surface_arg_map["-method"];
+    std::vector<std::string> methods;
+    GetSDFMethodNames(methods);
+
+    std::string value("Sets the method to be executed ( Choices: ");
+    for(int i = 0; i < methods.size(); i++){
+        value += methods[i];
+        if(i < methods.size()-1)
+            value += ",";
+        value += " ";
+    }
+    value += ").";
+    desc.help = value;
+    surface_arg_map["-method"] = desc;
 
     argument_process(surface_arg_map, argc, argv, "surface", &opts);
     print_surface_configs(&opts);
@@ -407,10 +475,10 @@ void surface_command(int argc, char **argv){
     Float spacing = opts.spacing;
     Float kernel = opts.kernel;
     Float mcSpacing = opts.marchingCubeSpacing;
-    if(opts.method == SDF_ZHU_BRIDSON)
-        grid = ParticlesToSDF_Zhu(&builder, spacing, mcSpacing, kernel);
-    else if(opts.method == SDF_PARTICLE_COUNT)
+    if(opts.method == SDF_PARTICLE_COUNT)
         grid = ParticlesToSDF_Pcount(&builder, mcSpacing);
+    else if(opts.method < SDF_PARTICLE_COUNT)
+        grid = ParticlesToSDF_Surface(&builder, spacing, mcSpacing, kernel, opts.method);
     else{
         printf("Invalid method selected\n");
         CudaMemoryManagerClearCurrent();
@@ -440,11 +508,16 @@ void surface_command(int argc, char **argv){
         }
     };
 
+    /*
+    * NOTE: I'm not sure why, but the triangles generated from the particle
+    * sdf with Pcount method  need to be rotated otherwise normals get flipped.
+    * I don't quite get why, so maybe add a TODO here to better investigate this method
+    * but for now it seems that it literally is as simple as rotating the triangles.
+    */
     if(opts.method == SDF_PARTICLE_COUNT)
-        MarchingCubes(grid, &mesh, 0.25, reporter, kDirectionAll,
-                      kDirectionNone, false);
+        MarchingCubes(grid, &mesh, 0.25, reporter, true);
     else
-        MarchingCubes(grid, &mesh, 0.0, reporter);
+        MarchingCubes(grid, &mesh, 0.0, reporter, false);
 
     std::cout << std::endl;
 

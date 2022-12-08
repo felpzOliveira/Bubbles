@@ -53,24 +53,24 @@ class Shape2{
     Float angularVelocity;
     bool reverseOrientation;
     ShapeType type;
-    
+
     // Sphere2
     Float radius;
-    
+
     // Rectangle
     Bounds2f rect;
-    
+
     // SDF
     FieldGrid2f *grid;
-    
+
     __bidevice__ Shape2(){}
     __bidevice__ Shape2(const Transform2 &toWorld, bool reverseOrientation=false);
     __bidevice__ void InitSphere2(const Transform2 &toWorld, Float radius,
                                   bool reverseOrientation=false);
-    
+
     __bidevice__ void InitRectangle2(const Transform2 &toWorld, vec2f extension,
                                      bool reverseOrientation=false);
-    
+
     __bidevice__ Bounds2f GetBounds();
 
     __host__ void Update(const Transform2 &toWorld);
@@ -79,14 +79,14 @@ class Shape2{
 
     __bidevice__ bool Intersect(const Ray2 &ray, SurfaceInteraction2 *isect,
                                 Float *tShapeHit) const;
-    
+
     __bidevice__ Float ClosestDistance(const vec2f &point) const;
-    
-    __bidevice__ void ClosestPoint(const vec2f &point, 
+
+    __bidevice__ void ClosestPoint(const vec2f &point,
                                    ClosestPointQuery2 *query) const;
-    
+
     __bidevice__ bool IsInside(const vec2f &point) const;
-    
+
     __bidevice__ Float SignedDistance(const vec2f &point) const;
 
     __bidevice__ vec2f VelocityAt(const vec2f &point) const;
@@ -99,9 +99,9 @@ class Shape2{
     __bidevice__ bool Sphere2Intersect(const Ray2 &ray, SurfaceInteraction2 *isect,
                                        Float *tShapeHit) const;
     __bidevice__ Float Sphere2ClosestDistance(const vec2f &point) const;
-    __bidevice__ void Sphere2ClosestPoint(const vec2f &point, 
+    __bidevice__ void Sphere2ClosestPoint(const vec2f &point,
                                           ClosestPointQuery2 *query) const;
-    
+
     //////////////////////////
     // RECTANGLE 2D functions
     //////////////////////////
@@ -109,10 +109,10 @@ class Shape2{
     __bidevice__ bool Rectangle2Intersect(const Ray2 &ray, SurfaceInteraction2 *isec,
                                           Float *tShapeHit) const;
     __bidevice__ Float Rectangle2ClosestDistance(const vec2f &point) const;
-    __bidevice__ void Rectangle2ClosestPoint(const vec2f &point, 
+    __bidevice__ void Rectangle2ClosestPoint(const vec2f &point,
                                              ClosestPointQuery2 *query) const;
-    
-    __bidevice__ void ClosestPointBySDF(const vec2f &point, 
+
+    __bidevice__ void ClosestPointBySDF(const vec2f &point,
                                         ClosestPointQuery2 *query) const;
 };
 
@@ -130,7 +130,7 @@ class Plane3{
     public:
     vec3f point;
     Normal3f normal;
-    
+
     __bidevice__ Plane3();
     __bidevice__ Plane3(const vec3f &p, const Normal3f &n);
     __bidevice__ void Set(const vec3f &p, const Normal3f &n);
@@ -144,13 +144,13 @@ class Shape{
     vec3f angularVelocity;
     bool reverseOrientation;
     ShapeType type;
-    
+
     // Sphere
     Float radius;
-    
+
     // Box
     Float sizex, sizey, sizez;
-    
+
     // Mesh
     ParsedMesh *mesh;
     FieldGrid3f *grid;
@@ -158,14 +158,14 @@ class Shape{
 
     // Sdf shape
     Bounds3f bounds;
-    
+
     __bidevice__ Shape(){}
     __bidevice__ Shape(const Transform &toWorld, bool reverseOrientation=false);
     __bidevice__ void InitSphere(const Transform &toWorld, Float radius,
                                  bool reverseOrientation=false);
     __host__ void InitBox(const Transform &toWorld, Float sizex, Float sizey, Float sizez,
                           bool reverseOrientation=false);
-    __host__ void InitMesh(ParsedMesh *mesh, bool reverseOrientation=false, 
+    __host__ void InitMesh(ParsedMesh *mesh, bool reverseOrientation=false,
                            int maxDepth=22);
 
     __bidevice__ bool CanSolveSdf(void) const;
@@ -173,14 +173,14 @@ class Shape{
     __bidevice__ bool Intersect(const Ray &ray, SurfaceInteraction *isect,
                                 Float *tShapeHit) const;
     __bidevice__ Float ClosestDistance(const vec3f &point) const;
-    
-    __bidevice__ void ClosestPoint(const vec3f &point, 
+
+    __bidevice__ void ClosestPoint(const vec3f &point,
                                    ClosestPointQuery *query) const;
 
     __bidevice__ void SetVelocities(const vec3f &vel, const vec3f &angular);
 
     __bidevice__ bool IsInside(const vec3f &point) const;
-    
+
     __bidevice__ Float SignedDistance(const vec3f &point) const;
 
     __host__ void Update(const Transform &toWorld);
@@ -218,7 +218,7 @@ class Shape{
         int resolutionZ = (int)std::ceil(resolution * depth / width);
 
         grid = cudaAllocateVx(FieldGrid3f, 1);
-        grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx), 
+        grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx),
                     bounds.pMin, VertexCentered);
 
         printf("Generating SDF for shape: [%d x %d x %d] ... ",
@@ -238,7 +238,7 @@ class Shape{
     __bidevice__ bool SphereIntersect(const Ray &ray, SurfaceInteraction *isect,
                                       Float *tShapeHit) const;
     __bidevice__ Float SphereClosestDistance(const vec3f &point) const;
-    __bidevice__ void SphereClosestPoint(const vec3f &point, 
+    __bidevice__ void SphereClosestPoint(const vec3f &point,
                                          ClosestPointQuery *query) const;
     __host__ std::string SphereSerialize() const;
 
@@ -249,7 +249,7 @@ class Shape{
     __bidevice__ bool BoxIntersect(const Ray &ray, SurfaceInteraction *isect,
                                    Float *tShapeHit) const;
     __bidevice__ Float BoxClosestDistance(const vec3f &point) const;
-    __bidevice__ void BoxClosestPoint(const vec3f &point, 
+    __bidevice__ void BoxClosestPoint(const vec3f &point,
                                       ClosestPointQuery *query) const;
     __host__ std::string BoxSerialize() const;
     ///////////////////////
@@ -259,13 +259,13 @@ class Shape{
     __bidevice__ bool MeshIntersect(const Ray &ray, SurfaceInteraction *isect,
                                     Float *tShapeHit) const;
     __bidevice__ Float MeshClosestDistance(const vec3f &point) const;
-    __bidevice__ void MeshClosestPoint(const vec3f &point, 
+    __bidevice__ void MeshClosestPoint(const vec3f &point,
                                        ClosestPointQuery *query) const;
-    
-    __bidevice__ void ClosestPointBySDF(const vec3f &point, 
+
+    __bidevice__ void ClosestPointBySDF(const vec3f &point,
                                         ClosestPointQuery *query) const;
     __host__ std::string MeshSerialize() const;
-    
+
 };
 
 /*
@@ -273,7 +273,7 @@ class Shape{
 */
 __host__ Shape *MakeSphere(const Transform &toWorld, Float radius,
                            bool reverseOrientation = false);
-__host__ Shape *MakeBox(const Transform &toWorld, const vec3f &size, 
+__host__ Shape *MakeBox(const Transform &toWorld, const vec3f &size,
                         bool reverseOrientation = false);
 __host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld,
                          bool reverseOrientation = false);
@@ -308,9 +308,11 @@ __host__ void CreateShapeSDFCPU(Shape *shape);
 __bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
                                     const Bounds3f &bounds);
 
-__bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p, 
+__bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p,
                                          Float radius, Float offset=0.0f);
 
+// TODO: Is this busted? see surface.cpp build for zhu-bridson and this one,
+//       this routine only samples p.y > 0 ??? marching cubes issues?
 template<typename F>
 __host__ FieldGrid3f *CreateSDF(Bounds3f bounds, vec3f spacing, F sdf){
     FieldGrid3f *grid = cudaAllocateVx(FieldGrid3f, 1);

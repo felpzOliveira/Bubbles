@@ -138,7 +138,7 @@ __host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform);
 
 
 /*
-* Generates a acceleration Grid for a domain given its bounds, the target spacing
+* Generates an acceleration Grid for a domain given its bounds, the target spacing
 * of the simulation and the spacing scale to be used. This grid is uniform.
 */
 __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
@@ -208,7 +208,10 @@ __host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col
                                    vec3f length, int nPoints, Transform transform);
 
 /*
-* Writes the output of GDel3D to a ply file.
+* Writes the output of GDel3D to a ply file. The flag 'tetras' can be used to make
+* this routine write a 4-indexed file where each description is a tetrahedron and NOT
+* a quad. Setting 'tetras' to false will force decomposition of the tetrahedrons and write
+* triangles instead.
 */
 __host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
                                  const char *path, bool tetras=true);
@@ -216,9 +219,12 @@ __host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int p
 /*
 * Writes a ply file from a specific set of triangles from a given GDel3D output.
 */
-__host__ void UtilGDel3DWritePly(std::vector<i3> *tris, Point3HVec *pointVec,
+__host__ void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
                                  GDelOutput *output, const char *path);
 
+/*
+* Utility routine for looping through real tetrahedrons in GDel3D.
+*/
 template<typename Fn>
 __host__ void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
     const TetHVec tetVec      = output->tetVec;
@@ -243,11 +249,16 @@ __host__ void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
 
 
 /*
-* Find all triangles that are unique.
+* Find all triangles that are unique. Be warned that the indexes given in the output
+* 'tris' are of the type 'i3', i.e.: they will be sorted from lowest to highest. This
+* does not preserve triangle orientation.
 */
 __host__ void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
                                    GDelOutput *output, int pLen);
 
+/*
+* Utilities for bug hunting and preventing errors.
+*/
 template<typename T, typename U, typename Q> inline __host__
 int UtilIsDistributionConsistent(ParticleSet<T> *pSet, Grid<T, U, Q> *grid){
     // for now just check all hashes match

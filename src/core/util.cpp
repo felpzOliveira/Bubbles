@@ -175,9 +175,11 @@ __host__ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f 
             posBuffer[3 * it + 0] = p.x;
             posBuffer[3 * it + 1] = p.y;
             posBuffer[3 * it + 2] = p.z;
-            colBuffer[3 * it + 0] = col.x;
-            colBuffer[3 * it + 1] = col.y;
-            colBuffer[3 * it + 2] = col.z;
+            if(colBuffer){
+                colBuffer[3 * it + 0] = col.x;
+                colBuffer[3 * it + 1] = col.y;
+                colBuffer[3 * it + 2] = col.z;
+            }
             if(it >= nPoints) return it-1;
             it++;
         }
@@ -478,7 +480,7 @@ inline void GDel3D_WriteVertex(PredWrapper *predWrapper, std::ofstream &ofs){
     }
 }
 
-__host__ void UtilGDel3DWritePly(std::vector<i3> *tris, Point3HVec *pointVec,
+__host__ void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
                                  GDelOutput *output, const char *path)
 {
     PredWrapper predWrapper;
@@ -497,8 +499,8 @@ __host__ void UtilGDel3DWritePly(std::vector<i3> *tris, Point3HVec *pointVec,
     GDel3D_WriteVertex(&predWrapper, ofs);
 
     for(int i = 0; i < tris->size(); i++){
-        i3 val = tris->at(i);
-        ofs << "3 " << val.t[0] << " " << val.t[1] << " " << val.t[2] << " \n";
+        vec3i val = tris->at(i);
+        ofs << "3 " << val[0] << " " << val[1] << " " << val[2] << " \n";
     }
     ofs.close();
 }

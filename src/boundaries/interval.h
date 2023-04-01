@@ -27,7 +27,8 @@
 #define INTERVAL_LABEL_UNCOVERED 1
 #define INTERVAL_LABEL_PARTIALLY_COVERED 2
 
-#define INTERVAL_DEBUG
+#define INTERVAL_MAX_SUBDIVISIONS 4
+
 
 typedef enum{
     PolygonSubdivision,
@@ -527,7 +528,8 @@ bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
 
 inline __host__
 void IntervalBoundary(ParticleSet2 *pSet, Grid2 *domain, Float h,
-                      SubdivisionMethod method = PolygonSubdivision, int max_depth = 4)
+                      SubdivisionMethod method = PolygonSubdivision,
+                      int max_depth = INTERVAL_MAX_SUBDIVISIONS)
 {
     using T = vec2f;
     using U = vec2ui;
@@ -551,7 +553,8 @@ void IntervalBoundary(ParticleSet2 *pSet, Grid2 *domain, Float h,
 
 inline __host__
 void IntervalBoundary(ParticleSet3 *pSet, Grid3 *domain, Float h,
-                      SubdivisionMethod method = PolygonSubdivision, int max_depth = 4)
+                      SubdivisionMethod method = PolygonSubdivision,
+                      int max_depth = INTERVAL_MAX_SUBDIVISIONS)
 {
     using T = vec3f;
     using U = vec3ui;

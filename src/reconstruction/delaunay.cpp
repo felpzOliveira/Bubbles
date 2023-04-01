@@ -3,174 +3,439 @@
 #include <kernel.h>
 #include <util.h>
 #include <vector>
+#include <interval.h>
+#include <fstream>
 
-#define TRI_MAP_ADD(a, b, c, u_map)do{\
-    i3 i_val(a, b, c);\
-    if(u_map.find(i_val) == u_map.end()){\
-        u_map[i_val] = 1;\
-    }\
-}while(0)
-
-#define TRI_SET_ADD_CHECK(a, b, c, u_map, u_set, op_map, op, pset, ids)do{\
-    i3 i_val(a, b, c);\
-    if(u_set.find(i_val) == u_set.end()){\
-        if(u_map.find(i_val) == u_map.end()){\
-            u_map[i_val] = 1;\
-            op_map[i_val] = op;\
-        }else{\
-            uint32_t other_op = op_map[i_val];\
-            if(!SameSide(a, b, c, op, other_op, pset, ids)) u_map[i_val] += 1;\
-        }\
-    }\
-}while(0)
-
-__host__ bool SameSide(uint32_t tA, uint32_t tB, uint32_t tC, uint32_t tOp,
-                       uint32_t tOp2, ParticleSet3 *pSet, std::vector<uint32_t> *ids)
-{
-    vec3f pA = pSet->GetParticlePosition(ids->at(tA));
-    vec3f pB = pSet->GetParticlePosition(ids->at(tB));
-    vec3f pC = pSet->GetParticlePosition(ids->at(tC));
-    vec3f pOp = pSet->GetParticlePosition(ids->at(tOp));
-    vec3f pOp2 = pSet->GetParticlePosition(ids->at(tOp2));
-
-    vec3f M = (pA + pB + pC) * 0.33333;
-    vec3f MOP = pOp - M;
-    vec3f MOP2 = pOp2 - M;
-
-    return Dot(MOP, MOP2) > -0.05;
+template<typename DelaunayMap> __host__ bool
+DelaunayCanPushTriangle(int a, int b, int c, DelaunayMap &triMap){
+    if(!(a < 0 || b < 0 || c < 0)){
+        i3 i_val(a, b, c);
+        return triMap.find(i_val) == triMap.end();
+    }
+    return false;
 }
 
-__host__ int CheckPart(ParticleSet3 *pSet, Grid3 *grid, int pId){
+__host__ void
+DelaunayIndexedMapHandleTriangle(int a, int b, int c, int d,
+                                 DelaunayTriangleIndexedMap &indexedMap)
+{
+    i3 key(a, b, c);
+    DelaunayIndexInfo indexInfo = { vec3ui(a, b, c), d, 0 };
+    if(indexedMap.find(key) != indexedMap.end()){
+        indexInfo = indexedMap[key];
+    }
+
+    indexInfo.counter += 1;
+    indexedMap[key] = indexInfo;
+}
+
+#define PUSH_TRIANGLE(a, b, c, triMap)do{\
+    triMap[i3(a, b, c)] = vec3ui(a, b, c);\
+}while(0)
+
+#define MARK_TRIANGLE(a, b, c, vertexMap, triMap)do{\
+    vertexMap[a] += 1;\
+    vertexMap[b] += 1;\
+    vertexMap[c] += 1;\
+    triMap[i3(a, b, c)] = 1;\
+}while(0)
+
+#define PUSH_INDEX_INTO_LIST(a, b, c, indexList)do{\
+    indexList.push_back(vec3i(a, b, c));\
+}while(0)
+
+__host__ int CheckPart(ParticleSet3 *pSet, Grid3 *grid, int pId, Float &pR){
     vec3f pi = pSet->GetParticlePosition(pId);
     Bucket *bucket = pSet->GetParticleBucket(pId);
-    int minCandidate = pSet->GetParticleCount() + 2;
+    int acceptpart = bucket->Count() < 2 ? 0 : 1;
+    pR = Infinity;
     for(int i = 0; i < bucket->Count(); i++){
         int j = bucket->Get(i);
         if(j != pId){
             vec3f pj = pSet->GetParticlePosition(j);
             Float d = Distance(pi, pj);
-            if(d < 1e-5){
+            if(d < 1e-4){
                 if(pId > j){
-                    minCandidate = Min(j+1, minCandidate);
+                    acceptpart = 0;
+                    break;
                 }
+            }else{
+                pR = Min(pR, d);
             }
         }
     }
+    return acceptpart;
+}
 
-    if(!(minCandidate > pSet->GetParticleCount())){
-        minCandidate = -minCandidate;
+__host__ vec3f
+GeometricalNormal(vec3f a, vec3f b, vec3f c, bool normalized=true){
+    vec3f n;
+    vec3f n1 = a - b;
+    vec3f n2 = b - c;
+    n.x = n1.y * n2.z - n1.z * n2.y;
+    n.y = n1.z * n2.x - n1.x * n2.z;
+    n.z = n1.x * n2.y - n1.y * n2.x;
+    return normalized ? SafeNormalize(n) : n;
+}
+
+__host__ bool
+TriangleMatchesDirection(vec3f a, vec3f b, vec3f c, vec3f ng){
+    vec3f n = GeometricalNormal(a, b, c, false);
+    return !(Dot(n, ng) < 0);
+}
+
+__host__ vec3i
+DelaunayOrientation(vec3f a, vec3f b, vec3f c, vec3f ng, int A, int B, int C){
+    if(TriangleMatchesDirection(a, b, c, ng))
+        return vec3i(A, B, C);
+    else{
+        if(!TriangleMatchesDirection(a, c, b, ng)){
+            printf("Inverted triangle does not match normal ( %g %g %g ) {%d %d %d}\n",
+                    ng.x, ng.y, ng.z, A, B, C);
+            vec3f n0 = GeometricalNormal(a, b, c);
+            vec3f n1 = GeometricalNormal(a, c, b);
+            Float d0 = Dot(n0, ng);
+            Float d1 = Dot(n1, ng);
+            printf("Forward  ( %g %g %g ) --> %g\n", n0.x, n0.y, n0.z, d0);
+            printf("Backward ( %g %g %g ) --> %g\n", n1.x, n1.y, n1.z, d1);
+        }
+        return vec3i(A, C, B);
     }
-    return minCandidate;
 }
 
 __host__ void
-DelaunayTriangulate(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                    Grid3 *domain)
+DelaunayCacheStore(std::vector<int> &boundary, const char *path){
+    FILE *fp = fopen(path, "wb");
+    int *mem = boundary.data();
+    if(fp){
+        int c_mem = boundary.size();
+        fwrite(&c_mem, sizeof(int), 1, fp);
+        fwrite(mem, sizeof(int) * c_mem, 1, fp);
+        fclose(fp);
+    }
+}
+
+__host__ int
+DelaunayCacheLoad(std::vector<int> &boundary, const char *path){
+    FILE *fp = fopen(path, "rb");
+    int rv = -1;
+    if(fp){
+        int c_mem = 0;
+        fread(&c_mem, sizeof(int), 1, fp);
+        if(c_mem > 0){
+            int *mem = new int[c_mem];
+            fread(mem, sizeof(int) * c_mem, 1, fp);
+            for(int i = 0; i < c_mem; i++){
+                boundary.push_back(mem[i]);
+            }
+            rv = c_mem;
+            delete[] mem;
+        }
+        fclose(fp);
+    }
+    return rv;
+}
+
+#define DELAUNAY_CACHE_BOUNDARY 0
+
+__host__ void
+DelaunayPushParticleCellBoundary(std::vector<int> &boundary, vec3f p, Grid3 *domain){
+    int id = domain->GetLinearHashedPosition(p);
+    Cell3 *cell = domain->GetCell(id);
+    ParticleChain *pChain = cell->GetChain();
+    int size = cell->GetChainLength();
+
+    for(int i = 0; i < size; i++){
+        boundary[pChain->pId] = 1;
+        pChain = pChain->next;
+    }
+}
+
+__host__ void
+DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
+                Grid3 *domain)
 {
-    GpuDel triangulator;
     ParticleSet3 *pSet = sphSet->GetParticleSet();
+    DelaunayTriangleIndexedMap keyMap;
+    DelaunayTriangleMap triMap;
+    std::vector<int> boundary;
+    GpuDel triangulator;
+
+    Float spacing = 0.02;
+    Float mu = 2.0;
+
     int pointNum = 0;
+    boundary.reserve(pSet->GetParticleCount());
     for(int i = 0; i < pSet->GetParticleCount(); i++){
-        if(CheckPart(pSet, domain, i) >= 0){
+        Float pR = 0;
+        boundary.push_back(0);
+        if(CheckPart(pSet, domain, i, pR)){
             vec3f vi = pSet->GetParticlePosition(i);
             triangulation.ids.push_back(i);
+            triangulation.partRMap[i] = mu * spacing;
             triangulation.pointVec.push_back({vi.x, vi.y, vi.z});
-            pointNum++;
+            pointNum += 1;
         }
     }
 
+    printf("Point Count %d / %d\n", pointNum, pSet->GetParticleCount());
     triangulator.compute(triangulation.pointVec, &triangulation.output);
     triangulation.pLen = pointNum;
-}
 
-__host__ void
-DelaunayShrink(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-               std::vector<int> &boundary)
-{
-    DelaunayTriangleMap triMap, triOpMap;
-    DelaunayTriangleSet removedSet;
-    ParticleSet3 *pSet = sphSet->GetParticleSet();
     std::vector<uint32_t> *ids = &triangulation.ids;
+    DelaunayFloatTriangleMap &partRMap = triangulation.partRMap;
+    DelaunayVertexMap &vertexMap = triangulation.vertexMap;
+
+    std::vector<vec3i> indexList;
+    long int totalTris = 0, totalInserted = 0;
+
     GDel3D_ForEachRealTetra(&triangulation.output, triangulation.pLen,
-    [&](Tet tet, TetOpp botOpp, int i) -> void{
+    [&](Tet tet, TetOpp botOpp, int i) -> void
+    {
         int A = tet._v[0], B = tet._v[1],
             C = tet._v[2], D = tet._v[3];
-        TRI_MAP_ADD(A, C, B, triMap);
-        TRI_MAP_ADD(A, B, D, triMap);
-        TRI_MAP_ADD(A, D, C, triMap);
-        TRI_MAP_ADD(B, D, C, triMap);
+
+        int idA = ids->at(A), idB = ids->at(B),
+            idC = ids->at(C), idD = ids->at(D);
+        vec3f pA = pSet->GetParticlePosition(idA);
+        vec3f pB = pSet->GetParticlePosition(idB);
+        vec3f pC = pSet->GetParticlePosition(idC);
+        vec3f pD = pSet->GetParticlePosition(idD);
+
+        Float rA = partRMap[idA];
+        Float rB = partRMap[idB];
+        Float rC = partRMap[idC];
+        Float rD = partRMap[idD];
+
+        Float rAB = rA+rB;
+        Float rAC = rA+rC;
+        Float rAD = rA+rD;
+        Float rBC = rB+rC;
+        Float rBD = rB+rD;
+        Float rCD = rC+rD;
+
+        Float aB = Distance(pA, pB);
+        Float aC = Distance(pA, pC);
+        Float aD = Distance(pA, pD);
+        Float bC = Distance(pB, pC);
+        Float bD = Distance(pB, pD);
+        Float cD = Distance(pC, pD);
+
+        bool is_tetra_valid =  aB < rAB && aC < rAC && aD < rAD &&
+                               bC < rBC && bD < rBD &&
+                               cD < rCD;
+
+        if(!is_tetra_valid){
+            boundary[idA] = 1;
+            boundary[idB] = 1;
+            boundary[idC] = 1;
+            boundary[idD] = 1;
+            return;
+        }
+
+        DelaunayIndexedMapHandleTriangle(A, B, C, D, keyMap);
+        DelaunayIndexedMapHandleTriangle(A, B, D, C, keyMap);
+        DelaunayIndexedMapHandleTriangle(A, D, C, B, keyMap);
+        DelaunayIndexedMapHandleTriangle(B, D, C, A, keyMap);
     });
 
-    Float radius = 2.0 * sphSet->GetKernelRadius();
-    for(auto it = triMap.begin(); it != triMap.end(); it++){
-        i3 indices = it->first;
-        uint32_t A = indices.t[0];
-        uint32_t B = indices.t[1];
-        uint32_t C = indices.t[2];
-        vec3f p0 = pSet->GetParticlePosition(ids->at(A));
-        vec3f p1 = pSet->GetParticlePosition(ids->at(B));
-        vec3f p2 = pSet->GetParticlePosition(ids->at(C));
+    for(auto it : keyMap){
+        totalTris += 1;
+        DelaunayIndexInfo indexInfo = it.second;
+        vec3ui tri = indexInfo.baseTriangle;
 
-        Float d0 = Distance(p0, p1),
-              d1 = Distance(p1, p2),
-              d2 = Distance(p0, p2);
+        if(indexInfo.counter > 1)
+            continue;
 
-        if(!(d0 < radius &&
-            d1 < radius &&
-            d2 < radius))
-        {
-            removedSet.insert(indices);
-        }
+        int A = tri.x;
+        int B = tri.y;
+        int C = tri.z;
+
+        int idA = ids->at(A);
+        int idB = ids->at(B);
+        int idC = ids->at(C);
+        int idD = ids->at(indexInfo.oposite);
+        vec3f pA = pSet->GetParticlePosition(idA);
+        vec3f pB = pSet->GetParticlePosition(idB);
+        vec3f pC = pSet->GetParticlePosition(idC);
+        vec3f pD = pSet->GetParticlePosition(idD);
+
+        vec3f nA = pSet->GetParticleNormal(idA);
+        vec3f nB = pSet->GetParticleNormal(idB);
+        vec3f nC = pSet->GetParticleNormal(idC);
+
+        vec3f n = SafeNormalize((nA + nC + nB));
+        vec3i index = DelaunayOrientation(pA, pB, pC, n, A, B, C);
+        MARK_TRIANGLE(A, B, C, vertexMap, triMap);
+        PUSH_INDEX_INTO_LIST(index[0], index[1], index[2], triangulation.shrinked);
+
+        boundary[idA] = 1;
+        boundary[idB] = 1;
+        boundary[idC] = 1;
+        boundary[idD] = 1;
+
+        //DelaunayPushParticleCellBoundary(boundary, pA, domain);
+        //DelaunayPushParticleCellBoundary(boundary, pB, domain);
+        //DelaunayPushParticleCellBoundary(boundary, pC, domain);
+        //DelaunayPushParticleCellBoundary(boundary, pD, domain);
+
+        totalInserted += 1;
     }
 
-    triMap.clear();
+    printf("Total: %ld, Inserted: %ld\n", totalTris, totalInserted);
+    ////////////////////////////////////
+    FILE *fp = fopen("bound.txt", "w");
+    if(fp){
+        fprintf(fp, "%lu\n", boundary.size());
+        for(int i = 0; i < boundary.size(); i++){
+            vec3f p = pSet->GetParticlePosition(i);
+            fprintf(fp, "%g %g %g %d\n", p.x, p.y, p.z, boundary[i]);
+        }
+        fclose(fp);
+    }
+    ////////////////////////////////////
+    UtilGDel3DWritePly(&triangulation.shrinked, &triangulation.pointVec,
+                       &triangulation.output, "delaunay2.ply");
+}
 
+
+__host__ void
+DelaunaySurface2(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
+                Grid3 *domain)
+{
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+    DelaunayTriangleMap triMap;
+    std::vector<int> boundary;
+    GpuDel triangulator;
+
+    Float spacing = 0.02;
+    Float mu = 2.0;
+
+    int n = 0;
+    if(DELAUNAY_CACHE_BOUNDARY){
+        std::cout << " * Extracting boundary ... " << std::flush;
+        IntervalBoundary(pSet, domain, spacing, PolygonSubdivision);
+        n = UtilGetBoundaryState(pSet, &boundary);
+        DelaunayCacheStore(boundary, "cache");
+    }else{
+        std::cout << " * Loading boundary cache ... " << std::flush;
+        n = DelaunayCacheLoad(boundary, "cache");
+    }
+
+    if(n < 0){
+        printf("Failed to get compute boundary\n");
+        exit(0);
+    }
+    printf("%d / %d\n", n, pSet->GetParticleCount());
+
+    int pointNum = 0;
+    for(int i = 0; i < pSet->GetParticleCount(); i++){
+        Float pR = 0;
+        if(boundary[i] && CheckPart(pSet, domain, i, pR)){
+            vec3f vi = pSet->GetParticlePosition(i);
+            triangulation.ids.push_back(i);
+            triangulation.partRMap[i] = mu * spacing;
+            triangulation.pointVec.push_back({vi.x, vi.y, vi.z});
+            pointNum += 1;
+        }
+    }
+    printf("Point Count %d / %d\n", pointNum, n);
+    triangulator.compute(triangulation.pointVec, &triangulation.output);
+    triangulation.pLen = pointNum;
+
+    std::vector<uint32_t> *ids = &triangulation.ids;
+    DelaunayFloatTriangleMap &partRMap = triangulation.partRMap;
+    DelaunayVertexMap &vertexMap = triangulation.vertexMap;
+
+    std::vector<vec3i> indexList;
     GDel3D_ForEachRealTetra(&triangulation.output, triangulation.pLen,
-    [&](Tet tet, TetOpp botOpp, int i) -> void{
-        uint32_t A = tet._v[0], B = tet._v[1],
-                 C = tet._v[2], D = tet._v[3];
-        bool lA = boundary[ids->at(A)];
-        bool lB = boundary[ids->at(B)];
-        bool lC = boundary[ids->at(C)];
-        bool lD = boundary[ids->at(D)];
-        if(lA || lB || lC)
-            TRI_SET_ADD_CHECK(A, C, B, triMap, removedSet, triOpMap, D, pSet, ids);
-        if(lA || lB || lD)
-            TRI_SET_ADD_CHECK(A, B, D, triMap, removedSet, triOpMap, C, pSet, ids);
-        if(lA || lD || lC)
-            TRI_SET_ADD_CHECK(A, D, C, triMap, removedSet, triOpMap, B, pSet, ids);
-        if(lB || lC || lD)
-            TRI_SET_ADD_CHECK(B, D, C, triMap, removedSet, triOpMap, A, pSet, ids);
+    [&](Tet tet, TetOpp botOpp, int i) -> void
+    {
+        int A = tet._v[0], B = tet._v[1],
+            C = tet._v[2], D = tet._v[3];
+        int idA = ids->at(A), idB = ids->at(B),
+            idC = ids->at(C), idD = ids->at(D);
+        vec3f pA = pSet->GetParticlePosition(idA);
+        vec3f pB = pSet->GetParticlePosition(idB);
+        vec3f pC = pSet->GetParticlePosition(idC);
+        vec3f pD = pSet->GetParticlePosition(idD);
+
+        vec3f nA = pSet->GetParticleNormal(idA);
+        vec3f nB = pSet->GetParticleNormal(idB);
+        vec3f nC = pSet->GetParticleNormal(idC);
+        vec3f nD = pSet->GetParticleNormal(idD);
+
+        Float rA = partRMap[idA];
+        Float rB = partRMap[idB];
+        Float rC = partRMap[idC];
+        Float rD = partRMap[idD];
+
+        Float rAB = rA+rB;
+        Float rAC = rA+rC;
+        Float rAD = rA+rD;
+        Float rBC = rB+rC;
+        Float rBD = rB+rD;
+        Float rCD = rC+rD;
+
+        Float aB = Distance(pA, pB);
+        Float aC = Distance(pA, pC);
+        Float aD = Distance(pA, pD);
+        Float bC = Distance(pB, pC);
+        Float bD = Distance(pB, pD);
+        Float cD = Distance(pC, pD);
+
+#if 0
+        bool is_tetra_valid =  aB < rAB && aC < rAC && aD < rAD &&
+                               bC < rBC && bD < rBD &&
+                               cD < rCD;
+
+        if(!is_tetra_valid)
+            return;
+#endif
+        // ABC
+        if(aC < rAC && aB < rAB && bC < rBC){
+            if(DelaunayCanPushTriangle(A, B, C, triMap)){
+                vec3f n = SafeNormalize((nA + nC + nB));
+                vec3i index = DelaunayOrientation(pA, pB, pC, n, A, B, C);
+                MARK_TRIANGLE(A, B, C, vertexMap, triMap);
+                PUSH_INDEX_INTO_LIST(index[0], index[1], index[2],
+                                    triangulation.shrinked);
+            }
+        }
+        // ABD
+        if(aB < rAB && aD < rAD && bD < rBD){
+            if(DelaunayCanPushTriangle(A, B, D, triMap)){
+                vec3f n = SafeNormalize((nA + nB + nD));
+                vec3i index = DelaunayOrientation(pA, pB, pD, n, A, B, D);
+                MARK_TRIANGLE(A, B, D, vertexMap, triMap);
+                PUSH_INDEX_INTO_LIST(index[0], index[1], index[2],
+                                    triangulation.shrinked);
+            }
+        }
+        // ADC
+        if(aD < rAD && aC < rAC && cD < rCD){
+            if(DelaunayCanPushTriangle(A, D, C, triMap)){
+                vec3f n = SafeNormalize((nA + nC + nD));
+                vec3i index = DelaunayOrientation(pA, pD, pC, n, A, D, C);
+                MARK_TRIANGLE(A, D, C, vertexMap, triMap);
+                PUSH_INDEX_INTO_LIST(index[0], index[1], index[2],
+                                    triangulation.shrinked);
+            }
+        }
+        // BDC
+        if(bD < rBD && bC < rBC && cD < rCD){
+            if(DelaunayCanPushTriangle(B, D, C, triMap)){
+                vec3f n = SafeNormalize((nB + nC + nD));
+                vec3i index = DelaunayOrientation(pB, pD, pC, n, B, D, C);
+                MARK_TRIANGLE(B, D, C, vertexMap, triMap);
+                PUSH_INDEX_INTO_LIST(index[0], index[1], index[2],
+                                    triangulation.shrinked);
+            }
+        }
     });
 
-    for(auto it = triMap.begin(); it != triMap.end(); it++){
-        if(it->second == 1){
-            i3 index = it->first;
-            int A = index.t[0];
-            int B = index.t[1];
-            int C = index.t[2];
-            vec3f p0 = pSet->GetParticlePosition(ids->at(A));
-            vec3f p1 = pSet->GetParticlePosition(ids->at(B));
-            vec3f p2 = pSet->GetParticlePosition(ids->at(C));
-            vec3f n0 = pSet->GetParticleNormal(ids->at(A));
-            vec3f n1 = pSet->GetParticleNormal(ids->at(B));
-            vec3f n2 = pSet->GetParticleNormal(ids->at(C));
-            vec3f n = Normalize((n0 + n1 + n2));
-
-            vec3f e0 = p1 - p0;
-            vec3f e1 = p2 - p0;
-            vec3f ng = Normalize(Cross(e0, e1));
-            Float d = Dot(ng, n);
-            if(d > 0){
-                Swap(A, C);
-            }
-
-            index.t[0] = C;
-            index.t[1] = B;
-            index.t[2] = A;
-            triangulation.shrinked.push_back(index);
-        }
-    }
+    UtilGDel3DWritePly(&triangulation.shrinked, &triangulation.pointVec,
+                       &triangulation.output, "delaunay2.ply");
 }
 
 __host__ void

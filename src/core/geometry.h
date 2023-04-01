@@ -902,6 +902,27 @@ template<typename T> inline __bidevice__ vec4<T> Normalize(const vec4<T> &v){
     return v / v.Length();
 }
 
+template<typename T> inline __bidevice__ vec2<T> SafeNormalize(const vec2<T> &v){
+    Float length = v.Length();
+    if(IsZero(length))
+        return v;
+    return v / length;
+}
+
+template<typename T> inline __bidevice__ vec3<T> SafeNormalize(const vec3<T> &v){
+    Float length = v.Length();
+    if(IsZero(length))
+        return v;
+    return v / length;
+}
+
+template<typename T> inline __bidevice__ vec4<T> SafeNormalize(const vec4<T> &v){
+    Float length = v.Length();
+    if(IsZero(length))
+        return v;
+    return v / length;
+}
+
 inline __bidevice__ Float Sin(const Float &v){
     return std::sin(v);
 }

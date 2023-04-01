@@ -11,8 +11,9 @@ typedef enum{
     SDF_ZHU_BRIDSON = 0,
     SDF_SPH,
     SDF_PARTICLE_COUNT,
+    SDF_DELAUNAY,
     SDF_NONE,
-}SurfaceSDFMethod;
+}SurfaceMethod;
 
 typedef struct{
     Float kernel;
@@ -20,7 +21,7 @@ typedef struct{
     Float marchingCubeSpacing;
     std::string input;
     std::string output;
-    SurfaceSDFMethod method;
+    SurfaceMethod method;
     int inflags;
     int legacy;
     bool byResolution;
@@ -28,32 +29,35 @@ typedef struct{
     TriangleMeshFormat outformat;
 }surface_opts;
 
-SurfaceSDFMethod SDFMethodFromString(std::string method){
+SurfaceMethod SDFMethodFromString(std::string method){
     if(method == "zhu")
         return SDF_ZHU_BRIDSON;
     else if(method == "sph")
         return SDF_SPH;
     else if(method == "pcount")
         return SDF_PARTICLE_COUNT;
+    else if(method == "delaunay")
+        return SDF_DELAUNAY;
     return SDF_NONE;
 }
 
-std::string StringFromSDFMethod(SurfaceSDFMethod method){
+std::string StringFromSDFMethod(SurfaceMethod method){
     switch(method){
         case SDF_ZHU_BRIDSON: return "zhu";
         case SDF_PARTICLE_COUNT: return "pcount";
         case SDF_SPH: return "sph";
+        case SDF_DELAUNAY: return "delaunay";
         default:{
             return "none";
         }
     }
 }
 
-void GetSDFMethodNames(std::vector<std::string> &names){
+void GetMethodNames(std::vector<std::string> &names){
     int sdf_0 = SDF_ZHU_BRIDSON;
     int sdf_n = SDF_NONE;
     for(int s = sdf_0; s < sdf_n; s++){
-        SurfaceSDFMethod method = (SurfaceSDFMethod)s;
+        SurfaceMethod method = (SurfaceMethod)s;
         names.push_back(StringFromSDFMethod(method));
     }
 }
@@ -341,6 +345,12 @@ __bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
     }
 }
 
+void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
+                                 HostTriangleMesh3 *mesh)
+{
+    // TODO
+}
+
 FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *opts){
     CountingGrid3D countSdf;
     if(!opts->byResolution){
@@ -368,7 +378,7 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
     Float spacing = opts->spacing;
     Float radius = opts->kernel;
     Float sdfSpacing = opts->marchingCubeSpacing;
-    SurfaceSDFMethod method = opts->method;
+    SurfaceMethod method = opts->method;
 
     Grid3 *grid = UtilBuildGridForBuilder(pBuilder, spacing, spacingScale);
     Bounds3f dBounds = grid->GetBounds();
@@ -474,11 +484,13 @@ void fill_number(unsigned int val, char str[4]){
 void surface_command(int argc, char **argv){
     surface_opts opts;
     ParticleSetBuilder3 builder;
+    HostTriangleMesh3 mesh;
+    bool requires_mc = true;
 
     default_surface_opts(&opts);
     arg_desc desc = surface_arg_map["-method"];
     std::vector<std::string> methods;
-    GetSDFMethodNames(methods);
+    GetMethodNames(methods);
 
     std::string value("Sets the method to be executed ( Choices: ");
     for(int i = 0; i < methods.size(); i++){
@@ -527,47 +539,49 @@ void surface_command(int argc, char **argv){
         grid = ParticlesToSDF_Pcount(&builder, &opts);
     else if(opts.method < SDF_PARTICLE_COUNT)
         grid = ParticlesToSDF_Surface(&builder, &opts);
+    else if(opts.method == SDF_DELAUNAY)
+        ParticlesToDelaunay_Surface(&builder, &opts, &mesh);
     else{
         printf("Invalid method selected\n");
         CudaMemoryManagerClearCurrent();
         return;
     }
 
-    HostTriangleMesh3 mesh;
+    if(requires_mc){
+        printf("Running Marching Cubes\n");
 
-    printf("Running Marching Cubes\n");
+        vec3ui res = grid->GetResolution();
+        double processed = 0;
+        double total = res.x * res.y * res.z;
+        auto reporter = [&](vec3ui u) -> void{
+            unsigned int i = u.x, j = u.y, k = u.z;
+            processed += 1.0;
+            if(i > res.x){
+                std::cout << "\r" << res.x << " / " << res.y << " / " << res.z;
+                std::cout << " ( 100.00% )     " << std::flush;
+            }else{
+                char a[4], b[4], c[4], d[7];
+                fill_number(i, a); fill_number(j, b); fill_number(k, c);
+                double frac = processed * 100.0 / total;
+                fill_pct(frac, d);
+                std::cout << "\r" << a << " / " << b << " / " << c;
+                std::cout << " ( " << d << "% )    " << std::flush;
+            }
+        };
 
-    vec3ui res = grid->GetResolution();
-    double processed = 0;
-    double total = res.x * res.y * res.z;
-    auto reporter = [&](vec3ui u) -> void{
-        unsigned int i = u.x, j = u.y, k = u.z;
-        processed += 1.0;
-        if(i > res.x){
-            std::cout << "\r" << res.x << " / " << res.y << " / " << res.z;
-            std::cout << " ( 100.00% )     " << std::flush;
-        }else{
-            char a[4], b[4], c[4], d[7];
-            fill_number(i, a); fill_number(j, b); fill_number(k, c);
-            double frac = processed * 100.0 / total;
-            fill_pct(frac, d);
-            std::cout << "\r" << a << " / " << b << " / " << c;
-            std::cout << " ( " << d << "% )    " << std::flush;
-        }
-    };
-
-    /*
-    * NOTE: I'm not sure why, but the triangles generated from the particle
-    * sdf with Pcount method  need to be rotated otherwise normals get flipped.
-    * I don't quite get why, so maybe add a TODO here to better investigate this method
-    * but for now it seems that it literally is as simple as rotating the triangles.
-    */
-    if(opts.method == SDF_PARTICLE_COUNT)
+        /*
+        * NOTE: I'm not sure why, but the triangles generated from the particle
+        * sdf with Pcount method  need to be rotated otherwise normals get flipped.
+        * I don't quite get why, so maybe add a TODO here to better investigate this method
+        * but for now it seems that it literally is as simple as rotating the triangles.
+        */
+        if(opts.method == SDF_PARTICLE_COUNT)
         MarchingCubes(grid, &mesh, 0.25, reporter, true);
-    else
+        else
         MarchingCubes(grid, &mesh, 0.0, reporter, false);
 
-    std::cout << std::endl;
+        std::cout << std::endl;
+    }
 
     mesh.writeToDisk(opts.output.c_str(), opts.outformat);
 

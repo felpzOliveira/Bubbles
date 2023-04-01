@@ -202,54 +202,54 @@ std::map<const char *, arg_desc> argument_map = {
             .help = "When writting output use specific format."
         }
     },
-    {"-origin", 
-        { .processor = preview_origin_arg, 
-            .help = "Sets the origin point for previewing. (requires: -preview)" 
+    {"-origin",
+        { .processor = preview_origin_arg,
+            .help = "Sets the origin point for previewing. (requires: -preview)"
         }
     },
-    {"-target", 
-        { .processor = preview_target_arg, 
-            .help = "Sets the target point for previewing. (requires: -preview)" 
+    {"-target",
+        { .processor = preview_target_arg,
+            .help = "Sets the target point for previewing. (requires: -preview)"
         }
     },
-    {"-rotateX", 
-        { .processor = rotate_x_arg, 
-            .help = "Rotates the input in the X-direction. (degrees)" 
+    {"-rotateX",
+        { .processor = rotate_x_arg,
+            .help = "Rotates the input in the X-direction. (degrees)"
         }
     },
-    {"-rotateY", 
-        { .processor = rotate_y_arg, 
-            .help = "Rotates the input in the Y-direction. (degrees)" 
+    {"-rotateY",
+        { .processor = rotate_y_arg,
+            .help = "Rotates the input in the Y-direction. (degrees)"
         }
     },
-    {"-rotateZ", 
-        { .processor = rotate_z_arg, 
-            .help = "Rotates the input in the Z-direction. (degrees)" 
+    {"-rotateZ",
+        { .processor = rotate_z_arg,
+            .help = "Rotates the input in the Z-direction. (degrees)"
         }
     },
-    {"-scale", 
-        { .processor = scale_arg, 
-            .help = "Scales the input uninformly." 
+    {"-scale",
+        { .processor = scale_arg,
+            .help = "Scales the input uninformly."
         }
     },
-    {"-in", 
-        { .processor = input_arg, 
-            .help = "Where to read input file." 
+    {"-in",
+        { .processor = input_arg,
+            .help = "Where to read input file."
         }
     },
-    {"-out", 
-        { .processor = output_arg, 
-            .help = "Where to write output." 
+    {"-out",
+        { .processor = output_arg,
+            .help = "Where to write output."
         }
     },
-    {"-spacing", 
-        { .processor = spacing_arg, 
-            .help = "Spacing to use when generating particle cloud." 
+    {"-spacing",
+        { .processor = spacing_arg,
+            .help = "Spacing to use when generating particle cloud."
         }
     },
-    {"-preview", 
-        { .processor = preview_arg, 
-            .help = "Use Graphy to preview the point cloud." 
+    {"-preview",
+        { .processor = preview_arg,
+            .help = "Use Graphy to preview the point cloud."
         }
     },
     {"-legacy",
@@ -268,22 +268,22 @@ void PreviewParticles(SphParticleSet3 *sphSet, config_opts *opts){
     int it = 0;
     float *pos = new float[3 * pCount];
     float *col = new float[3 * pCount];
-    
+
     memset(col, 0x00, 3 * pCount * sizeof(float));
     for(int i = 0; i < pCount; i++){
         vec3f pi = pSet->GetParticlePosition(i);
         pos[it++] = pi.x; pos[it++] = pi.y;
         pos[it++] = pi.z; col[3 * i + 0] = 1;
     }
-    
+
     graphy_set_3d(at.x, at.y, at.z, to.x, to.y, to.z, 45.0, 0.1f, 100.0f);
     graphy_render_points3f(pos, col, pCount, 0.012);
-    
+
     std::cout << "Press anything ... " << std::flush;
     getchar();
-    
+
     graphy_close_display();
-    
+
     delete[] pos;
     delete[] col;
 }
@@ -317,29 +317,29 @@ void GenerateData(config_opts *opts){
             SerializerLoadSystem3(&builder, &shapes, opts->input.c_str(),
                                   flagsIn, &boundary);
         }
-        
+
         SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(&builder);
         ParticleSet3 *pSet = sphpSet->GetParticleSet();
         Bounds3f bounds = UtilComputeParticleSetBounds(pSet);
         Grid3 *grid = UtilBuildGridForDomain(bounds, h, 2.0);
-        
+
         SphSolver3 solver;
         solver.Initialize(DefaultSphSolverData3());
         solver.Setup(WaterDensity, h, 2.0, grid, sphpSet);
-        
+
         UpdateGridDistributionGPU(solver.solverData);
         if((toGen & SERIALIZER_NORMAL) || (toGen & SERIALIZER_DENSITY)){
             printf("Generating Density ... "); fflush(stdout);
             ComputeDensityGPU(solver.solverData);
             printf("OK\n");
         }
-        
+
         if(toGen & SERIALIZER_NORMAL){
             printf("Generating Normals ... "); fflush(stdout);
             ComputeNormalGPU(solver.solverData);
             printf("OK\n");
         }
-        
+
         if((toGen & SERIALIZER_LAYERS) || (toGen & SERIALIZER_BOUNDARY)){
             grid->UpdateQueryState();
             LNMInvalidateCells(grid);
@@ -362,7 +362,7 @@ void GenerateData(config_opts *opts){
             boundary.clear();
             UtilGetBoundaryState(pSet, &boundary);
         }
-        
+
         printf("Outputing to %s ... ", opts->output.c_str()); fflush(stdout);
         UtilEraseFile(opts->output.c_str());
 
@@ -379,9 +379,9 @@ void GenerateData(config_opts *opts){
         printf("OK\n");
         ok = 1;
     }
-    
+
     CudaMemoryManagerClearCurrent();
-    
+
     if(ok){
         printf("===== OK\n");
     }else{
@@ -394,22 +394,22 @@ void MeshToParticles(const char *name, const Transform &transform,
 {
     SphParticleSet3 *sphSet = nullptr;
     printf("===== Emitting particles from mesh\n");
-    
+
     ParsedMesh *mesh = LoadObj(name);
-    
+
     Shape *shape = MakeMesh(mesh, transform);
     ParticleSetBuilder3 builder;
     VolumeParticleEmitter3 emitter(shape, shape->GetBounds(), spacing);
-    
+
     emitter.Emit(&builder);
-    
+
     sphSet = SphParticleSet3FromBuilder(&builder);
     sphSet->SetTargetSpacing(spacing);
 
     *data = DefaultSphSolverData3();
     (*data)->sphpSet = sphSet;
     (*data)->domain = nullptr;
-    
+
     printf("===== OK\n");
 }
 
@@ -418,9 +418,9 @@ void convert_command(int argc, char **argv){
     default_opts(&g_opts);
     argument_process(argument_map, argc, argv, "convert", &g_opts);
     print_configs(&g_opts);
-    
+
     if(g_opts.gen_data == 0){
-        MeshToParticles(g_opts.input.c_str(), g_opts.transform, 
+        MeshToParticles(g_opts.input.c_str(), g_opts.transform,
                         g_opts.spacing, &data);
         if(g_opts.preview){
             PreviewParticles(data->sphpSet, &g_opts);

@@ -264,7 +264,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
         vec3f nB = pSet->GetParticleNormal(idB);
         vec3f nC = pSet->GetParticleNormal(idC);
 
-        vec3f n = SafeNormalize((nA + nC + nB));
+        vec3f n = SafeNormalize(nA + nC + nB);
         vec3i index = DelaunayOrientation(pA, pB, pC, n, A, B, C);
         MARK_TRIANGLE(A, B, C, vertexMap, triMap);
         PUSH_INDEX_INTO_LIST(index[0], index[1], index[2], triangulation.shrinked);

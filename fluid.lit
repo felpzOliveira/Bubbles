@@ -220,8 +220,8 @@ View [0 1.25 5 # eye
       0  1   0 # up
       36.0]    # fov
 
-Medium{ type[homogeneous] name[volume] asym_g[-0.7] scale[1.0]
-        sigma_s[0.99] sigma_a[0.01] albedo[8 8 2] density-scale[2.0] }
+Medium{ type[homogeneous] name[volume] asym_g[0.7] scale[1.0]
+        sigma_s[0.99] sigma_a[0.01] albedo[20 20 10] density-scale[1.0] }
 
 set-image-resolution [1200 900]
 
@@ -241,7 +241,7 @@ Material{ emission [spds/Ledtech.csv] name [light] type [diffuselight] scale[10]
 Material{ reflectance[0.3 0.3 0.6] name[ground2] type[diffuse] }
 
 # blue material for the dragons
-Material { name[mat_0] type [diffuse] reflectance [ 0.249 0.347 0.643 ] scale [0.5] }
+Material { name[mat_0] type [diffuse] reflectance [ 0.249 0.347 0.643 ] scale [0.25] }
 
 # first dragon
 Shape { type[mesh] name[mesh_0] geometry[models/sssdragon.obj] mat[mat_0]

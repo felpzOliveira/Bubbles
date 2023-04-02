@@ -12,61 +12,8 @@
 #include <sampling.h>
 #include <doring.h>
 #include <algorithm>
-#include <explicit_grid.h>
-#include <mac_solver.h>
 #include <util.h>
 #include <memory.h>
-
-void test_routine();
-
-void test_mac(int argc, char **argv){
-    CudaMemoryManagerStart(__FUNCTION__);
-
-    test_routine();
-    CudaMemoryManagerClearCurrent();
-    exit(0);
-
-    GWindow gui("MAC Test");
-    auto canvas = gui.get_canvas();
-    int res = 128;
-    if(argc > 1){
-        res = atoi(argv[1]);
-    }
-
-    printf("Resolution %d x %d\n", res, res);
-    int _w = res, _h = res;
-    Float density = 0.1;
-    Float timestep = 0.005;
-
-    MacSolver2 solver;
-    //PressureSolverEigen2 pSolver;
-    //PressureSolverJacobi2 pSolver;
-    PressureSolverPCG2 pSolver;
-    solver.Initialize(vec2ui(_w, _h), density, &pSolver);
-
-    canvas.Color(0x112F41);
-
-    MacSolverData2 *data = solver.GetSolverData();
-    auto fetcher = [&](int x, int y) -> GVec4f{
-        int f = x + y * solver.domain.x;
-        float s = data->d->src()[f];
-        float shade = ((1.0 - s));
-        return GVec4f(shade, shade, shade, 1.f);
-    };
-
-    size_t frame = 0;
-    while(1){
-        if(frame++ < 400)
-            solver.AddInflow(vec2f(0.45, 0.2), vec2f(0.15, 0.03), 1.6, -2.0, 4.0);
-        solver.Advance(timestep);
-        canvas.for_each_pixel([&](int x, int y) -> GVec4f{
-            return canvas.upsample_from(x, y, _w, _h, fetcher, GUpsampleMode::Bilinear);
-        });
-        gui.update();
-    }
-
-    CudaMemoryManagerClearCurrent();
-}
 
 // God, float point precision is hard. Don't want to use double but accumulating
 // float multiplications in matrix breaks precision on zero computations

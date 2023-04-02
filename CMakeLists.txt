@@ -71,18 +71,11 @@ file(GLOB BUBBLES_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/src/bubbles.cpp)
 file(GLOB BBTOOL_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/src/bbtool.cpp
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/apps/*.cpp)
 
-set(EIGEN_PSOLVER ${CMAKE_CURRENT_SOURCE_DIR}/src/pressure/eigen_pressuresolver.cpp)
-
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src/third/gDel3D)
 
 set(CMAKE_CXX_COMPILER nvcc)
 
-# have to split eigen compilation as it generates way to many warnings
-# not sure why it is not working
-#add_library(eigenobj OBJECT ${EIGEN_PSOLVER})
-#set_target_properties(eigenobj PROPERTIES COMPILE_FLAGS "${BB_COMPILE} -w" LINK_FLAGS "${BB_FLAGS}")
-
-add_library(corelib OBJECT ${BUBBLES_CORE} ${EIGEN_PSOLVER})
+add_library(corelib OBJECT ${BUBBLES_CORE})
 set_target_properties(corelib PROPERTIES COMPILE_FLAGS "${BB_COMPILE}" LINK_FLAGS "${BB_FLAGS}")
 
 add_executable(${BUBBLES} ${BUBBLES_SRCS} $<TARGET_OBJECTS:corelib>)

@@ -3,6 +3,7 @@ bbtool
 build
 simulations
 python/__pycache__
+*__pycache__
 .cody
 fluid_engine_questions.txt
 *.pbrt

@@ -7,7 +7,6 @@
 #include <obj_loader.h>
 #include <memory.h>
 #include <cutil.h>
-#include <explicit_grid.h>
 #include <counting.h>
 
 static int with_graphy = 1;

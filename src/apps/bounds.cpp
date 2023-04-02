@@ -715,6 +715,13 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     LNMInvalidateCells(grid);
     pSet->ClearDataBuffer(&pSet->v0s);
 
+    /////////////////////////////////////////////////////
+    DelaunayTriangulation triangulation;
+    DelaunaySurface(triangulation, sphpSet, grid);
+    CudaMemoryManagerClearCurrent();
+    return;
+    /////////////////////////////////////////////////////
+
     TimerList timer;
     boundary.clear();
     if(opts->method == BOUNDARY_LNM){
@@ -866,17 +873,17 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
 
 #if 0
     DelaunayTriangulation triangulation;
-    printf("Computing raw triangulation ... "); fflush(stdout);
+    std::cout << "Computing raw triangulation ... " << std::flush;
     DelaunayTriangulate(triangulation, sphpSet, grid);
 
-    printf("Done.\nFiltering ... "); fflush(stdout);
-
+    std::cout << "Done.\nFiltering ... " << std::flush;
     DelaunayShrink(triangulation, sphpSet, boundary);
 
     DelaunayWritePly(triangulation, "delaunay.ply");
 
     printf("Done.\n");
 #endif
+
 
     if(opts->narrowband){
         boundary.clear();

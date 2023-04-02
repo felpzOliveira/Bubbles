@@ -50,7 +50,7 @@ inline __bidevice__ U ClampedIndex(U u, U sizes, int dims, int &clamped){
 * requires a higher resolution attempting to create a high resolution Grid2/3 can easily
 * run out of memory because of the neighbors lists it builds for particle querying.
 * I'll create a lightweight version of Grid2/3 that can be used with higher resolution
-* but does not provide the hability to query particles.
+* but does not provide the ability to query particles.
 */
 template<typename T, typename U, typename Q, typename DataType>
 class LightweightGrid{

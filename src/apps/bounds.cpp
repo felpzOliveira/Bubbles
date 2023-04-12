@@ -715,13 +715,6 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     LNMInvalidateCells(grid);
     pSet->ClearDataBuffer(&pSet->v0s);
 
-    /////////////////////////////////////////////////////
-    DelaunayTriangulation triangulation;
-    DelaunaySurface(triangulation, sphpSet, grid);
-    CudaMemoryManagerClearCurrent();
-    return;
-    /////////////////////////////////////////////////////
-
     TimerList timer;
     boundary.clear();
     if(opts->method == BOUNDARY_LNM){

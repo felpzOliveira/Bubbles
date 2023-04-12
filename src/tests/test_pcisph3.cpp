@@ -542,9 +542,6 @@ void test_pcisph3_water_drop(){
     Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(),
                                                spacing, spacingScale);
     vec3ui res = domainGrid->GetIndexCount();
-    printf("%u x %u x %u\n", res.x, res.y, res.z);
-    CudaMemoryManagerClearCurrent();
-    return;
 
     ParticleSet3 *pSet = sphSet->GetParticleSet();
 

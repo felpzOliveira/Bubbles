@@ -293,7 +293,7 @@ __host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
             return true;
         };
 
-        printf("Emitting particles ... ");
+        printf("Emitting particles, spacing = %g ... ", emitter->spacing);
         fflush(stdout);
         timers.Start();
         emitter->generator->ForEach(emitter->bound, emitter->spacing, Accept);

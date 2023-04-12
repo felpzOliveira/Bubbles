@@ -6,6 +6,7 @@
 #include <memory.h>
 #include <host_mesh.h>
 #include <counting.h>
+#include <delaunay.h>
 
 typedef enum{
     SDF_ZHU_BRIDSON = 0,
@@ -19,6 +20,7 @@ typedef struct{
     Float kernel;
     Float spacing;
     Float marchingCubeSpacing;
+    Float delaunayMu;
     std::string input;
     std::string output;
     SurfaceMethod method;
@@ -69,6 +71,7 @@ void default_surface_opts(surface_opts *opts){
     opts->inflags = SERIALIZER_POSITION;
     opts->kernel = 0.04;
     opts->spacing = 0.02;
+    opts->delaunayMu = 1.1;
     opts->marchingCubeSpacing = 0.01;
     opts->outformat = FORMAT_OBJ;
     opts->byResolution = false;
@@ -80,14 +83,16 @@ void print_surface_configs(surface_opts *opts){
     std::cout << "    * Input : " << opts->input << std::endl;
     std::cout << "    * Output : " << opts->output << std::endl;
     std::cout << "    * Spacing : " << opts->spacing << std::endl;
-    std::cout << "    * SDF Method : " << StringFromSDFMethod(opts->method) << std::endl;
+    std::cout << "    * Delaunay μ : " << opts->delaunayMu << std::endl;
+    std::cout << "    * Reconstruction method : " <<
+                        StringFromSDFMethod(opts->method) << std::endl;
     std::cout << "    * Kernel : " << opts->kernel << std::endl;
     std::cout << "    * Mesh Spacing : " << opts->marchingCubeSpacing << std::endl;
     std::cout << "    * Legacy : " << opts->legacy << std::endl;
     std::cout << "    * Output Format: " << FormatString(opts->outformat) << std::endl;
     if(opts->byResolution){
         std::cout << "    * Forcing Resolution : " << opts->resolution.x
-              << " x " << opts->resolution.y << " x " << opts->resolution.z << std::endl;
+                   << " x " << opts->resolution.y << " x " << opts->resolution.z << std::endl;
     }
 }
 
@@ -112,6 +117,17 @@ ARGUMENT_PROCESS(surface_inflags_args){
 ARGUMENT_PROCESS(surface_out_args){
     surface_opts *opts = (surface_opts *)config;
     opts->output = ParseNext(argc, argv, i, "-out", 1);
+    return 0;
+}
+
+ARGUMENT_PROCESS(surface_delaunay_mu_args){
+    surface_opts *opts = (surface_opts *)config;
+    opts->delaunayMu = ParseNextFloat(argc, argv, i, "-delaunay-mu");
+    if(opts->delaunayMu < 0.001){
+        printf("Invalid μ\n");
+        return -1;
+    }
+
     return 0;
 }
 
@@ -233,6 +249,12 @@ std::map<const char *, arg_desc> surface_arg_map = {
             .help = "Configures spacing used during simulation."
         }
     },
+    {"-delaunay-mu",
+        {
+            .processor = surface_delaunay_mu_args,
+            .help = "Sets the value of the delaunay μ term. (default: 1.1)"
+        }
+    },
     {"-kernel",
         {
             .processor = surface_kernel_args,
@@ -348,7 +370,32 @@ __bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
 void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
                                  HostTriangleMesh3 *mesh)
 {
-    // TODO
+    DelaunayTriangulation triangulation;
+    // TODO: We need the solver simply to distribute particles and update the buckets
+    //       it would be nice if we could do that without having to build a solver
+    SphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+
+    // TODO: Even this spacingScale is irrelevant it would be best if it were
+    //       to represent the original simulation domain, i.e.: add flags to cmd
+    std::cout << "Building domain... " << std::flush;
+    Grid3 *grid = UtilBuildGridForBuilder(pBuilder, opts->spacing, 2.0);
+    SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(pBuilder);
+
+    solver.Setup(WaterDensity, opts->spacing, 2.0, grid, sphpSet);
+
+    std::cout << "Distributing particles..." << std::flush;
+    UpdateGridDistributionGPU(solver.solverData);
+    grid->UpdateQueryState();
+
+    std::cout << "Done\nComputing delaunay surface... " << std::endl;
+    DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu, grid);
+
+    std::cout << "Writing delaunay boundary... " << std::flush;
+    DelaunayWriteBoundary(triangulation, sphpSet, "bound.txt");
+
+    std::cout << "Done\nFetching geometry... " << std::endl;
+    DelaunayGetTriangleMesh(triangulation, mesh);
 }
 
 FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *opts){
@@ -386,8 +433,8 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
     vec3f p0 = dBounds.pMin;
     vec3f p1 = dBounds.pMax;
     printf("Built domain with extension:\n"
-            "    [%u x %u x %u]\n"
-            "    [%g %g %g]  x  [%g %g %g]\n",
+           "    [%u x %u x %u]\n"
+           "    [%g %g %g]  x  [%g %g %g]\n",
            res.x, res.y, res.z, p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
 
     SphSolver3 solver;
@@ -402,7 +449,7 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
 
     /* check if density is needed */
     if(method == SDF_SPH)
-        ComputeDensityGPU(solver.solverData);
+    ComputeDensityGPU(solver.solverData);
 
     grid->UpdateQueryState();
 
@@ -444,7 +491,7 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
     sdfGrid->MarkFilled();
     res = sdfGrid->GetResolution();
     std::cout << "OK [ Resolution: " << res.x << " x " << res.y << " x " << res.z
-              << " ]" << std::endl;
+    << " ]" << std::endl;
     return sdfGrid;
 }
 
@@ -539,9 +586,10 @@ void surface_command(int argc, char **argv){
         grid = ParticlesToSDF_Pcount(&builder, &opts);
     else if(opts.method < SDF_PARTICLE_COUNT)
         grid = ParticlesToSDF_Surface(&builder, &opts);
-    else if(opts.method == SDF_DELAUNAY)
+    else if(opts.method == SDF_DELAUNAY){
         ParticlesToDelaunay_Surface(&builder, &opts, &mesh);
-    else{
+        requires_mc = false;
+    }else{
         printf("Invalid method selected\n");
         CudaMemoryManagerClearCurrent();
         return;
@@ -576,9 +624,9 @@ void surface_command(int argc, char **argv){
         * but for now it seems that it literally is as simple as rotating the triangles.
         */
         if(opts.method == SDF_PARTICLE_COUNT)
-        MarchingCubes(grid, &mesh, 0.25, reporter, true);
+            MarchingCubes(grid, &mesh, 0.25, reporter, true);
         else
-        MarchingCubes(grid, &mesh, 0.0, reporter, false);
+            MarchingCubes(grid, &mesh, 0.0, reporter, false);
 
         std::cout << std::endl;
     }

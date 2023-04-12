@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <host_mesh.h>
 
 struct DelaunayIndexInfo{
     vec3ui baseTriangle;
@@ -16,6 +17,7 @@ typedef std::unordered_map<i3, int, i3Hasher, i3IsSame> DelaunayTriangleMap;
 typedef std::unordered_map<i3, DelaunayIndexInfo, i3Hasher, i3IsSame> DelaunayTriangleIndexedMap;
 typedef std::unordered_map<int, Float> DelaunayFloatTriangleMap;
 typedef std::unordered_map<int, int> DelaunayVertexMap;
+typedef std::unordered_map<uint32_t, std::unordered_set<uint32_t>> DelaunayVertexConnection;
 
 struct DelaunayTriangulation{
     Point3HVec pointVec;
@@ -23,13 +25,21 @@ struct DelaunayTriangulation{
     DelaunayFloatTriangleMap partRMap;
     DelaunayVertexMap vertexMap;
     size_t pLen;
+    std::vector<int> boundary;
     std::vector<vec3i> shrinked;
     std::vector<uint32_t> ids;
 };
 
 __host__ void
 DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                Grid3 *domain);
+                Float spacing, Float mu, Grid3 *domain);
+
+__host__ void
+DelaunayGetTriangleMesh(DelaunayTriangulation &triangulation, HostTriangleMesh3 *mesh);
+
+__host__ void
+DelaunayWriteBoundary(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
+                      const char *path);
 
 __host__ void
 DelaunayWritePly(DelaunayTriangulation &triangulation, const char *path);

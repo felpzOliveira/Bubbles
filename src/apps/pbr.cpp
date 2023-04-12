@@ -35,6 +35,7 @@ typedef struct{
     std::string output;
     RenderMode mode;
     Float radius;
+    Float innerRadius;
     Transform transform;
     std::string pickedMat;
     int level;
@@ -238,6 +239,13 @@ ARGUMENT_PROCESS(pbr_radius_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(pbr_inner_radius_arg){
+    pbr_opts *opts = (pbr_opts *)config;
+    Float radius = ParseNextFloat(argc, argv, i, "-inner");
+    opts->innerRadius = radius;
+    return 0;
+}
+
 ARGUMENT_PROCESS(pbr_serializer_inform_arg){
     pbr_opts *opts = (pbr_opts *)config;
     std::string format = ParseNext(argc, argv, i, "-inform", 1);
@@ -378,7 +386,12 @@ std::map<const char *, arg_desc> pbr_argument_map = {
     },
     {"-radius",
         { .processor = pbr_radius_arg,
-            .help = "Radius to use for particle cloud. (default: 0.012)"
+            .help = "Radius to use for boundary particle. (default: 0.012)"
+        }
+    },
+    {"-inner-radius",
+        { .processor = pbr_inner_radius_arg,
+            .help = "Radius to use for interior particles. (default: 0.012)"
         }
     },
     {"-inform",
@@ -532,6 +545,7 @@ void default_pbr_opts(pbr_opts *opts){
     opts->output = "";
     opts->flags = SERIALIZER_POSITION;
     opts->radius = 0.012;
+    opts->innerRadius = opts->radius;
     opts->mode = RenderMode::ALL;
     opts->transform = Transform();
     opts->level = -1;
@@ -547,7 +561,8 @@ void default_pbr_opts(pbr_opts *opts){
 void print_configs(pbr_opts *opts){
     std::cout << "Configs: " << std::endl;
     std::cout << "    * Target file : " << opts->input << std::endl;
-    std::cout << "    * Render radius : " << opts->radius << std::endl;
+    std::cout << "    * Render boundary radius : " << opts->radius << std::endl;
+    std::cout << "    * Render inner radius : " << opts->innerRadius << std::endl;
     std::cout << "    * Render mode : " << render_mode_string(opts->mode) << std::endl;
     if(opts->domain.size() > 0){
         std::cout << "    * Domain : " << opts->domain << std::endl;
@@ -932,6 +947,7 @@ void pbr_command(int argc, char **argv){
     int count = 0;
     int pAdded = 0;
     std::string radiusString;
+    std::string innerRadiusString;
 
     default_pbr_opts(&opts);
     argument_process(pbr_argument_map, argc, argv, "pbr", &opts);
@@ -973,6 +989,7 @@ void pbr_command(int argc, char **argv){
     }
 
     radiusString = __to_stringf(opts.radius);
+    innerRadiusString = __to_stringf(opts.innerRadius);
 
     if(count > 0){
         int total = count;
@@ -1071,11 +1088,17 @@ void pbr_command(int argc, char **argv){
                         data += __to_stringf(p.position.y); data += " ";
                         data += __to_stringf(p.position.z); data += "\n";
                         data += "\tShape \"sphere\" \"float radius\" [";
-                        data += radiusString;
+                        if(i < 1)
+                            data += innerRadiusString;
+                        else
+                            data += radiusString;
                         data += "]\nAttributeEnd\n";
                     }else{
                         data += "Shape{ type[sphere] radius[";
-                        data += radiusString;
+                        if(i < 1)
+                            data += innerRadiusString;
+                        else
+                            data += radiusString;
                         data += "] mat[layer_";
                         data += __to_stringi(i);
                         data += "] center[";

@@ -378,11 +378,12 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
 
     // TODO: Even this spacingScale is irrelevant it would be best if it were
     //       to represent the original simulation domain, i.e.: add flags to cmd
+    Float domainSpacing = opts->spacing * 0.5f;
     std::cout << "Building domain... " << std::flush;
-    Grid3 *grid = UtilBuildGridForBuilder(pBuilder, opts->spacing, 2.0);
+    Grid3 *grid = UtilBuildGridForBuilder(pBuilder, domainSpacing, 2.0);
     SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(pBuilder);
 
-    solver.Setup(WaterDensity, opts->spacing, 2.0, grid, sphpSet);
+    solver.Setup(WaterDensity, domainSpacing, 2.0, grid, sphpSet);
 
     std::cout << "Distributing particles..." << std::flush;
     UpdateGridDistributionGPU(solver.solverData);

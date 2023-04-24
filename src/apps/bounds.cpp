@@ -27,11 +27,13 @@ typedef struct{
 
 typedef struct{
     std::string input;
+    std::string inputRef;
     std::string output;
     Float doringMu;
     Float spacing;
     Float spacingScale;
     Float nbRho;
+    int computeRecall;
     int countstart;
     int countend;
     int inner_cmd;
@@ -63,6 +65,7 @@ void default_boundary_opts(boundary_opts *opts){
     opts->countend = 0;
     opts->write_domain = 0;
     opts->inner_cmd = 0;
+    opts->computeRecall = 0;
     opts->noout = 0;
     opts->nbRho = 0.02;
     opts->doringMu = RDM_MU_3D;
@@ -93,6 +96,11 @@ void print_boundary_configs(boundary_opts *opts){
 
         if(opts->narrowband){
             std::cout << "    * Narrow-Band ρ : " << opts->nbRho << std::endl;
+        }
+
+        std::cout << "    * Recall : " << opts->computeRecall << std::endl;
+        if(opts->computeRecall){
+            std::cout << "    * Recall Ref : " << opts->inputRef << std::endl;
         }
     }else if(opts->inner_cmd == 1){
         std::cout << "    * Statistics Run" << std::endl;
@@ -286,6 +294,18 @@ ARGUMENT_PROCESS(boundary_lnm_unbounded_args){
     return 0;
 }
 
+ARGUMENT_PROCESS(boundary_input_regerence){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->inputRef = ParseNext(argc, argv, i, "-in-ref", 1);
+    return 0;
+}
+
+ARGUMENT_PROCESS(boundary_compute_recall){
+    boundary_opts *opts = (boundary_opts *)config;
+    opts->computeRecall = 1;
+    return 0;
+}
+
 std::map<const char *, arg_desc> bounds_arg_map = {
     {"-in",
         {
@@ -419,6 +439,18 @@ std::map<const char *, arg_desc> bounds_arg_map = {
         {
             .processor = boundary_write_domain_args,
             .help = "Writes the domain of the boundary computation (grid) in particle format."
+        }
+    },
+    {"-in-ref",
+        {
+            .processor = boundary_input_regerence,
+            .help = "Sets the reference file to use as ground truth for recall computation ( Requires -rec )",
+        }
+    },
+    {"-rec",
+        {
+            .processor = boundary_compute_recall,
+            .help = "Computes recall metrics after boundary extraction ( Requires -in-ref )",
         }
     }
 };
@@ -637,6 +669,61 @@ vec2i *compute_particle_l2_afinnity(ParticleSet3 *pSet, Grid3 *grid,
     return minimums;
 }
 
+void compute_recall(std::vector<int> *boundary, boundary_opts *opts){
+    ParticleSetBuilder3 builder;
+    std::vector<SerializedShape> shapes;
+    std::vector<int> refBound;
+    if(opts->legacy_in){
+        std::vector<vec3f> points;
+        SerializerLoadLegacySystem3(&points, opts->inputRef.c_str(),
+                                    opts->inflags, &refBound);
+    }else{
+        SerializerLoadSystem3(&builder, &shapes, opts->inputRef.c_str(),
+                              opts->inflags, &refBound);
+    }
+
+    if(refBound.size() != boundary->size()){
+        printf("Reference input does not match in size ( %lu != %lu )\n",
+                refBound.size(), boundary->size());
+        return;
+    }
+
+    double Tp = 0;
+    double Tn = 0;
+    double Fp = 0;
+    double Fn = 0;
+
+    for(uint32_t i = 0; i < refBound.size(); i++){
+        int realValue = refBound[i];
+        int currentValue = boundary->at(i);
+
+        if(realValue == currentValue){ // method correctly computed
+            if(realValue != 0) // particle is boundary
+                Tp += 1;
+            else // particle is interior
+                Tn += 1;
+        }else{ // method failed
+            if(currentValue != 0) // method says is boundary but it is wrong
+                Fp += 1;
+            else
+                Fn += 1;
+        }
+    }
+
+    printf("Recal Stats:\n");
+    printf(" - True Positives: %g\n", Tp);
+    printf(" - True Negatives: %g\n", Tn);
+    printf(" - False Positives: %g\n", Fp);
+    printf(" - False Negatives: %g\n", Fn);
+
+    double recall = Tp / (Tp + Fn);
+    double fpr = Fp / (Fp + Tn);
+    double M = recall * (1.f - fpr);
+    printf(" - Recall ( Tp / (Tp + Fn) ) = %g\n", recall);
+    printf(" - FPR ( Fp / (Fp + Tn) ) = %g\n", fpr);
+    printf(" - M ( Rec (1 - FPR) ) = %g\n", M);
+}
+
 void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=nullptr,
                               bool dump_to_file=true)
 {
@@ -716,6 +803,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
     pSet->ClearDataBuffer(&pSet->v0s);
 
     TimerList timer;
+    int n = 0;
     boundary.clear();
     if(opts->method == BOUNDARY_LNM){
         if(opts->lnmalgo == 5){
@@ -842,6 +930,19 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         timer.Start();
         MarroneAdaptBoundary(pSet, grid, opts->spacing, marroneWorkQ);
         timer.Stop();
+    }else if(opts->method == BOUNDARY_DELAUNAY){
+        DelaunayTriangulation triangulation;
+        printf("[Warning]: Delaunay extraction also extracts surface and it does not\n"
+               "           support GPU execution. Expect it to be siginificantly slower.\n");
+        // TODO: delaunay μ to cmd
+        timer.Start();
+        DelaunaySurface(triangulation, sphpSet, opts->spacing, 1.1, grid);
+        timer.Stop();
+
+        boundary = triangulation.boundary;
+        for(int i = 0; i < boundary.size(); i++){
+            n += boundary[i] != 0 ? 1 : 0;
+        }
     }
     /*
         The following methods are implemented correctly
@@ -861,22 +962,13 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
 
     Float interval = timer.GetElapsedGPU(0);
 
-    int n = UtilGetBoundaryState(pSet, &boundary);
+    if(opts->method != BOUNDARY_DELAUNAY)
+        n = UtilGetBoundaryState(pSet, &boundary);
+
     printf("Got %d / %d - %g ms\n", n, (int)boundary.size(), interval);
 
-#if 0
-    DelaunayTriangulation triangulation;
-    std::cout << "Computing raw triangulation ... " << std::flush;
-    DelaunayTriangulate(triangulation, sphpSet, grid);
-
-    std::cout << "Done.\nFiltering ... " << std::flush;
-    DelaunayShrink(triangulation, sphpSet, boundary);
-
-    DelaunayWritePly(triangulation, "delaunay.ply");
-
-    printf("Done.\n");
-#endif
-
+    if(opts->computeRecall)
+        compute_recall(&boundary, opts);
 
     if(opts->narrowband){
         boundary.clear();
@@ -950,6 +1042,21 @@ void boundary_command(int argc, char **argv){
 
     argument_process(bounds_arg_map, argc, argv, "boundary", &opts);
     print_boundary_configs(&opts);
+
+    if(opts.computeRecall){
+        if(opts.inputRef.size() == 0){
+            printf("Missing reference input for recall computation\n");
+            return;
+        }
+        FILE *fp = fopen(opts.inputRef.c_str(), "rb");
+        if(!fp){
+            printf("Could not open reference file for recall computation\n");
+            return;
+        }
+
+        fclose(fp);
+    }
+
     if(opts.inner_cmd == 1){
         process_stats_procedure(&opts);
     }else if(opts.inner_cmd == 0){

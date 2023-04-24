@@ -107,6 +107,21 @@ DelaunayOrientation(vec3f a, vec3f b, vec3f c, vec3f op, int A, int B, int C){
         return vec3i(A, C, B);
 }
 
+__host__ bool
+DelaunayFilterTetrahedron(vec3f a, vec3f b, vec3f c, vec3f d, Float threshold){
+    vec3f f0 = a - d;
+    vec3f f1 = b - d;
+    vec3f f2 = c - d;
+    Float vol = (1.f / 6.f) * Absf(Dot(f0, Cross(f1, f2)));
+    return vol < threshold;
+}
+
+__host__ bool
+DelaunayFilterTriangle(vec3f a, vec3f b, vec3f c, Float threshold){
+    Float area = 0.5f * Cross(b - a, c - a).Length();
+    return area < threshold;
+}
+
 __host__ void
 DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
                 Float spacing, Float mu, Grid3 *domain)
@@ -116,9 +131,6 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     DelaunayTriangleMap triMap;
     std::vector<int> &boundary = triangulation.boundary;
     GpuDel triangulator;
-
-    //Float spacing = 0.036;
-    //Float mu = 1.1f;
 
     printf(" * Delaunay: [μ = %g] [h = %g]\n", mu, spacing);
     int pointNum = 0;
@@ -131,8 +143,8 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
         if(CheckPart(pSet, domain, i, pR)){
             vec3f vi = pSet->GetParticlePosition(i);
             triangulation.ids.push_back(i);
-            //triangulation.partRMap[i] = mu * spacing;
-            triangulation.partRMap[i] = mu * pR;
+            triangulation.partRMap[i] = mu * spacing;
+            //triangulation.partRMap[i] = mu * pR;
             triangulation.pointVec.push_back({vi.x, vi.y, vi.z});
             pointNum += 1;
         }
@@ -150,6 +162,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     std::vector<vec3i> indexList;
     long int totalTris = 0, totalInserted = 0;
 
+    //Float maxRatio = 0.f;
     GDel3D_ForEachRealTetra(&triangulation.output, triangulation.pLen,
     [&](Tet tet, TetOpp botOpp, int i) -> void
     {
@@ -186,6 +199,17 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
                                bC < rBC && bD < rBD &&
                                cD < rCD;
 
+#if 0
+        Float edge_long = Max(Max(Max(aB, aC), Max(aD, bC)), Max(bD, cD));
+        Float edge_smal = Min(Min(Min(aB, aC), Min(aD, bC)), Min(bD, cD));
+        Float ratio = (edge_long / edge_smal);
+        //is_tetra_valid &= !DelaunayFilterTetrahedron(pA, pB, pC, pD, 0.04);
+        if(is_tetra_valid){
+            maxRatio = Max(maxRatio, ratio);
+            is_tetra_valid &= ratio < 5;
+        }
+#endif
+
         if(!is_tetra_valid){
             boundary[idA] = 1;
             boundary[idB] = 1;
@@ -199,6 +223,8 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
         DelaunayIndexedMapHandleTriangle(A, D, C, B, keyMap);
         DelaunayIndexedMapHandleTriangle(B, D, C, A, keyMap);
     });
+
+    //printf("Ratio = %g\n", maxRatio);
 
     for(auto it : keyMap){
         totalTris += 1;

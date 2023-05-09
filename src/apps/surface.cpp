@@ -389,6 +389,10 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     UpdateGridDistributionGPU(solver.solverData);
     grid->UpdateQueryState();
 
+    /* compute density and normal for debugging normals */
+    ComputeDensityGPU(solver.solverData);
+    ComputeNormalGPU(solver.solverData);
+
     std::cout << "Done\nComputing delaunay surface... " << std::endl;
     DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu, grid);
 

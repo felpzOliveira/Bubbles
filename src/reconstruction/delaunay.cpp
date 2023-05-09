@@ -86,25 +86,45 @@ GeometricalNormal(vec3f a, vec3f b, vec3f c, bool normalized=true){
 __host__ bool
 TriangleMatchesDirection(vec3f a, vec3f b, vec3f c, vec3f ng){
     vec3f n = GeometricalNormal(a, b, c, false);
-    return !(Dot(n, ng) < 0);
+    Float d = Dot(n, ng);
+    return (d >= 0);
 }
 
 __host__ vec3i
-DelaunayOrientation(vec3f a, vec3f b, vec3f c, vec3f op, int A, int B, int C){
+DelaunayOrientation(vec3f a, vec3f b, vec3f c, vec3f op, int A, int B, int C,
+                    vec3f na, vec3f nb, vec3f nc, bool &remove, Bounds3f &bounds)
+{
+#if 1
+    remove = false;
     vec3f ng = Normalize(op - a);
     if(!TriangleMatchesDirection(a, b, c, ng))
         return vec3i(A, B, C);
     if(TriangleMatchesDirection(a, c, b, ng)){
-            printf("Inverted triangle does not match normal ( %g %g %g ) {%d %d %d}\n",
-                    ng.x, ng.y, ng.z, A, B, C);
-            vec3f n0 = GeometricalNormal(a, b, c);
-            vec3f n1 = GeometricalNormal(a, c, b);
-            Float d0 = Dot(n0, ng);
-            Float d1 = Dot(n1, ng);
-            printf("Forward  ( %g %g %g ) --> %g\n", n0.x, n0.y, n0.z, d0);
-            printf("Backward ( %g %g %g ) --> %g\n", n1.x, n1.y, n1.z, d1);
+        vec3f navg = Normalize(na + nb + nc);
+        Float dot = Dot(GeometricalNormal(a, b, c), navg);
+        if(dot == 0 || dot == -0){
+            printf("Dot = %g\n", dot);
+            //remove = true;
         }
-        return vec3i(A, C, B);
+
+        if(dot < 0)
+            return vec3i(A, C, B);
+        else
+            return vec3i(A, B, C);
+        static int tri_inv_counter = 0;
+        tri_inv_counter++;
+        printf("Inverted triangle does not match normal ( %g %g %g ) {%d %d %d}\n",
+                ng.x, ng.y, ng.z, A, B, C);
+        vec3f n0 = GeometricalNormal(a, b, c);
+        vec3f n1 = GeometricalNormal(a, c, b);
+        Float d0 = Dot(n0, ng);
+        Float d1 = Dot(n1, ng);
+        printf("Forward  ( %g %g %g ) --> %g\n", n0.x, n0.y, n0.z, d0);
+        printf("Backward ( %g %g %g ) --> %g\n", n1.x, n1.y, n1.z, d1);
+        printf("inv count = %d\n", tri_inv_counter);
+    }
+    return vec3i(A, C, B);
+#endif
 }
 
 __host__ bool
@@ -131,6 +151,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     DelaunayTriangleMap triMap;
     std::vector<int> &boundary = triangulation.boundary;
     GpuDel triangulator;
+    Bounds3f bounds = domain->GetBounds();
 
     printf(" * Delaunay: [μ = %g] [h = %g]\n", mu, spacing);
     int pointNum = 0;
@@ -225,7 +246,16 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     });
 
     //printf("Ratio = %g\n", maxRatio);
+#if 0
+    DD_edgeMap edgeMap;
 
+    auto add_edge = [](DD_edgeMap &map, i2 edge){
+        if(map.find(edge) == map.end())
+            map[edge] = 1;
+        else
+            map[edge] += 1;
+    };
+#endif
     for(auto it : keyMap){
         totalTris += 1;
         DelaunayIndexInfo indexInfo = it.second;
@@ -247,21 +277,42 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
         vec3f pC = pSet->GetParticlePosition(idC);
         vec3f pD = pSet->GetParticlePosition(idD);
 
-        vec3i index = DelaunayOrientation(pA, pB, pC, pD, A, B, C);
-        MARK_TRIANGLE(A, B, C, vertexMap, triMap);
-        PUSH_INDEX_INTO_LIST(index[0], index[1], index[2], triangulation.shrinked);
-        //MARK_CONNECTIONS(A, B, C, conMap);
-        //MARK_CONNECTIONS(B, A, C, conMap);
-        //MARK_CONNECTIONS(C, B, A, conMap);
+        vec3f _nA = pSet->GetParticleNormal(idA);
+        vec3f _nB = pSet->GetParticleNormal(idB);
+        vec3f _nC = pSet->GetParticleNormal(idC);
 
         boundary[idA] = 1;
         boundary[idB] = 1;
         boundary[idC] = 1;
         boundary[idD] = 1;
 
+        bool remove = false;
+        vec3i index = DelaunayOrientation(pA, pB, pC, pD, A, B, C,
+                                          _nA, _nB, _nC, remove, bounds);
+        if(remove)
+            continue;
+        MARK_TRIANGLE(A, B, C, vertexMap, triMap);
+        PUSH_INDEX_INTO_LIST(index[0], index[1], index[2], triangulation.shrinked);
+        //MARK_CONNECTIONS(A, B, C, conMap);
+        //MARK_CONNECTIONS(B, A, C, conMap);
+        //MARK_CONNECTIONS(C, B, A, conMap);
+
+        //i2 eAB({A, B});
+        //i2 eAC({A, C});
+        //i2 eBC({B, C});
+
+        //add_edge(edgeMap, eAB);
+        //add_edge(edgeMap, eAC);
+        //add_edge(edgeMap, eBC);
+
         totalInserted += 1;
     }
-
+#if 0
+    for(auto it = edgeMap.begin(); it != edgeMap.end(); it++){
+        if(it->second > 2)
+            printf("Edge appears %d times\n", it->second);
+    }
+#endif
     printf(" - Total triangles: %ld, Inserted: %ld\n", totalTris, totalInserted);
 }
 

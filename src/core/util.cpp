@@ -9,6 +9,7 @@
 #include <sstream>
 #include <unordered_set>
 #include <unordered_map>
+#include <shape.h>
 
 #define PushPosition(p, c, pp, pc, id) do{\
     pp[3 * id + 0] = p.x;\
@@ -19,6 +20,43 @@
     pc[3 * id + 2] = c.z;\
     id++;\
 }while(0)
+
+ParsedMesh *UtilGDel3DToParsedMesh(std::vector<vec3i> *tris, Point3HVec *pointVec,
+                                   GDelOutput *output)
+{
+    PredWrapper predWrapper;
+    predWrapper.init(*pointVec, output->ptInfty);
+    int size = predWrapper.pointNum();
+    ParsedMesh *mesh = cudaAllocateVx(ParsedMesh, 1);
+
+    mesh->nVertices = size;
+    mesh->nTriangles = tris->size();
+    mesh->nNormals = 0;
+    mesh->nUvs = 0;
+    mesh->uv = nullptr;
+    mesh->s = nullptr;
+    mesh->n = nullptr;
+
+    mesh->p = cudaAllocateVx(Point3f, mesh->nVertices);
+    mesh->indices = cudaAllocateVx(Point3i, 3 * tris->size());
+    for(int i = 0; i < mesh->nVertices; i++){
+        const Point3 pt = predWrapper.getPoint(i);
+        mesh->p[i] = Point3f(pt._p[0], pt._p[1], pt._p[2]);
+    }
+
+    for(int i = 0; i < tris->size(); i++){
+        vec3i val = tris->at(i);
+        mesh->indices[3 * i + 0] = Point3i(val.x, 0, 0);
+        mesh->indices[3 * i + 1] = Point3i(val.y, 0, 0);
+        mesh->indices[3 * i + 2] = Point3i(val.z, 0, 0);
+    }
+
+    mesh->transform = Transform();
+    mesh->allocator = AllocatorType::GPU;
+    sprintf(mesh->name, "gdel3mesh");
+
+    return mesh;
+}
 
 __host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
                                    vec3f length, int nPoints, Transform transform)

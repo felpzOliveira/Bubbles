@@ -222,6 +222,9 @@ __host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int p
 __host__ void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
                                  GDelOutput *output, const char *path);
 
+ParsedMesh *UtilGDel3DToParsedMesh(std::vector<vec3i> *tris, Point3HVec *pointVec,
+                                   GDelOutput *output);
+
 /*
 * Utility routine for looping through real tetrahedrons in GDel3D.
 */

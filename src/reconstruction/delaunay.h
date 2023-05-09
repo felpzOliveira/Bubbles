@@ -13,6 +13,11 @@ struct DelaunayIndexInfo{
     int counter;
 };
 
+typedef iN<2> i2;
+typedef iNHasher<2> i2Hasher;
+typedef iNIsSame<2> i2IsSame;
+
+typedef std::unordered_map<i2, int, i2Hasher, i2IsSame> DD_edgeMap;
 typedef std::unordered_map<i3, int, i3Hasher, i3IsSame> DelaunayTriangleMap;
 typedef std::unordered_map<i3, DelaunayIndexInfo, i3Hasher, i3IsSame> DelaunayTriangleIndexedMap;
 typedef std::unordered_map<int, Float> DelaunayFloatTriangleMap;
@@ -28,6 +33,8 @@ struct DelaunayTriangulation{
     std::vector<int> boundary;
     std::vector<vec3i> shrinked;
     std::vector<uint32_t> ids;
+
+    // debug
 };
 
 __host__ void

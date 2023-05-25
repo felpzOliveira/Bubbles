@@ -93,8 +93,9 @@ int main(int argc, char **argv){
     //test_pcisph2_water_block();
     //test_pcisph2_marching_squares();
 
+    //test_pcisph2_continuous_emitter();
     //test_pcisph2_double_dam_break();
-    test_pcisph2_water_block_lnm();
+    //test_pcisph2_water_block_lnm();
     //test_pcisph3_sdf();
     //test_pcisph3_rotating_water_box();
     //test_pcisph3_dam_break_double_dragon();
@@ -111,7 +112,7 @@ int main(int argc, char **argv){
     //test_pcisph3_dam_break_double_dragon();
     //test_pcisph3_box_mesh();
     //test_pcisph3_dragon_pool();
-    //test_pcisph3_double_dam_break();
+    test_pcisph3_double_dam_break();
     //test_pcisph3_rotating_water_box();
     //test_pcisph3_dragon_shower();
 

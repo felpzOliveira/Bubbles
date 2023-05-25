@@ -88,7 +88,7 @@ void test_pcisph3_box_drop(){
             pBuilder.MapGridEmit(velocityField, spacing);
         }
         UtilPrintStepStandard(&solver, step-1);
-#if 1
+#if 0
         std::string path("/media/felipe/FluidStuff/box/out_");
         path += std::to_string(step-1);
         path += ".txt";
@@ -1870,7 +1870,7 @@ void test_pcisph3_double_dam_break(){
     vec3f origin(0, 1, -3);
     vec3f target(0,0,0);
 
-    Float spacing = 0.02;
+    Float spacing = 0.01;
     Float boxLen = 1.5;
     Float boxFluidLen = 0.5;
     Float boxFluidYLen = 0.9;
@@ -1919,9 +1919,16 @@ void test_pcisph3_double_dam_break(){
     ParticleSet3 *pSet = sphSet->GetParticleSet();
 
     auto callback = [&](int step) -> int{
-        if(step == 0) return 1;
+        if(step == 0)
+            return 1;
         UtilPrintStepStandard(&solver, step-1);
         ProfilerReport();
+
+        std::string path("../simulations/double_dam/out_");
+        path += std::to_string(step-1);
+        path += ".txt";
+        SerializerSaveSphDataSet3(solver.GetSphSolverData(), path.c_str(),
+                                  SERIALIZER_POSITION);
         return step > 450 ? 0 : 1;
     };
 

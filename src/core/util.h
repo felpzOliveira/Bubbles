@@ -78,8 +78,10 @@ struct i3{
     public:
     int t[3];
 
+    __bidevice__
     i3(){ t[0] = 0; t[1] = 0; t[2] = 0; }
 
+    __bidevice__
     i3(int a, int b, int c){
         if(a > c) Swap(a, c);
         if(a > b) Swap(a, b);
@@ -88,19 +90,27 @@ struct i3{
         t[1] = b;
         t[2] = c;
     }
+
+    __bidevice__
+    bool operator==(const i3 &other){
+        return t[0] == other.t[0] && t[1] == other.t[1] && t[2] == other.t[2];
+    }
 };
 
 
 struct i3Hasher{
     public:
+    __bidevice__
     size_t operator()(const i3 &a) const{
         int f = a.t[0] + a.t[1] + a.t[2];
-        return std::hash<int>()(f);
+        return f;
+        //return std::hash<int>()(f);
     }
 };
 
 struct i3IsSame{
     public:
+    __bidevice__
     bool operator()(const i3 &a, const i3 &b) const{
         return b.t[0] == a.t[0] && b.t[1] == a.t[1] && b.t[2] == a.t[2];
     }
@@ -226,6 +236,16 @@ ParsedMesh *UtilGDel3DToParsedMesh(std::vector<vec3i> *tris, Point3HVec *pointVe
                                    GDelOutput *output);
 
 /*
+* Get the total amount of tetras generated through GDel3D
+*/
+uint32_t GDel3D_TetraCount(GDelOutput *output);
+
+/*
+* Get the total amount of real tetras generated through GDel3D
+*/
+uint32_t GDel3D_RealTetraCount(GDelOutput *output, uint32_t pLen);
+
+/*
 * Utility routine for looping through real tetrahedrons in GDel3D.
 */
 template<typename Fn>
@@ -234,6 +254,7 @@ __host__ void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
     const TetOppHVec oppVec   = output->tetOppVec;
     const CharHVec tetInfoVec = output->tetInfoVec;
 
+    printf("Size = %lu\n", tetVec.size());
     for(int i = 0; i < tetVec.size(); i++){
         bool valid = true;
         Tet tet = tetVec[i];
@@ -249,7 +270,6 @@ __host__ void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
             fn(tet, botOpp, i);
     }
 }
-
 
 /*
 * Find all triangles that are unique. Be warned that the indexes given in the output

@@ -1,5 +1,5 @@
-project(Bubbles LANGUAGES C CXX CUDA)
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
+project(Bubbles LANGUAGES C CXX CUDA)
 
 option(CONVEXHULL_QHULL "Use QHull for convex hull" ON)
 
@@ -80,9 +80,11 @@ set_target_properties(corelib PROPERTIES COMPILE_FLAGS "${BB_COMPILE}" LINK_FLAG
 
 add_executable(${BUBBLES} ${BUBBLES_SRCS} $<TARGET_OBJECTS:corelib>)
 target_link_libraries(${BUBBLES} ${BB_LINK_LIBS};gflip3d)
-set_target_properties(${BUBBLES} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}" LINK_FLAGS "${BB_FLAGS}")
+set_target_properties(${BUBBLES} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}"
+                      LINK_FLAGS "${BB_FLAGS}")
 
 add_executable(${BBTOOL} ${BBTOOL_SRCS} $<TARGET_OBJECTS:corelib>)
 target_link_libraries(${BBTOOL} ${BB_LINK_LIBS};gflip3d)
-set_target_properties(${BBTOOL} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}" LINK_FLAGS "${BB_FLAGS}")
+set_target_properties(${BBTOOL} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}"
+                      LINK_FLAGS "${BB_FLAGS}")
 

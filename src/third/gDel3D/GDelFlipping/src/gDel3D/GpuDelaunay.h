@@ -60,7 +60,6 @@ public:
     
     void compute( const Point3HVec& input, GDelOutput *output );
 
-private:
     // Execution configuration
     const GDelParams _params; 
     GDelOutput*      _output; 
@@ -116,7 +115,6 @@ private:
     // Timing
     CudaTimer _profTimer; 
 
-private:
     // Memory pool
     IntDVec &poolPopIntDVec();
     IntDVec &poolPeekIntDVec();

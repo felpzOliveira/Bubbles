@@ -128,6 +128,28 @@ struct Matrix3x3{
         }
     }
 
+    __bidevice__ Matrix3x3 operator*(Float s) const{
+        Matrix3x3 r;
+        for(int i = 0; i < 3; i++)
+            for(int j = 0; j < 3; j++)
+                r.m[i][j] = m[i][j] * s;
+        return r;
+    }
+
+    __bidevice__ vec3f Vec(vec3f v){
+        return vec3f(m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z,
+                     m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z,
+                     m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z);
+    }
+
+    __bidevice__ Matrix3x3 operator+(const Matrix3x3 &o) const{
+        Matrix3x3 r;
+        for(int i = 0; i < 3; i++)
+            for(int j = 0; j < 3; j++)
+                r.m[i][j] = m[i][j] + o.m[i][j];
+        return r;
+    }
+
     __bidevice__ friend Matrix3x3 Transpose(const Matrix3x3 &o){
         return Matrix3x3(o.m[0][0], o.m[1][0], o.m[2][0],
                          o.m[0][1], o.m[1][1], o.m[2][1],

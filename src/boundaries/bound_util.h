@@ -28,8 +28,13 @@ class WorkQueue{
     int counter;
     T *ids;
     __bidevice__ WorkQueue(){}
-    __host__ void SetSlots(int n){
-        ids = cudaAllocateVx(T, n);
+
+    __host__ void SetSlots(int n, bool registered=true){
+        if(registered)
+            ids = cudaAllocateVx(T, n);
+        else
+            ids = cudaAllocateUnregisterVx(T, n);
+
         for(int i = 0; i < n; i++){
             ids[i] = T(0);
         }
@@ -46,6 +51,10 @@ class WorkQueue{
         }
         ids[at] = id;
         return at;
+    }
+
+    __bidevice__ T At(int index){
+        return ids[index];
     }
 
     __bidevice__ T Fetch(int *where=nullptr){

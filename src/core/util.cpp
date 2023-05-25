@@ -500,14 +500,6 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
     }\
 }while(0)
 
-static __host__ uint32_t GDel3D_GetRealTetraCount(GDelOutput *output, uint32_t pLen){
-    uint32_t tetraNo = 0;
-    GDel3D_ForEachRealTetra(output, pLen, [&](Tet tet, TetOpp botOpp, int i) -> void{
-        tetraNo += 1;
-    });
-    return tetraNo;
-}
-
 inline void GDel3D_WriteVertex(PredWrapper *predWrapper, std::ofstream &ofs){
     for(int i = 0; i < (int)predWrapper->pointNum(); i++){
         const Point3 pt = predWrapper->getPoint(i);
@@ -567,7 +559,7 @@ __host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int p
                         "represents a tetrahedron, NOT a quad." << std::endl;
             warned = 1;
         }
-        ofs << "element face " << GDel3D_GetRealTetraCount(output, pLen) << "\n";
+        ofs << "element face " << GDel3D_RealTetraCount(output, pLen) << "\n";
         ofs << "property list uchar int vertex_index\n";
         ofs << "end_header\n";
 
@@ -632,3 +624,17 @@ __host__ void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
         }
     }
 }
+
+
+uint32_t GDel3D_TetraCount(GDelOutput *output){
+    return output->tetVec.size();
+}
+
+uint32_t GDel3D_RealTetraCount(GDelOutput *output, uint32_t pLen){
+    uint32_t counter = 0;
+    GDel3D_ForEachRealTetra(output, pLen, [&](Tet &, const TetOpp &, int){
+        counter += 1;
+    });
+    return counter;
+}
+

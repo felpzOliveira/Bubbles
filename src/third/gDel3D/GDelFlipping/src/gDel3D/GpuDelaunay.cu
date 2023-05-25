@@ -90,12 +90,15 @@ void GpuDel::compute( const Point3HVec& pointVec, GDelOutput *output )
 
     _output->stats.totalTime = timer.value(); 
 
-    cleanup(); 
+    //cleanup(); 
 
     // 3. Star splaying
     if ( !_params.noSplaying )
         _splaying.fixWithStarSplaying( pointVec, output );
 
+	_tetVec.copyFromHost(output->tetVec);
+	_oppVec.copyFromHost(output->tetOppVec);
+	_tetInfoVec.copyFromHost(output->tetInfoVec);
     return;
 }
 

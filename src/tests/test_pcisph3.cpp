@@ -1870,7 +1870,7 @@ void test_pcisph3_double_dam_break(){
     vec3f origin(0, 1, -3);
     vec3f target(0,0,0);
 
-    Float spacing = 0.01;
+    Float spacing = 0.02;
     Float boxLen = 1.5;
     Float boxFluidLen = 0.5;
     Float boxFluidYLen = 0.9;

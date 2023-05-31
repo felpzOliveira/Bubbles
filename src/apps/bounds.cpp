@@ -932,11 +932,9 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         timer.Stop();
     }else if(opts->method == BOUNDARY_DELAUNAY){
         DelaunayTriangulation triangulation;
-        printf("[Warning]: Delaunay extraction also extracts surface and it does not\n"
-               "           support GPU execution. Expect it to be siginificantly slower.\n");
         // TODO: delaunay μ to cmd
         timer.Start();
-        DelaunaySurface(triangulation, sphpSet, opts->spacing, 1.1, grid);
+        DelaunaySurface(triangulation, sphpSet, opts->spacing, 1.1, grid, &solver);
         timer.Stop();
 
         boundary = triangulation.boundary;

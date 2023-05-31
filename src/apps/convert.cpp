@@ -426,6 +426,7 @@ void convert_command(int argc, char **argv){
             PreviewParticles(data->sphpSet, &g_opts);
         }
 
+        remove(g_opts.output.c_str());
         if(g_opts.to_legacy){
             SerializerSaveSphDataSet3Legacy(data, g_opts.output.c_str(),
                                             SERIALIZER_POSITION, nullptr);

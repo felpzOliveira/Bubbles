@@ -29,7 +29,7 @@ class WorkQueue{
     T *ids;
     __bidevice__ WorkQueue(){}
 
-    __host__ void SetSlots(int n, bool registered=true){
+    void SetSlots(int n, bool registered=true){
         if(registered)
             ids = cudaAllocateVx(T, n);
         else
@@ -71,11 +71,11 @@ class WorkQueue{
     #endif
     }
 
-    __host__ void ResetEntry(){
+    void ResetEntry(){
         entry = 0;
     }
 
-    __host__ void Reset(){
+    void Reset(){
         entry = 0;
         size = 0;
         counter = 0;
@@ -94,7 +94,7 @@ class MultiWorkQueue{
         }
     }
 
-    __host__ void SetSlots(int maxItems, int id){
+    void SetSlots(int maxItems, int id){
         if(qs[id] == nullptr){
             qs[id] = cudaAllocateVx(BaseQueue, 1);
             qs[id]->SetSlots(maxItems);
@@ -105,7 +105,7 @@ class MultiWorkQueue{
         return qs[id];
     }
 
-    __host__ void Reset(int id=-1){
+    void Reset(int id=-1){
         if(id >= 0) qs[id]->Reset();
         else{
             for(size_t i = 0; i < count; i++){
@@ -123,7 +123,7 @@ class DualWorkQueue{
 
     DualWorkQueue() = default;
 
-    __host__ void SetSlots(int maxItems){
+    void SetSlots(int maxItems){
         mQueue.SetSlots(maxItems, 0);
         mQueue.SetSlots(maxItems, 1);
         active = 0;
@@ -137,7 +137,7 @@ class DualWorkQueue{
         return mQueue.FetchQueueFor(1-active);
     }
 
-    __host__ void Flip(int reset=1){
+    void Flip(int reset=1){
         WorkQueue<T> *Q = ActiveQueue();
         Q->Reset();
         active = 1 - active;

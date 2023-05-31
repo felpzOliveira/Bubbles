@@ -523,7 +523,7 @@ __host__ void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
     ofs << "property double y\n";
     ofs << "property double z\n";
     ofs << "element face " << tris->size() << "\n";
-    ofs << "property list uchar int vertex_index\n";
+    ofs << "property list uchar int vertex_indices\n";
     ofs << "end_header\n";
 
     GDel3D_WriteVertex(&predWrapper, ofs);
@@ -560,7 +560,7 @@ __host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int p
             warned = 1;
         }
         ofs << "element face " << GDel3D_RealTetraCount(output, pLen) << "\n";
-        ofs << "property list uchar int vertex_index\n";
+        ofs << "property list uchar int vertex_indices\n";
         ofs << "end_header\n";
 
         // write vertices
@@ -583,7 +583,7 @@ __host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int p
         });
 
         ofs << "element face " << triSet.size() << "\n";
-        ofs << "property list uchar int vertex_index\n";
+        ofs << "property list uchar int vertex_indices\n";
         ofs << "end_header\n";
 
         // write vertices

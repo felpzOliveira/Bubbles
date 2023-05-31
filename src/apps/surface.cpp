@@ -7,6 +7,7 @@
 #include <host_mesh.h>
 #include <counting.h>
 #include <delaunay.h>
+#include <interval.h>
 
 typedef enum{
     SDF_ZHU_BRIDSON = 0,
@@ -21,6 +22,7 @@ typedef struct{
     Float spacing;
     Float marchingCubeSpacing;
     Float delaunayMu;
+    bool delaunayUseBoundary;
     std::string input;
     std::string output;
     SurfaceMethod method;
@@ -72,6 +74,7 @@ void default_surface_opts(surface_opts *opts){
     opts->kernel = 0.04;
     opts->spacing = 0.02;
     opts->delaunayMu = 1.1;
+    opts->delaunayUseBoundary = true;
     opts->marchingCubeSpacing = 0.01;
     opts->outformat = FORMAT_OBJ;
     opts->byResolution = false;
@@ -84,6 +87,7 @@ void print_surface_configs(surface_opts *opts){
     std::cout << "    * Output : " << opts->output << std::endl;
     std::cout << "    * Spacing : " << opts->spacing << std::endl;
     std::cout << "    * Delaunay μ : " << opts->delaunayMu << std::endl;
+    std::cout << "    * Delaunay boundary : " << opts->delaunayUseBoundary << std::endl;
     std::cout << "    * Reconstruction method : " <<
                         StringFromSDFMethod(opts->method) << std::endl;
     std::cout << "    * Kernel : " << opts->kernel << std::endl;
@@ -117,6 +121,12 @@ ARGUMENT_PROCESS(surface_inflags_args){
 ARGUMENT_PROCESS(surface_out_args){
     surface_opts *opts = (surface_opts *)config;
     opts->output = ParseNext(argc, argv, i, "-out", 1);
+    return 0;
+}
+
+ARGUMENT_PROCESS(surface_delaunay_boundary_args){
+    surface_opts *opts = (surface_opts *)config;
+    opts->delaunayUseBoundary = false;
     return 0;
 }
 
@@ -255,6 +265,12 @@ std::map<const char *, arg_desc> surface_arg_map = {
             .help = "Sets the value of the delaunay μ term. (default: 1.1)"
         }
     },
+    {"-delaunay-no-bounds",
+        {
+            .processor = surface_delaunay_boundary_args,
+            .help = "Sets the delaunay reconstruction method to not compute exact boundary."
+        }
+    },
     {"-kernel",
         {
             .processor = surface_kernel_args,
@@ -389,12 +405,25 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     UpdateGridDistributionGPU(solver.solverData);
     grid->UpdateQueryState();
 
-    /* compute density and normal for debugging normals */
+    /* compute density and normal */
     ComputeDensityGPU(solver.solverData);
     ComputeNormalGPU(solver.solverData);
 
+    /* do neighbor processing, i.e.: find out particles that are going to be extended */
+    ParticleSet3 *pSet = sphpSet->GetParticleSet();
+    pSet->ClearDataBuffer(&pSet->v0s);
+
+    std::cout << "Done\nInspecting neighbors... " << std::flush;
+    if(opts->delaunayUseBoundary){
+        //LNMBoundarySingle(pSet, grid, opts->spacing, false);
+        IntervalBoundary(pSet, grid, opts->spacing, SubdivisionMethod::PolygonSubdivision);
+    }
+    else
+        DelaunayClassifyNeighbors(pSet, grid, 30, opts->spacing, opts->delaunayMu);
+
+    /* apply delaunay triangulation and filtering to get mesh */
     std::cout << "Done\nComputing delaunay surface... " << std::endl;
-    DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu, grid);
+    DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu, grid, &solver);
 
     std::cout << "Writing delaunay boundary... " << std::flush;
     DelaunayWriteBoundary(triangulation, sphpSet, "bound.txt");
@@ -454,7 +483,7 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
 
     /* check if density is needed */
     if(method == SDF_SPH)
-    ComputeDensityGPU(solver.solverData);
+        ComputeDensityGPU(solver.solverData);
 
     grid->UpdateQueryState();
 
@@ -496,41 +525,8 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
     sdfGrid->MarkFilled();
     res = sdfGrid->GetResolution();
     std::cout << "OK [ Resolution: " << res.x << " x " << res.y << " x " << res.z
-    << " ]" << std::endl;
+              << " ]" << std::endl;
     return sdfGrid;
-}
-
-void fill_pct(double val, char str[7]){
-    if(val >= 100){
-        sprintf(str, "100.00");
-        return;
-    }
-
-    if(val < 10){
-        sprintf(str, "00%.2f", val);
-    }else if(val < 100){
-        sprintf(str, "0%.2f", val);
-    }
-
-    str[6] = 0;
-}
-
-void fill_number(unsigned int val, char str[4]){
-    int at = 0;
-    if(val > 1000){
-        str[0] = 'N'; str[1] = 'a'; str[2] = 'N';
-        str[3] = 0;
-        return;
-    }
-
-    if(val < 10){
-        str[0] = '0'; str[1] = '0'; at = 2;
-    }else if(val < 100){
-        str[0] = '0'; at = 1;
-    }
-
-    sprintf(&str[at], "%u", val);
-    str[4] = 0;
 }
 
 void surface_command(int argc, char **argv){
@@ -603,25 +599,6 @@ void surface_command(int argc, char **argv){
     if(requires_mc){
         printf("Running Marching Cubes\n");
 
-        vec3ui res = grid->GetResolution();
-        double processed = 0;
-        double total = res.x * res.y * res.z;
-        auto reporter = [&](vec3ui u) -> void{
-            unsigned int i = u.x, j = u.y, k = u.z;
-            processed += 1.0;
-            if(i > res.x){
-                std::cout << "\r" << res.x << " / " << res.y << " / " << res.z;
-                std::cout << " ( 100.00% )     " << std::flush;
-            }else{
-                char a[4], b[4], c[4], d[7];
-                fill_number(i, a); fill_number(j, b); fill_number(k, c);
-                double frac = processed * 100.0 / total;
-                fill_pct(frac, d);
-                std::cout << "\r" << a << " / " << b << " / " << c;
-                std::cout << " ( " << d << "% )    " << std::flush;
-            }
-        };
-
         /*
         * NOTE: I'm not sure why, but the triangles generated from the particle
         * sdf with Pcount method  need to be rotated otherwise normals get flipped.
@@ -629,11 +606,9 @@ void surface_command(int argc, char **argv){
         * but for now it seems that it literally is as simple as rotating the triangles.
         */
         if(opts.method == SDF_PARTICLE_COUNT)
-            MarchingCubes(grid, &mesh, 0.25, reporter, true);
+            MarchingCubes(grid, &mesh, 0.25, true);
         else
-            MarchingCubes(grid, &mesh, 0.0, reporter, false);
-
-        std::cout << std::endl;
+            MarchingCubes(grid, &mesh, 0.0, false);
     }
 
     mesh.writeToDisk(opts.output.c_str(), opts.outformat);

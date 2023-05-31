@@ -6,4 +6,4 @@
 #include <functional>
 
 void MarchingCubes(FieldGrid3f *grid, HostTriangleMesh3* mesh, Float isoValue,
-                   std::function<void(vec3ui u)> fn, bool rotate_faces=false);
+                   bool rotate_faces=false);

@@ -231,6 +231,16 @@ inline __bidevice__ double NextFloatDown(double v, int delta = 1) {
     return BitsToFloat(ui);
 }
 
+
+template<typename T> inline __bidevice__
+void atomic_increase(T *value){
+#if defined(__CUDA_ARCH__)
+    atomicAdd(value, T(1));
+#else
+    __atomic_fetch_add(value, T(1), __ATOMIC_SEQ_CST);
+#endif
+}
+
 template <typename T, typename U, typename V>
 inline __bidevice__ T Clamp(T val, U low, V high){
     if(val < low) return low;

@@ -5,7 +5,7 @@
 #include <obj_loader.h> // get parser utilities
 #include <transform.h>
 
-// Two dragons scene: -clip-plane 4 3.6 2 -layered -mat diffuse -mat-value 0.549 0.647 0.643
+// Two dragons scene: -clip 4 3.6 2 -layered -mat diffuse -mat-value 0.549 0.647 0.643
 #define MESH_FOLDER "/home/felipe/Documents/CGStuff/models"
 
 #define __to_stringf __to_string<Float>
@@ -335,7 +335,7 @@ ARGUMENT_PROCESS(pbr_translate_arg){
 ARGUMENT_PROCESS(pbr_clip_arg){
     vec3f data;
     pbr_opts *opts = (pbr_opts *)config;
-    std::string value = ParseNext(argc, argv, i, "-clip-plane", 3);
+    std::string value = ParseNext(argc, argv, i, "-clip", 3);
     const char *token = value.c_str();
     ParseV3(&data, &token);
     opts->cutSource = data[0];
@@ -450,7 +450,7 @@ std::map<const char *, arg_desc> pbr_argument_map = {
             .help = "Translate input set."
         }
     },
-    {"-clip-plane",
+    {"-clip",
         { .processor = pbr_clip_arg,
             .help = "Specify parameters to perform plane clip, <source> <distance> <axis>."
         }

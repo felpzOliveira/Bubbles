@@ -5,7 +5,7 @@ option(CONVEXHULL_QHULL "Use QHull for convex hull" ON)
 
 set(BUBBLES "bubbles")
 set(BBTOOL "bbtool")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src/core"
+set (INC_PATHS      "${CMAKE_CURRENT_SOURCE_DIR}/src/core"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/shapes"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/third"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/third/graphy"
@@ -23,16 +23,13 @@ execute_process(COMMAND ${CUDA_OUTPUT}
                         RESULT_VARIABLE CUDA_RETURN_CODE
                         OUTPUT_VARIABLE CHK_CUDA_OUTPUT)
 
-
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     message(STATUS "Debug build")
-    set(BB_FLAGS "-std=c++14 -g -G -DDEBUG --use_fast_math --extended-lambda")
+    set(BB_FLAGS "-g -G -DDEBUG --use_fast_math --extended-lambda")
 else()
     message(STATUS "Release build")
-    set(BB_FLAGS "-std=c++14 -Xptxas -O3 -DRELEASE --use_fast_math -maxrregcount 64 --extended-lambda")
+    set(BB_FLAGS "-Xptxas -O3 -DRELEASE --use_fast_math -maxrregcount 64 --extended-lambda")
 endif()
-
-set(cxx_warning_flags "-fdiagnostics-format=json")
 
 if(NOT ${CUDA_RETURN_CODE} EQUAL 0)
     message(SEND_ERROR ${CHK_CUDA_OUTPUT})
@@ -71,20 +68,35 @@ file(GLOB BUBBLES_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/src/bubbles.cpp)
 file(GLOB BBTOOL_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/src/bbtool.cpp
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/apps/*.cpp)
 
+set_source_files_properties(${BUBBLES_CORE} PROPERTIES LANGUAGE CUDA)
+set_source_files_properties(${BUBBLES_SRCS} PROPERTIES LANGUAGE CUDA)
+set_source_files_properties(${BBTOOL_SRCS} PROPERTIES LANGUAGE CUDA)
+
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src/third/gDel3D)
 
-set(CMAKE_CXX_COMPILER nvcc)
-
 add_library(corelib OBJECT ${BUBBLES_CORE})
-set_target_properties(corelib PROPERTIES COMPILE_FLAGS "${BB_COMPILE}" LINK_FLAGS "${BB_FLAGS}")
+target_include_directories(corelib PUBLIC ${INC_PATHS})
+set_target_properties(corelib PROPERTIES COMPILE_FLAGS "${BB_COMPILE}")
+set_target_properties(corelib PROPERTIES
+       CUDA_ARCHITECTURES "75"
+       CUDA_SEPARABLE_COMPILATION ON
+       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
 add_executable(${BUBBLES} ${BUBBLES_SRCS} $<TARGET_OBJECTS:corelib>)
-target_link_libraries(${BUBBLES} ${BB_LINK_LIBS};gflip3d)
-set_target_properties(${BUBBLES} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}"
-                      LINK_FLAGS "${BB_FLAGS}")
+target_include_directories(${BUBBLES} PUBLIC ${INC_PATHS})
+target_link_libraries(${BUBBLES} ${BB_LINK_LIBS};gflip3d;cuda)
+set_target_properties(${BUBBLES} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}")
+set_target_properties(${BUBBLES} PROPERTIES
+       CUDA_ARCHITECTURES "75"
+       CUDA_SEPARABLE_COMPILATION ON
+       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
 add_executable(${BBTOOL} ${BBTOOL_SRCS} $<TARGET_OBJECTS:corelib>)
-target_link_libraries(${BBTOOL} ${BB_LINK_LIBS};gflip3d)
-set_target_properties(${BBTOOL} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}"
-                      LINK_FLAGS "${BB_FLAGS}")
+target_include_directories(${BBTOOL} PUBLIC ${INC_PATHS})
+target_link_libraries(${BBTOOL} ${BB_LINK_LIBS};gflip3d;cuda)
+set_target_properties(${BBTOOL} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}")
+set_target_properties(${BBTOOL} PROPERTIES
+       CUDA_ARCHITECTURES "75"
+       CUDA_SEPARABLE_COMPILATION ON
+       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 

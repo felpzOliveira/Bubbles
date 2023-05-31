@@ -2,20 +2,11 @@
 #pragma once
 #include <gDel3D/GpuDelaunay.h>
 #include <util.h>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include <host_mesh.h>
 #include <bound_util.h>
-
-struct DelaunayIndexInfo{
-    vec3ui baseTriangle;
-    int oposite;
-    int counter;
-};
-
-typedef std::unordered_map<i3, DelaunayIndexInfo, i3Hasher, i3IsSame> DelaunayTriangleIndexedMap;
-typedef std::unordered_map<uint32_t, std::unordered_set<uint32_t>> DelaunayVertexConnection;
+#include <unordered_set>
+#include <sph_solver.h>
 
 typedef WorkQueue<vec4ui> DelaunayWorkQueue;
 
@@ -25,19 +16,21 @@ struct DelaunayTriangulation{
     size_t pLen;
     std::vector<int> boundary;
     std::vector<vec3i> shrinked;
+    std::vector<vec3f> shrinkedPs;
     std::vector<uint32_t> ids;
 };
 
-__host__ void
+void
 DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                Float spacing, Float mu, Grid3 *domain);
+                Float spacing, Float mu, Grid3 *domain, SphSolver3 *solver);
 
-__host__ void
+void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
+                               Float spacing, Float mu);
+
+void
 DelaunayGetTriangleMesh(DelaunayTriangulation &triangulation, HostTriangleMesh3 *mesh);
 
-__host__ void
+void
 DelaunayWriteBoundary(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
                       const char *path);
 
-__host__ void
-DelaunayWritePly(DelaunayTriangulation &triangulation, const char *path);

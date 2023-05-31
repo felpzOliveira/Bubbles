@@ -22,7 +22,7 @@ void writePly(HostTriangleMesh3 *mesh, std::ostream *strm){
     }
 */
     (*strm) << "element face " << mesh->numberOfTriangles() << "\n";
-    (*strm) << "property list uchar int vertex_index\n";
+    (*strm) << "property list uchar int vertex_indices\n";
     (*strm) << "end_header\n";
 
     for(const auto &pt : mesh->points){

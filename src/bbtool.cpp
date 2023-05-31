@@ -2,7 +2,6 @@
 #include <util.h>
 #include <map>
 #include <iomanip>
-#include <gDel3D/GpuDelaunay.h>
 
 ARGUMENT_PROCESS(convert_cmd){
     convert_command(argc-1, &argv[1]);

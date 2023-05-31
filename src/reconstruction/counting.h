@@ -46,8 +46,8 @@ inline __bidevice__ U ClampedIndex(U u, U sizes, int dims, int &clamped){
 
 /*
 * NOTE: Since surface reconstruction by particle counting does not require access to
-* particle neighborhood using Grid2/3 is overkill and in fact because marching cubes
-* requires a higher resolution attempting to create a high resolution Grid2/3 can easily
+* particle neighborhood, using Grid2/3 is overkill and in fact because marching cubes
+* requires a higher resolution, attempting to create a high resolution Grid2/3 can easily
 * run out of memory because of the neighbors lists it builds for particle querying.
 * I'll create a lightweight version of Grid2/3 that can be used with higher resolution
 * but does not provide the ability to query particles.
@@ -64,8 +64,8 @@ class LightweightGrid{
     DataType *stored;
 
     __bidevice__ LightweightGrid(){}
-    __host__ void SetDimension(vec2f){ dimensions = 2; }
-    __host__ void SetDimension(vec3f){ dimensions = 3; }
+    void SetDimension(vec2f){ dimensions = 2; }
+    void SetDimension(vec3f){ dimensions = 3; }
     __bidevice__ unsigned int GetCellCount(){ return total; }
     __bidevice__ Q GetBounds(){ return bounds; }
     __bidevice__ T GetCellSize(){ return cellsLen; }
@@ -133,7 +133,7 @@ class LightweightGrid{
     }
 
     /* Initialize internals of the lightweight grid */
-    __host__ void Build(const U &resolution, const T &dp0, const T &dp1,
+    void Build(const U &resolution, const T &dp0, const T &dp1,
                         bool with_data=true)
     {
         SetDimension(T(0));
@@ -179,7 +179,7 @@ typedef LightweightGrid<vec3f, vec3ui, Bounds3f, size_t> LightweightGrid3;
 * Simple routines for explicit build operations.
 */
 
-inline __host__ LightweightGrid2 *
+inline LightweightGrid2 *
 MakeLightweightGrid(const vec2ui &size, const vec2f &pMin, const vec2f &pMax)
 {
     LightweightGrid2 *grid = cudaAllocateVx(LightweightGrid2, 1);
@@ -187,7 +187,7 @@ MakeLightweightGrid(const vec2ui &size, const vec2f &pMin, const vec2f &pMax)
     return grid;
 }
 
-inline __host__ LightweightGrid3 *
+inline LightweightGrid3 *
 MakeLightweightGrid(const vec3ui &size, const vec3f &pMin, const vec3f &pMax)
 {
     LightweightGrid3 *grid = cudaAllocateVx(LightweightGrid3, 1);
@@ -327,10 +327,10 @@ class CountingGrid{
     int dimensions;
 
     __bidevice__ CountingGrid(){}
-    __host__ void SetDimension(vec2f){ dimensions = 2; }
-    __host__ void SetDimension(vec3f){ dimensions = 3; }
+    void SetDimension(vec2f){ dimensions = 2; }
+    void SetDimension(vec3f){ dimensions = 3; }
 
-    __host__ void BuildByResolution(ParticleSetBuilder<T> *pBuilder, U u){
+    void BuildByResolution(ParticleSetBuilder<T> *pBuilder, U u){
         Q bounds;
         T half;
         T ds;
@@ -365,7 +365,7 @@ class CountingGrid{
         Build(grid);
     }
 
-    __host__ void BuildBySpacing(ParticleSetBuilder<T> *pBuilder, Float spacing){
+    void BuildBySpacing(ParticleSetBuilder<T> *pBuilder, Float spacing){
         Q bounds;
         U resolution;
         T half;
@@ -397,7 +397,7 @@ class CountingGrid{
         Build(grid);
     }
 
-    __host__ void Build(GridType *_grid){
+    void Build(GridType *_grid){
         Float initialCellCount = 0;
         grid = _grid;
         particleCount = 0;
@@ -426,7 +426,7 @@ class CountingGrid{
         }
     }
 
-    __host__ FieldGridType *Solve(){
+    FieldGridType *Solve(){
         FieldGridType *field = cudaAllocateVx(FieldGridType, 1);
         Q bounds = grid->GetBounds();
         T spacing = grid->GetCellSize();

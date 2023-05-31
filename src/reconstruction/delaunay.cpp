@@ -8,6 +8,7 @@
 #include <interval.h>
 #include <fstream>
 #include <cutil.h>
+#include <unordered_map>
 
 struct DelaunaySet{
     int nPos = 0;
@@ -24,6 +25,13 @@ struct DelaunaySet{
         return vec3f();
     }
 
+    __bidevice__ void SetParticlePosition(int id, vec3f p){
+        if(nPos > 0){
+            int trueId = id - offset;
+            positions[trueId] = p;
+        }
+    }
+
     __bidevice__ vec3f GetParticleNormal(int id){
         if(nNor > 0){
             int trueId = id - offset;
@@ -36,19 +44,25 @@ struct DelaunaySet{
         return id >= offset;
     }
 
-    __host__ void Build(std::vector<vec3f> &pos, std::vector<vec3f> &nor, int off){
+    void Build(std::vector<vec3f> &pos, std::vector<vec3f> &nor, int off){
         nPos = pos.size();
         nNor = nor.size();
         offset = off;
 
         if(nPos > 0 && nNor > 0){
-            positions = cudaAllocateVx(vec3f, nPos);
-            normals = cudaAllocateVx(vec3f, nNor);
+            positions = cudaAllocateUnregisterVx(vec3f, nPos);
+            normals = cudaAllocateUnregisterVx(vec3f, nNor);
             memcpy(positions, pos.data(), pos.size() * sizeof(vec3f));
             memcpy(normals, nor.data(), nor.size() * sizeof(vec3f));
         }
     }
+
+    void Cleanup(){
+        cudaFree(positions);
+        cudaFree(normals);
+    }
 };
+
 
 struct DelaunaySmallBucket{
     int id;
@@ -62,17 +76,17 @@ struct DelaunaySetBuilder{
     std::vector<vec3f> pos;
     std::vector<vec3f> nor;
 
-    __host__ void PushParticle(vec3f p, vec3f n){
+    void PushParticle(vec3f p, vec3f n){
         pos.push_back(p);
         nor.push_back(n);
     }
 
-    __host__ size_t Size(){
+    size_t Size(){
         return pos.size();
     }
 
-    __host__ DelaunaySet *Build(int total_p){
-        DelaunaySet *dSet = cudaAllocateVx(DelaunaySet, 1);
+    DelaunaySet *Build(int total_p){
+        DelaunaySet *dSet = cudaAllocateUnregisterVx(DelaunaySet, 1);
         dSet->Build(pos, nor, total_p);
         return dSet;
     }
@@ -89,31 +103,19 @@ __bidevice__ vec3f DelaunayPosition(ParticleSet3 *pSet, DelaunaySet *dSet, int i
 }
 
 inline
-__bidevice__ vec3f DelaunayNormal(ParticleSet3 *pSet, DelaunaySet *dSet, int id){
+__bidevice__ void DelaunaySetPosition(ParticleSet3 *pSet, DelaunaySet *dSet,
+                                      int id, vec3f p)
+{
     int count = pSet->GetParticleCount();
     if(id < count)
-        return pSet->GetParticleNormal(id);
+        pSet->SetParticlePosition(id, p);
     else
-        return dSet->GetParticleNormal(id);
+        dSet->SetParticlePosition(id, p);
 }
 
 inline __bidevice__ void DelaunaySetBoundary(DelaunaySet *dSet, int id, int *u_bound){
     if(!dSet->InSet(id))
         u_bound[id] = 1;
-}
-
-__host__ void
-DelaunayIndexedMapHandleTriangle(int a, int b, int c, int d,
-                                 DelaunayTriangleIndexedMap &indexedMap)
-{
-    i3 key(a, b, c);
-    DelaunayIndexInfo indexInfo = { vec3ui(a, b, c), d, 0 };
-    if(indexedMap.find(key) != indexedMap.end()){
-        indexInfo = indexedMap[key];
-    }
-
-    indexInfo.counter += 1;
-    indexedMap[key] = indexInfo;
 }
 
 __bidevice__ vec3f
@@ -128,11 +130,16 @@ GeometricalNormal(vec3f a, vec3f b, vec3f c, bool normalized=true){
 }
 
 __bidevice__ void ParticleFlag(ParticleSet3 *pSet, Grid3 *grid, int pId, Float radius,
-                               DelaunaySmallBucket *buckets)
+                               int threshold)
 {
     int *neighbors = nullptr;
     vec3f pi = pSet->GetParticlePosition(pId);
-    DelaunaySmallBucket *bucket = &buckets[pId];
+
+    // TODO: The small bucket thing is not being used, I'm letting here
+    //       just in case we ever want to do more processing on them
+    DelaunaySmallBucket tbucket;
+    DelaunaySmallBucket *bucket = &tbucket;
+
     unsigned int cellId = grid->GetLinearHashedPosition(pi);
     Cell3 *cell = grid->GetCell(cellId);
     int count = grid->GetNeighborsOf(cellId, &neighbors);
@@ -180,6 +187,7 @@ __bidevice__ void ParticleFlag(ParticleSet3 *pSet, Grid3 *grid, int pId, Float r
         Cell3 *cell = grid->GetCell(neighbors[i]);
         ParticleChain *pChain = cell->GetChain();
         int size = cell->GetChainLength();
+
         for(int j = 0; j < size; j++){
             vec3f pj = pSet->GetParticlePosition(pChain->pId);
             fn_accept(pj, pChain->pId);
@@ -192,34 +200,107 @@ __bidevice__ void ParticleFlag(ParticleSet3 *pSet, Grid3 *grid, int pId, Float r
 
     bucket->size = 1+within_radius;
     bucket->density = density;
+    if(density < threshold)
+        pSet->SetParticleV0(pId, 1);
 }
 
-__host__ void SpawnParticles(vec3f pi, int pId, vec3f n, int id, DelaunaySetBuilder &dBuilder,
-                          std::vector<uint32_t> &ids, Point3HVec &pointVec, Float radius)
+void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
+                               Float spacing, Float mu)
 {
-    ids.push_back(pId);
-    pointVec.push_back({pi.x, pi.y, pi.z});
+    int maxSize = 0;
+    unsigned int totalCells = domain->GetCellCount();
+    for(unsigned int i = 0; i < totalCells; i++){
+        Cell3 *cell = domain->GetCell(i);
+        maxSize = Max(maxSize, cell->GetChainLength());
+    }
 
-    for(int i = 0; i < 10; i++){
-        Float u0 = rand_float();
-        Float u1 = rand_float();
-        Float r = radius;
+    Float radius = mu * spacing;
+    AutoParallelFor("Delaunay_GetDomain", pSet->GetParticleCount(), AutoLambda(int i){
+        ParticleFlag(pSet, domain, i, radius, threshold);
+    });
+}
 
-        Float theta = TwoPi * u0;
-        Float phi = acos(1.f - 2.f * u1);
-        Float x = r * sin(phi) * cos(theta);
-        Float y = r * sin(phi) * sin(theta);
-        Float z = r * cos(phi);
-
-        vec3f p = pi + vec3f(x, y, z);
-        ids.push_back(id + i);
-        pointVec.push_back({p.x, p.y, p.z});
-        dBuilder.PushParticle(p, n);
+void DumpPoints(DelaunaySetBuilder &dBuilder, ParticleSet3 *pSet){
+    FILE *fp = fopen("test_points.txt", "wb");
+    if(fp){
+        int nCount = pSet->GetParticleCount();
+        int dCount = dBuilder.Size();
+        int totalP = nCount + dCount;
+        fprintf(fp, "%d\n", totalP);
+        for(int i = 0; i < nCount; i++){
+            vec3f pi = pSet->GetParticlePosition(i);
+            int vi = pSet->GetParticleV0(i);
+            fprintf(fp, "%g %g %g %d\n", pi.x, pi.y, pi.z, vi);
+        }
+        for(int i = 0; i < dCount; i++){
+            vec3f pi = dBuilder.pos[i];
+            fprintf(fp, "%g %g %g 2\n", pi.x, pi.y, pi.z);
+        }
+        fclose(fp);
     }
 }
 
-__host__ void SpawnTetra1(vec3f pi, int pId, vec3f n, int id, DelaunaySetBuilder &dBuilder,
-                          std::vector<uint32_t> &ids, Point3HVec &pointVec, Float edgeLen)
+void SpawnParticles(vec3f pi, int pId, vec3f n, int id, DelaunaySetBuilder &dBuilder,
+                    std::vector<uint32_t> &ids, Point3HVec &pointVec, unsigned int cellId,
+                    Grid3 *grid, ParticleSet3 *pSet)
+{
+    int *neighbors = nullptr;
+    int count = grid->GetNeighborsOf(cellId, &neighbors);
+    Float radius = 1.1f * 0.02f;
+    Float scaledRadius = 0.5 * radius;
+    vec3f ps[120];
+    int max_n = sizeof(ps) / sizeof(vec3f);
+    int c = 0;
+
+    int added = 0;
+    for(int i = 0; i < count; i++){
+        Cell3 *cell = grid->GetCell(neighbors[i]);
+        ParticleChain *pChain = cell->GetChain();
+        int size = cell->GetChainLength();
+
+        for(int j = 0; j < size; j++){
+            if(pId != pChain->pId){
+                vec3f pj = pSet->GetParticlePosition(pChain->pId);
+                Float d = Distance(pi, pj);
+                if(d < scaledRadius && d > 1e-4){
+                    added += 1;
+                }else{
+                    if(c < max_n)
+                        ps[c++] = pj;
+                }
+            }
+            pChain = pChain->next;
+        }
+    }
+
+    if(added == 0){
+        for(int i = 0; i < 6; i++){
+            Float theta = i * Pi / 6.f;
+            Float phi = i * TwoPi / 6.f;
+            Float x = scaledRadius * sinf(theta) * cosf(phi);
+            Float y = scaledRadius * sinf(theta) * sinf(phi);
+            Float z = scaledRadius * cosf(theta);
+            vec3f pn = pi + vec3f(x, y, z) * 0.6;
+            bool accept = true;
+            for(int s = 0; s < c && accept; s++){
+                if(Distance(pn, ps[s]) < 1e-4)
+                    accept = false;
+            }
+            if(accept){
+                ids.push_back(id + added);
+                pointVec.push_back({pn.x, pn.y, pn.z});
+                dBuilder.PushParticle(pn, n);
+                added += 1;
+            }
+        }
+    }else{
+        ids.push_back(pId);
+        pointVec.push_back({pi.x, pi.y, pi.z});
+    }
+}
+
+void SpawnTetra1(vec3f pi, int pId, vec3f n, int id, DelaunaySetBuilder &dBuilder,
+                 std::vector<uint32_t> &ids, Point3HVec &pointVec, Float edgeLen)
 {
     const vec3f u0 = vec3f(0.57735, 0.57735, 0.57735);
     const vec3f u1 = vec3f(0.57735, -0.57735, -0.57735);
@@ -249,23 +330,47 @@ __host__ void SpawnTetra1(vec3f pi, int pId, vec3f n, int id, DelaunaySetBuilder
     dBuilder.PushParticle(p3, n);
 }
 
-__host__ void SpawnTetra2(vec3f p0, vec3f p1, vec3f n, int id, DelaunaySetBuilder &dBuilder,
-                          std::vector<uint32_t> &ids, Point3HVec &pointVec, Float edgeLen)
+void SpawnTetra2(vec3f p0, int pId, vec3f n, int id, DelaunaySetBuilder &dBuilder,
+                 std::vector<uint32_t> &ids, Point3HVec &pointVec, Float edgeLen)
 {
     Matrix3x3 I;
     const vec3f u0 = vec3f(0.57735, 0.57735, 0.57735);
     const vec3f u1 = vec3f(0.57735, -0.57735, -0.57735);
     const vec3f u2 = vec3f(-0.57735, 0.57735, -0.57735);
     const vec3f u3 = vec3f(-0.57735, -0.57735, 0.57735);
-    vec3f dir = Normalize(p1 - p0);
+    if(IsZero(n.LengthSquared())){
+        SpawnTetra1(p0, pId, n, id, dBuilder, ids, pointVec, edgeLen);
+        return;
+    }
+
+    vec3f dir = -n;
     vec3f edir = Normalize(u1 - u0);
     vec3f v = Cross(edir, dir);
-
     Float c = Dot(edir, dir);
+
     if(c == -1){
-        // TODO: direction dir is the negative of edir, all we need to do is rotate
-        //       p1 by 180 or simply swap p1 and p0 and scale the tetra
-        printf("Invalid direction for build\n");
+        vec3f dir1 = -edir;
+        vec3f dir2 = Normalize(u2 - u1);
+        vec3f dir3 = Normalize(u3 - u1);
+
+        vec3f _np1 = p0 + dir1 * edgeLen;
+        vec3f _np2 = p0 + dir2 * edgeLen;
+        vec3f _np3 = p0 + dir3 * edgeLen;
+
+        ids.push_back(pId);
+        ids.push_back(id + 0);
+        ids.push_back(id + 1);
+        ids.push_back(id + 2);
+
+        pointVec.push_back({p0.x, p0.y, p0.z});
+        pointVec.push_back({_np1.x, _np1.y, _np1.z});
+        pointVec.push_back({_np2.x, _np2.y, _np2.z});
+        pointVec.push_back({_np3.x, _np3.y, _np3.z});
+
+        dBuilder.PushParticle(_np1, n);
+        dBuilder.PushParticle(_np2, n);
+        dBuilder.PushParticle(_np3, n);
+
         return;
     }
 
@@ -277,62 +382,125 @@ __host__ void SpawnTetra2(vec3f p0, vec3f p1, vec3f n, int id, DelaunaySetBuilde
     Matrix3x3 vx2 = Matrix3x3::Mul(vx, vx);
     Matrix3x3 R = I + vx + vx2 * (1.f / (1.f + c));
 
+    vec3f ru1 = R.Vec(u1);
     vec3f ru2 = R.Vec(u2);
     vec3f ru3 = R.Vec(u3);
 
-    vec3f dir_u2 = Normalize(ru2 - p1);
-    vec3f dir_u3 = Normalize(ru3 - p1);
+    vec3f dir_u1 = Normalize(ru1); // TODO: isn't this -n itself?
+    vec3f dir_u2 = Normalize(ru2);
+    vec3f dir_u3 = Normalize(ru3);
 
-    vec3f np1 = p1 + dir_u2 * edgeLen;
-    vec3f np2 = p1 + dir_u3 * edgeLen;
+    vec3f np1 = p0 + dir_u1 * edgeLen;
+    vec3f np2 = p0 + dir_u2 * edgeLen;
+    vec3f np3 = p0 + dir_u3 * edgeLen;
 
+    ids.push_back(pId);
     ids.push_back(id + 0);
     ids.push_back(id + 1);
+    ids.push_back(id + 2);
 
+    pointVec.push_back({p0.x, p0.y, p0.z});
     pointVec.push_back({np1.x, np1.y, np1.z});
     pointVec.push_back({np2.x, np2.y, np2.z});
+    pointVec.push_back({np3.x, np3.y, np3.z});
 
     dBuilder.PushParticle(np1, n);
     dBuilder.PushParticle(np2, n);
+    dBuilder.PushParticle(np3, n);
 }
 
-__host__ void SpawnTetra3(vec3f p0, vec3f p1, vec3f p2, vec3f n, int id,
-                          DelaunaySetBuilder &dBuilder, std::vector<uint32_t> &ids,
-                          Point3HVec &pointVec, Float edgeLen)
-{
-    vec3f nb = GeometricalNormal(p0, p1, p2);
-    vec3f bcenter = (p0 + p1 + p2) * 0.3333f;
-    Float e = edgeLen;
-    Float d0 = Distance(p0, bcenter);
-    Float d0_2 = d0 * d0;
-    Float ed2 = e * e;
+__bidevice__
+void MoveParticles(ParticleSet3 *pSet, Grid3 *grid, int pId, vec3f &po){
+    vec3f pi = pSet->GetParticlePosition(pId);
+    int vi = pSet->GetParticleV0(pId);
+    Float spacing = 0.01f;
+    Float halfSpacing = spacing * 0.5f;
+    Float invSpacing = 1.f / spacing;
+    po = pi;
 
-    Float d2 = d0_2;
-    if(ed2 < d2){
-        printf("Warning: large triangle?\n");
-    }else{
-        Float h = Max(0.1 * edgeLen, sqrt(ed2 - d2) * 0.8);
-        vec3f np = bcenter + h * nb;
+    if(vi == 0)
+        return;
 
-        //Float e0 = Distance(p0, np);
-        //Float e1 = Distance(p1, np);
-        //Float e2 = Distance(p2, np);
-        //printf("Ratio {%g %g %g}\n", e0/edgeLen, e1/edgeLen, e2/edgeLen);
-        ids.push_back(id + 0);
-        pointVec.push_back({np.x, np.y, np.z});
-        dBuilder.PushParticle(np, n);
+    int x_id = std::floor(pi.x * invSpacing);
+    int y_id = std::floor(pi.y * invSpacing);
+    int z_id = std::floor(pi.z * invSpacing);
+
+    vec3f center =
+            vec3f((Float)x_id, (Float)y_id, (Float)z_id) * spacing + vec3f(halfSpacing);
+    const vec3f vertices[] = {
+        vec3f(-1, -1, -1), vec3f(-1, -1, +1),
+        vec3f(-1, +1, -1), vec3f(-1, +1, +1),
+        vec3f(+1, -1, -1), vec3f(+1, -1, +1),
+        vec3f(+1, +1, -1), vec3f(+1, +1, +1),
+
+        vec3f(-1.0, +0.5, +0.0), vec3f(+1.0, +0.5, +0.0),
+        vec3f(+0.0, +0.5, +1.0), vec3f(+0.0, +0.5, -1.0),
+        vec3f(+0.0, +1.0, +0.0), vec3f(+0.0, -1.0, +0.0),
+    };
+
+    int vcount = sizeof(vertices) / sizeof(vertices[0]);
+    Float minDist = Infinity;
+    vec3f ps = pi;
+    for(int i = 0; i < vcount; i++){
+        vec3f pn = center + vertices[i] * halfSpacing;
+        Float dist = Distance(pn, pi);
+        if(minDist > dist){
+            ps = pn;
+            minDist = dist;
+        }
+    }
+
+    po = ps;
+}
+
+__bidevice__
+void MoveParticles2(ParticleSet3 *pSet, Grid3 *grid, int pId, vec3f &po){
+    vec3f pi = pSet->GetParticlePosition(pId);
+    int vi = pSet->GetParticleV0(pId);
+    po = pi;
+
+    if(vi == 0)
+        return;
+
+    vec3f ni = pSet->GetParticleNormal(pId);
+    if(IsZero(ni.LengthSquared()))
+        return;
+
+    int *neighbors = nullptr;
+    unsigned int cellId = grid->GetLinearHashedPosition(pi);
+    int count = grid->GetNeighborsOf(cellId, &neighbors);
+
+    Float wsum = 0.f;
+    vec3f dsum(0.f);
+    for(int i = 0; i < count; i++){
+        Cell3 *cell = grid->GetCell(neighbors[i]);
+        ParticleChain *pChain = cell->GetChain();
+        int size = cell->GetChainLength();
+
+        for(int j = 0; j < size; j++){
+            if(pChain->pId != pId){
+                vec3f pj = pSet->GetParticlePosition(pChain->pId);
+                dsum = dsum + pj;
+                wsum += 1.f;
+            }
+        }
+    }
+
+    if(wsum > 0){
+        Float relax = 0.25f;
+        dsum = dsum * (1.f / wsum);
+        vec3f disp = dsum - pi;
+        po = pi + disp * relax;
     }
 }
 
-__host__ void CheckPart(ParticleSet3 *pSet, Grid3 *grid, int pId, int threshold,
-                        DelaunaySetBuilder &dBuilder, std::vector<uint32_t> &ids,
-                        Point3HVec &pointVec, Float dist, DelaunaySmallBucket *sbucket)
+void CheckPart(ParticleSet3 *pSet, Grid3 *grid, int pId, DelaunaySetBuilder &dBuilder,
+               std::vector<uint32_t> &ids, Point3HVec &pointVec, Float dist)
 {
-    vec3f pi = pSet->GetParticlePosition(pId);
-    unsigned int cellId = grid->GetLinearHashedPosition(pi);
-    Cell3 *cell = grid->GetCell(cellId);
-    Bucket *bucket = pSet->GetParticleBucket(pId);
     int acceptpart = 1;
+    vec3f pi = pSet->GetParticlePosition(pId);
+#if 1
+    Bucket *bucket = pSet->GetParticleBucket(pId);
     for(int i = 0; i < bucket->Count(); i++){
         int j = bucket->Get(i);
         if(j != pId){
@@ -346,53 +514,44 @@ __host__ void CheckPart(ParticleSet3 *pSet, Grid3 *grid, int pId, int threshold,
             }
         }
     }
+#else
+    int *neighbors = nullptr;
+    unsigned int cellId = grid->GetLinearHashedPosition(pi);
+    int count = grid->GetNeighborsOf(cellId, &neighbors);
+    for(int i = 0; i < count; i++){
+        Cell3 *cell = grid->GetCell(neighbors[i]);
+        ParticleChain *pChain = cell->GetChain();
+        int size = cell->GetChainLength();
 
+        for(int j = 0; j < size; j++){
+            if(pChain->pId != pId){
+                vec3f pj = pSet->GetParticlePosition(pChain->pId);
+                Float d = Distance(pi, pj);
+                if(d < 1e-4){
+                    if(pId > j){
+                        acceptpart = 0;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+#endif
     if(acceptpart == 1){
         int totalP = pSet->GetParticleCount() + dBuilder.Size();
         vec3f n = pSet->GetParticleNormal(pId);
-        if(sbucket->density < threshold){
+        int bi = pSet->GetParticleV0(pId);
+        if(bi > 0){
+            //ids.push_back(pId);
+            //pointVec.push_back({pi.x, pi.y, pi.z});
+            //SpawnTetra2(pi, pId, n, totalP, dBuilder, ids, pointVec, 0.9 * dist);
             SpawnTetra1(pi, pId, n, totalP, dBuilder, ids, pointVec, 0.9 * dist);
-            //SpawnParticles(pi, pId, n, totalP, dBuilder, ids, pointVec, dist);
+            //SpawnParticles(pi, pId, n, totalP, dBuilder, ids, pointVec, cellId, grid, pSet);
         }else{
             ids.push_back(pId);
             pointVec.push_back({pi.x, pi.y, pi.z});
         }
-    #if 0
-        else if(sbucket->size == 2){
-            vec3f p1 = sbucket->pneighbors[0];
-            SpawnTetra2(pi, p1, n, totalP, dBuilder, ids, pointVec, 0.99 * dist);
-        }else if(sbucket->size == 3){
-            vec3f p1 = sbucket->pneighbors[0];
-            vec3f p2 = sbucket->pneighbors[1];
-            SpawnTetra3(pi, p1, p2, n, totalP, dBuilder, ids, pointVec, 0.99 * dist);
-        }
-    #endif
     }
-}
-
-__bidevice__ bool
-TriangleMatchesDirection(vec3f a, vec3f b, vec3f c, vec3f ng){
-    vec3f n = GeometricalNormal(a, b, c, false);
-    Float d = Dot(n, ng);
-    return (d >= 0);
-}
-
-__bidevice__ vec3i
-DelaunayOrientation(vec3f a, vec3f b, vec3f c, vec3f op, int A, int B, int C,
-                    vec3f na, vec3f nb, vec3f nc)
-{
-    vec3f ng = SafeNormalize(op - a);
-    if(!TriangleMatchesDirection(a, b, c, ng))
-        return vec3i(A, B, C);
-    if(TriangleMatchesDirection(a, c, b, ng)){
-        vec3f navg = SafeNormalize(na + nb + nc);
-        Float dot = Dot(GeometricalNormal(a, b, c), navg);
-        if(dot < 0)
-            return vec3i(A, C, B);
-        else
-            return vec3i(A, B, C);
-    }
-    return vec3i(A, C, B);
 }
 
 __bidevice__ bool DelaunayIsTetValid(Tet tet, TetOpp opp, char v, uint32_t pLen){
@@ -407,7 +566,7 @@ __bidevice__ bool DelaunayIsTetValid(Tet tet, TetOpp opp, char v, uint32_t pLen)
     return valid;
 }
 
-__bidevice__ int face_inside(i3 *tFaces, i3 face){
+__bidevice__ int matching_faces(i3 *tFaces, i3 face){
     for(int i = 0; i < 4; i++){
         if(tFaces[i] == face)
             return i;
@@ -416,7 +575,20 @@ __bidevice__ int face_inside(i3 *tFaces, i3 face){
     return -1;
 }
 
-__host__ static void
+__bidevice__ vec3ui matching_orientation(i3 face, Tet &tet){
+    for(int i = 0; i < 4; i++){
+        const int *orderVi = TetViAsSeenFrom[i];
+        i3 _face(tet._v[orderVi[0]], tet._v[orderVi[1]], tet._v[orderVi[2]]);
+        if(face == _face){
+            return vec3ui(tet._v[orderVi[0]], tet._v[orderVi[1]], tet._v[orderVi[2]]);
+        }
+    }
+
+    printf("Did not find face, bug?\n");
+    return vec3ui();
+}
+
+static void
 DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangulation,
                            ParticleSet3 *pSet, DelaunaySet *dSet, uint32_t *ids,
                            int *bound, Float mu, Float spacing, DelaunayWorkQueue *delQ)
@@ -431,7 +603,7 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
     delQ->SetSlots(size, false);
 
     Float radius = mu * spacing;
-    int *tetFlags = cudaAllocateUnregisterVx(int, size);
+    char *tetFlags = cudaAllocateUnregisterVx(char, size);
 
     AutoParallelFor("Delaunay_Filter", size, AutoLambda(int i){
         Tet tet = kernTet[i];
@@ -478,9 +650,8 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
                 DelaunaySetBoundary(dSet, idB, bound);
                 DelaunaySetBoundary(dSet, idC, bound);
                 DelaunaySetBoundary(dSet, idD, bound);
-            }else{
+            }else
                 tetFlags[i] = 1;
-            }
         }
     });
 
@@ -492,8 +663,7 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
 
         i3 faces[] = {i3(A, B, C), i3(A, B, D), i3(A, D, C), i3(B, D, C)};
         int info[] = {0, 0, 0, 0};
-        vec4ui tris[] = { vec4ui(A, B, C, D), vec4ui(A, B, D, C),
-                          vec4ui(A, D, C, B), vec4ui(B, D, C, A) };
+        int opp[] = {D, C, B, A};
 
         if(tetFlags[i] == 0)
             return;
@@ -509,16 +679,16 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
             i3 topFaces[] = {i3(a, b, c), i3(a, b, d), i3(a, d, c), i3(b, d, c)};
 
             for(int k = 0; k < 4; k++){
-                int where = face_inside(faces, topFaces[k]);
-                if(where >= 0){
+                int where = matching_faces(faces, topFaces[k]);
+                if(where >= 0)
                     info[where] += 1;
-                }
             }
         }
 
         for(int s = 0; s < 4; s++){
             if(info[s] == 0){
-                delQ->Push(tris[s]);
+                vec3ui tri = matching_orientation(faces[s], tet);
+                delQ->Push(vec4ui(tri.x, tri.y, tri.z, opp[s]));
             }
         }
     });
@@ -526,9 +696,9 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
     cudaFree(tetFlags);
 }
 
-__host__ void
+void
 DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                Float spacing, Float mu, Grid3 *domain)
+                Float spacing, Float mu, Grid3 *domain, SphSolver3 *solver)
 {
     GpuDel triangulator;
     int *u_bound = nullptr;
@@ -536,10 +706,12 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     uint32_t *u_ids = nullptr;
     std::vector<uint32_t> *ids = nullptr;
     DelaunayWorkQueue *delQ = nullptr;
-    DelaunaySmallBucket *buckets = nullptr;
     DelaunaySetBuilder dBuilder;
     int pointNum = 0;
-    const int threshold = 30;
+
+    Float kernel = sphSet->GetKernelRadius();
+    vec3f cellSize = domain->GetCellSize();
+    Float dist = mu * spacing;
 
     DelaunaySet *dSet = nullptr;
     ParticleSet3 *pSet = sphSet->GetParticleSet();
@@ -552,19 +724,37 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     u_bound = cudaAllocateUnregisterVx(int, pSet->GetParticleCount());
     boundary->reserve(pSet->GetParticleCount());
 
-    buckets = cudaAllocateUnregisterVx(DelaunaySmallBucket, pSet->GetParticleCount());
+#if 1
+    vec3f *u_ps = cudaAllocateUnregisterVx(vec3f, pSet->GetParticleCount());
 
-    Float dist = mu * spacing;
+    int iterations = 1;
+    for(int s = 0; s < iterations; s++){
+        AutoParallelFor("Delaunay_MoveParticles", pSet->GetParticleCount(),
+            AutoLambda(int i)
+        {
+            vec3f pl;
+            MoveParticles(pSet, domain, i, pl);
 
-    AutoParallelFor("Delaunay_GetDomain", pSet->GetParticleCount(), AutoLambda(int i){
-        ParticleFlag(pSet, domain, i, dist, buckets);
-    });
+            u_ps[i] = pl;
+        });
+
+        for(int i = 0; i < pSet->GetParticleCount(); i++){
+            pSet->SetParticlePosition(i, u_ps[i]);
+        }
+    }
+
+    cudaFree(u_ps);
+
+    UpdateGridDistributionGPU(solver->solverData);
+#endif
 
     for(int i = 0; i < pSet->GetParticleCount(); i++){
-        CheckPart(pSet, domain, i, threshold, dBuilder, triangulation.ids,
-                  triangulation.pointVec, dist, &buckets[i]);
+        CheckPart(pSet, domain, i, dBuilder, triangulation.ids,
+                  triangulation.pointVec, dist);
         u_bound[i] = 0;
     }
+
+    //DumpPoints(dBuilder, pSet);
 
     pointNum = triangulation.pointVec.size();
     std::cout << "done\n - Support points " << dBuilder.Size() << std::endl;
@@ -589,7 +779,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     u_tri = cudaAllocateUnregisterVx(vec3i, delQ->size);
     triangulation.shrinked.resize(delQ->size);
 
-    AutoParallelFor("Delaunay_OrderTriangles", delQ->size, AutoLambda(int i){
+    AutoParallelFor("Delaunay_MarkTrisAndBoundary", delQ->size, AutoLambda(int i){
         vec4ui uniqueTri = delQ->At(i);
         vec3ui tri = vec3ui(uniqueTri.x, uniqueTri.y, uniqueTri.z);
         int opp = uniqueTri.w;
@@ -602,17 +792,8 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
         int idB = u_ids[B];
         int idC = u_ids[C];
         int idD = u_ids[opp];
-        vec3f pA = DelaunayPosition(pSet, dSet, idA);
-        vec3f pB = DelaunayPosition(pSet, dSet, idB);
-        vec3f pC = DelaunayPosition(pSet, dSet, idC);
-        vec3f pD = DelaunayPosition(pSet, dSet, idD);
 
-        vec3f _nA = DelaunayNormal(pSet, dSet, idA);
-        vec3f _nB = DelaunayNormal(pSet, dSet, idB);
-        vec3f _nC = DelaunayNormal(pSet, dSet, idC);
-
-        vec3i index = DelaunayOrientation(pA, pB, pC, pD, A, B, C,
-                                          _nA, _nB, _nC);
+        vec3i index = vec3i(A, C, B);
 
         DelaunaySetBoundary(dSet, idA, u_bound);
         DelaunaySetBoundary(dSet, idB, u_bound);
@@ -627,26 +808,73 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     int n_it = pSet->GetParticleCount();
     int b_len = 0;
     int max_it = Max(n_it, delQ->size);
+
+    // NOTE: This remapping does not really do anything usefull, it just
+    //       recompute vertices indices so that we can output a smaller
+    //       file without unusefull points
+    // TODO: We can probably remove this and do some changes in kernel
+    //       but it is not actually affecting performance
+    std::unordered_map<uint32_t, uint32_t> remap;
+    uint32_t runningId = 0;
+
     for(int i = 0; i < max_it; i++){
+        if(i < delQ->size){
+            int A = u_tri[i].x;
+            int B = u_tri[i].y;
+            int C = u_tri[i].z;
+            int idA = u_ids[A];
+            int idB = u_ids[B];
+            int idC = u_ids[C];
+
+            vec3f pA = DelaunayPosition(pSet, dSet, idA);
+            vec3f pB = DelaunayPosition(pSet, dSet, idB);
+            vec3f pC = DelaunayPosition(pSet, dSet, idC);
+
+            uint32_t aId, bId, cId;
+            if(remap.find(idA) == remap.end()){
+                aId = runningId++;
+                remap[idA] = aId;
+                triangulation.shrinkedPs.push_back(pA);
+            }else
+                aId = remap[idA];
+
+            if(remap.find(idB) == remap.end()){
+                bId = runningId++;
+                remap[idB] = bId;
+                triangulation.shrinkedPs.push_back(pB);
+            }else
+                bId = remap[idB];
+
+            if(remap.find(idC) == remap.end()){
+                cId = runningId++;
+                remap[idC] = cId;
+                triangulation.shrinkedPs.push_back(pC);
+            }else
+                cId = remap[idC];
+
+            triangulation.shrinked[i] = vec3i(aId, bId, cId);
+        }
+
         if(i < pSet->GetParticleCount()){
             b_len += u_bound[i] > 0;
             boundary->push_back(u_bound[i]);
         }
-        if(i < delQ->size)
-            triangulation.shrinked[i] = u_tri[i];
     }
     std::cout << "done ( boundary: " << b_len << " / " << n_it << " ) " << std::endl;
+    std::cout << " - Finished building mesh" << " ( " << triangulation.shrinkedPs.size() << " vertices | "
+              << triangulation.shrinked.size() << " triangles )" << std::endl;
 
+    triangulator.cleanup();
+    dSet->Cleanup();
+    cudaFree(dSet);
     cudaFree(delQ->ids);
     cudaFree(delQ);
     cudaFree(u_tri);
     cudaFree(u_ids);
     cudaFree(u_bound);
-    cudaFree(buckets);
-    triangulator.cleanup();
 }
 
-__host__ void
+void
 DelaunayWriteBoundary(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
                       const char *path)
 {
@@ -654,6 +882,9 @@ DelaunayWriteBoundary(DelaunayTriangulation &triangulation, SphParticleSet3 *sph
     ParticleSet3 *pSet = sphSet->GetParticleSet();
     if(fp){
         std::vector<int> &boundary = triangulation.boundary;
+        //std::vector<int> boundary;
+        //int n = UtilGetBoundaryState(pSet, &boundary);
+        //printf(" Filter ( %d / %d )\n", n, pSet->GetParticleCount());
         fprintf(fp, "%lu\n", boundary.size());
         for(int i = 0; i < boundary.size(); i++){
             vec3f p = pSet->GetParticlePosition(i);
@@ -663,14 +894,13 @@ DelaunayWriteBoundary(DelaunayTriangulation &triangulation, SphParticleSet3 *sph
     }
 }
 
-__host__ void
+void
 DelaunayGetTriangleMesh(DelaunayTriangulation &triangulation, HostTriangleMesh3 *mesh){
     if(mesh){
-        PredWrapper predWrapper;
-        predWrapper.init(triangulation.pointVec, triangulation.output.ptInfty);
-        for(int i = 0; i < (int)predWrapper.pointNum(); i++){
-            const Point3 pt = predWrapper.getPoint(i);
-            mesh->addPoint(vec3f(pt._p[0], pt._p[1], pt._p[2]));
+        std::vector<vec3f> *points = &triangulation.shrinkedPs;
+        for(int i = 0; i < (int)points->size(); i++){
+            vec3f p = points->at(i);
+            mesh->addPoint(p);
         }
 
         for(vec3i index : triangulation.shrinked){
@@ -680,8 +910,3 @@ DelaunayGetTriangleMesh(DelaunayTriangulation &triangulation, HostTriangleMesh3 
     }
 }
 
-__host__ void
-DelaunayWritePly(DelaunayTriangulation &triangulation, const char *path){
-    UtilGDel3DWritePly(&triangulation.shrinked, &triangulation.pointVec,
-                       &triangulation.output, path);
-}

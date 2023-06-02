@@ -724,7 +724,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     u_bound = cudaAllocateUnregisterVx(int, pSet->GetParticleCount());
     boundary->reserve(pSet->GetParticleCount());
 
-#if 1
+#if 0
     vec3f *u_ps = cudaAllocateUnregisterVx(vec3f, pSet->GetParticleCount());
 
     int iterations = 1;

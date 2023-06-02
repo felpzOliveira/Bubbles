@@ -20,6 +20,14 @@
 *                        method for particle-based fluids
 */
 
+/*
+* NOTE: This implementation is slightly different than the one presented in the paper
+* in order to handle the case where the spacing of the mesh is smaller than the spacing
+* of the simulation, i.e.: high-resolution meshes. The particles are splatted onto the
+* grid based on the ratio = spacingSPH / spacingMesh and the filters have increased
+* radius given by 3 + 2*ratio for the box filter and 5 + 2*ratio for the gaussian filter.
+*/
+
 template<typename T>
 inline __bidevice__ vec3f AsFloat(vec3<T> vf){
     return vec3f(Float(vf.x), Float(vf.y), Float(vf.z));
@@ -219,11 +227,12 @@ struct FilterSolver2D{
     }
 
     template<typename SamplerFn>
-    __bidevice__ Float Box(vec2ui u, SamplerFn sampler){
+    __bidevice__ Float Box(vec2ui u, SamplerFn sampler, Float ratio){
         int i = u.x, j = u.y;
         Float val = Float(0);
         Float iterations = 0;
-        Convolution(3, [&](int x, int y){
+        int radius = 3 + ratio * 2;
+        Convolution(radius, [&](int x, int y){
             val = val + sampler(vec2ui(i + x, j + y));
             iterations += 1.f;
         });
@@ -232,10 +241,11 @@ struct FilterSolver2D{
     }
 
     template<typename SamplerFn>
-    __bidevice__ Float Gaussian(vec2ui u, SamplerFn sampler){
+    __bidevice__ Float Gaussian(vec2ui u, SamplerFn sampler, Float ratio){
         int i = u.x, j = u.y;
         Float val = Float(0);
-        Convolution(5, [&](int x, int y){
+        int radius = 5 + ratio * 2;
+        Convolution(radius, [&](int x, int y){
             Float dx = Float(x);
             Float dy = Float(y);
             Float dx2 = dx * dx;
@@ -272,11 +282,12 @@ struct FilterSolver3D{
     }
 
     template<typename SamplerFn>
-    __bidevice__ Float Box(vec3ui u, SamplerFn sampler){
+    __bidevice__ Float Box(vec3ui u, SamplerFn sampler, Float ratio){
         int i = u.x, j = u.y, k = u.z;
         Float val = Float(0);
         Float iterations = 0;
-        Convolution(3, [&](int x, int y, int z){
+        int radius = 3 + ratio * 2;
+        Convolution(radius, [&](int x, int y, int z){
             val = val + sampler(vec3ui(i + x, j + y, k + z));
             iterations += 1.f;
         });
@@ -285,10 +296,11 @@ struct FilterSolver3D{
     }
 
     template<typename SamplerFn>
-    __bidevice__ Float Gaussian(vec3ui u, SamplerFn sampler){
+    __bidevice__ Float Gaussian(vec3ui u, SamplerFn sampler, Float ratio){
         int i = u.x, j = u.y, k = u.z;
         Float val = Float(0);
-        Convolution(5, [&](int x, int y, int z){
+        int radius = 5 + ratio * 2;
+        Convolution(radius, [&](int x, int y, int z){
             Float dx = Float(x);
             Float dy = Float(y);
             Float dz = Float(z);
@@ -320,6 +332,7 @@ class CountingGrid{
     // the underlying grid
     GridType *grid;
 
+    Float scaledRatio;
     // terms for the method
     Float mu_0;
     Float *fieldDIF; // the value of the sdf for the method
@@ -330,7 +343,7 @@ class CountingGrid{
     void SetDimension(vec2f){ dimensions = 2; }
     void SetDimension(vec3f){ dimensions = 3; }
 
-    void BuildByResolution(ParticleSetBuilder<T> *pBuilder, U u){
+    void BuildByResolution(ParticleSetBuilder<T> *pBuilder, U u, Float simSpacing){
         Q bounds;
         T half;
         T ds;
@@ -352,20 +365,60 @@ class CountingGrid{
             half[i] = resolution[i] * 0.5 * ds[i];
         }
 
+        int ratio = std::floor(simSpacing / spacing);
         T pMin = bounds.Center() - half;
         T pMax = bounds.Center() + half;
         grid = MakeLightweightGrid(resolution, pMin, pMax);
 
         // NOTE: Is there a way to avoid having to do a double loop over this?
         for(T &p : pBuilder->positions){
-            unsigned int h = grid->GetLinearHashedPosition(p);
-            grid->stored[h] += 1;
+            U u = grid->GetHashedPosition(p);
+            if(ratio == 0){
+                unsigned int h = grid->GetLinearCellIndex(u);
+                grid->stored[h] += 1;
+            }else{
+                for(int x = -ratio; x <= ratio; x++){
+                    for(int y = -ratio; y <= ratio; y++){
+                        if(dimensions > 2){
+                            for(int z = -ratio; z <= ratio; z++){
+                                T _u;
+                                _u[0] = int(u[0]) + x;
+                                _u[1] = int(u[1]) + y;
+                                _u[2] = int(u[2]) + z;
+                                if((_u[0] >= 0 && _u[0] < resolution[0]) &&
+                                   (_u[1] >= 0 && _u[1] < resolution[1]) &&
+                                   (_u[2] >= 0 && _u[2] < resolution[2]))
+                                {
+                                    U tg;
+                                    tg[0] = _u[0]; tg[1] = _u[1]; tg[2] = _u[2];
+                                    unsigned int h = grid->GetLinearCellIndex(tg);
+                                    grid->stored[h] += 1;
+                                }
+                            }
+                        }else{
+                            T _u;
+                            _u[0] = int(u[0]) + x;
+                            _u[1] = int(u[1]) + y;
+                            if((_u[0] >= 0 && _u[0] < resolution[0]) &&
+                               (_u[1] >= 0 && _u[1] < resolution[1]))
+                            {
+                                U tg;
+                                tg[0] = _u[0]; tg[1] = _u[1];
+                                unsigned int h = grid->GetLinearCellIndex(tg);
+                                grid->stored[h] += 1;
+                            }
+                        }
+                    }
+                }
+            }
         }
+
+        scaledRatio = ratio;
 
         Build(grid);
     }
 
-    void BuildBySpacing(ParticleSetBuilder<T> *pBuilder, Float spacing){
+    void BuildBySpacing(ParticleSetBuilder<T> *pBuilder, Float spacing, Float simSpacing){
         Q bounds;
         U resolution;
         T half;
@@ -389,10 +442,50 @@ class CountingGrid{
         grid = MakeLightweightGrid(resolution, pMin, pMax);
 
         // NOTE: Is there a way to avoid having to do a double loop over this?
+        int ratio = std::floor(simSpacing / spacing);
         for(T &p : pBuilder->positions){
-            unsigned int h = grid->GetLinearHashedPosition(p);
-            grid->stored[h] += 1;
+            U u = grid->GetHashedPosition(p);
+            if(ratio == 0){
+                unsigned int h = grid->GetLinearCellIndex(u);
+                grid->stored[h] += 1;
+            }else{
+                for(int x = -ratio; x <= ratio; x++){
+                    for(int y = -ratio; y <= ratio; y++){
+                        if(dimensions > 2){
+                            for(int z = -ratio; z <= ratio; z++){
+                                T _u;
+                                _u[0] = int(u[0]) + x;
+                                _u[1] = int(u[1]) + y;
+                                _u[2] = int(u[2]) + z;
+                                if((_u[0] >= 0 && _u[0] < resolution[0]) &&
+                                   (_u[1] >= 0 && _u[1] < resolution[1]) &&
+                                   (_u[2] >= 0 && _u[2] < resolution[2]))
+                                {
+                                    U tg;
+                                    tg[0] = _u[0]; tg[1] = _u[1]; tg[2] = _u[2];
+                                    unsigned int h = grid->GetLinearCellIndex(tg);
+                                    grid->stored[h] += 1;
+                                }
+                            }
+                        }else{
+                            T _u;
+                            _u[0] = int(u[0]) + x;
+                            _u[1] = int(u[1]) + y;
+                            if((_u[0] >= 0 && _u[0] < resolution[0]) &&
+                               (_u[1] >= 0 && _u[1] < resolution[1]))
+                            {
+                                U tg;
+                                tg[0] = _u[0]; tg[1] = _u[1];
+                                unsigned int h = grid->GetLinearCellIndex(tg);
+                                grid->stored[h] += 1;
+                            }
+                        }
+                    }
+                }
+            }
         }
+
+        scaledRatio = ratio;
 
         Build(grid);
     }
@@ -458,6 +551,7 @@ inline void ComputeDIF(CountingGrid<T, U, Q, FilterSolver> *cGrid, Float sigma=1
     U size = grid->GetIndexCount();
     int total = cGrid->total;
     int dimensions = grid->GetDimensions();
+    Float ratio = cGrid->scaledRatio;
 
     /* Compute S(k): Equation 2, page 3 */
     AutoParallelFor("CountingGrid - DIF", total, AutoLambda(int i){
@@ -476,7 +570,7 @@ inline void ComputeDIF(CountingGrid<T, U, Q, FilterSolver> *cGrid, Float sigma=1
             return DIF[where];
         };
 
-        smoothDIF[i] = solver.Box(u, sampler);
+        smoothDIF[i] = solver.Box(u, sampler, ratio);
     });
 
     /* Apply gaussian filter */
@@ -491,7 +585,7 @@ inline void ComputeDIF(CountingGrid<T, U, Q, FilterSolver> *cGrid, Float sigma=1
             return smoothDIF[where];
         };
 
-        DIF[i] = solver.Gaussian(u, sampler);
+        DIF[i] = solver.Gaussian(u, sampler, ratio);
     });
 }
 

@@ -6,11 +6,6 @@
 #include <marching_cubes.h>
 #include <cutil.h>
 
-/**************************************************************/
-//          M A R C H I N G   C U B E S   M E T H O D         //
-//                  3D Surface Reconstruction                 //
-/**************************************************************/
-
 /*
 * The base implementation is taken from the Jet framework, I adapted it
 * to be runnable under CUDA.

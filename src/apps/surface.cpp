@@ -434,12 +434,13 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
 
 FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *opts){
     CountingGrid3D countSdf;
+    Float spacingScale = 2.0;
+    Float spacing = opts->spacing / spacingScale;
     if(!opts->byResolution){
-        Float spacingScale = 2.0;
         Float sdfSpacing = opts->marchingCubeSpacing;
-        countSdf.BuildBySpacing(pBuilder, sdfSpacing * spacingScale);
+        countSdf.BuildBySpacing(pBuilder, sdfSpacing * spacingScale, spacing);
     }else{
-        countSdf.BuildByResolution(pBuilder, opts->resolution);
+        countSdf.BuildByResolution(pBuilder, opts->resolution, spacing);
     }
 
     std::cout << "Generating SDF... " << std::flush;

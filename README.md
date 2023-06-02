@@ -28,14 +28,14 @@ Building Bubbles also builds the binary `bbtool` that provides utilities for man
 ./bbtool boundary -in <bubbles_output> -method sandim
 ```
 The following is execution of these boundaries routines (Color Field, Asymmetry and Sandim).
-![Alt text](images/comps.png)
+![Alt text](images/comps1.png)
 Several other helper routines for narrow-band extraction and different methods are also available under src/boundaries. Surface reconstruction can be performed with the `surface` command, for example: generating a mesh using Zhu-Bridson sdf computation can be done with:
 
 ```bash
 ./bbtool surface -in <bubbles_output> -out mesh.ply -outform ply -method zhu
 ```
 The following image shows the three supported methods sampled at `256³`: SPH-based, Zhu-Bridson and the Counting Particles method [QP22].
-![Alt text](images/surface.png)
+![Alt text](images/surface1.png)
 
 Bbtool can also be used for generating files that can be used with [PBRT-v4](https://github.com/mmp/pbrt-v4) for rendering the particle systems that are exported, and also my own renderer [Lit](https://github.com/felpzOliveira/Lit) with:
 ```bash

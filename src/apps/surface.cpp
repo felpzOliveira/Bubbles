@@ -8,10 +8,12 @@
 #include <counting.h>
 #include <delaunay.h>
 #include <interval.h>
+#include <svd.h>
 
 typedef enum{
     SDF_ZHU_BRIDSON = 0,
     SDF_SPH,
+    SDF_ANISOTROPIC,
     SDF_PARTICLE_COUNT,
     SDF_DELAUNAY,
     SDF_NONE,
@@ -36,6 +38,8 @@ typedef struct{
 SurfaceMethod SDFMethodFromString(std::string method){
     if(method == "zhu")
         return SDF_ZHU_BRIDSON;
+    else if(method == "aniso" || method == "anisotropic")
+        return SDF_ANISOTROPIC;
     else if(method == "sph")
         return SDF_SPH;
     else if(method == "pcount")
@@ -48,6 +52,7 @@ SurfaceMethod SDFMethodFromString(std::string method){
 std::string StringFromSDFMethod(SurfaceMethod method){
     switch(method){
         case SDF_ZHU_BRIDSON: return "zhu";
+        case SDF_ANISOTROPIC: return "anisotropic";
         case SDF_PARTICLE_COUNT: return "pcount";
         case SDF_SPH: return "sph";
         case SDF_DELAUNAY: return "delaunay";
@@ -299,7 +304,29 @@ std::map<const char *, arg_desc> surface_arg_map = {
 
 template <typename T>
 __bidevice__ T cubic(T x){ return x * x * x; }
-__bidevice__ double k_cub(double s) { return Max(0.0, cubic(1.0 - s * s)); }
+__bidevice__ Float k_cub(Float s) { return Max(0.0, cubic(1.0 - s * s)); }
+__bidevice__ Float wij(Float distance, Float r) {
+    if(distance < r)
+        return 1.f - cubic(distance / r);
+    return 0.f;
+}
+
+__bidevice__
+inline double k_p(double distance){
+    const double distanceSquared = distance * distance;
+    if(distanceSquared >= 1.0){
+        return 0.0;
+    }else{
+        const double x = 1.0 - distanceSquared;
+        return x * x * x;
+    }
+}
+
+__bidevice__
+inline Float k_w(const vec3f& m,  Float gDet){
+    const Float sigma = 315.0 / (64 * Pi);
+    return sigma * gDet * k_p(m.Length());
+}
 
 __bidevice__ Float SphSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet, Float kernelRadius){
     const Float cutOff = 0.5; // ??
@@ -384,7 +411,7 @@ __bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
 }
 
 void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
-                                 HostTriangleMesh3 *mesh)
+                                 HostTriangleMesh3 *mesh, TimerList &timer)
 {
     DelaunayTriangulation triangulation;
     // TODO: We need the solver simply to distribute particles and update the buckets
@@ -402,12 +429,16 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     solver.Setup(WaterDensity, domainSpacing, 2.0, grid, sphpSet);
 
     std::cout << "Distributing particles..." << std::flush;
+    timer.Start("Hash Particles");
     UpdateGridDistributionGPU(solver.solverData);
     grid->UpdateQueryState();
 
     /* compute density and normal */
+    timer.StopAndNext("Density Computation");
     ComputeDensityGPU(solver.solverData);
+    timer.StopAndNext("Normal Computation");
     ComputeNormalGPU(solver.solverData);
+    timer.Stop();
 
     /* do neighbor processing, i.e.: find out particles that are going to be extended */
     ParticleSet3 *pSet = sphpSet->GetParticleSet();
@@ -415,15 +446,21 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
 
     std::cout << "Done\nInspecting neighbors... " << std::flush;
     if(opts->delaunayUseBoundary){
+        timer.Start("Interval Boundary Computation");
+        IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision, 2);
         //LNMBoundarySingle(pSet, grid, opts->spacing, false);
-        IntervalBoundary(pSet, grid, opts->spacing, SubdivisionMethod::PolygonSubdivision);
+        timer.Stop();
     }
-    else
+    else{
+        timer.Start("Estimate Boundary Computation");
         DelaunayClassifyNeighbors(pSet, grid, 30, opts->spacing, opts->delaunayMu);
+        timer.Stop();
+    }
 
     /* apply delaunay triangulation and filtering to get mesh */
     std::cout << "Done\nComputing delaunay surface... " << std::endl;
-    DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu, grid, &solver);
+    DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu,
+                    grid, &solver, timer);
 
     std::cout << "Writing delaunay boundary... " << std::flush;
     DelaunayWriteBoundary(triangulation, sphpSet, "bound.txt");
@@ -432,20 +469,24 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     DelaunayGetTriangleMesh(triangulation, mesh);
 }
 
-FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *opts){
+FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
+                                   TimerList &timer)
+{
     CountingGrid3D countSdf;
     Float spacingScale = 2.0;
     Float spacing = opts->spacing / spacingScale;
+    std::cout << "Generating SDF... " << std::flush;
+    timer.Start("Domain build");
     if(!opts->byResolution){
         Float sdfSpacing = opts->marchingCubeSpacing;
         countSdf.BuildBySpacing(pBuilder, sdfSpacing * spacingScale, spacing);
     }else{
         countSdf.BuildByResolution(pBuilder, opts->resolution, spacing);
     }
-
-    std::cout << "Generating SDF... " << std::flush;
+    timer.StopAndNext("Build SDF");
 
     FieldGrid3f *sdfGrid = countSdf.Solve();
+    timer.Stop();
     vec3ui res = sdfGrid->GetResolution();
     std::cout << "OK [ Resolution: " << res.x << " x " << res.y << " x " << res.z
               << " ]" << std::endl;
@@ -453,7 +494,164 @@ FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *
     return sdfGrid;
 }
 
-FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *opts){
+// TODO: BROKEN! fix me!
+void ComputeAnisotropicSDF(SphSolverData3 *solverData, FieldGrid3f *sdfGrid,
+                           surface_opts *opts)
+{
+    Float spacingScale = 2.0;
+    Grid3 *grid = solverData->domain;
+    ParticleSet3 *pSet = solverData->sphpSet->GetParticleSet();
+    Float spacing = opts->spacing;
+    Float kernelRadius = opts->kernel;
+    Float inf = grid->GetBounds().Diagonal().Length();
+
+    SVDMat3d *gs = cudaAllocateUnregisterVx(SVDMat3d, pSet->GetParticleCount());
+    vec3f *xMean = cudaAllocateUnregisterVx(vec3f, pSet->GetParticleCount());
+    WorkQueue<int> *workQ = cudaAllocateUnregisterVx(WorkQueue<int>, 1);
+    workQ->SetSlots(pSet->GetParticleCount(), false);
+
+    spacing *= spacingScale;
+    Float r = 2.0 * spacing;
+    Float invH = 1.f / spacing;
+    Float h2 = spacing * spacing;
+
+    AutoParallelFor("Compute-Means", pSet->GetParticleCount(), AutoLambda(int f){
+        int *neighbors = nullptr;
+        vec3f pi = pSet->GetParticlePosition(f);
+        unsigned int cellId = grid->GetLinearHashedPosition(pi);
+        int count = grid->GetNeighborsOf(cellId, &neighbors);
+
+        vec3f mean;
+        Float wsum = 0.f;
+        size_t num = 0;
+        for(int i = 0; i < count; i++){
+            Cell3 *cell = grid->GetCell(neighbors[i]);
+            ParticleChain *pChain = cell->GetChain();
+            int size = cell->GetChainLength();
+            for(int j = 0; j < size; j++){
+                vec3f pj = pSet->GetParticlePosition(pChain->pId);
+                Float dist = Distance(pi, pj);
+                if(dist < kernelRadius){
+                    Float wj = wij((pi - pj).Length(), r);
+                    wsum += wj;
+                    mean = mean + wj * pj;
+                    num++;
+                }
+                pChain = pChain->next;
+            }
+        }
+
+        mean = mean * (1.f / wsum);
+        xMean[f] = Lerp(pi, mean, 0.5);
+
+        if(num < 25){
+            gs[f] = SVDMat3d::ScaleMatrix(invH, invH, invH);
+        }else{
+            workQ->Push(f);
+        }
+    });
+
+    AutoParallelFor("Compute-G", workQ->size, AutoLambda(int id){
+        int *neighbors = nullptr;
+        int f = workQ->At(id);
+        vec3f pi = pSet->GetParticlePosition(f);
+        vec3f mean = xMean[f];
+        unsigned int cellId = grid->GetLinearHashedPosition(pi);
+        int count = grid->GetNeighborsOf(cellId, &neighbors);
+
+        SVDMat3d mat = SVDMat3d::ScaleMatrix(h2, h2, h2);
+        Float wsum = 0.f;
+
+        for(int i = 0; i < count; i++){
+            Cell3 *cell = grid->GetCell(neighbors[i]);
+            ParticleChain *pChain = cell->GetChain();
+            int size = cell->GetChainLength();
+            for(int j = 0; j < size; j++){
+                vec3f pj = pSet->GetParticlePosition(pChain->pId);
+                Float dist = Distance(pi, pj);
+                if(dist < kernelRadius){
+                    vec3f v = pj - mean;
+                    Float wj = wij((pi - pj).Length(), r);
+                    wsum += wj;
+                    mat = mat + SVDMat3d::Vvt(v.x, v.y, v.z) * wj;
+                }
+                pChain = pChain->next;
+            }
+        }
+
+        mat = mat * (1.f / wsum);
+        gs[f] = mat;
+    });
+
+    AutoParallelFor("Compute-SVD", pSet->GetParticleCount(), AutoLambda(int f){
+        SVDMat3d u, w;
+        SVDVec3d sv;
+        SVD3(gs[f], u, sv, w);
+
+        vec3f v(Absf(sv[0]), Absf(sv[1]), Absf(sv[2]));
+        Float maxVal = Max(v.x, Max(v.y, v.z));
+        v.x = Max(v.x, maxVal / 4.f);
+        v.y = Max(v.y, maxVal / 4.f);
+        v.z = Max(v.z, maxVal / 4.f);
+
+        SVDMat3d invSigma = SVDMat3d::ScaleMatrix(1.f / v.x, 1.f / v.y, 1.f / v.z);
+        Float scaleTerm = powf(v.x * v.y * v.z, 1.f / 3.f);
+        gs[f] = (w * invSigma * u.Transpose()) * invH * scaleTerm;
+        pSet->SetParticlePosition(f, xMean[f]);
+    });
+
+    UpdateGridDistributionGPU(solverData);
+
+    AutoParallelFor("Compute-SDF", sdfGrid->total, AutoLambda(int f){
+        int *neighbors = nullptr;
+        vec3ui u = DimensionalIndex(f, sdfGrid->resolution, 3);
+        vec3f p = sdfGrid->GetDataPosition(u);
+        vec3f clampedP = grid->GetBounds().Clamped(p, Epsilon);
+        Float mass = pSet->GetMass();
+        unsigned int cellId = grid->GetLinearHashedPosition(clampedP);
+        int count = grid->GetNeighborsOf(cellId, &neighbors);
+
+        Float sum = 0;
+        for(int i = 0; i < count; i++){
+            Cell3 *cell = grid->GetCell(neighbors[i]);
+            ParticleChain *pChain = cell->GetChain();
+            int size = cell->GetChainLength();
+            for(int j = 0; j < size; j++){
+                vec3f pj = pSet->GetParticlePosition(pChain->pId);
+                Float dj = pSet->GetParticleDensity(pChain->pId);
+                Float dist = Distance(p, pj);
+                if(dist < kernelRadius){
+                    vec3f dr = pj - p;
+                    SVDMat3d *G = &gs[pChain->pId];
+                    SVDVec3d tg_p = G->PointMul(dr.x, dr.y, dr.z);
+                    Float det = G->Determinant();
+                    Float kw = k_w(vec3f(tg_p[0], tg_p[1], tg_p[2]), det);
+                    Float term = (mass / dj) * kw;
+
+                    sum += term;
+                }
+                pChain = pChain->next;
+            }
+        }
+
+        if(IsNaN(sum))
+            sum = inf;
+
+        sdfGrid->SetValueAt(0.5 - sum, u);
+    });
+
+    sdfGrid->MarkFilled();
+
+    cudaFree(gs);
+    cudaFree(xMean);
+    cudaFree(workQ->ids);
+    cudaFree(workQ);
+}
+
+
+FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
+                                    TimerList &timer)
+{
     /* Build a domain for the particles */
     Float spacingScale = 2.0;
     Float threshold = 0.25;
@@ -480,16 +678,19 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
     solver.Setup(WaterDensity, spacing, spacingScale, grid, sphpSet);
 
     /* distribute particles */
+    timer.Start("Hash Particles");
     UpdateGridDistributionGPU(solver.solverData);
 
     /* check if density is needed */
-    if(method == SDF_SPH)
-        ComputeDensityGPU(solver.solverData);
+    timer.StopAndNext("Density Computation");
+    ComputeDensityGPU(solver.solverData);
 
     grid->UpdateQueryState();
+    timer.Stop();
 
     /* build sdf grid */
     FieldGrid3f *sdfGrid = cudaAllocateVx(FieldGrid3f, 1);
+    timer.Start("Build SDF");
     if(!opts->byResolution){
         sdfSpacing *= spacingScale;
         p0 = dBounds.pMin + 0.5 * vec3f(sdfSpacing);
@@ -512,18 +713,23 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
     Float inf = grid->GetBounds().Diagonal().Length();
     std::cout << "Generating SDF... " << std::flush;
     /* compute sdf */
-    AutoParallelFor("SDF", sdfGrid->total, AutoLambda(int i){
-        vec3ui u = DimensionalIndex(i, sdfGrid->resolution, 3);
-        vec3f p = sdfGrid->GetDataPosition(u);
-        Float estimate = inf;
-        if(method == SDF_ZHU_BRIDSON)
-            estimate = ZhuBridsonSDF(p, grid, pSet, radius, threshold);
-        else if(method == SDF_SPH)
-            estimate = SphSDF(p, grid, pSet, radius);
-        sdfGrid->SetValueAt(estimate, u);
-    });
+    if(method == SDF_ANISOTROPIC){
+        ComputeAnisotropicSDF(solver.solverData, sdfGrid, opts);
+    }else{
+        AutoParallelFor("SDF", sdfGrid->total, AutoLambda(int i){
+            vec3ui u = DimensionalIndex(i, sdfGrid->resolution, 3);
+            vec3f p = sdfGrid->GetDataPosition(u);
+            Float estimate = inf;
+            if(method == SDF_ZHU_BRIDSON)
+                estimate = ZhuBridsonSDF(p, grid, pSet, radius, threshold);
+            else if(method == SDF_SPH)
+                estimate = SphSDF(p, grid, pSet, radius);
+            sdfGrid->SetValueAt(estimate, u);
+        });
+    }
 
     sdfGrid->MarkFilled();
+    timer.Stop();
     res = sdfGrid->GetResolution();
     std::cout << "OK [ Resolution: " << res.x << " x " << res.y << " x " << res.z
               << " ]" << std::endl;
@@ -584,12 +790,13 @@ void surface_command(int argc, char **argv){
     std::cout << "OK [ Particles: " << builder.positions.size() << " ]" << std::endl;
 
     FieldGrid3f *grid;
+    TimerList timer;
     if(opts.method == SDF_PARTICLE_COUNT)
-        grid = ParticlesToSDF_Pcount(&builder, &opts);
+        grid = ParticlesToSDF_Pcount(&builder, &opts, timer);
     else if(opts.method < SDF_PARTICLE_COUNT)
-        grid = ParticlesToSDF_Surface(&builder, &opts);
+        grid = ParticlesToSDF_Surface(&builder, &opts, timer);
     else if(opts.method == SDF_DELAUNAY){
-        ParticlesToDelaunay_Surface(&builder, &opts, &mesh);
+        ParticlesToDelaunay_Surface(&builder, &opts, &mesh, timer);
         requires_mc = false;
     }else{
         printf("Invalid method selected\n");
@@ -606,15 +813,20 @@ void surface_command(int argc, char **argv){
         * I don't quite get why, so maybe add a TODO here to better investigate this method
         * but for now it seems that it literally is as simple as rotating the triangles.
         */
+        timer.Start("Marching Cubes");
         if(opts.method == SDF_PARTICLE_COUNT)
             MarchingCubes(grid, &mesh, 0.25, true);
         else
             MarchingCubes(grid, &mesh, 0.0, false);
+        timer.Stop();
     }
 
+    timer.Start("Mesh output");
     mesh.writeToDisk(opts.output.c_str(), opts.outformat);
+    timer.Stop();
 
     printf("Finished, triangle count: %ld\n", mesh.numberOfTriangles());
+    timer.PrintEvents();
     std::cout << "**********************************" << std::endl;
     CudaMemoryManagerClearCurrent();
 }

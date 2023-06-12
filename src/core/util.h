@@ -127,38 +127,36 @@ struct i3IsSame{
 * Get a set of scattered particles for displaying the FieldGrid SDF.
 * Returns the amount of particles added to the particles vector.
 */
-__host__ int UtilGetSDFParticles(FieldGrid3f *field, std::vector<vec3f> *particles,
-                                 Float sdfThreshold, Float spacing, int absolute=1);
+int UtilGetSDFParticles(FieldGrid3f *field, std::vector<vec3f> *particles,
+                        Float sdfThreshold, Float spacing, int absolute=1);
 
 /*
 * Computes the bounds of a mesh by inspecting all of its vertex.
 */
-__host__ Bounds3f UtilComputeMeshBounds(ParsedMesh *mesh);
+Bounds3f UtilComputeMeshBounds(ParsedMesh *mesh);
 
 /*
 * Computes a scale transform that makes sure the given mesh fits in a maximum length.
 */
-__host__ Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLength,
-                                           Float *scaleValue=nullptr);
+Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLength,
+                                  Float *scaleValue=nullptr);
 
 /*
 * Computes the bounds of a mesh after a transformation.
 */
-__host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform);
+Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform);
 
 
 /*
 * Generates an acceleration Grid for a domain given its bounds, the target spacing
 * of the simulation and the spacing scale to be used. This grid is uniform.
 */
-__host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
-                                       Float spacingScale = 2.0);
+Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing, Float spacingScale = 2.0);
 
-__host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
-                                       Float spacingScale = 2.0);
+Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing, Float spacingScale = 2.0);
 
-__host__ Grid3 *UtilBuildGridForBuilder(ParticleSetBuilder3 *builder,
-                                        Float spacing, Float spacingScale);
+Grid3 *UtilBuildGridForBuilder(ParticleSetBuilder3 *builder,
+                               Float spacing, Float spacingScale);
 
 /*
 * Checks if emitting from any of the emitters in VolumeParticleEmitterSet3 
@@ -167,11 +165,11 @@ __host__ Grid3 *UtilBuildGridForBuilder(ParticleSetBuilder3 *builder,
 * cause a full redistribution by our grid hashing scheme and may generate out of bounds
 * particles.
 */
-__host__ int UtilIsEmitterOverlapping(VolumeParticleEmitter3 *emitterSet,
-                                      ColliderSet3 *colliderSet);
+int UtilIsEmitterOverlapping(VolumeParticleEmitter3 *emitterSet,
+                             ColliderSet3 *colliderSet);
 
-__host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
-                                      ColliderSet3 *colliderSet);
+int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
+                             ColliderSet3 *colliderSet);
 
 /*
 * Parses a BB file and add its particles to a ParticleSetBuilder3 builder.
@@ -181,41 +179,41 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
 * by using the 'initialVelocity' parameter.
 * Returns the bounds taken by transformed particles.
 */
-__host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBuilder3 *builder,
-                                                int legacy=0, Transform transform=Transform(),
-                                                vec3f centerAt=vec3f(0),
-                                                vec3f initialVelocity=vec3f(0));
+Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBuilder3 *builder,
+                                       int legacy=0, Transform transform=Transform(),
+                                       vec3f centerAt=vec3f(0),
+                                       vec3f initialVelocity=vec3f(0));
 
 /*
 * Creates a SDF on field for the given particle distribution in the Sph Solver using
 * density cutOffDensity - density as node value.
 */
-__host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *field);
+void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *field);
 
 /*
 * Generates points around a circle of radius 'rad' uniformly settings color to 'col'.
 */
-__host__ int UtilGenerateCirclePoints(float *posBuffer, float *colBuffer, vec3f col,
-                                      vec2f center, Float rad, int nPoints);
+int UtilGenerateCirclePoints(float *posBuffer, float *colBuffer, vec3f col,
+                             vec2f center, Float rad, int nPoints);
 
 /*
 * Generates points around a square of size 'len'. The given transform is used to move
 * points to a specific location as the square is generated around the origin.
 */
-__host__ int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f col,
-                                      Transform2 transform, vec2f len, int nPoints);
+int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f col,
+                             Transform2 transform, vec2f len, int nPoints);
 
 /*
 * Generates points around a sphere of radius 'rad' uniformly settings color to 'col'.
 */
-__host__ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f col,
-                                      Float rad, int nPoints, Transform transform);
+int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f col,
+                             Float rad, int nPoints, Transform transform);
 
 /*
 * Generates points around a box of size 'length' settings colors to 'col'.
 */
-__host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
-                                   vec3f length, int nPoints, Transform transform);
+int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
+                          vec3f length, int nPoints, Transform transform);
 
 /*
 * Writes the output of GDel3D to a ply file. The flag 'tetras' can be used to make
@@ -223,14 +221,14 @@ __host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col
 * a quad. Setting 'tetras' to false will force decomposition of the tetrahedrons and write
 * triangles instead.
 */
-__host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
-                                 const char *path, bool tetras=true);
+void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
+                        const char *path, bool tetras=true);
 
 /*
 * Writes a ply file from a specific set of triangles from a given GDel3D output.
 */
-__host__ void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
-                                 GDelOutput *output, const char *path);
+void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
+                        GDelOutput *output, const char *path);
 
 ParsedMesh *UtilGDel3DToParsedMesh(std::vector<vec3i> *tris, Point3HVec *pointVec,
                                    GDelOutput *output);
@@ -249,12 +247,11 @@ uint32_t GDel3D_RealTetraCount(GDelOutput *output, uint32_t pLen);
 * Utility routine for looping through real tetrahedrons in GDel3D.
 */
 template<typename Fn>
-__host__ void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
+void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
     const TetHVec tetVec      = output->tetVec;
     const TetOppHVec oppVec   = output->tetOppVec;
     const CharHVec tetInfoVec = output->tetInfoVec;
 
-    printf("Size = %lu\n", tetVec.size());
     for(int i = 0; i < tetVec.size(); i++){
         bool valid = true;
         Tet tet = tetVec[i];
@@ -276,13 +273,13 @@ __host__ void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
 * 'tris' are of the type 'i3', i.e.: they will be sorted from lowest to highest. This
 * does not preserve triangle orientation.
 */
-__host__ void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
-                                   GDelOutput *output, int pLen);
+void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
+                          GDelOutput *output, int pLen);
 
 /*
 * Utilities for bug hunting and preventing errors.
 */
-template<typename T, typename U, typename Q> inline __host__
+template<typename T, typename U, typename Q> inline
 int UtilIsDistributionConsistent(ParticleSet<T> *pSet, Grid<T, U, Q> *grid){
     // for now just check all hashes match
     Q gridBounds = grid->GetBounds();
@@ -313,8 +310,7 @@ int UtilIsDistributionConsistent(ParticleSet<T> *pSet, Grid<T, U, Q> *grid){
 }
 
 inline
-__host__ int UtilIsDomainContaining(Bounds3f domainBounds, std::vector<Bounds3f> testBounds)
-{
+int UtilIsDomainContaining(Bounds3f domainBounds, std::vector<Bounds3f> testBounds){
     vec3f center = domainBounds.Center();
     for(int i = 0; i < testBounds.size(); i++){
         Bounds3f bound = testBounds[i];
@@ -353,7 +349,7 @@ __host__ int UtilIsDomainContaining(Bounds3f domainBounds, std::vector<Bounds3f>
 * Compute the bounds of a given particle set.
 */
 inline
-__host__ Bounds3f UtilComputeParticleSetBounds(ParticleSet3 *pSet){
+Bounds3f UtilComputeParticleSetBounds(ParticleSet3 *pSet){
     int count = pSet->GetParticleCount();
     vec3f pi = pSet->GetParticlePosition(0);
     Bounds3f bounds(pi, pi);
@@ -366,7 +362,7 @@ __host__ Bounds3f UtilComputeParticleSetBounds(ParticleSet3 *pSet){
 }
 
 inline
-__host__ Bounds2f UtilComputeParticleSetBounds(ParticleSet2 *pSet){
+Bounds2f UtilComputeParticleSetBounds(ParticleSet2 *pSet){
     int count = pSet->GetParticleCount();
     vec2f pi = pSet->GetParticlePosition(0);
     Bounds2f bounds(pi, pi);
@@ -379,7 +375,7 @@ __host__ Bounds2f UtilComputeParticleSetBounds(ParticleSet2 *pSet){
 }
 
 template<typename DataAccessor>
-inline __host__ Float UtilComputeMedian(DataAccessor *accessor, int size){
+inline Float UtilComputeMedian(DataAccessor *accessor, int size){
     double value = 0;
     for(int i = 0; i < size; i++){
         value += accessor[i];
@@ -390,9 +386,7 @@ inline __host__ Float UtilComputeMedian(DataAccessor *accessor, int size){
 }
 
 template<typename ParticleAccessor>
-inline __host__ int UtilFillBoundaryParticles(ParticleAccessor *pSet,
-                                              std::vector<int> *boundaries)
-{
+inline int UtilFillBoundaryParticles(ParticleAccessor *pSet, std::vector<int> *boundaries){
     int bCount = 0;
     int pCount = pSet->GetParticleCount();
     boundaries->clear();
@@ -410,7 +404,7 @@ inline __host__ int UtilFillBoundaryParticles(ParticleAccessor *pSet,
     return bCount;
 }
 
-inline __host__ void UtilEraseFile(const char *filename){
+inline void UtilEraseFile(const char *filename){
     remove(filename);
 }
 
@@ -420,8 +414,8 @@ inline __host__ void UtilEraseFile(const char *filename){
 * obstacles are written. TODO: Split coliders/domain from the collider set builder?
 */
 template<typename Solver, typename ParticleAccessor>
-inline __host__ void UtilSaveSimulation3(Solver *solver, ParticleAccessor *pSet,
-                                         const char *filename, int flags)
+inline void UtilSaveSimulation3(Solver *solver, ParticleAccessor *pSet,
+                                const char *filename, int flags)
 {
     std::stringstream ss;
     std::vector<int> boundaries;
@@ -450,7 +444,7 @@ inline __host__ void UtilSaveSimulation3(Solver *solver, ParticleAccessor *pSet,
     SerializerSaveSphDataSet3(solver->GetSphSolverData(), filename, flags, &boundaries);
 }
 
-template<typename Solver, typename ParticleAccessor> inline __host__
+template<typename Solver, typename ParticleAccessor> inline
 void UtilSaveSimulation3(Solver *solver, std::vector<ParticleAccessor *> pSets,
                          const char *filename, int flags)
 {
@@ -486,10 +480,10 @@ void UtilSaveSimulation3(Solver *solver, std::vector<ParticleAccessor *> pSets,
 * Callback should return 0 if simulation should stop or != 0 to continue.
 */
 template<typename Solver, typename ParticleAccessor>
-inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
-                                        Float spacing, vec2f lower, vec2f upper,
-                                        Float targetInterval,
-                                        const std::function<int(int )> &callback)
+inline void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
+                               Float spacing, vec2f lower, vec2f upper,
+                               Float targetInterval,
+                               const std::function<int(int )> &callback)
 {
     float *ptr = nullptr;
     float *pos = nullptr;
@@ -539,11 +533,11 @@ inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
 * Callback should return 0 if simulation should stop or != 0 to continue.
 */
 template<typename Solver, typename ParticleAccessor>
-inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
-                                        Float spacing, vec2f lower, vec2f upper,
-                                        Float targetInterval,
-                                        const std::function<int(int )> &callback,
-                                        const std::function<void(float *, int)> &setCol)
+inline void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
+                               Float spacing, vec2f lower, vec2f upper,
+                               Float targetInterval,
+                               const std::function<int(int )> &callback,
+                               const std::function<void(float *, int)> &setCol)
 {
     float *ptr = nullptr;
     float *pos = nullptr;
@@ -597,12 +591,12 @@ inline __host__ void UtilRunSimulation2(Solver *solver, ParticleAccessor *pSet,
 * Callback should return 0 if simulation should stop or != 0 to continue.
 */
 template<typename Solver, typename ParticleAccessor>
-inline __host__ void UtilRunDynamicSimulation2(Solver *solver, ParticleAccessor *pSet,
-                                               Float spacing, vec2f lower, vec2f upper,
-                                               Float targetInterval, int extraParts,
-                                               const std::function<int(int )> &callback,
-                                               const std::function<void(float *, int)> &setCol,
-                                               const std::function<int(float*, float*)> &filler)
+inline void UtilRunDynamicSimulation2(Solver *solver, ParticleAccessor *pSet,
+                                      Float spacing, vec2f lower, vec2f upper,
+                                      Float targetInterval, int extraParts,
+                                      const std::function<int(int )> &callback,
+                                      const std::function<void(float *, int)> &setCol,
+                                      const std::function<int(float*, float*)> &filler)
 {
     float *ptr = nullptr;
     float *pos = nullptr;
@@ -657,10 +651,10 @@ inline __host__ void UtilRunDynamicSimulation2(Solver *solver, ParticleAccessor 
 * Callback should return 0 if simulation should stop or != 0 to continue.
 */
 template<typename Solver, typename ParticleAccessor>
-inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
-                                        Float spacing, vec3f origin, vec3f target,
-                                        Float targetInterval, std::vector<Shape*> sdfs,
-                                        const std::function<int(int )> &callback)
+inline void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
+                               Float spacing, vec3f origin, vec3f target,
+                               Float targetInterval, std::vector<Shape*> sdfs,
+                               const std::function<int(int )> &callback)
 {
     std::vector<vec3f> particles;
     int total = pSet->GetReservedSize();
@@ -726,13 +720,13 @@ inline __host__ void UtilRunSimulation3(Solver *solver, ParticleAccessor *pSet,
 * Callback should return 0 if simulation should stop or != 0 to continue.
 */
 template<typename Solver, typename ParticleAccessor>
-inline __host__ void UtilRunDynamicSimulation3(Solver *solver, ParticleAccessor *pSet,
-                                               Float spacing, vec3f origin, vec3f target,
-                                               Float targetInterval, int extraParts,
-                                               std::vector<Shape*> sdfs,
-                                               const std::function<int(int )> &callback,
-                                               const std::function<void(float*,int)> &setCol,
-                                               const std::function<int(float*,float*)> &filler)
+inline void UtilRunDynamicSimulation3(Solver *solver, ParticleAccessor *pSet,
+                                      Float spacing, vec3f origin, vec3f target,
+                                      Float targetInterval, int extraParts,
+                                      std::vector<Shape*> sdfs,
+                                      const std::function<int(int )> &callback,
+                                      const std::function<void(float*,int)> &setCol,
+                                      const std::function<int(float*,float*)> &filler)
 {
     std::vector<vec3f> particles;
     int total = pSet->GetReservedSize();
@@ -804,9 +798,7 @@ inline __host__ void UtilRunDynamicSimulation3(Solver *solver, ParticleAccessor 
 * Print LNM stats after a step of simulation.
 */
 template<typename Solver>
-inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
-                                           std::vector<int> refFrames={})
-{
+inline void UtilPrintStepStandard(Solver *solver, int step, std::vector<int> refFrames={}){
     LNMData faster, slower, last, average;
     LNMStats stats = solver->GetLNMStats();
     Float advTime = solver->GetAdvanceTime();
@@ -830,7 +822,7 @@ inline __host__ void UtilPrintStepStandard(Solver *solver, int step,
 /*
 * Dumps the basic position of the current simulator step into disk.
 */
-inline __host__ void UtilSaveSph3Frame(const char *basedir, int step, SphSolverData3 *data){
+inline void UtilSaveSph3Frame(const char *basedir, int step, SphSolverData3 *data){
     std::string path(basedir);
     path += std::to_string(step);
     path += ".txt";
@@ -841,7 +833,7 @@ inline __host__ void UtilSaveSph3Frame(const char *basedir, int step, SphSolverD
 /*
 * Fetch the current boundary of the particle set.
 */
-template<typename ParticleSetAccessor> inline __host__
+template<typename ParticleSetAccessor> inline
 int UtilGetBoundaryState(ParticleSetAccessor *pSet, std::vector<int> *boundaries){
     int count = pSet->GetParticleCount();
     int n = 0;

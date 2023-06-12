@@ -58,7 +58,7 @@ ParsedMesh *UtilGDel3DToParsedMesh(std::vector<vec3i> *tris, Point3HVec *pointVe
     return mesh;
 }
 
-__host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
+int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
                                    vec3f length, int nPoints, Transform transform)
 {
     int perEdge = (int)Floor((Float)nPoints / 12);
@@ -132,7 +132,7 @@ __host__ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col
     return it;
 }
 
-__host__ int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f col,
+int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f col,
                                       Transform2 transform, vec2f len, int nPoints)
 {
     int perSide = (int)Floor((Float)nPoints / 4);
@@ -191,7 +191,7 @@ __host__ int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f 
     return it;
 }
 
-__host__ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f col,
+int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f col,
                                       Float rad, int nPoints, Transform transform)
 {
     int it = 0;
@@ -226,7 +226,7 @@ __host__ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f 
     return it;
 }
 
-__host__ int UtilGenerateCirclePoints(float *posBuffer, float *colBuffer, vec3f col,
+int UtilGenerateCirclePoints(float *posBuffer, float *colBuffer, vec3f col,
                                       vec2f center, Float rad, int nPoints)
 {
     Float step = 2.0 * Pi / (Float)nPoints;
@@ -257,7 +257,7 @@ __bidevice__ int ParticleBySDF(const vec3f &p, FieldGrid3f *sdf, Float sdfThresh
     return rv;
 }
 
-__host__ int UtilGetSDFParticles(FieldGrid3f *sdf, std::vector<vec3f> *particles,
+int UtilGetSDFParticles(FieldGrid3f *sdf, std::vector<vec3f> *particles,
                                  Float sdfThreshold, Float spacing, int absolute)
 {
     Float h = spacing;
@@ -280,7 +280,7 @@ __host__ int UtilGetSDFParticles(FieldGrid3f *sdf, std::vector<vec3f> *particles
     return added;
 }
 
-__host__ Bounds3f _UtilComputePointsBounds(vec3f *points, int size){
+Bounds3f _UtilComputePointsBounds(vec3f *points, int size){
     vec3f pi = points[0];
     Bounds3f bounds(pi, pi);
     for(int i = 1; i < size; i++){
@@ -291,12 +291,12 @@ __host__ Bounds3f _UtilComputePointsBounds(vec3f *points, int size){
     return bounds;
 }
 
-__host__ Bounds3f UtilComputeMeshBounds(ParsedMesh *mesh){
+Bounds3f UtilComputeMeshBounds(ParsedMesh *mesh){
     AssertA(mesh->nVertices > 0 && mesh->p != nullptr, "Invalid mesh given");
     return _UtilComputePointsBounds(mesh->p, mesh->nVertices);
 }
 
-__host__ Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLength,
+Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLength,
                                            Float *scaleValue)
 {
     Bounds3f bounds = UtilComputeMeshBounds(mesh);
@@ -307,7 +307,7 @@ __host__ Transform UtilComputeFitTransform(ParsedMesh *mesh, Float maximumAxisLe
     return Scale(scale);
 }
 
-__host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
+Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
                                        Float spacingScale)
 {
     vec3f pMin(0), pMax(0), half(0);
@@ -327,7 +327,7 @@ __host__ Grid3 *UtilBuildGridForDomain(Bounds3f domain, Float spacing,
     return MakeGrid(vec3ui(mx, my, mz), pMin, pMax);
 }
 
-__host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
+Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
                                        Float spacingScale)
 {
     vec2f pMin(0), pMax(0), half(0);
@@ -345,7 +345,7 @@ __host__ Grid2 *UtilBuildGridForDomain(Bounds2f domain, Float spacing,
     return MakeGrid(vec2ui(mx, my), pMin, pMax);
 }
 
-__host__ Grid3 *UtilBuildGridForBuilder(ParticleSetBuilder3 *builder, Float spacing,
+Grid3 *UtilBuildGridForBuilder(ParticleSetBuilder3 *builder, Float spacing,
                                         Float spacingScale)
 {
     int size = builder->positions.size();
@@ -359,7 +359,7 @@ __host__ Grid3 *UtilBuildGridForBuilder(ParticleSetBuilder3 *builder, Float spac
     return UtilBuildGridForDomain(container, spacing, spacingScale);
 }
 
-__host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBuilder3 *builder,
+Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBuilder3 *builder,
                                                 int legacy, Transform transform,
                                                 vec3f centerAt, vec3f initialVelocity)
 {
@@ -386,7 +386,7 @@ __host__ Bounds3f UtilParticleSetBuilder3FromBB(const char *path, ParticleSetBui
     return gtransform(bounds);
 }
 
-__host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform){
+Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform){
     vec3f pi = transform.Point(mesh->p[0]);
     Bounds3f bounds(pi, pi);
     for(int i = 1; i < mesh->nVertices; i++){
@@ -397,9 +397,7 @@ __host__ Bounds3f UtilComputeBoundsAfter(ParsedMesh *mesh, Transform transform){
     return bounds;
 }
 
-__host__ int UtilIsEmitterOverlapping(VolumeParticleEmitter3 *emitter,
-                                      ColliderSet3 *colliderSet)
-{
+int UtilIsEmitterOverlapping(VolumeParticleEmitter3 *emitter, ColliderSet3 *colliderSet){
     int emitter_collider_overlaps = 0;
     Bounds3f bound = emitter->shape->GetBounds();
     for(int j = 0; j < colliderSet->nColiders; j++){
@@ -414,7 +412,7 @@ __host__ int UtilIsEmitterOverlapping(VolumeParticleEmitter3 *emitter,
     return emitter_collider_overlaps;
 }
 
-__host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *field){
+void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *field){
     vec2ui resolution;
     vec2f gridSpacing;
     vec2f origin;
@@ -441,7 +439,7 @@ __host__ void UtilSphDataToFieldGrid2f(SphSolverData2 *solverData, FieldGrid2f *
     }
 }
 
-__host__ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
+int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
                                       ColliderSet3 *colliderSet)
 {
     int emitter_overlaps = 0;
@@ -510,7 +508,7 @@ inline void GDel3D_WriteVertex(PredWrapper *predWrapper, std::ofstream &ofs){
     }
 }
 
-__host__ void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
+void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
                                  GDelOutput *output, const char *path)
 {
     PredWrapper predWrapper;
@@ -535,7 +533,7 @@ __host__ void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
     ofs.close();
 }
 
-__host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
+void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
                                  const char *path, bool tetras)
 {
     PredWrapper predWrapper;
@@ -604,7 +602,7 @@ __host__ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int p
     }\
 }while(0)
 
-__host__ void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
+void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
                                    GDelOutput *output, int pLen)
 {
     std::unordered_map<i3, int, i3Hasher, i3IsSame> triMap;

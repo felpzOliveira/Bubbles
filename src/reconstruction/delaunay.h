@@ -5,8 +5,8 @@
 #include <vector>
 #include <host_mesh.h>
 #include <bound_util.h>
-#include <unordered_set>
 #include <sph_solver.h>
+#include <statics.h>
 
 typedef WorkQueue<vec4ui> DelaunayWorkQueue;
 
@@ -22,7 +22,8 @@ struct DelaunayTriangulation{
 
 void
 DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                Float spacing, Float mu, Grid3 *domain, SphSolver3 *solver);
+                Float spacing, Float mu, Grid3 *domain, SphSolver3 *solver,
+                TimerList &timer);
 
 void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
                                Float spacing, Float mu);

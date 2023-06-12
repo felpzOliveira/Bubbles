@@ -9,7 +9,9 @@ if len(sys.argv) > 1:
 print("Loading mesh...")
 ms.load_new_mesh(path)
 print("Finished loading\nFiltering...")
-ms.apply_coord_taubin_smoothing()
+ms.meshing_repair_non_manifold_edges()
+#ms.apply_coord_taubin_smoothing()
+ms.meshing_surface_subdivision_loop()
 #ms.meshing_re_orient_faces_coherentely()
 #for _ in range(0, 4):
  #   ms.apply_coord_taubin_smoothing()

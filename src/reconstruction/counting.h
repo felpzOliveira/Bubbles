@@ -180,8 +180,8 @@ class LightweightGrid{
     }
 };
 
-typedef LightweightGrid<vec2f, vec2ui, Bounds2f, size_t> LightweightGrid2;
-typedef LightweightGrid<vec3f, vec3ui, Bounds3f, size_t> LightweightGrid3;
+typedef LightweightGrid<vec2f, vec2ui, Bounds2f, Float> LightweightGrid2;
+typedef LightweightGrid<vec3f, vec3ui, Bounds3f, Float> LightweightGrid3;
 
 /*
 * Simple routines for explicit build operations.
@@ -316,17 +316,31 @@ struct FilterSolver3D{
     }
 };
 
+inline bool CellParticleIntersection(vec2f pi, Float r, vec2f center, vec2f ds, Float &fr){
+    vec2f p = pi - center;
+    vec2f d = Abs(p) - ds;
+    fr = (Max(d, vec2f(0.f)) + vec2f(Min(Max(d.x, d.y), 0.f))).Length() - r;
+    return fr < 0;
+}
+
+inline bool CellParticleIntersection(vec3f pi, Float r, vec3f center, vec3f ds, Float &fr){
+    vec3f p = pi - center;
+    vec3f d = Abs(p) - ds;
+    fr = (Max(d, vec3f(0)) + vec3f(Min(Max(d.x, Max(d.y, d.z)), 0.f))).Length() - r;
+    return fr < 0;
+}
+
 // Vector computation  Dimension computation  Domain computation      FilterSolver
 // T = vec2f/vec3f,    U = vec2ui/vec3ui,     Q = Bounds2f/Bounds3f   Box/Gaussian solver
 template<typename T, typename U, typename Q, typename FilterSolver>
 class CountingGrid{
     public:
 
-    using GridType = LightweightGrid<T, U, Q, size_t>;
+    using GridType = LightweightGrid<T, U, Q, Float>;
     using FieldGridType = FieldGrid<T, U, Q, Float>;
 
     unsigned int total; // total of cells
-    size_t *countField; // the field of particle counts
+    Float *countField; // the field of particle counts
     size_t particleCount;
 
     // the underlying grid
@@ -342,6 +356,63 @@ class CountingGrid{
     __bidevice__ CountingGrid(){}
     void SetDimension(vec2f){ dimensions = 2; }
     void SetDimension(vec3f){ dimensions = 3; }
+
+    void SplatParticle(const T &pi, Float radius){
+        U res = grid->GetIndexCount();
+        U centerU = grid->GetHashedPosition(pi);
+        T ds = grid->GetCellSize();
+        Q bounds = grid->GetBounds();
+        T ufmin, ufmax;
+        int depth = 0;
+        Float fr;
+
+        for(int i = 0; i < dimensions; i++){
+            depth = Max(depth, std::ceil(radius / ds[i]));
+            ufmin[i] = centerU[i];
+            ufmax[i] = centerU[i];
+        }
+
+        ufmin = ufmin - T(depth);
+        ufmax = ufmax + T(depth);
+
+        for(int j = ufmin[1]; j <= ufmax[1]; j++){
+            if(j < 0 || j >= res[1])
+                continue;
+
+            for(int i = ufmin[0]; i <= ufmax[0]; i++){
+                if(i < 0 || i >= res[0])
+                    continue;
+
+                if(dimensions > 2){
+                    for(int k = ufmin[2]; k <= ufmax[2]; k++){
+                        if(k < 0 || k >= res[2])
+                            continue;
+
+                        T index;
+                        index[0] = i + 0.5;
+                        index[1] = j + 0.5;
+                        index[2] = k + 0.5;
+
+                        T pc = bounds.pMin + ds * index;
+                        U tg; tg[0] = i; tg[1] = j; tg[2] = k;
+                        unsigned int h = grid->GetLinearCellIndex(tg);
+                        if(CellParticleIntersection(pi, radius, pc, ds, fr))
+                            grid->stored[h] += 1;
+                    }
+                }else{
+                    T index;
+                    index[0] = i + 0.5;
+                    index[1] = j + 0.5;
+
+                    T pc = bounds.pMin + ds * index;
+                    U tg; tg[0] = i; tg[1] = j;
+                    unsigned int h = grid->GetLinearCellIndex(tg);
+                    if(CellParticleIntersection(pi, radius, pc, ds, fr))
+                        grid->stored[h] += 1;
+                }
+            }
+        }
+    }
 
     void BuildByResolution(ParticleSetBuilder<T> *pBuilder, U u, Float simSpacing){
         Q bounds;
@@ -372,44 +443,12 @@ class CountingGrid{
 
         // NOTE: Is there a way to avoid having to do a double loop over this?
         for(T &p : pBuilder->positions){
-            U u = grid->GetHashedPosition(p);
-            if(ratio == 0){
+            if(ratio > 0)
+                SplatParticle(p, simSpacing * 0.25);
+            else{
+                U u = grid->GetHashedPosition(p);
                 unsigned int h = grid->GetLinearCellIndex(u);
                 grid->stored[h] += 1;
-            }else{
-                for(int x = -ratio; x <= ratio; x++){
-                    for(int y = -ratio; y <= ratio; y++){
-                        if(dimensions > 2){
-                            for(int z = -ratio; z <= ratio; z++){
-                                T _u;
-                                _u[0] = int(u[0]) + x;
-                                _u[1] = int(u[1]) + y;
-                                _u[2] = int(u[2]) + z;
-                                if((_u[0] >= 0 && _u[0] < resolution[0]) &&
-                                   (_u[1] >= 0 && _u[1] < resolution[1]) &&
-                                   (_u[2] >= 0 && _u[2] < resolution[2]))
-                                {
-                                    U tg;
-                                    tg[0] = _u[0]; tg[1] = _u[1]; tg[2] = _u[2];
-                                    unsigned int h = grid->GetLinearCellIndex(tg);
-                                    grid->stored[h] += 1;
-                                }
-                            }
-                        }else{
-                            T _u;
-                            _u[0] = int(u[0]) + x;
-                            _u[1] = int(u[1]) + y;
-                            if((_u[0] >= 0 && _u[0] < resolution[0]) &&
-                               (_u[1] >= 0 && _u[1] < resolution[1]))
-                            {
-                                U tg;
-                                tg[0] = _u[0]; tg[1] = _u[1];
-                                unsigned int h = grid->GetLinearCellIndex(tg);
-                                grid->stored[h] += 1;
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -444,44 +483,12 @@ class CountingGrid{
         // NOTE: Is there a way to avoid having to do a double loop over this?
         int ratio = std::floor(simSpacing / spacing);
         for(T &p : pBuilder->positions){
-            U u = grid->GetHashedPosition(p);
-            if(ratio == 0){
+            if(ratio > 0)
+                SplatParticle(p, simSpacing * 0.25);
+            else{
+                U u = grid->GetHashedPosition(p);
                 unsigned int h = grid->GetLinearCellIndex(u);
                 grid->stored[h] += 1;
-            }else{
-                for(int x = -ratio; x <= ratio; x++){
-                    for(int y = -ratio; y <= ratio; y++){
-                        if(dimensions > 2){
-                            for(int z = -ratio; z <= ratio; z++){
-                                T _u;
-                                _u[0] = int(u[0]) + x;
-                                _u[1] = int(u[1]) + y;
-                                _u[2] = int(u[2]) + z;
-                                if((_u[0] >= 0 && _u[0] < resolution[0]) &&
-                                   (_u[1] >= 0 && _u[1] < resolution[1]) &&
-                                   (_u[2] >= 0 && _u[2] < resolution[2]))
-                                {
-                                    U tg;
-                                    tg[0] = _u[0]; tg[1] = _u[1]; tg[2] = _u[2];
-                                    unsigned int h = grid->GetLinearCellIndex(tg);
-                                    grid->stored[h] += 1;
-                                }
-                            }
-                        }else{
-                            T _u;
-                            _u[0] = int(u[0]) + x;
-                            _u[1] = int(u[1]) + y;
-                            if((_u[0] >= 0 && _u[0] < resolution[0]) &&
-                               (_u[1] >= 0 && _u[1] < resolution[1]))
-                            {
-                                U tg;
-                                tg[0] = _u[0]; tg[1] = _u[1];
-                                unsigned int h = grid->GetLinearCellIndex(tg);
-                                grid->stored[h] += 1;
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -543,8 +550,8 @@ class CountingGrid{
 
 template<typename T, typename U, typename Q, typename FilterSolver>
 inline void ComputeDIF(CountingGrid<T, U, Q, FilterSolver> *cGrid, Float sigma=1.2){
-    LightweightGrid<T, U, Q, size_t> *grid = cGrid->grid;
-    size_t *countField = cGrid->countField;
+    LightweightGrid<T, U, Q, Float> *grid = cGrid->grid;
+    Float *countField = cGrid->countField;
     Float *DIF = cGrid->fieldDIF;
     Float *smoothDIF = cGrid->smoothFieldDIF;
     Float mu_0 = cGrid->mu_0;

@@ -87,7 +87,7 @@ int main(int argc, char **argv){
     /* Initialize cuda API */
     cudaInitEx();
 
-    /* Sets the default kernel launching parameters, 16 is good for my notebook */
+    /* Sets the default kernel launching parameters */
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
 
     //test_pcisph2_water_block();
@@ -109,10 +109,10 @@ int main(int argc, char **argv){
     //test_pcisph3_dragon();
     //test_pcisph2_water_sphere();
     //test_pcisph3_water_block();
-    //test_pcisph3_dam_break_double_dragon();
+    test_pcisph3_dam_break_double_dragon();
     //test_pcisph3_box_mesh();
     //test_pcisph3_dragon_pool();
-    test_pcisph3_double_dam_break();
+    //test_pcisph3_double_dam_break();
     //test_pcisph3_rotating_water_box();
     //test_pcisph3_dragon_shower();
 

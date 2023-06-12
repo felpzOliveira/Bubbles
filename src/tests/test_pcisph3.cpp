@@ -13,8 +13,8 @@
 #include <sdfs.h>
 #include <dilts.h>
 
-#define MODELS_PATH "/home/felipe/Documents/CGStuff/models/"
-#define SIM_PATH "/home/felipe/Documents/Bubbles/simulations/"
+#define MODELS_PATH "/home/felpz/Documents/CGStuff/models/"
+#define SIM_PATH "/home/felpz/Documents/Bubbles/simulations/"
 
 void test_pcisph3_box_drop(){
     printf("===== PCISPH Solver 3D -- Box Drop\n");
@@ -1773,13 +1773,13 @@ void test_pcisph3_box_mesh(){
 
 void test_pcisph3_dam_break_double_dragon(){
     printf("===== PCISPH Solver 3D -- Dam Break Double Dragon\n");
-#define WITH_MESH
+//#define WITH_MESH
     CudaMemoryManagerStart(__FUNCTION__);
     vec3f origin(0.0, 0.0, 7.0);
     vec3f target(0, -0.5, 0);
 
     vec3f boxSize(3.5, 2.5, 2.0);
-    Float spacing = 0.02;
+    Float spacing = 0.05;
     Float spacingScale = 1.8;
 
     vec3f waterBox(0.55, 2.1, boxSize.z - 2.0 * spacing);
@@ -1806,7 +1806,7 @@ void test_pcisph3_dam_break_double_dragon(){
     Shape *boxRight = MakeBox(Translate(+xof, -yof, 0), waterBox);
 
     VolumeParticleEmitterSet3 emitters;
-    emitters.AddEmitter(boxRight, spacing);
+    emitters.AddEmitter(boxRight, spacing, vec3f(0, -5, 0));
 
     ColliderSetBuilder3 cBuilder;
 #if defined(WITH_MESH)
@@ -1839,7 +1839,7 @@ void test_pcisph3_dam_break_double_dragon(){
         if(step == 0) return 1;
         UtilPrintStepStandard(&solver,step-1);
 #if 0
-        const char *sim_folder = "/home/felipe/Documents/Bubbles/simulations/";
+        const char *sim_folder = "../simulations/";
         std::string path(sim_folder);
         path += "two_dragons/output_";
         path += std::to_string(step-1);
@@ -1870,7 +1870,7 @@ void test_pcisph3_double_dam_break(){
     vec3f origin(0, 1, -3);
     vec3f target(0,0,0);
 
-    Float spacing = 0.02;
+    Float spacing = 0.05;
     Float boxLen = 1.5;
     Float boxFluidLen = 0.5;
     Float boxFluidYLen = 0.9;
@@ -1891,8 +1891,8 @@ void test_pcisph3_double_dam_break(){
     ParticleSetBuilder3 pBuilder;
     VolumeParticleEmitterSet3 emitterSet;
 
-    VolumeParticleEmitter3 emitterp(boxp, boxp->GetBounds(), spacing);
-    VolumeParticleEmitter3 emittern(boxn, boxn->GetBounds(), spacing);
+    VolumeParticleEmitter3 emitterp(boxp, boxp->GetBounds(), spacing, vec3f(0,-3,0));
+    VolumeParticleEmitter3 emittern(boxn, boxn->GetBounds(), spacing, vec3f(0,-3,0));
 
     emitterSet.AddEmitter(&emitterp);
     emitterSet.AddEmitter(&emittern);
@@ -1923,12 +1923,13 @@ void test_pcisph3_double_dam_break(){
             return 1;
         UtilPrintStepStandard(&solver, step-1);
         ProfilerReport();
-
+#if 0
         std::string path("../simulations/double_dam/out_");
         path += std::to_string(step-1);
         path += ".txt";
         SerializerSaveSphDataSet3(solver.GetSphSolverData(), path.c_str(),
                                   SERIALIZER_POSITION);
+#endif
         return step > 450 ? 0 : 1;
     };
 
@@ -1952,15 +1953,12 @@ void test_pcisph3_pathing(){
     vec3f containerLen(2.0, 1.0, 1.0);
     Shape *container = MakeBox(Transform(), containerLen, true);
 
-#define MODELS_PATH "/home/felipe/Documents/CGStuff/models/"
     ParsedMesh *unityCube = LoadObj(MODELS_PATH "cube.obj");
     Float xExtent = 0.5;
     vec3f scaleSize(xExtent, 0.2, 0.5);
     Float xof = (containerLen.x - xExtent) * 0.5; xof -= spacing;
     Transform t = Translate(-xof, 0, 0) * RotateZ(-14) * Scale(scaleSize);
     Shape *leftRamp = MakeMesh(unityCube, t);
-
-#undef MODELS_PATH
 
     Shape *boxEmitter = MakeBox(Translate(0, 0, 0), vec3f(0.05));
 

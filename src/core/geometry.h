@@ -115,7 +115,7 @@ void __assert_check(bool v, const char *name, const char *filename,
 inline __bidevice__ Float Max(Float a, Float b){ return a < b ? b : a; }
 inline __bidevice__ Float Min(Float a, Float b){ return a < b ? a : b; }
 inline __bidevice__ Float Absf(Float v){ return v > 0 ? v : -v; }
-inline __bidevice__ bool IsNaN(Float v){ return v != v; }
+inline __bidevice__ bool IsNaN(Float v){ return v != v || std::isinf(v); }
 inline __bidevice__ Float Radians(Float deg) { return (Pi / 180) * deg; }
 inline __bidevice__ Float Degrees(Float rad) { return (rad * 180 / Pi); }
 inline __bidevice__ bool IsZero(Float a){ return Absf(a) < 1e-8; }

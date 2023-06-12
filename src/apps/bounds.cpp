@@ -932,9 +932,11 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         timer.Stop();
     }else if(opts->method == BOUNDARY_DELAUNAY){
         DelaunayTriangulation triangulation;
+        TimerList dummyTimer;
         // TODO: delaunay μ to cmd
         timer.Start();
-        DelaunaySurface(triangulation, sphpSet, opts->spacing, 1.1, grid, &solver);
+        DelaunaySurface(triangulation, sphpSet, opts->spacing, 1.1, grid,
+                        &solver, dummyTimer);
         timer.Stop();
 
         boundary = triangulation.boundary;

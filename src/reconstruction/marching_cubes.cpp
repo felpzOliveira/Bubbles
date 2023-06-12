@@ -287,6 +287,13 @@ void MarchingCubes(FieldGrid3f *grid, HostTriangleMesh3 *mesh, Float isoValue,
     });
 
     size = *requiredCubes;
+
+    if(size == 0){
+        printf("done\n - Given SDF does not intersect surface, nothing to do ( 0 cells ).\n");
+        cudaFree(requiredCubes);
+        return;
+    }
+
     // Prepare processing work queue for the cubes that actually need to be solved
     MarchingCubeWorkQueue *workQ = cudaAllocateUnregisterVx(MarchingCubeWorkQueue, 1);
     workQ->SetSlots((int)size, false);
@@ -350,7 +357,7 @@ void MarchingCubes(FieldGrid3f *grid, HostTriangleMesh3 *mesh, Float isoValue,
     AutoParallelFor("MarchingCubes-ProcessCubes", workQ->size, AutoLambda(int cubeIndex){
         int idxVertexOfTheEdge[2];
         int indexMap[8] = {0, 1, 5, 4, 2, 3, 7, 6};
-        MarchingCubeWorkItem *mcItem = &workQ->ids[cubeIndex];
+        MarchingCubeWorkItem *mcItem = workQ->Ref(cubeIndex);
         vec3f *e = &mcItem->e[0];
         vec3f *n = &mcItem->n[0];
         int idxEdgeFlags = EdgeFlags(mcItem->idxFlagSize);
@@ -412,7 +419,7 @@ void MarchingCubes(FieldGrid3f *grid, HostTriangleMesh3 *mesh, Float isoValue,
             continue;
 
         vec3ui face;
-        MarchingCubeWorkItem *mcItem = &workQ->ids[out->cubeIndex];
+        MarchingCubeWorkItem *mcItem = workQ->Ref(out->cubeIndex);
         int idxFlagSize = mcItem->idxFlagSize;
         vec3f *e = &mcItem->e[0];
         vec3f *n = &mcItem->n[0];

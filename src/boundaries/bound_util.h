@@ -57,6 +57,10 @@ class WorkQueue{
         return ids[index];
     }
 
+    __bidevice__ T *Ref(int index){
+        return &ids[index];
+    }
+
     __bidevice__ T Fetch(int *where=nullptr){
         int at = QueueGetEntry(this);
         if(where) *where = at;

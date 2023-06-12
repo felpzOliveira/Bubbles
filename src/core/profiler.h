@@ -26,7 +26,7 @@ void   ProfilerReport();
 void   ProfilerManualStart(const char *funcname);
 void   ProfilerManualFinish();
 
-__host__ __device__ 
+__host__ __device__
 void _ProfilerSetParticle(int value, int id);
 
 

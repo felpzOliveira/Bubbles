@@ -107,26 +107,26 @@ typedef void(*MemoryFree)(void *);
 * It also gets the list of mtls found, can be passed directly to the MTL API for
 * material loading. mtls can be nullptr, in which case only the mesh list is returned.
 */
-__host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl> *mtls,
-                                           bool split_mesh=true);
+std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl> *mtls,
+                                  bool split_mesh=true);
 
 /*
 * If you want to simply load the mesh and not split and not get any materials
 * and do your own thing, call this. It will be faster and use less memory.
 */
-__host__ ParsedMesh *LoadObj(const char *path);
+ParsedMesh *LoadObj(const char *path);
 
 /*
 * Duplicates the information of a mesh applying the MeshProperties given,
 * not very efficient but usefull.
 */
-__host__ ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props=nullptr);
+ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props=nullptr);
 
 /*
 * Configures the allocators to be use. AllocatorType::GPU for allocation through
 * cutil.h and GPU ready memory and AllocatorType::CPU for standard libc allocators.
 */
-__host__ void UseDefaultAllocatorFor(AllocatorType type);
+void UseDefaultAllocatorFor(AllocatorType type);
 
 /////////////////////////////////////////////////////////////
 // Exposing allocator for BVH component to sync mesh access
@@ -135,12 +135,12 @@ __host__ void UseDefaultAllocatorFor(AllocatorType type);
 /*
 * Get memory from the default allocator configured.
 */
-__host__ void *DefaultAllocatorMemory(long size);
+void *DefaultAllocatorMemory(long size);
 
 /*
 * Release memory from the default allocator configured.
 */
-__host__ void DefaultAllocatorFree(void *ptr);
+void DefaultAllocatorFree(void *ptr);
 
 /////////////////////////////////////////////////////////////
 // Exposing parsing routines for serializer
@@ -149,27 +149,27 @@ __host__ void DefaultAllocatorFree(void *ptr);
 /*
 * Get one line from the input stream and return it in 't'.
 */
-__host__ std::istream &GetLine(std::istream &is, std::string &t);
+std::istream &GetLine(std::istream &is, std::string &t);
 
 /*
 * Parse a single float and move token head.
 */
-__host__ Float ParseFloat(const char **token);
+Float ParseFloat(const char **token);
 
 /*
 * Parse a single vec2f and move token head.
 */
-__host__ void ParseV2(vec2f *v, const char **token);
+void ParseV2(vec2f *v, const char **token);
 
 /*
 * Parse a single vec3f and move token head.
 */
-__host__ void ParseV3(vec3f *v, const char **token);
+void ParseV3(vec3f *v, const char **token);
 
 /*
 * Parses a transform and move token head.
 */
-__host__ void ParseTransform(Transform *t, const char **token);
+void ParseTransform(Transform *t, const char **token);
 
 /*
 * Writes a HostTriangleMesh3 into a stream as an obj if WITH_WRITE is enabled.

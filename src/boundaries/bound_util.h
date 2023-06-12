@@ -3,7 +3,7 @@
 #include <grid.h>
 #include <cutil.h>
 
-template<typename T> inline __bidevice__ int QueuePushEntry(T *Q){
+template<typename T> inline bb_cpu_gpu int QueuePushEntry(T *Q){
 #if defined(__CUDA_ARCH__)
     return atomicAdd(&Q->size, 1);
 #else
@@ -11,7 +11,7 @@ template<typename T> inline __bidevice__ int QueuePushEntry(T *Q){
 #endif
 }
 
-template<typename T> inline __bidevice__ int QueueGetEntry(T *Q){
+template<typename T> inline bb_cpu_gpu int QueueGetEntry(T *Q){
 #if defined(__CUDA_ARCH__)
     return atomicAdd(&Q->entry, 1);
 #else
@@ -27,7 +27,7 @@ class WorkQueue{
     int capacity;
     int counter;
     T *ids;
-    __bidevice__ WorkQueue(){}
+    bb_cpu_gpu WorkQueue(){}
 
     void SetSlots(int n, bool registered=true){
         if(registered)
@@ -44,7 +44,7 @@ class WorkQueue{
         capacity = n;
     }
 
-    __bidevice__ int Push(T id){
+    bb_cpu_gpu int Push(T id){
         int at = QueuePushEntry(this);
         if(at >= capacity){
             printf("Too many entries\n");
@@ -53,21 +53,21 @@ class WorkQueue{
         return at;
     }
 
-    __bidevice__ T At(int index){
+    bb_cpu_gpu T At(int index){
         return ids[index];
     }
 
-    __bidevice__ T *Ref(int index){
+    bb_cpu_gpu T *Ref(int index){
         return &ids[index];
     }
 
-    __bidevice__ T Fetch(int *where=nullptr){
+    bb_cpu_gpu T Fetch(int *where=nullptr){
         int at = QueueGetEntry(this);
         if(where) *where = at;
         return ids[at];
     }
 
-    __bidevice__ void IncreaseCounter(){
+    bb_cpu_gpu void IncreaseCounter(){
     #if defined(__CUDA_ARCH__)
         atomicAdd(&counter, 1);
     #else
@@ -92,7 +92,7 @@ class MultiWorkQueue{
     BaseQueue *qs[N];
     size_t count = 0;
 
-    __bidevice__ MultiWorkQueue(){
+    bb_cpu_gpu MultiWorkQueue(){
         for(size_t i = 0; i < N; i++){
             qs[i] = nullptr;
         }
@@ -105,7 +105,7 @@ class MultiWorkQueue{
         }
     }
 
-    __bidevice__ BaseQueue *FetchQueueFor(int id){
+    bb_cpu_gpu BaseQueue *FetchQueueFor(int id){
         return qs[id];
     }
 
@@ -133,11 +133,11 @@ class DualWorkQueue{
         active = 0;
     }
 
-    __bidevice__ WorkQueue<T> *ActiveQueue(){
+    bb_cpu_gpu WorkQueue<T> *ActiveQueue(){
         return mQueue.FetchQueueFor(active);
     }
 
-    __bidevice__ WorkQueue<T> *NextQueue(){
+    bb_cpu_gpu WorkQueue<T> *NextQueue(){
         return mQueue.FetchQueueFor(1-active);
     }
 
@@ -147,12 +147,12 @@ class DualWorkQueue{
         active = 1 - active;
     }
 
-    __bidevice__ void Push(T id){
+    bb_cpu_gpu void Push(T id){
         WorkQueue<T> *Q = NextQueue();
         Q->Push(id);
     }
 
-    __bidevice__ T Fetch(int *where=nullptr){
+    bb_cpu_gpu T Fetch(int *where=nullptr){
         WorkQueue<T> *Q = ActiveQueue();
         return Q->Fetch(where);
     }
@@ -163,7 +163,7 @@ typedef WorkQueue<int> IntWorkQueue;
 typedef WorkQueue<vec3f> SandimWorkQueue3;
 typedef WorkQueue<vec2f> SandimWorkQueue2;
 
-template<typename T, typename U, typename Q, typename Func> __bidevice__
+template<typename T, typename U, typename Q, typename Func> bb_cpu_gpu
 void ForAllNeighbors(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, T pi, Func fn,
                      int depth=1)
 {
@@ -188,7 +188,7 @@ void ForAllNeighbors(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, T pi, Func fn,
     }
 }
 
-template<typename T, typename U, typename Q, typename Func> __bidevice__
+template<typename T, typename U, typename Q, typename Func> bb_cpu_gpu
 void ForAllNeighbors(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, int pId, Func fn){
     int *neighbors = nullptr;
     T pi = pSet->GetParticlePosition(pId);

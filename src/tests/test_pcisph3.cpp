@@ -355,7 +355,7 @@ void test_pcisph3_rotating_water_box(){
             container->Update(g_transform * transform);
             container->SetVelocities(linear, angular * 50.0);
         }
-#if 1
+#if 0
         std::vector<int> bounds;
         int n = UtilGetBoundaryState(pSet, &bounds);
         printf("Boundary %d / %d\n", (int)n, (int)pSet->GetParticleCount());

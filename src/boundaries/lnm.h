@@ -16,13 +16,13 @@
 * TODO: Implement generic Fn search for Li-boundaries for GPU, i.e.: port from CPU.
 */
 
-__bidevice__ inline int LNMDomainQuerySize(int len1D, int dim){
+bb_cpu_gpu inline int LNMDomainQuerySize(int len1D, int dim){
     return (int)pow(len1D, dim);
 }
 
 // compute eq 3.14
 template<typename T, typename U, typename Q>
-__bidevice__ inline Float LNMComputeDelta(Grid<T, U, Q> *domain, Float h){
+bb_cpu_gpu inline Float LNMComputeDelta(Grid<T, U, Q> *domain, Float h){
     /* Get the minimum in case its not a regular grid */
     T len = domain->GetCellSize();
     Float maxd = MinComponent(len);
@@ -33,7 +33,7 @@ __bidevice__ inline Float LNMComputeDelta(Grid<T, U, Q> *domain, Float h){
 
 // going to classify on v0 buffer as simulation step should already be resolved
 template<typename T, typename Q>
-__bidevice__ void LNMBoundaryLNSet(ParticleSet<T> *pSet, Cell<Q> *self, int L){
+bb_cpu_gpu void LNMBoundaryLNSet(ParticleSet<T> *pSet, Cell<Q> *self, int L){
     int count = self->GetChainLength();
     ParticleChain *pChain = self->GetChain();
     for(int i = 0; i < count; i++){
@@ -43,7 +43,7 @@ __bidevice__ void LNMBoundaryLNSet(ParticleSet<T> *pSet, Cell<Q> *self, int L){
 }
 
 template<typename T, typename Q>
-__bidevice__ void LNMBoundaryPushWork(ParticleSet<T> *pSet, Cell<Q> *self,
+bb_cpu_gpu void LNMBoundaryPushWork(ParticleSet<T> *pSet, Cell<Q> *self,
                                       LNMWorkQueue *workQ)
 {
     int count = self->GetChainLength();
@@ -54,7 +54,7 @@ __bidevice__ void LNMBoundaryPushWork(ParticleSet<T> *pSet, Cell<Q> *self,
     }
 }
 
-template<typename T, typename U, typename Q> __global__
+template<typename T, typename U, typename Q> bb_kernel
 void LNMBoundaryL2GeomKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                              Float preDelta, Float h, LNMWorkQueue *workQ,
                              int algorithm)
@@ -79,7 +79,7 @@ void LNMBoundaryL2GeomKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 }
 
 template<typename T, typename U, typename Q>
-__global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+bb_kernel void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                     Float preDelta, Float h, int algorithm,
                                     LNMWorkQueue *workQ)
 {
@@ -111,7 +111,7 @@ __global__ void LNMBoundaryL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 }
 
 template<typename T, typename U, typename Q>
-__global__ void LNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
+bb_kernel void LNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
     int id = threadIdx.x + blockIdx.x * blockDim.x;
     if(id < domain->GetActiveCellCount()){
         int threshold = LNMDomainQuerySize(3, domain->dimensions);
@@ -141,7 +141,7 @@ __global__ void LNMBoundaryL1Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain)
 /*
  * Checks if a pair of coordinates u0 and u1 lie on the same N1x1 neighborhood.
  */
-template<typename U> __bidevice__ inline
+template<typename U> bb_cpu_gpu inline
 bool LNMBoundaryAreCoords1x1(const U u0, const U u1, int dim){
     int eval = 0;
     for(int s = 0; s < dim; s++){
@@ -165,7 +165,7 @@ bool LNMBoundaryAreCoords1x1(const U u0, const U u1, int dim){
  * there are however a few cases where this is faster (see thesis).
  */
 template<typename T, typename U, typename Q>
-__global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+bb_kernel void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                         int preDelta)
 {
     int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -239,8 +239,8 @@ __global__ void LNMBoundarySingleKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *dom
 }
 
 template<typename T, typename U, typename Q>
-__host__ void LNMBoundarySingle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h,
-                                bool unbounded=false)
+void LNMBoundarySingle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h,
+                       bool unbounded=false)
 {
     Float delta = LNMComputeDelta(domain, h);
     if(unbounded){
@@ -256,9 +256,9 @@ __host__ void LNMBoundarySingle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Flo
 * Actual boundary routine.
 */
 template<typename T, typename U, typename Q>
-__host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                          Float h, int algorithm=0, LNMWorkQueue *workQ=nullptr,
-                          bool unbounded=false)
+void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                 Float h, int algorithm=0, LNMWorkQueue *workQ=nullptr,
+                 bool unbounded=false)
 {
     Float delta = LNMComputeDelta(domain, h);
     if(unbounded){
@@ -289,7 +289,7 @@ __host__ void LNMBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 //                 V O X E L   C L A S S I F I E R            */
 /**************************************************************/
 template<typename T, typename U, typename Q>
-__global__ void LNMBoundaryExtendL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
+bb_kernel void LNMBoundaryExtendL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
     int id = threadIdx.x + blockIdx.x * blockDim.x;
     if(id < domain->GetActiveCellCount()){
         int i = domain->GetActiveCellId(id);
@@ -302,7 +302,7 @@ __global__ void LNMBoundaryExtendL2Kernel(ParticleSet<T> *pSet, Grid<T, U, Q> *d
 }
 
 template<typename T, typename U, typename Q>
-__global__ void LNMBoundaryLKKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+bb_kernel void LNMBoundaryLKKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                     Float preDelta, Float h)
 {
     int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -330,7 +330,7 @@ __global__ void LNMBoundaryLKKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
 }
 
 template<typename T, typename U, typename Q>
-__bidevice__ bool LNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned int cellId){
+bb_cpu_gpu bool LNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned int cellId){
     int *neighbors = nullptr;
     int count = domain->GetNeighborsOf(cellId, &neighbors);
     const int dim = domain->dimensions;
@@ -367,7 +367,7 @@ __bidevice__ bool LNMComputeOnce(Grid<T, U, Q> *domain, int refLevel, unsigned i
 }
 
 template<typename T, typename U, typename Q>
-__global__ void LNMOnceKernel(Grid<T, U, Q> *domain, int level){
+bb_kernel void LNMOnceKernel(Grid<T, U, Q> *domain, int level){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < domain->GetCellCount()){
         if(LNMComputeOnce(domain, level, i)){
@@ -378,7 +378,7 @@ __global__ void LNMOnceKernel(Grid<T, U, Q> *domain, int level){
 
 
 template<typename T, typename U, typename Q>
-__host__ void LNMInvalidateCells(Grid<T, U, Q> *domain){
+void LNMInvalidateCells(Grid<T, U, Q> *domain){
     int total = domain->GetCellCount();
     for(int i = 0; i < total; i++){
         Cell<Q> *cell = domain->GetCell(i);
@@ -388,7 +388,7 @@ __host__ void LNMInvalidateCells(Grid<T, U, Q> *domain){
 
 // Lazy implementation
 template<typename T, typename U, typename Q>
-__host__ int LNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1, int startLevel=0){
+int LNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1, int startLevel=0){
     bool done = false;
     int level = startLevel;
     int N = domain->GetCellCount();
@@ -416,7 +416,7 @@ __host__ int LNMClassifyLazyGPU(Grid<T, U, Q> *domain, int levels=-1, int startL
 }
 
 template<typename T, typename U, typename Q>
-__global__ void LNMParticleAttributesKernel(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
+bb_kernel void LNMParticleAttributesKernel(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < pSet->GetParticleCount()){
         T pi = pSet->GetParticlePosition(i);
@@ -431,16 +431,16 @@ __global__ void LNMParticleAttributesKernel(Grid<T, U, Q> *domain, ParticleSet<T
     }
 }
 
-template<typename T, typename U, typename Q> __host__
+template<typename T, typename U, typename Q>
 void LNMAssignParticlesAttributesGPU(Grid<T, U, Q> *domain, ParticleSet<T> *pSet){
     int N = pSet->GetParticleCount();
     GPULaunch(N, GPUKernel(LNMParticleAttributesKernel<T, U, Q>), domain, pSet);
 }
 
 template<typename T, typename U, typename Q>
-__host__ void LNMBoundaryExtended(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
-                                  Float h, int max_level, int algorithm=0,
-                                  bool unbounded=false)
+void LNMBoundaryExtended(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
+                         Float h, int max_level, int algorithm=0,
+                         bool unbounded=false)
 {
     // classify voxels
     LNMClassifyLazyGPU<T, U, Q>(domain, max_level);

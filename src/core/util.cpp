@@ -243,7 +243,7 @@ int UtilGenerateCirclePoints(float *posBuffer, float *colBuffer, vec3f col,
     return nPoints;
 }
 
-__bidevice__ int ParticleBySDF(const vec3f &p, FieldGrid3f *sdf, Float sdfThreshold,
+bb_cpu_gpu int ParticleBySDF(const vec3f &p, FieldGrid3f *sdf, Float sdfThreshold,
                                int absolute=1)
 {
     int rv = 0;

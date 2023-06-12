@@ -74,10 +74,24 @@ Float TimerList::GetElapsedCPU(int i){
     return t;
 }
 
+Float TimerList::GetTotalSummedTimeCPU(){
+    Float t = 0;
+    for(int i = 0; i < cpuElapsed.size(); i++)
+        t += cpuElapsed.at(i);
+    return t;
+}
+
+Float TimerList::GetTotalSummedTimeGPU(){
+    Float t = 0;
+    for(int i = 0; i < gpuElapsed.size(); i++)
+        t += gpuElapsed.at(i);
+    return t;
+}
+
 void TimerList::PrintEvents(){
     // TODO: we need a extra flag so we can tell if it is gpu event or cpu
     int n = gpuElapsed.size();
-    std::cout << "Timer events ( " << n << " ):" << std::endl;
+    std::cout << "Timer events ( " << GetTotalSummedTimeCPU() << " ms ):" << std::endl;
     for(int i = 0; i < n; i++){
         Float interval = GetElapsedCPU(i);
         std::cout << " - ";

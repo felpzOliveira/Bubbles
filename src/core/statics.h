@@ -42,8 +42,8 @@ class LNMData{
     public:
     Float timeTaken;
     Float simPercentage;
-    __bidevice__ LNMData(): timeTaken(0), simPercentage(0){}
-    __bidevice__ LNMData(Float ttaken, Float percentage) : timeTaken(ttaken),
+    bb_cpu_gpu LNMData(): timeTaken(0), simPercentage(0){}
+    bb_cpu_gpu LNMData(Float ttaken, Float percentage) : timeTaken(ttaken),
     simPercentage(percentage){}
 };
 
@@ -80,4 +80,6 @@ class TimerList{
     int Active();
     Float GetElapsedCPU(int i);
     Float GetElapsedGPU(int i);
+    Float GetTotalSummedTimeCPU();
+    Float GetTotalSummedTimeGPU();
 };

@@ -1,55 +1,51 @@
 #include <sph_solver.h>
 
-__host__ void SphSolverData3SetupFor(SphSolverData3 *solverData,
-                                     int expectedParticleCount)
-{
+void SphSolverData3SetupFor(SphSolverData3 *solverData, int expectedParticleCount){
     solverData->smoothedVelocities = cudaAllocateVx(vec3f, expectedParticleCount);
 }
 
-__bidevice__ SphSolver3::SphSolver3(){ solverData = nullptr; }
+bb_cpu_gpu SphSolver3::SphSolver3(){ solverData = nullptr; }
 
-__bidevice__ void SphSolver3::Initialize(SphSolverData3 *data){
+bb_cpu_gpu void SphSolver3::Initialize(SphSolverData3 *data){
     solverData = data;
 }
 
-__bidevice__ SphSolverData3 *SphSolver3::GetSphSolverData(){
+bb_cpu_gpu SphSolverData3 *SphSolver3::GetSphSolverData(){
     return solverData;
 }
 
-__host__ void SphSolver3::SetViscosityCoefficient(Float viscosityCoefficient){
+void SphSolver3::SetViscosityCoefficient(Float viscosityCoefficient){
     AssertA(solverData, "Invalid solverData for {SetViscosityCoefficient}");
     solverData->viscosity = Max(0, viscosityCoefficient);
 }
 
-__host__ void SphSolver3::SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient){
+void SphSolver3::SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient){
     AssertA(solverData, "Invalid solverData for {SetPseudoViscosityCoefficient}");
     solverData->pseudoViscosity = Max(0, pseudoViscosityCoefficient);
 }
 
-__bidevice__ Float SphSolver3::GetKernelRadius(){
+bb_cpu_gpu Float SphSolver3::GetKernelRadius(){
     AssertA(solverData, "Invalid solverData for {GetKernelRadius}");
     AssertA(solverData->sphpSet, "No Particle set in solver data");
     return solverData->sphpSet->GetKernelRadius();
 }
 
-__host__ void SphSolver3::SetColliders(ColliderSet3 *col){
+void SphSolver3::SetColliders(ColliderSet3 *col){
     AssertA(solverData, "Invalid solverData for {SetColliders}");
     solverData->collider = col;
 }
 
-__host__ ColliderSet3 *SphSolver3::GetColliders(){
+ColliderSet3 *SphSolver3::GetColliders(){
     AssertA(solverData, "Invalid solverData for {GetColliders}");
     return solverData->collider;
 }
 
-__bidevice__ SphParticleSet3 *SphSolver3::GetSphParticleSet(){
+bb_cpu_gpu SphParticleSet3 *SphSolver3::GetSphParticleSet(){
     AssertA(solverData, "Invalid solverData for {GetSphParticleSet}");
     return solverData->sphpSet;
 }
 
-__host__ void AdvanceTimeStep(SphSolver3 *solver, Float timeStep,
-                              int use_cpu = 0)
-{
+void AdvanceTimeStep(SphSolver3 *solver, Float timeStep, int use_cpu = 0){
     SphSolverData3 *data = solver->solverData;
     if(use_cpu)
         UpdateGridDistributionCPU(data);
@@ -74,7 +70,7 @@ __host__ void AdvanceTimeStep(SphSolver3 *solver, Float timeStep,
         ComputePseudoViscosityInterpolationGPU(data, timeStep);
 }
 
-__host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
+void SphSolver3::Advance(Float timeIntervalInSeconds){
     TimerList lnmTimer;
     unsigned int numberOfIntervals = 0;
     unsigned int numberOfIntervalsRunned = 0;
@@ -107,8 +103,8 @@ __host__ void SphSolver3::Advance(Float timeIntervalInSeconds){
     lnmTimer.Stop();
 }
 
-__host__ void SphSolver3::Setup(Float targetDensity, Float targetSpacing,
-                                Float relativeRadius, Grid3 *dom, SphParticleSet3 *pSet)
+void SphSolver3::Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
+                       Grid3 *dom, SphParticleSet3 *pSet)
 {
     solverData->domain = dom;
     solverData->sphpSet = pSet;
@@ -136,7 +132,7 @@ __host__ void SphSolver3::Setup(Float targetDensity, Float targetSpacing,
     solverData->frame_index = 1;
 }
 
-__host__ SphSolverData3 *DefaultSphSolverData3(){
+SphSolverData3 *DefaultSphSolverData3(){
     SphSolverData3 *data = cudaAllocateVx(SphSolverData3, 1);
     data->eosExponent = 7.0;
     data->negativePressureScale = 0.0;

@@ -1,8 +1,8 @@
 #include <point_generator.h>
 
-__host__ TrianglePointGenerator::TrianglePointGenerator() : PointGenerator2(){}
+TrianglePointGenerator::TrianglePointGenerator() : PointGenerator2(){}
 
-__host__ void
+void
 TrianglePointGenerator::ForEach(const Bounds2f &domain, Float spacing,
                                 const std::function<bool(const vec2f &)> &callback) const
 {
@@ -32,10 +32,10 @@ TrianglePointGenerator::ForEach(const Bounds2f &domain, Float spacing,
 }
 
 
-__bidevice__ TrianglePointGeneratorDevice::TrianglePointGeneratorDevice(){}
+bb_cpu_gpu TrianglePointGeneratorDevice::TrianglePointGeneratorDevice(){}
 
-__bidevice__ int TrianglePointGeneratorDevice::Generate(const Bounds2f &domain, Float spacing,
-                                                        vec2f *points, int maxn)
+bb_cpu_gpu int TrianglePointGeneratorDevice::Generate(const Bounds2f &domain, Float spacing,
+                                                      vec2f *points, int maxn)
 {
     Float halfSpacing = spacing / 2;
     Float ySpacing = spacing * std::sqrt(3.0) / 2.0;

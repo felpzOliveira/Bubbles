@@ -1,8 +1,8 @@
 #include <pbf_solver.h>
 
-__host__ PbfSolver2::PbfSolver2(){}
+PbfSolver2::PbfSolver2(){}
 
-__host__ void PbfSolver2::Initialize(SphSolverData2 *data){
+void PbfSolver2::Initialize(SphSolverData2 *data){
     solverData = cudaAllocateVx(PbfSolverData2, 1);
     memset(solverData, 0x00, sizeof(PbfSolverData2));
     solverData->sphData = data;
@@ -15,38 +15,38 @@ __host__ void PbfSolver2::Initialize(SphSolverData2 *data){
     predictIterations = 10;
 }
 
-__bidevice__ SphSolverData2 *PbfSolver2::GetSphSolverData(){
+bb_cpu_gpu SphSolverData2 *PbfSolver2::GetSphSolverData(){
     AssertA(solverData, "Invalid solverData for {GetSphSolverData}");
     return solverData->sphData;
 }
 
-__bidevice__ SphParticleSet2 *PbfSolver2::GetSphParticleSet(){
+bb_cpu_gpu SphParticleSet2 *PbfSolver2::GetSphParticleSet(){
     AssertA(solverData, "Invalid solverData for {GetSphSolverData}");
     AssertA(solverData->sphData, "Invalid solverData for {GetSphSolverData}");
     return solverData->sphData->sphpSet;
 }
 
-__host__ void PbfSolver2::SetColliders(ColliderSet2 *colliders){
+void PbfSolver2::SetColliders(ColliderSet2 *colliders){
     AssertA(solverData, "Invalid solverData for {SetColliders}");
     AssertA(solverData->sphData, "Invalid solverData for {SetColliders}");
     solverData->sphData->collider = colliders;
 }
 
-__host__ LNMStats PbfSolver2::GetLNMStats(){
+LNMStats PbfSolver2::GetLNMStats(){
     return lnmStats;
 }
 
-__host__ Float PbfSolver2::GetAdvanceTime(){
+Float PbfSolver2::GetAdvanceTime(){
     return stepInterval;
 }
 
-__host__ int PbfSolver2::GetParticleCount(){
+int PbfSolver2::GetParticleCount(){
     return solverData->sphData->sphpSet->GetParticleSet()->GetParticleCount();
 }
 
-__host__ void PbfSolver2::Setup(Float targetDensity, Float targetSpacing,
-                                Float relativeRadius, Grid2 *domain,
-                                SphParticleSet2 *pSet)
+void PbfSolver2::Setup(Float targetDensity, Float targetSpacing,
+                       Float relativeRadius, Grid2 *domain,
+                       SphParticleSet2 *pSet)
 {
     AssertA(solverData, "Invalid call to {PbfSolver2::Setup}");
     SphSolverData2 *sphData = solverData->sphData;
@@ -82,9 +82,7 @@ __host__ void PbfSolver2::Setup(Float targetDensity, Float targetSpacing,
 }
 
 
-__host__ void AdvanceTimeStep(PbfSolver2 *solver, Float timeStep,
-                              int use_cpu = 0)
-{
+void AdvanceTimeStep(PbfSolver2 *solver, Float timeStep, int use_cpu = 0){
     PbfSolverData2 *pbfData = solver->solverData;
     SphSolverData2 *data = pbfData->sphData;
 
@@ -109,7 +107,7 @@ __host__ void AdvanceTimeStep(PbfSolver2 *solver, Float timeStep,
 }
 
 
-__host__ void PbfSolver2::Advance(Float timeIntervalInSeconds){
+void PbfSolver2::Advance(Float timeIntervalInSeconds){
     TimerList lnmTimer;
     unsigned int numberOfIntervals = 0;
     Float remainingTime = timeIntervalInSeconds;

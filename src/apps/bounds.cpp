@@ -538,7 +538,7 @@ void process_stats_procedure(boundary_opts *opts){
 }
 
 template<typename T>
-__bidevice__ void atomic_increase_stats(T *val){
+bb_cpu_gpu void atomic_increase_stats(T *val){
 #if defined(__CUDA_ARCH__)
     (void)atomicAdd(val, T(1));
 #else
@@ -592,7 +592,7 @@ void advance_boundary_references(work_queue_stats *workQstats, int targetLevel,
     cudaFree(stats);
 }
 
-__bidevice__
+bb_cpu_gpu
 vec2i compute_part2_minimum_neighboors(ParticleSet3 *pSet, Grid3 *grid, int i){
     vec2i res(0, 0);
     vec3f pi = pSet->GetParticlePosition(i);

@@ -1,23 +1,23 @@
 #include <transform_sequence.h>
 
-__host__ TransformSequence::TransformSequence() : scopeStart(0), scopeEnd(0){}
+TransformSequence::TransformSequence() : scopeStart(0), scopeEnd(0){}
 
-__host__ void TransformSequence::ComputeInitialTransform(){
+void TransformSequence::ComputeInitialTransform(){
     if(transforms.size() == 1){
         Interpolate(scopeStart, &lastInterpolatedTransform);
     }
 }
 
-__host__ void TransformSequence::UpdateInterval(Float start, Float end){
+void TransformSequence::UpdateInterval(Float start, Float end){
     scopeStart = Min(scopeStart, start);
     scopeEnd = Max(scopeEnd, end);
 }
 
-__host__ void TransformSequence::GetLastTransform(Transform *transform){
+void TransformSequence::GetLastTransform(Transform *transform){
     Interpolate(scopeEnd, transform);
 }
 
-__host__ void TransformSequence::AddRestore(Float s0, Float s1){
+void TransformSequence::AddRestore(Float s0, Float s1){
     Transform firstTransform, lastTransform;
     Interpolate(scopeStart, &firstTransform);
     Interpolate(scopeEnd, &lastTransform);
@@ -26,9 +26,7 @@ __host__ void TransformSequence::AddRestore(Float s0, Float s1){
     AddInterpolation(&lastTransform, &firstTransform, s0, s1);
 }
 
-__host__ void TransformSequence::AddInterpolation(Transform *t0, Transform *t1,
-                                                  Float s0, Float s1)
-{
+void TransformSequence::AddInterpolation(Transform *t0, Transform *t1, Float s0, Float s1){
     Float start = Min(s0, s1);
     Float end = Max(s0, s1);
     UpdateInterval(start, end);
@@ -46,7 +44,7 @@ __host__ void TransformSequence::AddInterpolation(Transform *t0, Transform *t1,
     ComputeInitialTransform();
 }
 
-__host__ void TransformSequence::AddInterpolation(InterpolatedTransform *inp){
+void TransformSequence::AddInterpolation(InterpolatedTransform *inp){
     AggregatedTransform aggTransform = {
         .immutablePre = Transform(),
         .immutablePost = Transform(),
@@ -61,8 +59,8 @@ __host__ void TransformSequence::AddInterpolation(InterpolatedTransform *inp){
     ComputeInitialTransform();
 }
 
-__host__ void TransformSequence::AddInterpolation(AggregatedTransform *kTransform,
-                                                  Float s0, Float s1)
+void TransformSequence::AddInterpolation(AggregatedTransform *kTransform,
+                                         Float s0, Float s1)
 {
     Float start = Min(s0, s1);
     Float end = Max(s0, s1);
@@ -76,7 +74,7 @@ __host__ void TransformSequence::AddInterpolation(AggregatedTransform *kTransfor
     ComputeInitialTransform();
 }
 
-__host__ void TransformSequence::AddInterpolation(AggregatedTransform *kTransform){
+void TransformSequence::AddInterpolation(AggregatedTransform *kTransform){
     AggregatedTransform aggTransform = *kTransform;
     aggTransform.owned = 0;
     UpdateInterval(aggTransform.start, aggTransform.end);
@@ -84,8 +82,8 @@ __host__ void TransformSequence::AddInterpolation(AggregatedTransform *kTransfor
     ComputeInitialTransform();
 }
 
-__host__ void TransformSequence::Interpolate(Float t, Transform *outTransform,
-                                             vec3f *linear, vec3f *angular)
+void TransformSequence::Interpolate(Float t, Transform *outTransform,
+                                    vec3f *linear, vec3f *angular)
 {
     AggregatedTransform *aggTransform = nullptr;
     Transform interp;
@@ -154,18 +152,18 @@ TransformSequence::~TransformSequence(){
     }
 }
 
-__host__ QuaternionSequence::QuaternionSequence(){
+QuaternionSequence::QuaternionSequence(){
     scopeStart = Infinity;
     scopeEnd = -Infinity;
 }
 
-__host__ void QuaternionSequence::AddQuaternion(const Quaternion &q1, const Float &t){
+void QuaternionSequence::AddQuaternion(const Quaternion &q1, const Float &t){
     scopeStart = Min(scopeStart, t);
     scopeEnd = Max(scopeEnd, t);
     quaternions.push_back({.t = t, .q = q1});
 }
 
-__host__ void QuaternionSequence::AddQuaternion(const Float &angle, const vec3f &axis,
+void QuaternionSequence::AddQuaternion(const Float &angle, const vec3f &axis,
                                                 const Float &t)
 {
     Transform rot = Rotate(angle, axis);
@@ -174,9 +172,7 @@ __host__ void QuaternionSequence::AddQuaternion(const Float &angle, const vec3f 
     quaternions.push_back({.t = t, .q = Quaternion(rot)});
 }
 
-__host__ void QuaternionSequence::Interpolate(Float t, Transform *transform,
-                                              vec3f *angular)
-{
+void QuaternionSequence::Interpolate(Float t, Transform *transform, vec3f *angular){
     AggregatedQuaternion *aQ = nullptr, *laQ = nullptr;
     for(int i = 0; i < quaternions.size(); i++){
         AggregatedQuaternion *aggQ = &quaternions[i];

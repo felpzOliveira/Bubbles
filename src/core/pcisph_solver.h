@@ -33,24 +33,24 @@ class PciSphSolver2{
     PciSphSolverData2 *solverData;
     Float stepInterval;
     LNMStats lnmStats;
-    
-    __host__ PciSphSolver2();
-    __host__ void Initialize(SphSolverData2 *data);
-    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
+
+    PciSphSolver2();
+    void Initialize(SphSolverData2 *data);
+    void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
                         Grid2 *domain, SphParticleSet2 *pSet);
-    __host__ void SetColliders(ColliderSet2 *colliders);
-    __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
-    __bidevice__ SphSolverData2 *GetSphSolverData();
-    __bidevice__ SphParticleSet2 *GetSphParticleSet();
-    __host__ void Advance(Float timeIntervalInSeconds);
-    __host__ void UpdateDensity();
-    
-    __host__ Float ComputeBeta(Float timeIntervalInSeconds);
-    __host__ Float ComputeDelta(Float timeIntervalInSeconds);
-    __host__ Float ComputeDeltaDenom();
-    __host__ LNMStats GetLNMStats();
-    __host__ Float GetAdvanceTime();
-    __host__ int GetParticleCount();
+    void SetColliders(ColliderSet2 *colliders);
+    void SetViscosityCoefficient(Float viscosityCoefficient);
+    bb_cpu_gpu SphSolverData2 *GetSphSolverData();
+    bb_cpu_gpu SphParticleSet2 *GetSphParticleSet();
+    void Advance(Float timeIntervalInSeconds);
+    void UpdateDensity();
+
+    Float ComputeBeta(Float timeIntervalInSeconds);
+    Float ComputeDelta(Float timeIntervalInSeconds);
+    Float ComputeDeltaDenom();
+    LNMStats GetLNMStats();
+    Float GetAdvanceTime();
+    int GetParticleCount();
 };
 
 class PciSphSolver3{
@@ -62,45 +62,40 @@ class PciSphSolver3{
     PciSphSolverData3 *solverData;
     Float stepInterval;
     LNMStats lnmStats;
-    
-    __host__ PciSphSolver3();
-    __host__ void Initialize(SphSolverData3 *data);
-    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
+
+    PciSphSolver3();
+    void Initialize(SphSolverData3 *data);
+    void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
                         Grid3 *domain, SphParticleSet3 *pSet);
-    __host__ void SetColliders(ColliderSet3 *colliders);
-    __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
-    __bidevice__ SphSolverData3 *GetSphSolverData();
-    __bidevice__ SphParticleSet3 *GetSphParticleSet();
-    __host__ void Advance(Float timeIntervalInSeconds);
-    __host__ ColliderSet3 *GetColliders();
-    
-    __host__ Float ComputeBeta(Float timeIntervalInSeconds);
-    __host__ Float ComputeDelta(Float timeIntervalInSeconds);
-    __host__ Float ComputeDeltaDenom();
-    __host__ LNMStats GetLNMStats();
-    __host__ Float GetAdvanceTime();
-    __host__ int GetParticleCount();
+    void SetColliders(ColliderSet3 *colliders);
+    void SetViscosityCoefficient(Float viscosityCoefficient);
+    bb_cpu_gpu SphSolverData3 *GetSphSolverData();
+    bb_cpu_gpu SphParticleSet3 *GetSphParticleSet();
+    void Advance(Float timeIntervalInSeconds);
+    ColliderSet3 *GetColliders();
+
+    Float ComputeBeta(Float timeIntervalInSeconds);
+    Float ComputeDelta(Float timeIntervalInSeconds);
+    Float ComputeDeltaDenom();
+    LNMStats GetLNMStats();
+    Float GetAdvanceTime();
+    int GetParticleCount();
 };
 
-__host__ void ComputePressureForceAndIntegrate(PciSphSolverData2 *data, 
-                                               Float timeIntervalInSeconds, 
-                                               Float maxDensityErrorRatio, 
-                                               Float delta, int maxIt,
-                                               int is_cpu=0);
+void ComputePressureForceAndIntegrate(PciSphSolverData2 *data, Float timeIntervalInSeconds,
+                                      Float maxDensityErrorRatio, Float delta, int maxIt,
+                                      int is_cpu=0);
 
-__host__ void ComputePressureForceAndIntegrate(PciSphSolverData3 *data, 
-                                               Float timeIntervalInSeconds, 
-                                               Float maxDensityErrorRatio, 
-                                               Float delta, int maxIt,
-                                               int is_cpu=0);
+void ComputePressureForceAndIntegrate(PciSphSolverData3 *data, Float timeIntervalInSeconds,
+                                      Float maxDensityErrorRatio, Float delta, int maxIt,
+                                      int is_cpu=0);
 
-__host__ int EmptyCallback(int);
+int EmptyCallback(int);
 
-__host__ void PciSphRunSimulation3(PciSphSolver3 *solver, Float spacing,
-                                   vec3f origin, vec3f target, 
-                                   Float targetInterval, std::vector<Shape*> sdfs={},
-                                   const std::function<int(int )> &callback=EmptyCallback);
+void PciSphRunSimulation3(PciSphSolver3 *solver, Float spacing, vec3f origin, vec3f target,
+                          Float targetInterval, std::vector<Shape*> sdfs={},
+                          const std::function<int(int )> &callback=EmptyCallback);
 
-__host__ void PciSphRunSimulation2(PciSphSolver2 *solver, Float spacing,
-                                   vec2f lower, vec2f upper, Float targetInterval,
-                                   const std::function<int(int )> &callback=EmptyCallback);
+void PciSphRunSimulation2(PciSphSolver2 *solver, Float spacing, vec2f lower, vec2f upper,
+                          Float targetInterval,
+                          const std::function<int(int )> &callback=EmptyCallback);

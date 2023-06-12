@@ -1,6 +1,6 @@
 #include <sph_solver.h>
 
-__bidevice__ Float ComputeAverageTemperature(SphSolverData2 *data){
+bb_cpu_gpu Float ComputeAverageTemperature(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
     Float Tt = 0;
@@ -14,7 +14,7 @@ __bidevice__ Float ComputeAverageTemperature(SphSolverData2 *data){
 /**************************************************************/
 //      D E N S I T Y     A N D    P R E S S U R E            //
 /**************************************************************/
-__bidevice__ Float ComputePressureValue(SphSolverData2 *data, Float di){
+bb_cpu_gpu Float ComputePressureValue(SphSolverData2 *data, Float di){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     Float targetDensity = data->sphpSet->GetTargetDensity();
     Float eosScale = targetDensity * data->soundSpeed * data->soundSpeed;
@@ -27,12 +27,12 @@ __bidevice__ Float ComputePressureValue(SphSolverData2 *data, Float di){
     return p;
 }
 
-__bidevice__ void ComputePressureFor(SphSolverData2 *data, int particleId, Float di){
+bb_cpu_gpu void ComputePressureFor(SphSolverData2 *data, int particleId, Float di){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     pSet->SetParticlePressure(particleId, ComputePressureValue(data, di));
 }
 
-__bidevice__ Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &pi){
+bb_cpu_gpu Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &pi){
     int *neighbors = nullptr;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     unsigned int cellId = data->domain->GetLinearHashedPosition(pi);
@@ -59,7 +59,7 @@ __bidevice__ Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &pi)
     return di;
 }
 
-__bidevice__ Float ComputeDensityForParticle(SphSolverData2 *data, int particleId){
+bb_cpu_gpu Float ComputeDensityForParticle(SphSolverData2 *data, int particleId){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
     Bucket *bucket = pSet->GetParticleBucket(particleId);
@@ -84,8 +84,8 @@ __bidevice__ Float ComputeDensityForParticle(SphSolverData2 *data, int particleI
     return di;
 }
 
-__bidevice__ void ComputeDensityFor(SphSolverData2 *data, int particleId,
-                                    int compute_pressure)
+bb_cpu_gpu void ComputeDensityFor(SphSolverData2 *data, int particleId,
+                                  int compute_pressure)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     Float di = ComputeDensityForParticle(data, particleId);
@@ -101,7 +101,7 @@ __bidevice__ void ComputeDensityFor(SphSolverData2 *data, int particleId,
 /**************************************************************/
 //            F O R C E S    C O M P U T A T I O N            //
 /**************************************************************/
-__bidevice__ void ComputeNonPressureForceFor(SphSolverData2 *data, int particleId){
+bb_cpu_gpu void ComputeNonPressureForceFor(SphSolverData2 *data, int particleId){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
     vec2f vi = pSet->GetParticleVelocity(particleId);
@@ -130,7 +130,7 @@ __bidevice__ void ComputeNonPressureForceFor(SphSolverData2 *data, int particleI
     pSet->SetParticleForce(particleId, fi);
 }
 
-__bidevice__ void ComputePressureForceFor(SphSolverData2 *data, int particleId){
+bb_cpu_gpu void ComputePressureForceFor(SphSolverData2 *data, int particleId){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
     Bucket *bucket = pSet->GetParticleBucket(particleId);
@@ -173,7 +173,7 @@ __bidevice__ void ComputePressureForceFor(SphSolverData2 *data, int particleId){
     pSet->SetParticleForce(particleId, fi);
 }
 
-__bidevice__ void ComputeNormalFor(SphSolverData2 *data, int particleId){
+bb_cpu_gpu void ComputeNormalFor(SphSolverData2 *data, int particleId){
     vec2f ni(0);
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
@@ -203,8 +203,8 @@ __bidevice__ void ComputeNormalFor(SphSolverData2 *data, int particleId){
 }
 
 
-__bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
-                                      Float timeStep, int extended, int integrate)
+bb_cpu_gpu void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
+                                    Float timeStep, int extended, int integrate)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
@@ -303,8 +303,8 @@ __bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
 /**************************************************************/
 //               T I M E    I N T E G R A T I O N             //
 /**************************************************************/
-__bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
-                                     Float timeStep, int extended)
+bb_cpu_gpu void TimeIntegrationFor(SphSolverData2 *data, int particleId,
+                                   Float timeStep, int extended)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f vi = pSet->GetParticleVelocity(particleId);
@@ -344,8 +344,8 @@ __bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
     pSet->SetParticleVelocity(particleId, vi);
 }
 
-__bidevice__ void ComputePseudoViscosityAggregationKernelFor(SphSolverData2 *data,
-                                                             int particleId)
+bb_cpu_gpu void ComputePseudoViscosityAggregationKernelFor(SphSolverData2 *data,
+                                                           int particleId)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f vi = pSet->GetParticleVelocity(particleId);
@@ -376,9 +376,8 @@ __bidevice__ void ComputePseudoViscosityAggregationKernelFor(SphSolverData2 *dat
     data->smoothedVelocities[particleId] = smoothedVi;
 }
 
-__bidevice__ void ComputePseudoViscosityInterpolationKernelFor(SphSolverData2 *data,
-                                                               int particleId,
-                                                               Float timeStep)
+bb_cpu_gpu void ComputePseudoViscosityInterpolationKernelFor(SphSolverData2 *data,
+                                                             int particleId, Float timeStep)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f vi = pSet->GetParticleVelocity(particleId);
@@ -391,7 +390,7 @@ __bidevice__ void ComputePseudoViscosityInterpolationKernelFor(SphSolverData2 *d
 /**************************************************************/
 //                 G R I D     D I S T R I B U T I O N        //
 /**************************************************************/
-__host__ void UpdateGridDistributionCPU(SphSolverData2 *data){
+void UpdateGridDistributionCPU(SphSolverData2 *data){
     Grid2 *grid = data->domain;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver2 has no domain for UpdateGridDistribution");
@@ -419,7 +418,7 @@ __host__ void UpdateGridDistributionCPU(SphSolverData2 *data){
     data->frame_index = 1;
 }
 
-__global__ void UpdateGridDistributionKernel(Grid2 *grid, ParticleSet2 *pSet, int index){
+bb_kernel void UpdateGridDistributionKernel(Grid2 *grid, ParticleSet2 *pSet, int index){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < grid->GetCellCount()){
         if(index == 0)
@@ -429,21 +428,21 @@ __global__ void UpdateGridDistributionKernel(Grid2 *grid, ParticleSet2 *pSet, in
     }
 }
 
-__global__ void SwapGridStatesKernel(Grid2 *grid){
+bb_kernel void SwapGridStatesKernel(Grid2 *grid){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < grid->GetCellCount()){
         grid->SwapCellList(i);
     }
 }
 
-__global__ void UpdateParticlesBuckets(Grid2 *grid, ParticleSet2 *pSet, Float kernelRadius){
+bb_kernel void UpdateParticlesBuckets(Grid2 *grid, ParticleSet2 *pSet, Float kernelRadius){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < pSet->GetParticleCount()){
         grid->DistributeParticleBucket(pSet, i, kernelRadius);
     }
 }
 
-__host__ void UpdateGridDistributionGPU(SphSolverData2 *data){
+void UpdateGridDistributionGPU(SphSolverData2 *data){
     Grid2 *grid = data->domain;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(grid, "SphSolver2 has no domain for UpdateGridDistribution");
@@ -469,7 +468,7 @@ __host__ void UpdateGridDistributionGPU(SphSolverData2 *data){
     data->frame_index = 1;
 }
 
-__host__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure){
+void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputeDensity");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver2 has no particles for ComputeDensity");
@@ -478,7 +477,7 @@ __host__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure){
     });
 }
 
-__global__ void ComputeDensityKernel(SphSolverData2 *data, int compute_pressure){
+bb_kernel void ComputeDensityKernel(SphSolverData2 *data, int compute_pressure){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -486,13 +485,13 @@ __global__ void ComputeDensityKernel(SphSolverData2 *data, int compute_pressure)
     }
 }
 
-__host__ void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure){
+void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeDensityKernel, data, compute_pressure);
 }
 
-__global__ void ComputePseudoViscosityAggregationKernel(SphSolverData2 *data)
+bb_kernel void ComputePseudoViscosityAggregationKernel(SphSolverData2 *data)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
@@ -501,7 +500,7 @@ __global__ void ComputePseudoViscosityAggregationKernel(SphSolverData2 *data)
     }
 }
 
-__global__ void ComputePseudoViscosityInterpolationKernel(SphSolverData2 *data,
+bb_kernel void ComputePseudoViscosityInterpolationKernel(SphSolverData2 *data,
                                                           Float timeStep)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -511,7 +510,7 @@ __global__ void ComputePseudoViscosityInterpolationKernel(SphSolverData2 *data,
     }
 }
 
-__host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float timeStep){
+void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float timeStep){
     Float scale = data->pseudoViscosity * timeStep;
     if(scale > 0.1){
         ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
@@ -522,7 +521,7 @@ __host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float
     }
 }
 
-__host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float timeStep){
+void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float timeStep){
     Float scale = data->pseudoViscosity * timeStep;
     if(scale > 0.1){
         ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
@@ -537,9 +536,7 @@ __host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float
     }
 }
 
-__host__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
-                                          int integrate)
-{
+void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep, int integrate){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputePressureForce");
     AssertA(pSet->GetParticleCount() > 0,
@@ -549,7 +546,7 @@ __host__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
     });
 }
 
-__host__ void ComputeNonPressureForceCPU(SphSolverData2 *data){
+void ComputeNonPressureForceCPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputeNonPressureForce");
     AssertA(pSet->GetParticleCount() > 0,
@@ -560,7 +557,7 @@ __host__ void ComputeNonPressureForceCPU(SphSolverData2 *data){
 }
 
 
-__global__ void ComputeNonPressureForceKernel(SphSolverData2 *data){
+bb_kernel void ComputeNonPressureForceKernel(SphSolverData2 *data){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -568,13 +565,13 @@ __global__ void ComputeNonPressureForceKernel(SphSolverData2 *data){
     }
 }
 
-__host__ void ComputeNonPressureForceGPU(SphSolverData2 *data){
+void ComputeNonPressureForceGPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeNonPressureForceKernel, data);
 }
 
-__global__ void ComputePressureForceKernel(SphSolverData2 *data, Float timeStep,
+bb_kernel void ComputePressureForceKernel(SphSolverData2 *data, Float timeStep,
                                            int integrate)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -584,7 +581,7 @@ __global__ void ComputePressureForceKernel(SphSolverData2 *data, Float timeStep,
     }
 }
 
-__host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep, int integrate){
+void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep, int integrate){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputePressureForce");
     AssertA(pSet->GetParticleCount() > 0,
@@ -593,7 +590,7 @@ __host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep, int 
     GPULaunch(N, ComputePressureForceKernel, data, timeStep, integrate);
 }
 
-__host__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended){
+void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for TimeIntegration");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver2 has no particles for TimeIntegration");
@@ -602,7 +599,7 @@ __host__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int exten
     });
 }
 
-__global__ void TimeIntegrationKernel(SphSolverData2 *data, Float timeStep, int extended){
+bb_kernel void TimeIntegrationKernel(SphSolverData2 *data, Float timeStep, int extended){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -610,13 +607,13 @@ __global__ void TimeIntegrationKernel(SphSolverData2 *data, Float timeStep, int 
     }
 }
 
-__host__ void TimeIntegrationGPU(SphSolverData2 *data, Float timeStep, int extended){
+void TimeIntegrationGPU(SphSolverData2 *data, Float timeStep, int extended){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, TimeIntegrationKernel, data, timeStep, extended);
 }
 
-__host__ void ComputeNormalCPU(SphSolverData2 *data){
+void ComputeNormalCPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     AssertA(pSet, "SphSolver2 has no valid particle set for ComputeDensity");
     AssertA(pSet->GetParticleCount() > 0, "SphSolver2 has no particles for ComputeDensity");
@@ -625,7 +622,7 @@ __host__ void ComputeNormalCPU(SphSolverData2 *data){
     });
 }
 
-__global__ void ComputeNormalKernel(SphSolverData2 *data){
+bb_kernel void ComputeNormalKernel(SphSolverData2 *data){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -633,14 +630,14 @@ __global__ void ComputeNormalKernel(SphSolverData2 *data){
     }
 }
 
-__host__ void ComputeNormalGPU(SphSolverData2 *data){
+void ComputeNormalGPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeNormalKernel, data);
 }
 
-__bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particleId,
-                                               Float Tmin, Float Tmax, int maxLevel)
+bb_cpu_gpu void ComputeInitialTemperatureFor(SphSolverData2 *data, int particleId,
+                                             Float Tmin, Float Tmax, int maxLevel)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
@@ -654,8 +651,8 @@ __bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particl
     pSet->SetParticleTemperature(particleId, Ti);
 }
 
-__host__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
-                                                  Float Tmax, int maxLevel)
+void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
+                                     Float Tmax, int maxLevel)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
@@ -664,7 +661,7 @@ __host__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
     });
 }
 
-__global__ void ComputeInitialTemperatureMapKernel(SphSolverData2 *data, Float Tmin,
+bb_kernel void ComputeInitialTemperatureMapKernel(SphSolverData2 *data, Float Tmin,
                                                    Float Tmax, int maxLevel)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -674,8 +671,8 @@ __global__ void ComputeInitialTemperatureMapKernel(SphSolverData2 *data, Float T
     }
 }
 
-__host__ void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin,
-                                              Float Tmax, int maxLevel)
+void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin,
+                                     Float Tmax, int maxLevel)
 {
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();

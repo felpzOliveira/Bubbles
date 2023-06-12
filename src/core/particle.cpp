@@ -2,7 +2,7 @@
 #include <grid.h>
 #include <cutil.h>
 
-__host__ SphParticleSet2 *SphParticleSet2FromBuilder(ParticleSetBuilder2 *builder){
+SphParticleSet2 *SphParticleSet2FromBuilder(ParticleSetBuilder2 *builder){
     AssertA(builder, "Invalid builder pointer for SphParticleSet2FromBuilder");
     ParticleSet2 *pSet = builder->MakeParticleSet();
     SphParticleSet2 *sphSet = cudaAllocateVx(SphParticleSet2, 1);
@@ -10,7 +10,7 @@ __host__ SphParticleSet2 *SphParticleSet2FromBuilder(ParticleSetBuilder2 *builde
     return sphSet;
 }
 
-__host__ SphParticleSet2 *SphParticleSet2FromContinuousBuilder(ContinuousParticleSetBuilder2 *builder){
+SphParticleSet2 *SphParticleSet2FromContinuousBuilder(ContinuousParticleSetBuilder2 *builder){
     AssertA(builder, "Invalid builder pointer for SphParticleSet2FromBuilder");
     ParticleSet2 *pSet = builder->GetParticleSet();
     SphParticleSet2 *sphSet = cudaAllocateVx(SphParticleSet2, 1);
@@ -18,7 +18,7 @@ __host__ SphParticleSet2 *SphParticleSet2FromContinuousBuilder(ContinuousParticl
     return sphSet;
 }
 
-__host__ SphParticleSet3 *SphParticleSet3FromBuilder(ParticleSetBuilder3 *builder){
+SphParticleSet3 *SphParticleSet3FromBuilder(ParticleSetBuilder3 *builder){
     AssertA(builder, "Invalid builder pointer for SphParticleSet3FromBuilder");
     ParticleSet3 *pSet = builder->MakeParticleSet();
     SphParticleSet3 *sphSet = cudaAllocateVx(SphParticleSet3, 1);
@@ -26,7 +26,7 @@ __host__ SphParticleSet3 *SphParticleSet3FromBuilder(ParticleSetBuilder3 *builde
     return sphSet;
 }
 
-__host__ SphParticleSet3 *SphParticleSet3FromContinuousBuilder(ContinuousParticleSetBuilder3 *builder){
+SphParticleSet3 *SphParticleSet3FromContinuousBuilder(ContinuousParticleSetBuilder3 *builder){
     AssertA(builder, "Invalid builder pointer for SphParticleSet3FromBuilder");
     ParticleSet3 *pSet = builder->GetParticleSet();
     SphParticleSet3 *sphSet = cudaAllocateVx(SphParticleSet3, 1);
@@ -34,7 +34,7 @@ __host__ SphParticleSet3 *SphParticleSet3FromContinuousBuilder(ContinuousParticl
     return sphSet;
 }
 
-__host__ SphParticleSet2 *SphParticleSet2ExFromBuilder(ParticleSetBuilder2 *builder){
+SphParticleSet2 *SphParticleSet2ExFromBuilder(ParticleSetBuilder2 *builder){
     AssertA(builder, "Invalid builder pointer for SphParticleSet2FromBuilder");
     ParticleSet2 *pSet = builder->MakeExtendedParticleSet();
     SphParticleSet2 *sphSet = cudaAllocateVx(SphParticleSet2, 1);
@@ -42,7 +42,7 @@ __host__ SphParticleSet2 *SphParticleSet2ExFromBuilder(ParticleSetBuilder2 *buil
     return sphSet;
 }
 
-__host__ SpecieSet2 *SpecieSet2FromBuilder(ParticleSetBuilder2 *builder,
+SpecieSet2 *SpecieSet2FromBuilder(ParticleSetBuilder2 *builder,
                                            Float mass, Float charge, int familyId)
 {
     AssertA(builder, "Invalid builder pointer for SphParticleSet2FromBuilder");

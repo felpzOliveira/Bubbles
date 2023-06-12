@@ -3,7 +3,7 @@
 /**************************************************************/
 //             P O S I T I O N     P R E D I C T I O N        //
 /**************************************************************/
-__bidevice__ void ComputePredictedPositionsFor(PbfSolverData2 *data, int particleId,
+bb_cpu_gpu void ComputePredictedPositionsFor(PbfSolverData2 *data, int particleId,
                                                Float timeIntervalInSeconds)
 {
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
@@ -31,16 +31,14 @@ __bidevice__ void ComputePredictedPositionsFor(PbfSolverData2 *data, int particl
     }
 }
 
-__host__ void ComputePredictedPositionsCPU(PbfSolverData2 *data,
-                                           Float timeIntervalInSeconds)
-{
+void ComputePredictedPositionsCPU(PbfSolverData2 *data, Float timeIntervalInSeconds){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         ComputePredictedPositionsFor(data, i, timeIntervalInSeconds);
     }
 }
 
-__global__ void ComputePredictedPositionsKernel(PbfSolverData2 *data,
+bb_kernel void ComputePredictedPositionsKernel(PbfSolverData2 *data,
                                                 Float timeIntervalInSeconds)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -50,9 +48,7 @@ __global__ void ComputePredictedPositionsKernel(PbfSolverData2 *data,
     }
 }
 
-__host__ void ComputePredictedPositionsGPU(PbfSolverData2 *data,
-                                           Float timeIntervalInSeconds)
-{
+void ComputePredictedPositionsGPU(PbfSolverData2 *data, Float timeIntervalInSeconds){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputePredictedPositionsKernel, data, timeIntervalInSeconds);
@@ -61,7 +57,7 @@ __host__ void ComputePredictedPositionsGPU(PbfSolverData2 *data,
 /**************************************************************/
 //                L A M B D A    C O M P U T A T I O N        //
 /**************************************************************/
-__bidevice__ void ComputeLambdaFor(PbfSolverData2 *data, int particleId){
+bb_cpu_gpu void ComputeLambdaFor(PbfSolverData2 *data, int particleId){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
     Float di = pSet->GetParticleDensity(particleId);
@@ -93,14 +89,14 @@ __bidevice__ void ComputeLambdaFor(PbfSolverData2 *data, int particleId){
     data->lambdas[particleId] = -ci / (sumGradNorm + data->lambdaRelax);
 }
 
-__host__ void ComputeLambdaCPU(PbfSolverData2 *data){
+void ComputeLambdaCPU(PbfSolverData2 *data){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         ComputeLambdaFor(data, i);
     }
 }
 
-__global__ void ComputeLambdaKernel(PbfSolverData2 *data){
+bb_kernel void ComputeLambdaKernel(PbfSolverData2 *data){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -108,7 +104,7 @@ __global__ void ComputeLambdaKernel(PbfSolverData2 *data){
     }
 }
 
-__host__ void ComputeLambdaGPU(PbfSolverData2 *data){
+void ComputeLambdaGPU(PbfSolverData2 *data){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeLambdaKernel, data);
@@ -117,8 +113,8 @@ __host__ void ComputeLambdaGPU(PbfSolverData2 *data){
 /**************************************************************/
 //              D E L T A P    C O M P U T A T I O N          //
 /**************************************************************/
-__bidevice__ void ComputeDeltaPFor(PbfSolverData2 *data, int particleId,
-                                   Float timeIntervalInSeconds)
+bb_cpu_gpu void ComputeDeltaPFor(PbfSolverData2 *data, int particleId,
+                                 Float timeIntervalInSeconds)
 {
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     Float sphRadius = data->sphData->sphpSet->GetKernelRadius();
@@ -165,14 +161,14 @@ __bidevice__ void ComputeDeltaPFor(PbfSolverData2 *data, int particleId,
     }
 }
 
-__host__ void ComputeDeltaPCPU(PbfSolverData2 *data, Float timeIntervalInSeconds){
+void ComputeDeltaPCPU(PbfSolverData2 *data, Float timeIntervalInSeconds){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         ComputeDeltaPFor(data, i, timeIntervalInSeconds);
     }
 }
 
-__global__ void ComputeDeltaPKernel(PbfSolverData2 *data, Float timeIntervalInSeconds){
+bb_kernel void ComputeDeltaPKernel(PbfSolverData2 *data, Float timeIntervalInSeconds){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -180,7 +176,7 @@ __global__ void ComputeDeltaPKernel(PbfSolverData2 *data, Float timeIntervalInSe
     }
 }
 
-__host__ void ComputeDeltaPGPU(PbfSolverData2 *data, Float timeIntervalInSeconds){
+void ComputeDeltaPGPU(PbfSolverData2 *data, Float timeIntervalInSeconds){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeDeltaPKernel, data, timeIntervalInSeconds);
@@ -189,7 +185,7 @@ __host__ void ComputeDeltaPGPU(PbfSolverData2 *data, Float timeIntervalInSeconds
 /**************************************************************/
 //          V O R T I C I T Y  C O M P U T A T I O N          //
 /**************************************************************/
-__bidevice__ void ComputeVorticityFor(PbfSolverData2 *data, int particleId){
+bb_cpu_gpu void ComputeVorticityFor(PbfSolverData2 *data, int particleId){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     vec2f vi = pSet->GetParticleVelocity(particleId);
     vec2f pi = pSet->GetParticlePosition(particleId);
@@ -215,15 +211,15 @@ __bidevice__ void ComputeVorticityFor(PbfSolverData2 *data, int particleId){
     }
 
     /*
-* NOTE: Paper does not claim this is normalized, but not normalizing
-*       will simply break simulation.
-*/
+    * NOTE: Paper does not claim this is normalized, but not normalizing
+    *       will simply break simulation.
+    */
     wi *= mass / pho0;
 
     data->w[particleId] = wi;
 }
 
-__bidevice__ void ComputeVorticityForceFor(PbfSolverData2 *data, int particleId){
+bb_cpu_gpu void ComputeVorticityForceFor(PbfSolverData2 *data, int particleId){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     Bucket *bucket = pSet->GetParticleBucket(particleId);
     vec2f pi = pSet->GetParticlePosition(particleId);
@@ -257,14 +253,14 @@ __bidevice__ void ComputeVorticityForceFor(PbfSolverData2 *data, int particleId)
     }
 }
 
-__host__ void ComputeVorticityForceCPU(PbfSolverData2 *data){
+void ComputeVorticityForceCPU(PbfSolverData2 *data){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         ComputeVorticityForceFor(data, i);
     }
 }
 
-__global__ void ComputeVorticityForceKernel(PbfSolverData2 *data){
+bb_kernel void ComputeVorticityForceKernel(PbfSolverData2 *data){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -272,20 +268,20 @@ __global__ void ComputeVorticityForceKernel(PbfSolverData2 *data){
     }
 }
 
-__host__ void ComputeVorticityForceGPU(PbfSolverData2 *data){
+void ComputeVorticityForceGPU(PbfSolverData2 *data){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeVorticityForceKernel, data);
 }
 
-__host__ void ComputeVorticityCPU(PbfSolverData2 *data){
+void ComputeVorticityCPU(PbfSolverData2 *data){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         ComputeVorticityFor(data, i);
     }
 }
 
-__global__ void ComputeVorticityKernel(PbfSolverData2 *data){
+bb_kernel void ComputeVorticityKernel(PbfSolverData2 *data){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -293,15 +289,15 @@ __global__ void ComputeVorticityKernel(PbfSolverData2 *data){
     }
 }
 
-__host__ void ComputeVorticityGPU(PbfSolverData2 *data){
+void ComputeVorticityGPU(PbfSolverData2 *data){
     ParticleSet2 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeVorticityKernel, data);
 }
 
 
-__host__ void AdvancePBF(PbfSolverData2 *data, Float timeIntervalInSeconds,
-                         unsigned int predictIterations, int use_cpu)
+void AdvancePBF(PbfSolverData2 *data, Float timeIntervalInSeconds,
+                unsigned int predictIterations, int use_cpu)
 {
     if(data->vorticityStr > 0){
         if(use_cpu){

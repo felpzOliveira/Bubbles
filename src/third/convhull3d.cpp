@@ -12,18 +12,18 @@ extern "C" {
 
 #if defined(USE_QHULL)
 FILE *fp = NULL;
-__host__ void ConvexHullPrepare(){
+void ConvexHullPrepare(){
     if(!fp) fp = fopen("/dev/null", "w");
     QHULL_LIB_CHECK
 }
 
-__host__ void ConvexHullFinish(){
+void ConvexHullFinish(){
     if(fp) fclose(fp);
     fp = NULL;
 }
 
-__host__ void ConvexHull3D(IndexedParticle<vec3f> *ips, int maxLen,
-                           int len, std::function<void(int)> reporter)
+void ConvexHull3D(IndexedParticle<vec3f> *ips, int maxLen,
+                  int len, std::function<void(int)> reporter)
 {
     coordT *ps = new coordT[3 * maxLen];
     qhT qh_qh;
@@ -57,7 +57,7 @@ __host__ void ConvexHull3D(IndexedParticle<vec3f> *ips, int maxLen,
 }
 
 #else
-__host__ void ConvexHullPrepare(){
+void ConvexHullPrepare(){
     static int warned = 0;
     if(!warned){
         printf("[Warning] : ConvexHull is not using QHull implementation\n");
@@ -65,10 +65,10 @@ __host__ void ConvexHullPrepare(){
     }
 }
 
-__host__ void ConvexHullFinish(){}
+void ConvexHullFinish(){}
 
-__host__ void ConvexHull3D(IndexedParticle<vec3f> *ips, int maxLen,
-                           int len, std::function<void(int)> reporter)
+void ConvexHull3D(IndexedParticle<vec3f> *ips, int maxLen,
+                  int len, std::function<void(int)> reporter)
 {
     int *faceIndices = NULL;
     int nFaces = 0;

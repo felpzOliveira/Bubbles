@@ -13,7 +13,7 @@ struct EulerIntegrator{
     Float h;
     Sampler fn;
 
-    __bidevice__ T Backtrack(){
+    bb_cpu_gpu T Backtrack(){
         T vel = fn(p) / h;
         return p - vel * dt;
     }
@@ -28,7 +28,7 @@ struct RK3Integrator{
     Float h;
     Sampler fn;
 
-    __bidevice__ T Backtrack(){
+    bb_cpu_gpu T Backtrack(){
         T k1 = fn(p) / h;
         T k2 = fn(p - 0.50 * dt * k1) / h;
         T k3 = fn(p - 0.75 * dt * k2) / h;

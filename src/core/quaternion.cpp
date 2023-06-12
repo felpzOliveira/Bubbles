@@ -1,6 +1,6 @@
 #include <quaternion.h>
 
-__bidevice__ Transform Quaternion::ToTransform() const{
+bb_cpu_gpu Transform Quaternion::ToTransform() const{
     Matrix4x4 m;
     Float xx = v.x * v.x, yy = v.y * v.y, zz = v.z * v.z;
     Float xy = v.x * v.y, xz = v.x * v.z, yz = v.y * v.z;
@@ -19,7 +19,7 @@ __bidevice__ Transform Quaternion::ToTransform() const{
     return Transform(Transpose(m), m);
 }
 
-__bidevice__ Quaternion::Quaternion(const Transform &t){
+bb_cpu_gpu Quaternion::Quaternion(const Transform &t){
     const Matrix4x4 &m = t.m;
     Float trace = m.m[0][0] + m.m[1][1] + m.m[2][2];
     if (trace > 0.f){
@@ -49,12 +49,12 @@ __bidevice__ Quaternion::Quaternion(const Transform &t){
     }
 }
 
-__bidevice__ Float Qangle(const Quaternion &q1, const Quaternion &q2){
+bb_cpu_gpu Float Qangle(const Quaternion &q1, const Quaternion &q2){
     Float cosTheta = Dot(q1, q2);
     return std::acos(Clamp(cosTheta, -1, 1));
 }
 
-__bidevice__ Quaternion Qlerp(Float t, const Quaternion &q1, const Quaternion &q2){
+bb_cpu_gpu Quaternion Qlerp(Float t, const Quaternion &q1, const Quaternion &q2){
     Float cosTheta = Dot(q1, q2);
 
     if(cosTheta > .9995f)

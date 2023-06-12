@@ -17,7 +17,7 @@ typedef struct{
     int totalSorts;
 }NodeDistribution;
 
-template<typename T, class C> inline __bidevice__
+template<typename T, class C> inline bb_cpu_gpu
 bool QuickSort(T *arr, int elements, C compare){
 #define  MAX_LEVELS  1000
     int beg[MAX_LEVELS], end[MAX_LEVELS], i=0, L, R;
@@ -48,25 +48,19 @@ bool QuickSort(T *arr, int elements, C compare){
     return true;
 }
 
-__host__ Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld,
-                         bool reverseOrientation)
-{
+Shape *MakeMesh(ParsedMesh *mesh, const Transform &toWorld, bool reverseOrientation){
     toWorld.Mesh(mesh);
     Shape *meshShape = cudaAllocateVx(Shape, 1);
     meshShape->InitMesh(mesh, reverseOrientation);
     return meshShape;
 }
 
-__host__ Shape *MakeMesh(const char *path, const Transform &toWorld,
-                         bool reverseOrientation)
-{
+Shape *MakeMesh(const char *path, const Transform &toWorld, bool reverseOrientation){
     ParsedMesh *mesh = LoadObj(path);
     return MakeMesh(mesh, toWorld, reverseOrientation);
 }
 
-__host__ void MakeNodeDistribution(NodeDistribution *dist, int nElements,
-                                   int maxDepth)
-{
+void MakeNodeDistribution(NodeDistribution *dist, int nElements, int maxDepth){
     Float fh = Log2(nElements);
     int h = ceil(fh);
     h = h > maxDepth ? maxDepth : h;
@@ -94,19 +88,19 @@ __host__ void MakeNodeDistribution(NodeDistribution *dist, int nElements,
     dist->skippedSorts = 0;
 }
 
-__bidevice__ int CompareX(PrimitiveHandle *p0, PrimitiveHandle *p1){
+bb_cpu_gpu int CompareX(PrimitiveHandle *p0, PrimitiveHandle *p1){
     return p0->bound.pMin.x >= p1->bound.pMin.x ? 1 : 0;
 }
 
-__bidevice__ int CompareY(PrimitiveHandle *p0, PrimitiveHandle *p1){
+bb_cpu_gpu int CompareY(PrimitiveHandle *p0, PrimitiveHandle *p1){
     return p0->bound.pMin.y >= p1->bound.pMin.y ? 1 : 0;
 }
 
-__bidevice__ int CompareZ(PrimitiveHandle *p0, PrimitiveHandle *p1){
+bb_cpu_gpu int CompareZ(PrimitiveHandle *p0, PrimitiveHandle *p1){
     return p0->bound.pMin.z >= p1->bound.pMin.z ? 1 : 0;
 }
 
-__host__ Node *GetNode(int n, NodeDistribution *nodeDist){
+Node *GetNode(int n, NodeDistribution *nodeDist){
     if(!(nodeDist->head < nodeDist->length)){
         printf(" ** [ERROR] : Allocated %d but requested more nodes\n", nodeDist->length);
         AssertA(0, "Too many node requirement");
@@ -121,15 +115,15 @@ __host__ Node *GetNode(int n, NodeDistribution *nodeDist){
     return node;
 }
 
-__host__ void NodeSetItens(Node *node, int n, NodeDistribution *dist){
+void NodeSetItens(Node *node, int n, NodeDistribution *dist){
     AssertA(dist->handleHead+n <= dist->maxHandles, "Too many handles requirement");
     node->n = n;
     node->handles = &dist->handles[dist->handleHead];
     dist->handleHead += n;
 }
 
-__host__ Node *BVHBuild(PrimitiveHandle *handles,int n, int depth,
-                        int max_depth, NodeDistribution *distr, int last_axis=-1)
+Node *BVHBuild(PrimitiveHandle *handles,int n, int depth,
+               int max_depth, NodeDistribution *distr, int last_axis=-1)
 {
     Node *node = GetNode(n, distr);
     int axis = int(3 * rand_float());
@@ -175,8 +169,8 @@ __host__ Node *BVHBuild(PrimitiveHandle *handles,int n, int depth,
     return node;
 }
 
-__host__ Node *CreateBVH(PrimitiveHandle *handles, int n, int depth,
-                         int max_depth, int *totalNodes, int *maxNodes)
+Node *CreateBVH(PrimitiveHandle *handles, int n, int depth,
+                int max_depth, int *totalNodes, int *maxNodes)
 {
     NodeDistribution distr;
     memset(&distr, 0x00, sizeof(NodeDistribution));
@@ -194,7 +188,7 @@ __host__ Node *CreateBVH(PrimitiveHandle *handles, int n, int depth,
 }
 
 
-__bidevice__ Bounds3f BVHBoundsOf(ParsedMesh *mesh, int triId){
+bb_cpu_gpu Bounds3f BVHBoundsOf(ParsedMesh *mesh, int triId){
     int i0 = mesh->indices[3 * triId + 0].x;
     int i1 = mesh->indices[3 * triId + 1].x;
     int i2 = mesh->indices[3 * triId + 2].x;
@@ -208,14 +202,14 @@ __bidevice__ Bounds3f BVHBoundsOf(ParsedMesh *mesh, int triId){
     return bound;
 }
 
-__host__ void BVHMeshTrianglesBoundsCPU(ParsedMesh *mesh, PrimitiveHandle *handles){
+void BVHMeshTrianglesBoundsCPU(ParsedMesh *mesh, PrimitiveHandle *handles){
     for(int i = 0; i < mesh->nTriangles; i++){
         handles[i].bound  = BVHBoundsOf(mesh, i);
         handles[i].handle = i;
     }
 }
 
-__bidevice__ Float DistanceTriangle(const vec3f &p, int triNum, ParsedMesh *mesh){
+bb_cpu_gpu Float DistanceTriangle(const vec3f &p, int triNum, ParsedMesh *mesh){
     int i0 = mesh->indices[3 * triNum + 0].x;
     int i1 = mesh->indices[3 * triNum + 1].x;
     int i2 = mesh->indices[3 * triNum + 2].x;
@@ -240,8 +234,8 @@ __bidevice__ Float DistanceTriangle(const vec3f &p, int triNum, ParsedMesh *mesh
                      Dot(nor, pa) * Dot(nor, pa) / Dot2(nor) );
 }
 
-__bidevice__ bool IntersectTriangle(const Ray &ray, SurfaceInteraction * isect,
-                                    int triNum, ParsedMesh *mesh, Float *tHit)
+bb_cpu_gpu bool IntersectTriangle(const Ray &ray, SurfaceInteraction * isect,
+                                  int triNum, ParsedMesh *mesh, Float *tHit)
 {
     int i0 = mesh->indices[3 * triNum + 0].x;
     int i1 = mesh->indices[3 * triNum + 1].x;
@@ -359,8 +353,8 @@ __bidevice__ bool IntersectTriangle(const Ray &ray, SurfaceInteraction * isect,
     return true;
 }
 
-__bidevice__ bool IntersectMeshNode(Node *node, ParsedMesh *mesh, const Ray &r,
-                                    SurfaceInteraction * isect, Float *tHit)
+bb_cpu_gpu bool IntersectMeshNode(Node *node, ParsedMesh *mesh, const Ray &r,
+                                  SurfaceInteraction * isect, Float *tHit)
 {
     Assert(node->n > 0 && node->is_leaf && node->handles);
     bool hit_anything = false;
@@ -376,8 +370,8 @@ __bidevice__ bool IntersectMeshNode(Node *node, ParsedMesh *mesh, const Ray &r,
     return hit_anything;
 }
 
-__bidevice__ Float DistanceMeshNode(const vec3f &point, ParsedMesh *mesh, Node *node,
-                                    int *handle)
+bb_cpu_gpu Float DistanceMeshNode(const vec3f &point, ParsedMesh *mesh, Node *node,
+                                  int *handle)
 {
     Assert(node->n > 0 && node->is_leaf && node->handles);
     Float distance = Infinity;
@@ -394,8 +388,8 @@ __bidevice__ Float DistanceMeshNode(const vec3f &point, ParsedMesh *mesh, Node *
 }
 
 #define MAX_STACK_SIZE 256
-__bidevice__ Float BVHMeshClosestDistance(const vec3f &point, int *closest,
-                                          ParsedMesh *mesh, Node *bvh)
+bb_cpu_gpu Float BVHMeshClosestDistance(const vec3f &point, int *closest,
+                                        ParsedMesh *mesh, Node *bvh)
 {
     NodePtr stack[MAX_STACK_SIZE];
     NodePtr *stackPtr = stack;
@@ -453,8 +447,8 @@ __bidevice__ Float BVHMeshClosestDistance(const vec3f &point, int *closest,
     return closestDistance;
 }
 
-__bidevice__ bool BVHMeshIntersect(const Ray &r, SurfaceInteraction *isect,
-                                   Float *tHit, ParsedMesh *mesh, Node *bvh)
+bb_cpu_gpu bool BVHMeshIntersect(const Ray &r, SurfaceInteraction *isect,
+                                 Float *tHit, ParsedMesh *mesh, Node *bvh)
 {
     NodePtr stack[MAX_STACK_SIZE];
     NodePtr *stackPtr = stack;
@@ -501,7 +495,7 @@ __bidevice__ bool BVHMeshIntersect(const Ray &r, SurfaceInteraction *isect,
     return hit_anything;
 }
 
-__host__ Node *MakeBVH(ParsedMesh *mesh, int maxDepth){
+Node *MakeBVH(ParsedMesh *mesh, int maxDepth){
     TimerList timers;
     int totalNodes = 0;
     int maxNodes = 0;
@@ -535,7 +529,7 @@ __host__ Node *MakeBVH(ParsedMesh *mesh, int maxDepth){
     return bvh;
 }
 
-__host__ void Shape::InitMesh(ParsedMesh *msh, bool reverseOr, int maxDepth){
+void Shape::InitMesh(ParsedMesh *msh, bool reverseOr, int maxDepth){
     mesh = msh;
     grid = nullptr; // don't generate the sdf in case this is a emitter
     reverseOrientation = reverseOr;
@@ -545,24 +539,24 @@ __host__ void Shape::InitMesh(ParsedMesh *msh, bool reverseOr, int maxDepth){
     type = ShapeType::ShapeMesh;
 }
 
-__bidevice__ Bounds3f Shape::MeshGetBounds(){
+bb_cpu_gpu Bounds3f Shape::MeshGetBounds(){
     return bvh->bound;
 }
 
-__bidevice__ bool Shape::MeshIntersect(const Ray &ray, SurfaceInteraction *isect,
-                                       Float *tShapeHit) const
+bb_cpu_gpu bool Shape::MeshIntersect(const Ray &ray, SurfaceInteraction *isect,
+                                     Float *tShapeHit) const
 {
     return BVHMeshIntersect(ray, isect, tShapeHit, mesh, bvh);
 }
 
-__bidevice__ Float Shape::MeshClosestDistance(const vec3f &point) const{
+bb_cpu_gpu Float Shape::MeshClosestDistance(const vec3f &point) const{
     int id = -1;
     return BVHMeshClosestDistance(point, &id, mesh, bvh);
 }
 
 #define MAX_ITERATIONS_COUNT 5
-__bidevice__ void Shape::ClosestPointBySDF(const vec3f &pWorld,
-                                           ClosestPointQuery *query) const
+bb_cpu_gpu void Shape::ClosestPointBySDF(const vec3f &pWorld,
+                                         ClosestPointQuery *query) const
 {
     vec3f targetNormal(0, 1, 0);
     vec3f point = WorldToObject.Point(pWorld);
@@ -603,8 +597,8 @@ __bidevice__ void Shape::ClosestPointBySDF(const vec3f &pWorld,
                                ObjectToWorld.Normal(normal), distance);
 }
 
-__bidevice__ void Shape2::ClosestPointBySDF(const vec2f &pWorld,
-                                            ClosestPointQuery2 *query) const
+bb_cpu_gpu void Shape2::ClosestPointBySDF(const vec2f &pWorld,
+                                          ClosestPointQuery2 *query) const
 {
     vec2f targetNormal(0, 1);
     vec2f point = WorldToObject.Point(pWorld);

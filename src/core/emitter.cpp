@@ -1,10 +1,10 @@
 #include <emitter.h>
 #include <statics.h>
 
-__host__ vec2f ZeroVelocityField2(const vec2f &p){ return vec2f(0); }
-__host__ vec3f ZeroVelocityField3(const vec3f &p){ return vec3f(0); }
+vec2f ZeroVelocityField2(const vec2f &p){ return vec2f(0); }
+vec3f ZeroVelocityField3(const vec3f &p){ return vec3f(0); }
 
-__bidevice__ vec3f SampleSphere(const vec2f &u){
+bb_cpu_gpu vec3f SampleSphere(const vec2f &u){
     Float usqrt = 2 * std::sqrt(u[1] * (1 - u[1]));
     Float utheta = 2 * Pi * u[0];
     return vec3f(std::cos(utheta) * usqrt, std::sin(utheta) * usqrt, 1 - 2*u[1]);
@@ -14,12 +14,11 @@ __bidevice__ vec3f SampleSphere(const vec2f &u){
 /**************************************************************/
 //               U N I F O R M   B O X   2 D                  //
 /**************************************************************/
-__host__ UniformBoxParticleEmitter2::UniformBoxParticleEmitter2(Bounds2f bound,
-                                                                vec2ui amount)
-:bound(bound), amount(amount){}
+UniformBoxParticleEmitter2::UniformBoxParticleEmitter2(Bounds2f bound, vec2ui amount)
+    :bound(bound), amount(amount){}
 
-__host__ void UniformBoxParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder,
-                                               Float number_density)
+void UniformBoxParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder,
+                                      Float number_density)
 {
     Float area  = bound.SurfaceArea();
     int total   = (amount.x - 1) * (amount.y - 1);
@@ -51,13 +50,12 @@ __host__ void UniformBoxParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builde
 /**************************************************************/
 //          V O L U M E    P A R T I C L E    2 D             //
 /**************************************************************/
-__host__ VolumeParticleEmitter2::VolumeParticleEmitter2(Shape2 *shape, const Bounds2f &bounds,
-                                                        Float spacing, const vec2f &initialVel,
-                                                        const vec2f &linearVel,
-                                                        Float angularVel,
-                                                        int maxParticles, Float jitter,
-                                                        bool isOneShot,bool allowOverlapping,
-                                                        int seed)
+VolumeParticleEmitter2::VolumeParticleEmitter2(Shape2 *shape, const Bounds2f &bounds,
+                                                Float spacing, const vec2f &initialVel,
+                                                const vec2f &linearVel, Float angularVel,
+                                                int maxParticles, Float jitter,
+                                                bool isOneShot,bool allowOverlapping,
+                                                int seed)
 : shape(shape), bound(bounds), spacing(spacing), initVel(initialVel), linearVel(linearVel),
 angularVel(angularVel), maxParticles(maxParticles), emittedParticles(0), jitter(jitter),
 isOneShot(isOneShot), allowOverlapping(allowOverlapping)
@@ -67,13 +65,13 @@ isOneShot(isOneShot), allowOverlapping(allowOverlapping)
     emittedParticles = 0;
 }
 
-__host__ void VolumeParticleEmitter2::SetJitter(Float jit){
+void VolumeParticleEmitter2::SetJitter(Float jit){
     jitter = Clamp(jit, 0.0, 1.0);
 }
 
 template<typename ParticleBuilder2>
-__host__ void _Emit(ParticleBuilder2 *Builder, VolumeParticleEmitter2 *emitter,
-                    const std::function<vec2f(const vec2f &)> &velocity)
+void _Emit(ParticleBuilder2 *Builder, VolumeParticleEmitter2 *emitter,
+           const std::function<vec2f(const vec2f &)> &velocity)
 {
     AssertA(emitter->shape, "Cannot emit particles without a surface shape");
 
@@ -111,14 +109,14 @@ __host__ void _Emit(ParticleBuilder2 *Builder, VolumeParticleEmitter2 *emitter,
     }
 }
 
-__host__ void VolumeParticleEmitter2::Emit(ContinuousParticleSetBuilder2 *Builder,
-                                           const std::function<vec2f(const vec2f &)> &velocity)
+void VolumeParticleEmitter2::Emit(ContinuousParticleSetBuilder2 *Builder,
+                                  const std::function<vec2f(const vec2f &)> &velocity)
 {
     _Emit<ContinuousParticleSetBuilder2>(Builder, this, velocity);
 }
 
-__host__ void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder,
-                                           const std::function<vec2f(const vec2f &)> &velocity)
+void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder,
+                                  const std::function<vec2f(const vec2f &)> &velocity)
 {
     _Emit<ParticleSetBuilder<vec2f>>(Builder, this, velocity);
 }
@@ -126,30 +124,28 @@ __host__ void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder,
 /**************************************************************/
 //          V O L U M E    P A R T I C L E    S E T   2 D     //
 /**************************************************************/
-__host__ VolumeParticleEmitterSet2::VolumeParticleEmitterSet2(){}
+VolumeParticleEmitterSet2::VolumeParticleEmitterSet2(){}
 
-__host__ void VolumeParticleEmitterSet2::AddEmitter(VolumeParticleEmitter2 *emitter){
+void VolumeParticleEmitterSet2::AddEmitter(VolumeParticleEmitter2 *emitter){
     emitters.push_back(emitter);
 }
 
-__host__ void VolumeParticleEmitterSet2::AddEmitter(Shape2 *shape, const Bounds2f &bounds,
-                                                    Float spacing, const vec2f &initialVel,
-                                                    const vec2f &linearVel,
-                                                    Float angularVel, int maxParticles,
-                                                    Float jitter, bool isOneShot,
-                                                    bool allowOverlapping, int seed)
+void VolumeParticleEmitterSet2::AddEmitter(Shape2 *shape, const Bounds2f &bounds,
+                                           Float spacing, const vec2f &initialVel,
+                                           const vec2f &linearVel, Float angularVel,
+                                           int maxParticles, Float jitter, bool isOneShot,
+                                           bool allowOverlapping, int seed)
 {
     emitters.push_back(new VolumeParticleEmitter2(shape, bounds, spacing, initialVel,
                                                   linearVel, angularVel, maxParticles,
                                                   jitter, isOneShot, allowOverlapping, seed));
 }
 
-__host__ void VolumeParticleEmitterSet2::AddEmitter(Shape2 *shape, Float spacing,
-                                                    const vec2f &initialVel,
-                                                    const vec2f &linearVel,
-                                                    Float angularVel, int maxParticles,
-                                                    Float jitter, bool isOneShot,
-                                                    bool allowOverlapping, int seed)
+void VolumeParticleEmitterSet2::AddEmitter(Shape2 *shape, Float spacing,
+                                           const vec2f &initialVel, const vec2f &linearVel,
+                                           Float angularVel, int maxParticles,
+                                           Float jitter, bool isOneShot,
+                                           bool allowOverlapping, int seed)
 {
     emitters.push_back(new VolumeParticleEmitter2(shape, shape->GetBounds(), spacing,
                                                   initialVel,linearVel, angularVel,
@@ -157,15 +153,15 @@ __host__ void VolumeParticleEmitterSet2::AddEmitter(Shape2 *shape, Float spacing
                                                   allowOverlapping, seed));
 }
 
-__host__ void VolumeParticleEmitterSet2::SetJitter(Float jitter){
+void VolumeParticleEmitterSet2::SetJitter(Float jitter){
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::SetJitter");
     for(int i = 0; i < emitters.size(); i++){
         emitters[i]->SetJitter(jitter);
     }
 }
 
-__host__ void VolumeParticleEmitterSet2::Emit(ContinuousParticleSetBuilder2 *Builder,
-                                              const std::function<vec2f(const vec2f &)> &velocity)
+void VolumeParticleEmitterSet2::Emit(ContinuousParticleSetBuilder2 *Builder,
+                                     const std::function<vec2f(const vec2f &)> &velocity)
 {
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
     for(int i = 0; i < emitters.size(); i++){
@@ -173,15 +169,15 @@ __host__ void VolumeParticleEmitterSet2::Emit(ContinuousParticleSetBuilder2 *Bui
     }
 }
 
-__host__ void VolumeParticleEmitterSet2::Emit(ParticleSetBuilder<vec2f> *Builder,
-                                              const std::function<vec2f(const vec2f &)> &velocity){
+void VolumeParticleEmitterSet2::Emit(ParticleSetBuilder<vec2f> *Builder,
+                                     const std::function<vec2f(const vec2f &)> &velocity){
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
     for(int i = 0; i < emitters.size(); i++){
         emitters[i]->Emit(Builder, velocity);
     }
 }
 
-__host__ void VolumeParticleEmitterSet2::Release(){
+void VolumeParticleEmitterSet2::Release(){
     for(int i = 0; i < emitters.size(); i++){
         if(emitters[i]){
             delete emitters[i];
@@ -194,12 +190,12 @@ __host__ void VolumeParticleEmitterSet2::Release(){
 /**************************************************************/
 //          V O L U M E    P A R T I C L E    3 D             //
 /**************************************************************/
-__host__ VolumeParticleEmitter3::VolumeParticleEmitter3(Shape *shape, const Bounds3f &bounds,
-                                                        Float spacing, const vec3f &initialVel,
-                                                        const vec3f &linearVel,
-                                                        Float angularVel, int maxParticles,
-                                                        Float jitter, bool isOneShot,
-                                                        bool allowOverlapping, int seed)
+VolumeParticleEmitter3::VolumeParticleEmitter3(Shape *shape, const Bounds3f &bounds,
+                                               Float spacing, const vec3f &initialVel,
+                                               const vec3f &linearVel, Float angularVel,
+                                               int maxParticles, Float jitter,
+                                               bool isOneShot, bool allowOverlapping,
+                                               int seed)
 : shape(shape), bound(bounds), spacing(spacing), initVel(initialVel), linearVel(linearVel),
 angularVel(angularVel), maxParticles(maxParticles), emittedParticles(0), jitter(jitter),
 isOneShot(isOneShot), allowOverlapping(allowOverlapping)
@@ -209,12 +205,12 @@ isOneShot(isOneShot), allowOverlapping(allowOverlapping)
     withValidator = 0;
     emittedParticles = 0;
 }
-__host__ VolumeParticleEmitter3::VolumeParticleEmitter3(Shape *_shape, Float spacing,
-                                                        const vec3f &initialVel,
-                                                        const vec3f &linearVel,
-                                                        Float angularVel, int maxParticles,
-                                                        Float jitter, bool isOneShot,
-                                                        bool allowOverlapping, int seed)
+VolumeParticleEmitter3::VolumeParticleEmitter3(Shape *_shape, Float spacing,
+                                               const vec3f &initialVel,
+                                               const vec3f &linearVel,
+                                               Float angularVel, int maxParticles,
+                                               Float jitter, bool isOneShot,
+                                               bool allowOverlapping, int seed)
 : shape(_shape), bound(_shape->GetBounds()), spacing(spacing), initVel(initialVel), linearVel(linearVel),
 angularVel(angularVel), maxParticles(maxParticles), emittedParticles(0), jitter(jitter),
 isOneShot(isOneShot), allowOverlapping(allowOverlapping)
@@ -225,20 +221,20 @@ isOneShot(isOneShot), allowOverlapping(allowOverlapping)
     withValidator = 0;
 }
 
-__host__ void
+void
 VolumeParticleEmitter3::SetValidator(std::function<int(const vec3f &)> gValidator){
     withValidator = 1;
     validatorFunc = gValidator;
 }
 
 
-__host__ void VolumeParticleEmitter3::SetJitter(Float jit){
+void VolumeParticleEmitter3::SetJitter(Float jit){
     jitter = Clamp(jit, 0.0, 1.0);
 }
 
 template<typename ParticleBuilder3>
-__host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
-                    const std::function<vec3f(const vec3f &)> &velocity)
+void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
+           const std::function<vec3f(const vec3f &)> &velocity)
 {
     AssertA(emitter->isOneShot, "Multiple emittion not supported yet");
     TimerList timers;
@@ -303,14 +299,14 @@ __host__ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
     }
 }
 
-__host__ void VolumeParticleEmitter3::Emit(ContinuousParticleSetBuilder3 *Builder,
-                                           const std::function<vec3f(const vec3f &)> &velocity)
+void VolumeParticleEmitter3::Emit(ContinuousParticleSetBuilder3 *Builder,
+                                  const std::function<vec3f(const vec3f &)> &velocity)
 {
     _Emit<ContinuousParticleSetBuilder3>(Builder, this, velocity);
 }
 
-__host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder,
-                                           const std::function<vec3f(const vec3f &)> &velocity)
+void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder,
+                                  const std::function<vec3f(const vec3f &)> &velocity)
 {
     _Emit<ParticleSetBuilder<vec3f>>(Builder, this, velocity);
 }
@@ -318,18 +314,18 @@ __host__ void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder,
 /**************************************************************/
 //          V O L U M E    P A R T I C L E    S E T   3 D     //
 /**************************************************************/
-__host__ VolumeParticleEmitterSet3::VolumeParticleEmitterSet3(){}
+VolumeParticleEmitterSet3::VolumeParticleEmitterSet3(){}
 
-__host__ void VolumeParticleEmitterSet3::AddEmitter(VolumeParticleEmitter3 *emitter){
+void VolumeParticleEmitterSet3::AddEmitter(VolumeParticleEmitter3 *emitter){
     emitters.push_back(emitter);
 }
 
-__host__ void VolumeParticleEmitterSet3::AddEmitter(Shape *shape, Float spacing,
-                                                    const vec3f &initialVel,
-                                                    const vec3f &linearVel,
-                                                    Float angularVel, int maxParticles,
-                                                    Float jitter, bool isOneShot,
-                                                    bool allowOverlapping, int seed)
+void VolumeParticleEmitterSet3::AddEmitter(Shape *shape, Float spacing,
+                                           const vec3f &initialVel,
+                                           const vec3f &linearVel,
+                                           Float angularVel, int maxParticles,
+                                           Float jitter, bool isOneShot,
+                                           bool allowOverlapping, int seed)
 {
     emitters.push_back(new VolumeParticleEmitter3(shape, shape->GetBounds(), spacing,
                                                   initialVel, linearVel, angularVel,
@@ -337,34 +333,34 @@ __host__ void VolumeParticleEmitterSet3::AddEmitter(Shape *shape, Float spacing,
                                                   allowOverlapping, seed));
 }
 
-__host__ void VolumeParticleEmitterSet3::AddEmitter(Shape *shape, const Bounds3f &bounds,
-                                                    Float spacing, const vec3f &initialVel,
-                                                    const vec3f &linearVel,
-                                                    Float angularVel, int maxParticles,
-                                                    Float jitter, bool isOneShot,
-                                                    bool allowOverlapping, int seed)
+void VolumeParticleEmitterSet3::AddEmitter(Shape *shape, const Bounds3f &bounds,
+                                           Float spacing, const vec3f &initialVel,
+                                           const vec3f &linearVel,
+                                           Float angularVel, int maxParticles,
+                                           Float jitter, bool isOneShot,
+                                           bool allowOverlapping, int seed)
 {
     emitters.push_back(new VolumeParticleEmitter3(shape, bounds, spacing, initialVel,
                                                   linearVel, angularVel, maxParticles,
                                                   jitter, isOneShot, allowOverlapping, seed));
 }
 
-__host__ void
+void
 VolumeParticleEmitterSet3::SetValidator(std::function<int(const vec3f &)> gValidator){
     for(VolumeParticleEmitter3 *emitter : emitters){
         emitter->SetValidator(gValidator);
     }
 }
 
-__host__ void VolumeParticleEmitterSet3::SetJitter(Float jitter){
+void VolumeParticleEmitterSet3::SetJitter(Float jitter){
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::SetJitter");
     for(int i = 0; i < emitters.size(); i++){
         emitters[i]->SetJitter(jitter);
     }
 }
 
-__host__ void VolumeParticleEmitterSet3::Emit(ContinuousParticleSetBuilder3 *Builder,
-                                              const std::function<vec3f(const vec3f &)> &velocity)
+void VolumeParticleEmitterSet3::Emit(ContinuousParticleSetBuilder3 *Builder,
+                                     const std::function<vec3f(const vec3f &)> &velocity)
 {
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::Emit");
     for(int i = 0; i < emitters.size(); i++){
@@ -372,8 +368,8 @@ __host__ void VolumeParticleEmitterSet3::Emit(ContinuousParticleSetBuilder3 *Bui
     }
 }
 
-__host__ void VolumeParticleEmitterSet3::Emit(ParticleSetBuilder<vec3f> *Builder,
-                                              const std::function<vec3f(const vec3f &)> &velocity)
+void VolumeParticleEmitterSet3::Emit(ParticleSetBuilder<vec3f> *Builder,
+                                     const std::function<vec3f(const vec3f &)> &velocity)
 {
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::Emit");
     for(int i = 0; i < emitters.size(); i++){
@@ -381,7 +377,7 @@ __host__ void VolumeParticleEmitterSet3::Emit(ParticleSetBuilder<vec3f> *Builder
     }
 }
 
-__host__ void VolumeParticleEmitterSet3::Release(){
+void VolumeParticleEmitterSet3::Release(){
     for(int i = 0; i < emitters.size(); i++){
         if(emitters[i]){
             delete emitters[i];

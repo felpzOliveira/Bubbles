@@ -6,40 +6,38 @@
 
 Float kDefaultTimeStepLimitScale = 5.0;
 
-__host__ PciSphSolver2::PciSphSolver2(){}
+PciSphSolver2::PciSphSolver2(){}
 
-__host__ void PciSphSolver2::Initialize(SphSolverData2 *data){
+void PciSphSolver2::Initialize(SphSolverData2 *data){
     solverData = cudaAllocateVx(PciSphSolverData2, 1);
     solverData->sphData = data;
     maxIterations = 5;
     maxErrorDensity = 0.001;
 }
 
-__bidevice__ SphSolverData2 *PciSphSolver2::GetSphSolverData(){
+bb_cpu_gpu SphSolverData2 *PciSphSolver2::GetSphSolverData(){
     AssertA(solverData, "Invalid solverData for {GetSphSolverData}");
     return solverData->sphData;
 }
 
-__bidevice__ SphParticleSet2 *PciSphSolver2::GetSphParticleSet(){
+bb_cpu_gpu SphParticleSet2 *PciSphSolver2::GetSphParticleSet(){
     AssertA(solverData, "Invalid solverData for {GetSphSolverData}");
     AssertA(solverData->sphData, "Invalid solverData for {GetSphSolverData}");
     return solverData->sphData->sphpSet;
 }
 
-__host__ void PciSphSolver2::SetColliders(ColliderSet2 *colliders){
+void PciSphSolver2::SetColliders(ColliderSet2 *colliders){
     AssertA(solverData, "Invalid solverData for {SetColliders}");
     AssertA(solverData->sphData, "Invalid solverData for {SetColliders}");
     solverData->sphData->collider = colliders;
 }
 
-__host__ void PciSphSolver2::SetViscosityCoefficient(Float viscosityCoefficient){
+void PciSphSolver2::SetViscosityCoefficient(Float viscosityCoefficient){
     AssertA(solverData, "Invalid solverData for {SetViscosityCoefficient}");
     solverData->sphData->viscosity = Max(0, viscosityCoefficient);
 }
 
-__host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep,
-                              int use_cpu = 0)
-{
+void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep, int use_cpu = 0){
     SphSolverData2 *data = solver->solverData->sphData;
     if(use_cpu)
         UpdateGridDistributionCPU(data);
@@ -60,24 +58,24 @@ __host__ void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep,
     ComputePressureForceAndIntegrate(solver->solverData, timeStep, 0.01, delta, 5);
 }
 
-__host__ int PciSphSolver2::GetParticleCount(){
+int PciSphSolver2::GetParticleCount(){
     return solverData->sphData->sphpSet->GetParticleSet()->GetParticleCount();
 }
 
-__host__ LNMStats PciSphSolver2::GetLNMStats(){
+LNMStats PciSphSolver2::GetLNMStats(){
     return lnmStats;
 }
 
-__host__ Float PciSphSolver2::GetAdvanceTime(){
+Float PciSphSolver2::GetAdvanceTime(){
     return stepInterval;
 }
 
-__host__ void PciSphSolver2::UpdateDensity(){
+void PciSphSolver2::UpdateDensity(){
     UpdateGridDistributionCPU(solverData->sphData);
     ComputeDensityCPU(solverData->sphData);
 }
 
-__host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
+void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     TimerList lnmTimer;
     unsigned int numberOfIntervals = 0;
     Float remainingTime = timeIntervalInSeconds;
@@ -117,8 +115,8 @@ __host__ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
     lnmStats.Add(LNMData(lnm, pct));
 }
 
-__host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
-                                   Float relativeRadius, Grid2 *domain, SphParticleSet2 *pSet)
+void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
+                          Grid2 *domain, SphParticleSet2 *pSet)
 {
     AssertA(solverData, "Invalid call to {PciSphSolver2::Setup}");
     SphSolverData2 *sphData = solverData->sphData;
@@ -160,7 +158,7 @@ __host__ void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing,
     sphData->frame_index = 1;
 }
 
-__host__ Float PciSphSolver2::ComputeDeltaDenom(){
+Float PciSphSolver2::ComputeDeltaDenom(){
     TrianglePointGenerator generator;
     std::vector<vec2f> points;
 
@@ -195,16 +193,16 @@ __host__ Float PciSphSolver2::ComputeDeltaDenom(){
     return denom;
 }
 
-__host__ Float PciSphSolver2::ComputeDelta(Float timeIntervalInSeconds){
+Float PciSphSolver2::ComputeDelta(Float timeIntervalInSeconds){
     return Absf(deltaDenom) > 0 ? -1 / (ComputeBeta(timeIntervalInSeconds) * deltaDenom) : 0;
 }
 
-__host__ Float PciSphSolver2::ComputeBeta(Float timeIntervalInSeconds){
+Float PciSphSolver2::ComputeBeta(Float timeIntervalInSeconds){
     Float timeStepSquare = timeIntervalInSeconds * timeIntervalInSeconds;
     return 2.0 * massOverTargetDensitySquared * timeStepSquare;
 }
 
-__host__ void PciSphRunSimulation2(PciSphSolver2 *solver, Float spacing,
+void PciSphRunSimulation2(PciSphSolver2 *solver, Float spacing,
                                    vec2f lower, vec2f upper, Float targetInterval,
                                    const std::function<int(int )> &callback)
 {

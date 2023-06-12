@@ -2,34 +2,34 @@
 #include <cutil.h>
 #include <shape.h>
 
-__bidevice__ SphGasSolver2::SphGasSolver2(){ solver = nullptr; }
+bb_cpu_gpu SphGasSolver2::SphGasSolver2(){ solver = nullptr; }
 
-__host__ void SphGasSolver2::Initialize(){
+void SphGasSolver2::Initialize(){
     solver = cudaAllocateVx(SphSolver2, 1);
     solver->Initialize(DefaultSphSolverData2());
 }
 
-__host__ void SphGasSolver2::SetViscosityCoefficient(Float viscosityCoefficient){
+void SphGasSolver2::SetViscosityCoefficient(Float viscosityCoefficient){
     solver->SetViscosityCoefficient(viscosityCoefficient);
 }
 
-__host__ void SphGasSolver2::SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient){
+void SphGasSolver2::SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient){
     solver->SetPseudoViscosityCoefficient(pseudoViscosityCoefficient);
 }
 
-__bidevice__ Float SphGasSolver2::GetKernelRadius(){
+bb_cpu_gpu Float SphGasSolver2::GetKernelRadius(){
     return solver->GetKernelRadius();
 }
 
-__host__ void SphGasSolver2::SetColliders(ColliderSet2 *col){
+void SphGasSolver2::SetColliders(ColliderSet2 *col){
     solver->SetColliders(col);
 }
 
-__bidevice__ SphSolverData2 *SphGasSolver2::GetSphSolverData(){
+bb_cpu_gpu SphSolverData2 *SphGasSolver2::GetSphSolverData(){
     return solver->solverData;
 }
 
-__bidevice__ void ComputeDensityInterpolationFor(SphSolverData2 *data, int particleId){
+bb_cpu_gpu void ComputeDensityInterpolationFor(SphSolverData2 *data, int particleId){
     int *neighbors = nullptr;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     vec2f pi = pSet->GetParticlePosition(particleId);
@@ -87,7 +87,7 @@ __bidevice__ void ComputeDensityInterpolationFor(SphSolverData2 *data, int parti
 }
 
 // Does not *technically* need to swap densities, can just perform with ex instead
-__bidevice__ void SwapDensitiesFor(SphSolverData2 *data, int particleId){
+bb_cpu_gpu void SwapDensitiesFor(SphSolverData2 *data, int particleId){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     Float di = pSet->GetParticleDensityEx(particleId);
     Float dii = pSet->GetParticleDensity(particleId);
@@ -98,7 +98,7 @@ __bidevice__ void SwapDensitiesFor(SphSolverData2 *data, int particleId){
     DBG_PRINT("Dif[%d] = %g\n", particleId, dif);
 }
 
-__global__ void ComputeExtendedDensityKernel(SphSolverData2 *data){
+bb_kernel void ComputeExtendedDensityKernel(SphSolverData2 *data){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -106,13 +106,13 @@ __global__ void ComputeExtendedDensityKernel(SphSolverData2 *data){
     }
 }
 
-__host__ void ComputeExtendedDensityGPU(SphSolverData2 *data){
+void ComputeExtendedDensityGPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeExtendedDensityKernel, data);
 }
 
-__host__ void ComputeExtendedDensityCPU(SphSolverData2 *data){
+void ComputeExtendedDensityCPU(SphSolverData2 *data){
     SphParticleSet2 *sphSet = data->sphpSet;
     ParticleSet2 *pSet = sphSet->GetParticleSet();
     int count = pSet->GetParticleCount();
@@ -123,7 +123,7 @@ __host__ void ComputeExtendedDensityCPU(SphSolverData2 *data){
     }
 }
 
-__global__ void ComputeExtendedPressureKernel(SphSolverData2 *data){
+bb_kernel void ComputeExtendedPressureKernel(SphSolverData2 *data){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -133,13 +133,13 @@ __global__ void ComputeExtendedPressureKernel(SphSolverData2 *data){
     }
 }
 
-__host__ void ComputePressureGPU(SphSolverData2 *data){
+void ComputePressureGPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeExtendedPressureKernel, data);
 }
 
-__host__ void ComputePressureCPU(SphSolverData2 *data){
+void ComputePressureCPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
 
@@ -150,7 +150,7 @@ __host__ void ComputePressureCPU(SphSolverData2 *data){
     }
 }
 
-__global__ void ComputeExtendedPressureForceKernel(SphSolverData2 *data){
+bb_kernel void ComputeExtendedPressureForceKernel(SphSolverData2 *data){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -158,13 +158,13 @@ __global__ void ComputeExtendedPressureForceKernel(SphSolverData2 *data){
     }
 }
 
-__host__ void ComputeExtendedPressureForceGPU(SphSolverData2 *data){
+void ComputeExtendedPressureForceGPU(SphSolverData2 *data){
     ParticleSet2 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeExtendedPressureForceKernel, data);
 }
 
-__host__ void ComputeExtendedPressureForceCPU(SphSolverData2 *data){
+void ComputeExtendedPressureForceCPU(SphSolverData2 *data){
     SphParticleSet2 *sphSet = data->sphpSet;
     ParticleSet2 *pSet = sphSet->GetParticleSet();
     int count = pSet->GetParticleCount();
@@ -176,7 +176,7 @@ __host__ void ComputeExtendedPressureForceCPU(SphSolverData2 *data){
 }
 
 
-__host__ void AdvanceTimeStep(SphGasSolver2 *solver, Float timeStep, int use_cpu = 0){
+void AdvanceTimeStep(SphGasSolver2 *solver, Float timeStep, int use_cpu = 0){
     SphSolverData2 *data = solver->GetSphSolverData();
     //StaticsCompute *sCompute = data->statsCompute;
     //StaticsStep *step = nullptr;
@@ -212,7 +212,7 @@ __host__ void AdvanceTimeStep(SphGasSolver2 *solver, Float timeStep, int use_cpu
         TimeIntegrationGPU(data, timeStep, 1);
 }
 
-__host__ void SphGasSolver2::Advance(Float timeIntervalInSeconds){
+void SphGasSolver2::Advance(Float timeIntervalInSeconds){
     unsigned int numberOfIntervals = 0;
     unsigned int numberOfIntervalsRunned = 0;
     Float remainingTime = timeIntervalInSeconds;
@@ -233,8 +233,8 @@ __host__ void SphGasSolver2::Advance(Float timeIntervalInSeconds){
 }
 
 
-__host__ void SphGasSolver2::Setup(Float targetDensity, Float targetSpacing,
-                                   Float relativeRadius, Grid2 *dom, SphParticleSet2 *pSet)
+void SphGasSolver2::Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
+                          Grid2 *dom, SphParticleSet2 *pSet)
 {
     SphSolverData2 *data = GetSphSolverData();
     //StaticsCompute *sCompute = data->statsCompute;
@@ -257,6 +257,6 @@ __host__ void SphGasSolver2::Setup(Float targetDensity, Float targetSpacing,
         ComputeInitialTemperatureMapGPU(data, data->Tmin, data->Tmax, maxLevel);
 }
 
-__host__ void SphGasSolver2::UpdateDensity(){
+void SphGasSolver2::UpdateDensity(){
     solver->UpdateDensity();
 }

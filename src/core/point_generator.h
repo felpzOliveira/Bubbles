@@ -10,38 +10,33 @@
 /* 2D Point generation over a domain */
 class PointGenerator2{
     public:
-    __host__ PointGenerator2();
-    __host__ void Generate(const Bounds2f &domain, Float spacing, 
-                           std::vector<vec2f> *points) const;
-    __host__ virtual void ForEach(const Bounds2f &domain, Float spacing,
-                                  const std::function<bool(const vec2f &)> &callback) 
-        const = 0;
+    PointGenerator2();
+    void Generate(const Bounds2f &domain, Float spacing, std::vector<vec2f> *points) const;
+    virtual void ForEach(const Bounds2f &domain, Float spacing,
+                        const std::function<bool(const vec2f &)> &callback) const = 0;
 };
 
 class TrianglePointGenerator : public PointGenerator2{
     public:
-    __host__ TrianglePointGenerator();
-    __host__ virtual void ForEach(const Bounds2f &domain, Float spacing,
-                                  const std::function<bool(const vec2f &)> &callback) 
-        const override;
+    TrianglePointGenerator();
+    virtual void ForEach(const Bounds2f &domain, Float spacing,
+                         const std::function<bool(const vec2f &)> &callback) const override;
 };
 
 class TrianglePointGeneratorDevice{
     public:
-    __bidevice__ TrianglePointGeneratorDevice();
-    __bidevice__ int Generate(const Bounds2f &domain, Float spacing,
-                              vec2f *points, int maxn);
+    bb_cpu_gpu TrianglePointGeneratorDevice();
+    bb_cpu_gpu int Generate(const Bounds2f &domain, Float spacing,
+                            vec2f *points, int maxn);
 };
 
 /* 3D Point generation over a domain */
 class PointGenerator3{
     public:
-    __host__ PointGenerator3();
-    __host__ void Generate(const Bounds3f &domain, Float spacing,
-                           std::vector<vec3f> *points) const;
-    __host__ virtual void ForEach(const Bounds3f &domain, Float spacing,
-                                  const std::function<bool(const vec3f &)> &callback)
-        const = 0;
+    PointGenerator3();
+    void Generate(const Bounds3f &domain, Float spacing, std::vector<vec3f> *points) const;
+    virtual void ForEach(const Bounds3f &domain, Float spacing,
+                         const std::function<bool(const vec3f &)> &callback) const = 0;
 };
 
 /*
@@ -52,15 +47,13 @@ class PointGenerator3{
 */
 class BccLatticePointGenerator : public PointGenerator3{
     public:
-    __host__ BccLatticePointGenerator();
-    __host__ virtual void ForEach(const Bounds3f &domain, Float spacing,
-                                  const std::function<bool(const vec3f &)> &callback)
-        const override;
+    BccLatticePointGenerator();
+    virtual void ForEach(const Bounds3f &domain, Float spacing,
+                         const std::function<bool(const vec3f &)> &callback) const override;
 };
 
 class BccLatticePointGeneratorDevice{
     public:
-    __bidevice__ BccLatticePointGeneratorDevice();
-    __bidevice__ int Generate(const Bounds3f &domain, Float spacing, 
-                              vec3f *points, int maxn);
+    bb_cpu_gpu BccLatticePointGeneratorDevice();
+    bb_cpu_gpu int Generate(const Bounds3f &domain, Float spacing, vec3f *points, int maxn);
 };

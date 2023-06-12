@@ -20,7 +20,7 @@
 * on particles v0 buffer (all methods in bubbles do that).
 */
 
-template<typename T, typename U, typename Q> __bidevice__
+template<typename T, typename U, typename Q> bb_cpu_gpu
 void NarrowBandCompute(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int queryDepth,
                        Float rho, int pId)
 {
@@ -43,7 +43,7 @@ void NarrowBandCompute(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int queryDep
     });
 }
 
-template<typename T, typename U, typename Q> __global__
+template<typename T, typename U, typename Q> bb_kernel
 void NarrowBandComputeKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                              int queryDepth, Float rho)
 {
@@ -55,7 +55,7 @@ void NarrowBandComputeKernel(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     }
 }
 
-template<typename T, typename U, typename Q> __host__
+template<typename T, typename U, typename Q>
 void GeometricalNarrowBand(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float rho){
     int use_cpu = GetSystemUseCPU();
     int N = pSet->GetParticleCount();

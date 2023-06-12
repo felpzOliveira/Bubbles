@@ -421,7 +421,7 @@ static inline void FillMesh(ParsedMesh *mesh, std::vector<vec3f> *v,
 
 }
 
-__host__ int FindName(const char *path){
+int FindName(const char *path){
     char sep = '/';
     int size = strlen(path);
     for(int i = size-1; i >= 0; i--){
@@ -431,7 +431,7 @@ __host__ int FindName(const char *path){
     return 0;
 }
 
-__host__ ParsedMesh *LoadObj(const char *path){
+ParsedMesh *LoadObj(const char *path){
     int p = FindName(path);
     std::vector<ParsedMesh *> *meshes = LoadObj(path, nullptr, false);
     ParsedMesh *mesh = meshes->at(0);
@@ -440,8 +440,8 @@ __host__ ParsedMesh *LoadObj(const char *path){
     return mesh;
 }
 
-__host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl> *mtls,
-                                           bool split_mesh)
+std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl> *mtls,
+                                  bool split_mesh)
 {
     ParsedMesh *currentMesh = nullptr;
     std::vector<vec3f> v, vn;
@@ -625,7 +625,7 @@ __host__ std::vector<ParsedMesh*> *LoadObj(const char *path, std::vector<MeshMtl
     return meshes;
 }
 
-__host__ ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props){
+ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props){
     ParsedMesh *duplicated = nullptr;
     MemoryCheck();
     if(mesh){
@@ -709,7 +709,7 @@ __host__ ParsedMesh *DuplicateMesh(ParsedMesh *mesh, MeshProperties *props){
     return duplicated;
 }
 
-__host__ void UseDefaultAllocatorFor(AllocatorType type){
+void UseDefaultAllocatorFor(AllocatorType type){
     if(type == AllocatorType::CPU){
         memoryAlloc = CPUMemAlloc;
         memoryFree  = CPUMemFree;

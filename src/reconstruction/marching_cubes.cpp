@@ -31,13 +31,13 @@ struct MarchingCubeWorkItem{
     vec3f e[12];
     vec3f n[12];
 
-    __bidevice__
+    bb_cpu_gpu
     MarchingCubeWorkItem(int){
         cubeIndex = 0;
         idxFlagSize = 0;
     }
 
-    __bidevice__
+    bb_cpu_gpu
     MarchingCubeWorkItem(size_t idx, int flag, Bounds3f _bounds,
                          Float *_data, vec3f *_normal, size_t *_edges)
     {
@@ -64,9 +64,9 @@ typedef WorkQueue<MarchingCubeWorkItem> MarchingCubeWorkQueue;
 typedef std::unordered_map<MarchingCubeVertexHashKey,
                            MarchingCubeVertexId> MarchingCubeVertexMap;
 
-__device__ __constant__ int gpuEdgeConnection[12][2];
-__device__ __constant__ int gpuCubeEdgeFlags[256];
-__device__ __constant__ int gpuTriangleConnectionTable3D[256][16];
+bb_gpu __constant__ int gpuEdgeConnection[12][2];
+bb_gpu __constant__ int gpuCubeEdgeFlags[256];
+bb_gpu __constant__ int gpuTriangleConnectionTable3D[256][16];
 
 void initializeGPUTables(){
     CUCHECK(cudaMemcpyToSymbol(gpuEdgeConnection, edgeConnection, sizeof(int) * 12 * 2));
@@ -75,7 +75,7 @@ void initializeGPUTables(){
                                triangleConnectionTable3D, sizeof(int) * 256 * 16));
 }
 
-__bidevice__ inline int EdgeFlags(int a){
+bb_cpu_gpu inline int EdgeFlags(int a){
 #if defined(__CUDA_ARCH__)
     return gpuCubeEdgeFlags[a];
 #else
@@ -83,7 +83,7 @@ __bidevice__ inline int EdgeFlags(int a){
 #endif
 }
 
-__bidevice__ inline int EdgeConnection(int a, int b){
+bb_cpu_gpu inline int EdgeConnection(int a, int b){
 #if defined(__CUDA_ARCH__)
     return gpuEdgeConnection[a][b];
 #else
@@ -91,7 +91,7 @@ __bidevice__ inline int EdgeConnection(int a, int b){
 #endif
 }
 
-__bidevice__ inline int ConnectionTable3D(int a, int b){
+bb_cpu_gpu inline int ConnectionTable3D(int a, int b){
 #if defined(__CUDA_ARCH__)
     return gpuTriangleConnectionTable3D[a][b];
 #else
@@ -99,7 +99,7 @@ __bidevice__ inline int ConnectionTable3D(int a, int b){
 #endif
 }
 
-template <typename T> __bidevice__
+template <typename T> bb_cpu_gpu
 T distanceToZeroLevelSet(T phi0, T phi1) {
     if(std::fabs(phi0) + std::fabs(phi1) > Epsilon)
         return std::fabs(phi0) / (std::fabs(phi0) + std::fabs(phi1));
@@ -118,7 +118,7 @@ inline bool queryVertexId(const MarchingCubeVertexMap& vertexMap,
     }
 }
 
-__bidevice__
+bb_cpu_gpu
 vec3f grad(FieldGrid3f *grid, size_t i, size_t j, size_t k, const vec3f &invSize){
     vec3f ret;
     ssize_t ip = i + 1;
@@ -155,7 +155,7 @@ vec3f grad(FieldGrid3f *grid, size_t i, size_t j, size_t k, const vec3f &invSize
     return ret;
 }
 
-__bidevice__ inline
+bb_cpu_gpu inline
 vec3f safeNormalize(const vec3f& n){
     if(n.LengthSquared() > 0.0)
         return Normalize(n);
@@ -169,7 +169,7 @@ vec3f safeNormalize(const vec3f& n){
 // |----*----|    -->    |-----|-----|
 // i        i+1         2i   2i+1  2i+2
 //
-__bidevice__ inline
+bb_cpu_gpu inline
 size_t globalEdgeId(size_t i, size_t j, size_t k, const vec3ui& dim,
                     size_t localEdgeId)
 {
@@ -191,7 +191,7 @@ size_t globalEdgeId(size_t i, size_t j, size_t k, const vec3ui& dim,
 // |----*----|    -->    |-----|-----|
 // i        i+1         2i   2i+1  2i+2
 //
-__bidevice__ inline
+bb_cpu_gpu inline
 size_t globalVertexId(size_t i, size_t j, size_t k, const vec3ui& dim,
                       size_t localVertexId)
 {
@@ -207,7 +207,7 @@ size_t globalVertexId(size_t i, size_t j, size_t k, const vec3ui& dim,
 }
 
 // Add cubeId to the marching cube work queue in case it needs further processing
-__bidevice__
+bb_cpu_gpu
 void buildMarchingCubeWorkQueue(Float *data, vec3f *normal, size_t *edges, Float isoValue,
                                 size_t cubeId, Bounds3f bounds, MarchingCubeWorkQueue *mcQ)
 {

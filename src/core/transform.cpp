@@ -4,11 +4,11 @@
 #include <shape.h>
 
 //PBRT is an freaking excellent reference!
-__bidevice__ void Interpolate(InterpolatedTransform *iTransform, Float t, Transform *transform){
+bb_cpu_gpu void Interpolate(InterpolatedTransform *iTransform, Float t, Transform *transform){
     iTransform->Interpolate(t, transform);
 }
 
-__bidevice__ void InterpolatedTransform::Interpolate(Float t, Transform *transform){
+bb_cpu_gpu void InterpolatedTransform::Interpolate(Float t, Transform *transform){
     if(t <= t0){
         *transform = tStart;
         return;
@@ -44,8 +44,8 @@ __bidevice__ void InterpolatedTransform::Interpolate(Float t, Transform *transfo
     *transform = Translate(translation) * quat.ToTransform() * Transform(scale);
 }
 
-__bidevice__ void InterpolatedTransform::Decompose(const Matrix4x4 &m, vec3f *T,
-                                                   Quaternion *Rquat, Matrix4x4 *S)
+bb_cpu_gpu void InterpolatedTransform::Decompose(const Matrix4x4 &m, vec3f *T,
+                                                 Quaternion *Rquat, Matrix4x4 *S)
 {
     // The decomposition works by attempting to solve M = TRS where M is affine
     // and compute values for T (translation) R (rotation) S (scale) matrix.
@@ -91,8 +91,8 @@ __bidevice__ void InterpolatedTransform::Decompose(const Matrix4x4 &m, vec3f *T,
     *S = Matrix4x4::Mul(Inverse(R), M);
 }
 
-__bidevice__ InterpolatedTransform::InterpolatedTransform(Transform *e0, Transform *e1,
-                                                          Float s0, Float s1)
+bb_cpu_gpu InterpolatedTransform::InterpolatedTransform(Transform *e0, Transform *e1,
+                                                        Float s0, Float s1)
 : tStart(*e0), tEnd(*e1), t0(s0), t1(s1)
 {
     Decompose(tStart.m, &T[0], &R[0], &S[0]);
@@ -103,7 +103,7 @@ __bidevice__ InterpolatedTransform::InterpolatedTransform(Transform *e0, Transfo
     }
 }
 
-__bidevice__ bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2], 
+bb_cpu_gpu bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2],
                                        Float *x0, Float *x1)
 {
     Float det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
@@ -114,12 +114,12 @@ __bidevice__ bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2],
     return true;
 }
 
-__bidevice__ Matrix4x4::Matrix4x4(Float mat[4][4]) { memcpy(m, mat, 16 * sizeof(Float)); }
+bb_cpu_gpu Matrix4x4::Matrix4x4(Float mat[4][4]) { memcpy(m, mat, 16 * sizeof(Float)); }
 
-__bidevice__ Matrix4x4::Matrix4x4(Float t00, Float t01, Float t02, Float t03, Float t10,
-                                  Float t11, Float t12, Float t13, Float t20, Float t21,
-                                  Float t22, Float t23, Float t30, Float t31, Float t32,
-                                  Float t33) 
+bb_cpu_gpu Matrix4x4::Matrix4x4(Float t00, Float t01, Float t02, Float t03, Float t10,
+                                Float t11, Float t12, Float t13, Float t20, Float t21,
+                                Float t22, Float t23, Float t30, Float t31, Float t32,
+                                Float t33)
 {
     m[0][0] = t00; m[0][1] = t01; m[0][2] = t02; m[0][3] = t03;
     m[1][0] = t10; m[1][1] = t11; m[1][2] = t12; m[1][3] = t13;
@@ -127,14 +127,14 @@ __bidevice__ Matrix4x4::Matrix4x4(Float t00, Float t01, Float t02, Float t03, Fl
     m[3][0] = t30; m[3][1] = t31; m[3][2] = t32; m[3][3] = t33;
 }
 
-__bidevice__ Matrix4x4 Transpose(const Matrix4x4 &m){
+bb_cpu_gpu Matrix4x4 Transpose(const Matrix4x4 &m){
     return Matrix4x4(m.m[0][0], m.m[1][0], m.m[2][0], m.m[3][0],
                      m.m[0][1], m.m[1][1], m.m[2][1], m.m[3][1],
                      m.m[0][2], m.m[1][2], m.m[2][2], m.m[3][2],
                      m.m[0][3], m.m[1][3], m.m[2][3], m.m[3][3]);
 }
 
-__bidevice__ Matrix4x4 Inverse(const Matrix4x4 &m){
+bb_cpu_gpu Matrix4x4 Inverse(const Matrix4x4 &m){
     int indxc[4], indxr[4];
     int ipiv[4] = {0, 0, 0, 0};
     Float minv[4][4];
@@ -165,12 +165,12 @@ __bidevice__ Matrix4x4 Inverse(const Matrix4x4 &m){
         indxr[i] = irow;
         indxc[i] = icol;
         if (minv[icol][icol] == 0.f) printf("Singular matrix in MatrixInvert\n");
-        
+
         // Set $m[icol][icol]$ to one by scaling row _icol_ appropriately
         Float pivinv = 1. / minv[icol][icol];
         minv[icol][icol] = 1.;
         for (int j = 0; j < 4; j++) minv[icol][j] *= pivinv;
-        
+
         // Subtract this row from others to zero out their columns
         for (int j = 0; j < 4; j++) {
             if (j != icol) {
@@ -190,11 +190,11 @@ __bidevice__ Matrix4x4 Inverse(const Matrix4x4 &m){
     return Matrix4x4(minv);
 }
 
-__bidevice__ Transform2 Scale2(Float u){
+bb_cpu_gpu Transform2 Scale2(Float u){
     return Scale2(u, u);
 }
 
-__bidevice__ Transform2 Scale2(Float x, Float y){
+bb_cpu_gpu Transform2 Scale2(Float x, Float y){
     AssertA(!IsZero(x) && !IsZero(y), "Zero scale Matrix3x3");
     Float ix = 1.0 / x;
     Float iy = 1.0 / y;
@@ -203,17 +203,17 @@ __bidevice__ Transform2 Scale2(Float x, Float y){
     return Transform2(m, inv);
 }
 
-__bidevice__ Transform2 Translate2(Float x, Float y){
+bb_cpu_gpu Transform2 Translate2(Float x, Float y){
     Matrix3x3 m(1, 0, x, 0, 1, y, 0, 0, 1);
     Matrix3x3 inv(1, 0, -x, 0, 1, -y, 0, 0, 1);
     return Transform2(m, inv);
 }
 
-__bidevice__ Transform2 Translate2(Float u){
+bb_cpu_gpu Transform2 Translate2(Float u){
     return Translate2(u, u);
 }
 
-__bidevice__ Transform2 Rotate2(Float alpha){
+bb_cpu_gpu Transform2 Rotate2(Float alpha){
     Float co = std::cos(alpha);
     Float si = std::sin(alpha);
     Float coi = std::cos(-alpha);
@@ -223,11 +223,11 @@ __bidevice__ Transform2 Rotate2(Float alpha){
     return Transform2(m, minv);
 }
 
-__bidevice__ Transform2 Transform2::operator*(const Transform2 &t2) const{
+bb_cpu_gpu Transform2 Transform2::operator*(const Transform2 &t2) const{
     return Transform2(Matrix3x3::Mul(m, t2.m), Matrix3x3::Mul(t2.mInv, mInv));
 }
 
-__bidevice__ Transform Translate(const vec3f &delta) {
+bb_cpu_gpu Transform Translate(const vec3f &delta) {
     Matrix4x4 m(1, 0, 0, delta.x, 0, 1, 0, delta.y, 0, 0, 1, delta.z, 0, 0, 0,
                 1);
     Matrix4x4 minv(1, 0, 0, -delta.x, 0, 1, 0, -delta.y, 0, 0, 1, -delta.z, 0,
@@ -235,29 +235,29 @@ __bidevice__ Transform Translate(const vec3f &delta) {
     return Transform(m, minv);
 }
 
-__bidevice__ Transform Translate(Float x, Float y, Float z){
+bb_cpu_gpu Transform Translate(Float x, Float y, Float z){
     return Translate(vec3f(x, y, z));
 }
 
-__bidevice__ Transform Translate(Float u){
+bb_cpu_gpu Transform Translate(Float u){
     return Translate(vec3f(u, u, u));
 }
 
-__bidevice__ Transform Scale(Float x, Float y, Float z) {
+bb_cpu_gpu Transform Scale(Float x, Float y, Float z) {
     Matrix4x4 m(x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1);
     Matrix4x4 minv(1 / x, 0, 0, 0, 0, 1 / y, 0, 0, 0, 0, 1 / z, 0, 0, 0, 0, 1);
     return Transform(m, minv);
 }
 
-__bidevice__ Transform Scale(Float u){
+bb_cpu_gpu Transform Scale(Float u){
     return Scale(u, u, u);
 }
 
-__bidevice__ Transform Scale(const vec3f &delta){
+bb_cpu_gpu Transform Scale(const vec3f &delta){
     return Scale(delta.x, delta.y, delta.z);
 }
 
-__bidevice__ Transform RotateX(Float theta, bool radians){
+bb_cpu_gpu Transform RotateX(Float theta, bool radians){
     if(!radians){
         theta = Radians(theta);
     }
@@ -268,7 +268,7 @@ __bidevice__ Transform RotateX(Float theta, bool radians){
     return Transform(m, Transpose(m));
 }
 
-__bidevice__ Transform RotateY(Float theta, bool radians){
+bb_cpu_gpu Transform RotateY(Float theta, bool radians){
     if(!radians){
         theta = Radians(theta);
     }
@@ -279,7 +279,7 @@ __bidevice__ Transform RotateY(Float theta, bool radians){
     return Transform(m, Transpose(m));
 }
 
-__bidevice__ Transform RotateZ(Float theta, bool radians){
+bb_cpu_gpu Transform RotateZ(Float theta, bool radians){
     if(!radians){
         theta = Radians(theta);
     }
@@ -290,7 +290,7 @@ __bidevice__ Transform RotateZ(Float theta, bool radians){
     return Transform(m, Transpose(m));
 }
 
-__bidevice__ Transform Rotate(Float theta, const vec3f &axis, bool radians){
+bb_cpu_gpu Transform Rotate(Float theta, const vec3f &axis, bool radians){
     vec3f a = Normalize(axis);
     if(!radians){
         theta = Radians(theta);
@@ -303,13 +303,13 @@ __bidevice__ Transform Rotate(Float theta, const vec3f &axis, bool radians){
     m.m[0][1] = a.x * a.y * (1 - cosTheta) - a.z * sinTheta;
     m.m[0][2] = a.x * a.z * (1 - cosTheta) + a.y * sinTheta;
     m.m[0][3] = 0;
-    
+
     // Compute rotations of second and third basis vectors
     m.m[1][0] = a.x * a.y * (1 - cosTheta) + a.z * sinTheta;
     m.m[1][1] = a.y * a.y + (1 - a.y * a.y) * cosTheta;
     m.m[1][2] = a.y * a.z * (1 - cosTheta) - a.x * sinTheta;
     m.m[1][3] = 0;
-    
+
     m.m[2][0] = a.x * a.z * (1 - cosTheta) - a.y * sinTheta;
     m.m[2][1] = a.y * a.z * (1 - cosTheta) + a.x * sinTheta;
     m.m[2][2] = a.z * a.z + (1 - a.z * a.z) * cosTheta;
@@ -318,22 +318,22 @@ __bidevice__ Transform Rotate(Float theta, const vec3f &axis, bool radians){
 }
 
 // Rotate following the path around the sphere centered at point instead of origin
-__bidevice__ Transform RotateAround(Float theta, const vec3f &axis, const vec3f &point){
+bb_cpu_gpu Transform RotateAround(Float theta, const vec3f &axis, const vec3f &point){
     return Translate(point) * Rotate(theta, axis) * Translate(-point);
 }
 
-__bidevice__ Transform Transform::operator*(const Transform &t2) const{
+bb_cpu_gpu Transform Transform::operator*(const Transform &t2) const{
     return Transform(Matrix4x4::Mul(m, t2.m), Matrix4x4::Mul(t2.mInv, mInv));
 }
 
-__bidevice__ bool Transform::SwapsHandedness() const{
+bb_cpu_gpu bool Transform::SwapsHandedness() const{
     Float det = m.m[0][0] * (m.m[1][1] * m.m[2][2] - m.m[1][2] * m.m[2][1]) -
         m.m[0][1] * (m.m[1][0] * m.m[2][2] - m.m[1][2] * m.m[2][0]) +
         m.m[0][2] * (m.m[1][0] * m.m[2][1] - m.m[1][1] * m.m[2][0]);
     return det < 0;
 }
 
-__bidevice__ Bounds3f Transform::operator()(const Bounds3f &b) const{
+bb_cpu_gpu Bounds3f Transform::operator()(const Bounds3f &b) const{
     const Transform &M = *this;
     Bounds3f ret(M.Point(vec3f(b.pMin.x, b.pMin.y, b.pMin.z)));
     ret = Union(ret, M.Point(vec3f(b.pMax.x, b.pMin.y, b.pMin.z)));
@@ -346,14 +346,14 @@ __bidevice__ Bounds3f Transform::operator()(const Bounds3f &b) const{
     return ret;
 }
 
-__bidevice__ void Transform::Mesh(ParsedMesh *mesh) const{
+bb_cpu_gpu void Transform::Mesh(ParsedMesh *mesh) const{
     int it = Max(mesh->nVertices, mesh->nNormals);
     for(int i = 0; i < it; i++){
         if(i < mesh->nVertices){
             Point3f p = mesh->p[i];
             mesh->p[i] = Point(p);
         }
-        
+
         if(i < mesh->nNormals){
             Normal3f n = mesh->n[i];
             mesh->n[i] = Normal(n);

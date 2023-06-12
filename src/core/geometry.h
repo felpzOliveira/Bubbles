@@ -77,7 +77,7 @@ typedef float Float;
 */
 
 
-inline __host__
+inline
 void __assert_check_host(bool v, const char *name, const char *filename,
                          int line, const char *msg)
 {
@@ -94,7 +94,7 @@ void __assert_check_host(bool v, const char *name, const char *filename,
     }
 }
 
-inline __bidevice__
+inline bb_cpu_gpu
 void __assert_check(bool v, const char *name, const char *filename,
                     int line, const char *msg)
 {
@@ -112,43 +112,43 @@ void __assert_check(bool v, const char *name, const char *filename,
     }
 }
 
-inline __bidevice__ Float Max(Float a, Float b){ return a < b ? b : a; }
-inline __bidevice__ Float Min(Float a, Float b){ return a < b ? a : b; }
-inline __bidevice__ Float Absf(Float v){ return v > 0 ? v : -v; }
-inline __bidevice__ bool IsNaN(Float v){ return v != v || std::isinf(v); }
-inline __bidevice__ Float Radians(Float deg) { return (Pi / 180) * deg; }
-inline __bidevice__ Float Degrees(Float rad) { return (rad * 180 / Pi); }
-inline __bidevice__ bool IsZero(Float a){ return Absf(a) < 1e-8; }
-inline __bidevice__ bool IsHighpZero(Float a) { return Absf(a) < 1e-22; }
-inline __bidevice__ bool IsUnsafeHit(Float a){ return Absf(a) < 1e-6; }
-inline __bidevice__ bool IsUnsafeZero(Float a){ return Absf(a) < 1e-6; }
-inline __bidevice__ Float Sign(Float a){
+inline bb_cpu_gpu Float Max(Float a, Float b){ return a < b ? b : a; }
+inline bb_cpu_gpu Float Min(Float a, Float b){ return a < b ? a : b; }
+inline bb_cpu_gpu Float Absf(Float v){ return v > 0 ? v : -v; }
+inline bb_cpu_gpu bool IsNaN(Float v){ return v != v || std::isinf(v); }
+inline bb_cpu_gpu Float Radians(Float deg) { return (Pi / 180) * deg; }
+inline bb_cpu_gpu Float Degrees(Float rad) { return (rad * 180 / Pi); }
+inline bb_cpu_gpu bool IsZero(Float a){ return Absf(a) < 1e-8; }
+inline bb_cpu_gpu bool IsHighpZero(Float a) { return Absf(a) < 1e-22; }
+inline bb_cpu_gpu bool IsUnsafeHit(Float a){ return Absf(a) < 1e-6; }
+inline bb_cpu_gpu bool IsUnsafeZero(Float a){ return Absf(a) < 1e-6; }
+inline bb_cpu_gpu Float Sign(Float a){
     int t = a < 0 ? -1 : 0;
     return a > 0 ? 1 : t;
 }
 
-inline __bidevice__ Float LinearRemap(Float x, Float a, Float b, Float A, Float B){
+inline bb_cpu_gpu Float LinearRemap(Float x, Float a, Float b, Float A, Float B){
     return A + (B - A) * ((x - a) / (b - a));
 }
 
-inline __bidevice__ Float Log2(Float x){
+inline bb_cpu_gpu Float Log2(Float x){
     const Float invLog2 = 1.442695040888963387004650940071;
     return std::log(x) * invLog2;
 }
 
-inline __bidevice__ void Swap(Float **a, Float **b){
+inline bb_cpu_gpu void Swap(Float **a, Float **b){
     Float *c = *a; *a = *b; *b = c;
 }
 
-inline __bidevice__ void Swap(Float *a, Float *b){
+inline bb_cpu_gpu void Swap(Float *a, Float *b){
     Float c = *a; *a = *b; *b = c;
 }
 
-inline __bidevice__ void Swap(int &a, int &b){
+inline bb_cpu_gpu void Swap(int &a, int &b){
     int c = a; a = b; b = c;
 }
 
-inline __bidevice__ bool Quadratic(Float a, Float b, Float c, Float *t0, Float *t1){
+inline bb_cpu_gpu bool Quadratic(Float a, Float b, Float c, Float *t0, Float *t1){
     double discr = (double)b * (double)b - 4 * (double)a * (double)c;
     if(discr < 0) return false;
     double root = std::sqrt(discr);
@@ -163,31 +163,31 @@ inline __bidevice__ bool Quadratic(Float a, Float b, Float c, Float *t0, Float *
     return true;
 }
 
-inline __bidevice__ uint32_t FloatToBits(float f){
+inline bb_cpu_gpu uint32_t FloatToBits(float f){
     uint32_t ui;
     memcpy(&ui, &f, sizeof(float));
     return ui;
 }
 
-inline __bidevice__ float BitsToFloat(uint32_t ui){
+inline bb_cpu_gpu float BitsToFloat(uint32_t ui){
     float f;
     memcpy(&f, &ui, sizeof(uint32_t));
     return f;
 }
 
-inline __bidevice__ uint64_t FloatToBits(double f){
+inline bb_cpu_gpu uint64_t FloatToBits(double f){
     uint64_t ui;
     memcpy(&ui, &f, sizeof(double));
     return ui;
 }
 
-inline __bidevice__ double BitsToFloat(uint64_t ui){
+inline bb_cpu_gpu double BitsToFloat(uint64_t ui){
     double f;
     memcpy(&f, &ui, sizeof(uint64_t));
     return f;
 }
 
-inline __bidevice__ float NextFloatUp(float v){
+inline bb_cpu_gpu float NextFloatUp(float v){
     if(std::isinf(v) && v > 0.) return v;
     if(v == -0.f) v = 0.f;
     uint32_t ui = FloatToBits(v);
@@ -198,7 +198,7 @@ inline __bidevice__ float NextFloatUp(float v){
     return BitsToFloat(ui);
 }
 
-inline __bidevice__ float NextFloatDown(float v){
+inline bb_cpu_gpu float NextFloatDown(float v){
     if(std::isinf(v) && v < 0.) return v;
     if(v == 0.f) v = -0.f;
     uint32_t ui = FloatToBits(v);
@@ -209,7 +209,7 @@ inline __bidevice__ float NextFloatDown(float v){
     return BitsToFloat(ui);
 }
 
-inline __bidevice__ double NextFloatUp(double v, int delta = 1) {
+inline bb_cpu_gpu double NextFloatUp(double v, int delta = 1) {
     if(std::isinf(v) && v > 0.) return v;
     if(v == -0.f) v = 0.f;
     uint64_t ui = FloatToBits(v);
@@ -220,7 +220,7 @@ inline __bidevice__ double NextFloatUp(double v, int delta = 1) {
     return BitsToFloat(ui);
 }
 
-inline __bidevice__ double NextFloatDown(double v, int delta = 1) {
+inline bb_cpu_gpu double NextFloatDown(double v, int delta = 1) {
     if(std::isinf(v) && v < 0.) return v;
     if(v == 0.f) v = -0.f;
     uint64_t ui = FloatToBits(v);
@@ -232,7 +232,7 @@ inline __bidevice__ double NextFloatDown(double v, int delta = 1) {
 }
 
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 void atomic_increase(T *value){
 #if defined(__CUDA_ARCH__)
     atomicAdd(value, T(1));
@@ -242,22 +242,22 @@ void atomic_increase(T *value){
 }
 
 template <typename T, typename U, typename V>
-inline __bidevice__ T Clamp(T val, U low, V high){
+inline bb_cpu_gpu T Clamp(T val, U low, V high){
     if(val < low) return low;
     if(val > high) return high;
     return val;
 }
 
 template<typename T>
-inline __bidevice__ Float gamma(T n){
+inline bb_cpu_gpu Float gamma(T n){
     return ((Float)n * MachineEpsilon) / (1 - (Float)n * MachineEpsilon);
 }
 
-__bidevice__ inline void swap(Float *a, Float *b){
+bb_cpu_gpu inline void swap(Float *a, Float *b){
     Float aux = *a; *a = *b; *b = aux;
 }
 
-__bidevice__ inline void swap(Float &a, Float &b){
+bb_cpu_gpu inline void swap(Float &a, Float &b){
     Float aux = a; a = b; b = aux;
 }
 
@@ -269,93 +269,93 @@ template<typename T> class vec1{
     public:
     T x;
 
-    __bidevice__ vec1(){ x = (T)0; }
-    __bidevice__ vec1(T a){ x = a; }
-    __bidevice__ vec1(T a, T b): x(a){
+    bb_cpu_gpu vec1(){ x = (T)0; }
+    bb_cpu_gpu vec1(T a){ x = a; }
+    bb_cpu_gpu vec1(T a, T b): x(a){
         Assert(!HasNaN());
     }
 
-    __bidevice__ bool IsZeroVector() const{
+    bb_cpu_gpu bool IsZeroVector() const{
         return IsZero(x);
     }
 
-    __bidevice__ bool HasNaN() const{
+    bb_cpu_gpu bool HasNaN() const{
         return IsNaN(x);
     }
 
-    __bidevice__ bool operator==(const vec1<T> &n) const{
+    bb_cpu_gpu bool operator==(const vec1<T> &n) const{
         return x == n.x;
     }
 
-    __bidevice__ T operator[](int i) const{
+    bb_cpu_gpu T operator[](int i) const{
         Assert(i == 0);
         return x;
     }
 
-    __bidevice__ T &operator[](int i){
+    bb_cpu_gpu T &operator[](int i){
         Assert(i == 0);
         return x;
     }
 
-    __bidevice__ vec1<T> operator/(T f) const{
+    bb_cpu_gpu vec1<T> operator/(T f) const{
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         return vec1<T>(x * inv);
     }
 
-    __bidevice__ vec1<T> &operator/(T f){
+    bb_cpu_gpu vec1<T> &operator/(T f){
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         x *= inv;
         return *this;
     }
 
-    __bidevice__ vec1<T> operator-(){
+    bb_cpu_gpu vec1<T> operator-(){
         return vec1<T>(-x);
     }
 
-    __bidevice__ vec1<T> operator-() const{
+    bb_cpu_gpu vec1<T> operator-() const{
         return vec1<T>(-x);
     }
 
-    __bidevice__ vec1<T> operator-(const vec1<T> &v) const{
+    bb_cpu_gpu vec1<T> operator-(const vec1<T> &v) const{
         return vec1(x - v.x);
     }
 
-    __bidevice__ vec1<T> operator-(const vec1<T> &v){
+    bb_cpu_gpu vec1<T> operator-(const vec1<T> &v){
         return vec1(x - v.x);
     }
 
-    __bidevice__ vec1<T> operator+(const vec1<T> &v) const{
+    bb_cpu_gpu vec1<T> operator+(const vec1<T> &v) const{
         return vec1<T>(x + v.x);
     }
 
-    __bidevice__ vec1<T> operator+=(const vec1<T> &v){
+    bb_cpu_gpu vec1<T> operator+=(const vec1<T> &v){
         x += v.x;
         return *this;
     }
 
-    __bidevice__ vec1<T> operator*(T s) const{
+    bb_cpu_gpu vec1<T> operator*(T s) const{
         return vec1<T>(x * s);
     }
 
-    __bidevice__ vec1<T> &operator*=(T s){
+    bb_cpu_gpu vec1<T> &operator*=(T s){
         x *= s;
         return *this;
     }
 
-    __bidevice__ vec1<T> operator*(const vec1<T> &v) const{
+    bb_cpu_gpu vec1<T> operator*(const vec1<T> &v) const{
         return vec1<T>(x * v.x);
     }
 
-    __bidevice__ vec1<T> &operator*=(const vec1<T> &v){
+    bb_cpu_gpu vec1<T> &operator*=(const vec1<T> &v){
         x *= v.x;
         return *this;
     }
 
-    __bidevice__ Float LengthSquared() const{ return x * x; }
-    __bidevice__ Float Length() const{ return sqrt(LengthSquared()); }
-    __bidevice__ void PrintSelf() const{
+    bb_cpu_gpu Float LengthSquared() const{ return x * x; }
+    bb_cpu_gpu Float Length() const{ return sqrt(LengthSquared()); }
+    bb_cpu_gpu void PrintSelf() const{
         printf("P = {x : %g}\n", x);
     }
 };
@@ -365,117 +365,117 @@ template<typename T> class vec2{
     public:
     T x, y;
 
-    __bidevice__ vec2(){ x = y = (T)0; }
-    __bidevice__ vec2(T a){ x = y = a; }
-    __bidevice__ vec2(T a, T b): x(a), y(b){
+    bb_cpu_gpu vec2(){ x = y = (T)0; }
+    bb_cpu_gpu vec2(T a){ x = y = a; }
+    bb_cpu_gpu vec2(T a, T b): x(a), y(b){
         Assert(!HasNaN());
     }
 
     template<typename V>
-    __bidevice__ vec2(vec2<V> v) : x(v.x), y(v.y){
+    bb_cpu_gpu vec2(vec2<V> v) : x(v.x), y(v.y){
         Assert(!HasNaN());
     }
 
-    template<typename V> __bidevice__ vec2<V> As(){
+    template<typename V> bb_cpu_gpu vec2<V> As(){
         return vec2<V>(V(x), V(y));
     }
 
-    __bidevice__ bool IsZeroVector() const{
+    bb_cpu_gpu bool IsZeroVector() const{
         return IsZero(x) && IsZero(y);
     }
 
-    __bidevice__ bool HasNaN() const{
+    bb_cpu_gpu bool HasNaN() const{
         return IsNaN(x) || IsNaN(y);
     }
 
-    __bidevice__ int Dimensions() const{ return 2; }
+    bb_cpu_gpu int Dimensions() const{ return 2; }
 
-    __bidevice__ bool operator==(const vec2<T> &n) const{
+    bb_cpu_gpu bool operator==(const vec2<T> &n) const{
         return x == n.x && y == n.y;
     }
 
-    __bidevice__ T operator[](int i) const{
+    bb_cpu_gpu T operator[](int i) const{
         Assert(i >= 0 && i < 2);
         if(i == 0) return x;
         return y;
     }
 
-    __bidevice__ T &operator[](int i){
+    bb_cpu_gpu T &operator[](int i){
         Assert(i >= 0 && i < 2);
         if(i == 0) return x;
         return y;
     }
 
-    __bidevice__ vec2<T> operator/(T f) const{
+    bb_cpu_gpu vec2<T> operator/(T f) const{
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         return vec2<T>(x * inv, y * inv);
     }
 
-    __bidevice__ vec2<T> &operator/(T f){
+    bb_cpu_gpu vec2<T> &operator/(T f){
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         x *= inv; y *= inv;
         return *this;
     }
 
-    __bidevice__ vec2<T> operator-(){
+    bb_cpu_gpu vec2<T> operator-(){
         return vec2<T>(-x, -y);
     }
 
-    __bidevice__ vec2<T> operator-() const{
+    bb_cpu_gpu vec2<T> operator-() const{
         return vec2<T>(-x, -y);
     }
 
-    __bidevice__ vec2<T> operator-(const vec2<T> &v) const{
+    bb_cpu_gpu vec2<T> operator-(const vec2<T> &v) const{
         return vec2(x - v.x, y - v.y);
     }
 
-    __bidevice__ vec2<T> operator-(const vec2<T> &v){
+    bb_cpu_gpu vec2<T> operator-(const vec2<T> &v){
         return vec2(x - v.x, y - v.y);
     }
 
-    __bidevice__ vec2<T> operator+(const vec2<T> &v) const{
+    bb_cpu_gpu vec2<T> operator+(const vec2<T> &v) const{
         return vec2<T>(x + v.x, y + v.y);
     }
 
-    __bidevice__ vec2<T> &operator-=(const vec2<T> &v){
+    bb_cpu_gpu vec2<T> &operator-=(const vec2<T> &v){
         x -= v.x; y -= v.y;
         return *this;
     }
 
-    __bidevice__ vec2<T> operator+=(const vec2<T> &v){
+    bb_cpu_gpu vec2<T> operator+=(const vec2<T> &v){
         x += v.x; y += v.y;
         return *this;
     }
 
-    __bidevice__ vec2<T> operator*(T s) const{
+    bb_cpu_gpu vec2<T> operator*(T s) const{
         return vec2<T>(x * s, y * s);
     }
 
-    __bidevice__ vec2<T> &operator*=(T s){
+    bb_cpu_gpu vec2<T> &operator*=(T s){
         x *= s; y *= s;
         return *this;
     }
 
-    __bidevice__ vec2<T> operator*(const vec2<T> &v) const{
+    bb_cpu_gpu vec2<T> operator*(const vec2<T> &v) const{
         return vec2<T>(x * v.x, y * v.y);
     }
 
-    __bidevice__ vec2<T> &operator*=(const vec2<T> &v){
+    bb_cpu_gpu vec2<T> &operator*=(const vec2<T> &v){
         x *= v.x; y *= v.y;
         return *this;
     }
 
-    __bidevice__ vec2<T> Rotate(Float radians) const{
+    bb_cpu_gpu vec2<T> Rotate(Float radians) const{
         Float si = std::sin(radians);
         Float co = std::cos(radians);
         return vec2<T>(x * co - y * si, x * si + y * co);
     }
 
-    __bidevice__ Float LengthSquared() const{ return x * x + y * y; }
-    __bidevice__ Float Length() const{ return sqrt(LengthSquared()); }
-    __bidevice__ void PrintSelf() const{
+    bb_cpu_gpu Float LengthSquared() const{ return x * x + y * y; }
+    bb_cpu_gpu Float Length() const{ return sqrt(LengthSquared()); }
+    bb_cpu_gpu void PrintSelf() const{
         printf("P = {x : %g, y : %g}\n", x, y);
     }
 };
@@ -484,58 +484,58 @@ template<typename T> class Normal3;
 template<typename T> class vec3{
     public:
     T x, y, z;
-    __bidevice__ vec3(){ x = y = z = (T)0; }
-    __bidevice__ vec3(T a){ x = y = z = a; }
+    bb_cpu_gpu vec3(){ x = y = z = (T)0; }
+    bb_cpu_gpu vec3(T a){ x = y = z = a; }
 
-    __bidevice__ vec3(T a, T b, T c): x(a), y(b), z(c){
+    bb_cpu_gpu vec3(T a, T b, T c): x(a), y(b), z(c){
         Assert(!HasNaN());
     }
 
-    template<typename V> __bidevice__ vec3(vec3<V> v): x(v.x), y(v.y), z(v.z){
+    template<typename V> bb_cpu_gpu vec3(vec3<V> v): x(v.x), y(v.y), z(v.z){
         Assert(!HasNaN());
     }
 
-    template<typename V> __bidevice__ vec3(Normal3<V> v): x(v.x), y(v.y), z(v.z){
+    template<typename V> bb_cpu_gpu vec3(Normal3<V> v): x(v.x), y(v.y), z(v.z){
         Assert(!HasNaN());
     }
 
-    template<typename V> __bidevice__ vec3<V> As(){
+    template<typename V> bb_cpu_gpu vec3<V> As(){
         return vec3<V>(V(x), V(y), V(z));
     }
 
-    __bidevice__ bool IsZeroVector() const{
+    bb_cpu_gpu bool IsZeroVector() const{
         return IsZero(x) && IsZero(y) && IsZero(z);
     }
 
-    __bidevice__ bool HasNaN(){
+    bb_cpu_gpu bool HasNaN(){
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
 
-    __bidevice__ bool HasNaN() const{
+    bb_cpu_gpu bool HasNaN() const{
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
 
-    __bidevice__ int Dimensions() const{ return 3; }
+    bb_cpu_gpu int Dimensions() const{ return 3; }
 
-    __bidevice__ bool operator==(const vec3<T> &n) const{
+    bb_cpu_gpu bool operator==(const vec3<T> &n) const{
         return x == n.x && y == n.y && z == n.z;
     }
 
-    __bidevice__ T operator[](int i) const{
+    bb_cpu_gpu T operator[](int i) const{
         Assert(i >= 0 && i < 3);
         if(i == 0) return x;
         if(i == 1) return y;
         return z;
     }
 
-    __bidevice__ T &operator[](int i){
+    bb_cpu_gpu T &operator[](int i){
         Assert(i >= 0 && i < 3);
         if(i == 0) return x;
         if(i == 1) return y;
         return z;
     }
 
-    __bidevice__ vec3<T> operator/(T f) const{
+    bb_cpu_gpu vec3<T> operator/(T f) const{
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
@@ -544,7 +544,7 @@ template<typename T> class vec3{
         return vec3<T>(x * inv, y * inv, z * inv);
     }
 
-    __bidevice__ vec3<T> &operator/(T f){
+    bb_cpu_gpu vec3<T> &operator/(T f){
         Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
@@ -555,7 +555,7 @@ template<typename T> class vec3{
         return *this;
     }
 
-    __bidevice__ vec3<T> operator/(const vec3<T> &v) const{
+    bb_cpu_gpu vec3<T> operator/(const vec3<T> &v) const{
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
         Float invy = (Float)1 / v.y;
@@ -563,7 +563,7 @@ template<typename T> class vec3{
         return vec3<T>(x * invx, y * invy, z * invz);
     }
 
-    __bidevice__ vec3<T> &operator/(const vec3<T> &v){
+    bb_cpu_gpu vec3<T> &operator/(const vec3<T> &v){
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
         Float invy = (Float)1 / v.y;
@@ -572,53 +572,53 @@ template<typename T> class vec3{
         return *this;
     }
 
-    __bidevice__ vec3<T> operator-(){
+    bb_cpu_gpu vec3<T> operator-(){
         return vec3<T>(-x, -y, -z);
     }
 
-    __bidevice__ vec3<T> operator-() const{
+    bb_cpu_gpu vec3<T> operator-() const{
         return vec3<T>(-x, -y, -z);
     }
 
-    __bidevice__ vec3<T> operator-(const vec3<T> &v) const{
+    bb_cpu_gpu vec3<T> operator-(const vec3<T> &v) const{
         return vec3(x - v.x, y - v.y, z - v.z);
     }
 
-    __bidevice__ vec3<T> &operator-=(const vec3<T> &v){
+    bb_cpu_gpu vec3<T> &operator-=(const vec3<T> &v){
         x -= v.x; y -= v.y; z -= v.z;
         return *this;
     }
 
-    __bidevice__ vec3<T> operator+(const vec3<T> &v) const{
+    bb_cpu_gpu vec3<T> operator+(const vec3<T> &v) const{
         return vec3<T>(x + v.x, y + v.y, z + v.z);
     }
 
-    __bidevice__ vec3<T> operator+=(const vec3<T> &v){
+    bb_cpu_gpu vec3<T> operator+=(const vec3<T> &v){
         x += v.x; y += v.y; z += v.z;
         return *this;
     }
 
-    __bidevice__ vec3<T> operator*(const vec3<T> &v) const{
+    bb_cpu_gpu vec3<T> operator*(const vec3<T> &v) const{
         return vec3<T>(x * v.x, y * v.y, z * v.z);
     }
 
-    __bidevice__ vec3<T> &operator*=(const vec3<T> &v){
+    bb_cpu_gpu vec3<T> &operator*=(const vec3<T> &v){
         x *= v.x; y *= v.y; z *= v.z;
         return *this;
     }
 
-    __bidevice__ vec3<T> operator*(T s) const{
+    bb_cpu_gpu vec3<T> operator*(T s) const{
         return vec3<T>(x * s, y * s, z * s);
     }
 
-    __bidevice__ vec3<T> &operator*=(T s){
+    bb_cpu_gpu vec3<T> &operator*=(T s){
         x *= s; y *= s; z *= s;
         return *this;
     }
 
-    __bidevice__ Float LengthSquared() const{ return x * x + y * y + z * z; }
-    __bidevice__ Float Length() const{ return sqrt(LengthSquared()); }
-    __bidevice__ void PrintSelf() const{
+    bb_cpu_gpu Float LengthSquared() const{ return x * x + y * y + z * z; }
+    bb_cpu_gpu Float Length() const{ return sqrt(LengthSquared()); }
+    bb_cpu_gpu void PrintSelf() const{
         printf("P = {x : %g, y : %g, z : %g}\n", x, y, z);
     }
 };
@@ -627,25 +627,25 @@ template<typename T> class vec3{
 template<typename T> class vec4{
     public:
     T x, y, z, w;
-    __bidevice__ vec4(){ x = y = z = w = (T)0; }
-    __bidevice__ vec4(T a){ x = y = z = w = a; }
-    __bidevice__ vec4(T a, T b, T c, T d): x(a), y(b), z(c), w(d){
+    bb_cpu_gpu vec4(){ x = y = z = w = (T)0; }
+    bb_cpu_gpu vec4(T a){ x = y = z = w = a; }
+    bb_cpu_gpu vec4(T a, T b, T c, T d): x(a), y(b), z(c), w(d){
         Assert(!HasNaN());
     }
 
-    __bidevice__ bool HasNaN(){
+    bb_cpu_gpu bool HasNaN(){
         return IsNaN(x) || IsNaN(y) || IsNaN(z) || IsNaN(w);
     }
 
-    __bidevice__ bool HasNaN() const{
+    bb_cpu_gpu bool HasNaN() const{
         return IsNaN(x) || IsNaN(y) || IsNaN(z) || IsNaN(w);
     }
 
-    __bidevice__ bool IsZeroVector() const{
+    bb_cpu_gpu bool IsZeroVector() const{
         return IsZero(x) && IsZero(y) && IsZero(z) && IsZero(w);
     }
 
-    __bidevice__ T operator[](int i) const{
+    bb_cpu_gpu T operator[](int i) const{
         Assert(i >= 0 && i < 4);
         if(i == 0) return x;
         if(i == 1) return y;
@@ -653,7 +653,7 @@ template<typename T> class vec4{
         return w;
     }
 
-    __bidevice__ T &operator[](int i){
+    bb_cpu_gpu T &operator[](int i){
         Assert(i >= 0 && i < 4);
         if(i == 0) return x;
         if(i == 1) return y;
@@ -661,7 +661,7 @@ template<typename T> class vec4{
         return w;
     }
 
-    __bidevice__ vec4<T> operator/(T f) const{
+    bb_cpu_gpu vec4<T> operator/(T f) const{
         Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
@@ -670,7 +670,7 @@ template<typename T> class vec4{
         return vec4<T>(x * inv, y * inv, z * inv, w * inv);
     }
 
-    __bidevice__ vec4<T> &operator/(T f){
+    bb_cpu_gpu vec4<T> &operator/(T f){
         Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
@@ -681,7 +681,7 @@ template<typename T> class vec4{
         return *this;
     }
 
-    __bidevice__ vec4<T> operator/(const vec4<T> &v) const{
+    bb_cpu_gpu vec4<T> operator/(const vec4<T> &v) const{
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
         Float invy = (Float)1 / v.y;
@@ -690,7 +690,7 @@ template<typename T> class vec4{
         return vec4<T>(x * invx, y * invy, z * invz, w * invw);
     }
 
-    __bidevice__ vec4<T> &operator/(const vec4<T> &v){
+    bb_cpu_gpu vec4<T> &operator/(const vec4<T> &v){
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
         Float invy = (Float)1 / v.y;
@@ -700,112 +700,112 @@ template<typename T> class vec4{
         return *this;
     }
 
-    __bidevice__ vec4<T> operator-(){
+    bb_cpu_gpu vec4<T> operator-(){
         return vec4<T>(-x, -y, -z, -w);
     }
 
-    __bidevice__ vec4<T> operator-() const{
+    bb_cpu_gpu vec4<T> operator-() const{
         return vec4<T>(-x, -y, -z, -w);
     }
 
-    __bidevice__ vec4<T> operator-(const vec4<T> &v) const{
+    bb_cpu_gpu vec4<T> operator-(const vec4<T> &v) const{
         return vec4(x - v.x, y - v.y, z - v.z, w - v.w);
     }
 
-    __bidevice__ vec4<T> &operator-=(const vec4<T> &v){
+    bb_cpu_gpu vec4<T> &operator-=(const vec4<T> &v){
         x -= v.x; y -= v.y; z -= v.z; w -= v.w;
         return *this;
     }
 
-    __bidevice__ vec4<T> operator+(const vec4<T> &v) const{
+    bb_cpu_gpu vec4<T> operator+(const vec4<T> &v) const{
         return vec4<T>(x + v.x, y + v.y, z + v.z, w + v.w);
     }
 
-    __bidevice__ vec4<T> operator+=(const vec4<T> &v){
+    bb_cpu_gpu vec4<T> operator+=(const vec4<T> &v){
         x += v.x; y += v.y; z += v.z; w += v.w;
         return *this;
     }
 
-    __bidevice__ vec4<T> operator*(const vec4<T> &v) const{
+    bb_cpu_gpu vec4<T> operator*(const vec4<T> &v) const{
         return vec4<T>(x * v.x, y * v.y, z * v.z, w * v.w);
     }
 
-    __bidevice__ vec4<T> &operator*=(const vec4<T> &v){
+    bb_cpu_gpu vec4<T> &operator*=(const vec4<T> &v){
         x *= v.x; y *= v.y; z *= v.z; w *= v.w;
         return *this;
     }
 
-    __bidevice__ vec4<T> operator*(T s) const{
+    bb_cpu_gpu vec4<T> operator*(T s) const{
         return vec4<T>(x * s, y * s, z * s, w * s);
     }
 
-    __bidevice__ vec4<T> &operator*=(T s){
+    bb_cpu_gpu vec4<T> &operator*=(T s){
         x *= s; y *= s; z *= s; w *= s;
         return *this;
     }
 
-    __bidevice__ Float LengthSquared() const{ return x * x + y * y + z * z + w * w; }
-    __bidevice__ Float Length() const{ return sqrt(LengthSquared()); }
-    __bidevice__ void PrintSelf() const{
+    bb_cpu_gpu Float LengthSquared() const{ return x * x + y * y + z * z + w * w; }
+    bb_cpu_gpu Float Length() const{ return sqrt(LengthSquared()); }
+    bb_cpu_gpu void PrintSelf() const{
         printf("P = {x : %g, y :  %g, z : %g, w : %g}", x, y, z, w);
     }
 };
 
 template<typename T>
-inline __bidevice__ bool HasZero(const vec2<T> &v){
+inline bb_cpu_gpu bool HasZero(const vec2<T> &v){
     return (IsZero(v.x) || (IsZero(v.y)));
 }
 
 template<typename T>
-inline __bidevice__ bool HasZero(const vec3<T> &v){
+inline bb_cpu_gpu bool HasZero(const vec3<T> &v){
     return (IsZero(v.x) || (IsZero(v.y)) || (IsZero(v.z)));
 }
 
 template<typename T>
-inline __bidevice__ Float SquaredDistance(const vec2<T> &p1, const vec2<T> &p2){
+inline bb_cpu_gpu Float SquaredDistance(const vec2<T> &p1, const vec2<T> &p2){
     return (p1 - p2).LengthSquared();
 }
 
 template<typename T>
-inline __bidevice__ Float SquaredDistance(const vec3<T> &p1, const vec3<T> &p2){
+inline bb_cpu_gpu Float SquaredDistance(const vec3<T> &p1, const vec3<T> &p2){
     return (p1 - p2).LengthSquared();
 }
 
 template<typename T>
-inline __bidevice__ Float SquaredDistance(const vec4<T> &p1, const vec4<T> &p2){
+inline bb_cpu_gpu Float SquaredDistance(const vec4<T> &p1, const vec4<T> &p2){
     return (p1 - p2).LengthSquared();
 }
 
 template<typename T>
-inline __bidevice__ Float Distance(const vec2<T> &p1, const vec2<T> &p2){
+inline bb_cpu_gpu Float Distance(const vec2<T> &p1, const vec2<T> &p2){
     return (p1 - p2).Length();
 }
 
 template<typename T>
-inline __bidevice__ Float Distance(const vec3<T> &p1, const vec3<T> &p2){
+inline bb_cpu_gpu Float Distance(const vec3<T> &p1, const vec3<T> &p2){
     return (p1 - p2).Length();
 }
 
 template<typename T>
-inline __bidevice__ Float Distance(const vec4<T> &p1, const vec4<T> &p2){
+inline bb_cpu_gpu Float Distance(const vec4<T> &p1, const vec4<T> &p2){
     return (p1 - p2).Length();
 }
 
 template<typename T>
-inline __bidevice__ vec2<T> Clamp(const vec2<T> &val, const vec2<T> &low, const vec2<T> &high){
+inline bb_cpu_gpu vec2<T> Clamp(const vec2<T> &val, const vec2<T> &low, const vec2<T> &high){
     return vec2<T>(Clamp(val.x, low.x, high.x),
                    Clamp(val.y, low.y, high.y));
 }
 
 template<typename T>
-inline __bidevice__ vec3<T> Clamp(const vec3<T> &val, const vec3<T> &low, const vec3<T> &high){
+inline bb_cpu_gpu vec3<T> Clamp(const vec3<T> &val, const vec3<T> &low, const vec3<T> &high){
     return vec3<T>(Clamp(val.x, low.x, high.x),
                    Clamp(val.y, low.y, high.y),
                    Clamp(val.z, low.z, high.z));
 }
 
 template<typename T>
-inline __bidevice__ vec4<T> Clamp(const vec4<T> &val, const vec4<T> &low, const vec4<T> &high){
+inline bb_cpu_gpu vec4<T> Clamp(const vec4<T> &val, const vec4<T> &low, const vec4<T> &high){
     return vec4<T>(Clamp(val.x, low.x, high.x),
                    Clamp(val.y, low.y, high.y),
                    Clamp(val.z, low.z, high.z),
@@ -813,84 +813,84 @@ inline __bidevice__ vec4<T> Clamp(const vec4<T> &val, const vec4<T> &low, const 
 }
 
 template<typename T>
-inline __bidevice__ vec3<T> Clamp(const vec3<T> &val){
+inline bb_cpu_gpu vec3<T> Clamp(const vec3<T> &val){
     return Clamp(val, vec3<T>(-1), vec3<T>(1));
 }
 
 template<typename T>
-inline __bidevice__ vec2<T> Round(const vec2<T> &val){
+inline bb_cpu_gpu vec2<T> Round(const vec2<T> &val){
     return vec2<T>(round(val.x), round(val.y));
 }
 
-template<typename T> inline __bidevice__ vec2<T> operator*(T s, vec2<T> &v){ return v * s; }
-template<typename T> inline __bidevice__ vec3<T> operator*(T s, vec3<T> &v){ return v * s; }
-template<typename T> inline __bidevice__ vec4<T> operator*(T s, vec4<T> &v){ return v * s; }
-template<typename T> inline __bidevice__ vec2<T> Abs(const vec2<T> &v){
+template<typename T> inline bb_cpu_gpu vec2<T> operator*(T s, vec2<T> &v){ return v * s; }
+template<typename T> inline bb_cpu_gpu vec3<T> operator*(T s, vec3<T> &v){ return v * s; }
+template<typename T> inline bb_cpu_gpu vec4<T> operator*(T s, vec4<T> &v){ return v * s; }
+template<typename T> inline bb_cpu_gpu vec2<T> Abs(const vec2<T> &v){
     return vec2<T>(Absf(v.x), Absf(v.y));
 }
 
-template <typename T, typename U> inline __bidevice__
+template <typename T, typename U> inline bb_cpu_gpu
 vec2<T> operator*(U s, const vec2<T> &v){
     return v * s;
 }
 
-template <typename T, typename U> inline __bidevice__
+template <typename T, typename U> inline bb_cpu_gpu
 vec3<T> operator*(U s, const vec3<T> &v){
     return v * s;
 }
 
-template <typename T, typename U> inline __bidevice__
+template <typename T, typename U> inline bb_cpu_gpu
 vec4<T> operator*(U s, const vec4<T> &v){
     return v * s;
 }
 
-template<typename T> inline vec3<T> __bidevice__ Abs(const vec3<T> &v){
+template<typename T> inline vec3<T> bb_cpu_gpu Abs(const vec3<T> &v){
     return vec3<T>(Absf(v.x), Absf(v.y), Absf(v.z));
 }
 
-template<typename T> inline vec4<T> __bidevice__ Abs(const vec4<T> &v){
+template<typename T> inline vec4<T> bb_cpu_gpu Abs(const vec4<T> &v){
     return vec4<T>(Absf(v.x), Absf(v.y), Absf(v.z), Absf(v.w));
 }
 
-template<typename T> inline __bidevice__ T Dot(const vec2<T> &v1, const vec2<T> &v2){
+template<typename T> inline bb_cpu_gpu T Dot(const vec2<T> &v1, const vec2<T> &v2){
     return v1.x * v2.x + v1.y * v2.y;
 }
 
-template<typename T> inline __bidevice__ T Dot(const vec3<T> &v1, const vec3<T> &v2){
+template<typename T> inline bb_cpu_gpu T Dot(const vec3<T> &v1, const vec3<T> &v2){
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 }
 
-template<typename T> inline __bidevice__ T Dot(const vec4<T> &v1, const vec4<T> &v2){
+template<typename T> inline bb_cpu_gpu T Dot(const vec4<T> &v1, const vec4<T> &v2){
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
 }
 
-template<typename T> inline __bidevice__ T Dot2(const vec2<T> &v1){
+template<typename T> inline bb_cpu_gpu T Dot2(const vec2<T> &v1){
     return Dot(v1, v1);
 }
 
-template<typename T> inline __bidevice__ T Dot2(const vec3<T> &v1){
+template<typename T> inline bb_cpu_gpu T Dot2(const vec3<T> &v1){
     return Dot(v1, v1);
 }
 
-template<typename T> inline __bidevice__ T Dot2(const vec4<T> &v1){
+template<typename T> inline bb_cpu_gpu T Dot2(const vec4<T> &v1){
     return Dot(v1, v1);
 }
 
-template<typename T> inline __bidevice__ T AbsDot(const vec3<T> &v1, const vec3<T> &v2){
+template<typename T> inline bb_cpu_gpu T AbsDot(const vec3<T> &v1, const vec3<T> &v2){
     return Absf(Dot(v1, v2));
 }
 
-template<typename T> inline __bidevice__ T AbsDot(const vec4<T> &v1, const vec4<T> &v2){
+template<typename T> inline bb_cpu_gpu T AbsDot(const vec4<T> &v1, const vec4<T> &v2){
     return Absf(Dot(v1, v2));
 }
 
-template<typename T> inline __bidevice__ T Cross(const vec2<T> &v1,
+template<typename T> inline bb_cpu_gpu T Cross(const vec2<T> &v1,
                                                  const vec2<T> &v2)
 {
     return v1.x * v2.y - v1.y * v2.x;
 }
 
-template<typename T> inline __bidevice__ vec3<T> Cross(const vec3<T> &v1,
+template<typename T> inline bb_cpu_gpu vec3<T> Cross(const vec3<T> &v1,
                                                        const vec3<T> &v2)
 {
     double v1x = v1.x, v1y = v1.y, v1z = v1.z;
@@ -900,114 +900,114 @@ template<typename T> inline __bidevice__ vec3<T> Cross(const vec3<T> &v1,
                    (v1x * v2y) - (v1y * v2x));
 }
 
-template<typename T> inline __bidevice__ vec2<T> Normalize(const vec2<T> &v){
+template<typename T> inline bb_cpu_gpu vec2<T> Normalize(const vec2<T> &v){
     return v / v.Length();
 }
 
-template<typename T> inline __bidevice__ vec3<T> Normalize(const vec3<T> &v){
+template<typename T> inline bb_cpu_gpu vec3<T> Normalize(const vec3<T> &v){
     return v / v.Length();
 }
 
-template<typename T> inline __bidevice__ vec4<T> Normalize(const vec4<T> &v){
+template<typename T> inline bb_cpu_gpu vec4<T> Normalize(const vec4<T> &v){
     return v / v.Length();
 }
 
-template<typename T> inline __bidevice__ vec2<T> SafeNormalize(const vec2<T> &v){
+template<typename T> inline bb_cpu_gpu vec2<T> SafeNormalize(const vec2<T> &v){
     Float length = v.Length();
     if(IsZero(length))
         return v;
     return v / length;
 }
 
-template<typename T> inline __bidevice__ vec3<T> SafeNormalize(const vec3<T> &v){
+template<typename T> inline bb_cpu_gpu vec3<T> SafeNormalize(const vec3<T> &v){
     Float length = v.Length();
     if(IsZero(length))
         return v;
     return v / length;
 }
 
-template<typename T> inline __bidevice__ vec4<T> SafeNormalize(const vec4<T> &v){
+template<typename T> inline bb_cpu_gpu vec4<T> SafeNormalize(const vec4<T> &v){
     Float length = v.Length();
     if(IsZero(length))
         return v;
     return v / length;
 }
 
-inline __bidevice__ Float Sin(const Float &v){
+inline bb_cpu_gpu Float Sin(const Float &v){
     return std::sin(v);
 }
 
-template<typename T> inline __bidevice__ vec2<T> Sin(const vec2<T> &v){
+template<typename T> inline bb_cpu_gpu vec2<T> Sin(const vec2<T> &v){
     return vec2<T>(std::sin(v.x), std::sin(v.y));
 }
 
-template<typename T> inline __bidevice__ vec3<T> Sin(const vec3<T> &v){
+template<typename T> inline bb_cpu_gpu vec3<T> Sin(const vec3<T> &v){
     return vec3<T>(std::sin(v.x), std::sin(v.y), std::sin(v.z));
 }
 
-template<typename T> inline __bidevice__ vec4<T> Sin(const vec4<T> &v){
+template<typename T> inline bb_cpu_gpu vec4<T> Sin(const vec4<T> &v){
     return vec4<T>(std::sin(v.x), std::sin(v.y), std::sin(v.z), std::sin(v.w));
 }
 
-template<typename T> inline __bidevice__ T MinComponent(const vec2<T> &v){
+template<typename T> inline bb_cpu_gpu T MinComponent(const vec2<T> &v){
     return Min(v.x, v.y);
 }
 
-template<typename T> inline __bidevice__ T MinComponent(const vec3<T> &v){
+template<typename T> inline bb_cpu_gpu T MinComponent(const vec3<T> &v){
     return Min(v.x, Min(v.y, v.z));
 }
 
-template<typename T> inline __bidevice__ T MaxComponent(const vec2<T> &v){
+template<typename T> inline bb_cpu_gpu T MaxComponent(const vec2<T> &v){
     return Max(v.x, v.y);
 }
 
-template<typename T> inline __bidevice__ T MaxComponent(const vec3<T> &v){
+template<typename T> inline bb_cpu_gpu T MaxComponent(const vec3<T> &v){
     return Max(v.x, Max(v.y, v.z));
 }
 
-template<typename T> inline __bidevice__ int MaxDimension(const vec3<T> &v){
+template<typename T> inline bb_cpu_gpu int MaxDimension(const vec3<T> &v){
     return (v.x > v.y) ? ((v.x > v.z) ? 0 : 2) : ((v.y > v.z) ? 1 : 2);
 }
 
-template<typename T> inline __bidevice__ int MinDimension(const vec3<T> &v){
+template<typename T> inline bb_cpu_gpu int MinDimension(const vec3<T> &v){
     return (v.x < v.y) ? ((v.x < v.z) ? 0 : 2) : ((v.y < v.z) ? 1 : 2);
 }
 
-template<typename T> inline __bidevice__ vec2<T> Min(const vec2<T> &v1, const vec2<T> &v2){
+template<typename T> inline bb_cpu_gpu vec2<T> Min(const vec2<T> &v1, const vec2<T> &v2){
     return vec2<T>(Min(v1.x, v2.x), Min(v1.y, v2.y));
 }
 
-template<typename T> inline __bidevice__ vec3<T> Min(const vec3<T> &v1, const vec3<T> &v2){
+template<typename T> inline bb_cpu_gpu vec3<T> Min(const vec3<T> &v1, const vec3<T> &v2){
     return vec3<T>(Min(v1.x, v2.x), Min(v1.y, v2.y), Min(v1.z, v2.z));
 }
 
-template<typename T> inline __bidevice__ vec4<T> Min(const vec4<T> &v1, const vec4<T> &v2){
+template<typename T> inline bb_cpu_gpu vec4<T> Min(const vec4<T> &v1, const vec4<T> &v2){
     return vec4<T>(Min(v1.x, v2.x), Min(v1.y, v2.y), Min(v1.z, v2.z), Min(v1.w, v2.w));
 }
 
-template<typename T> inline __bidevice__ vec2<T> Max(const vec2<T> &v1, const vec2<T> &v2){
+template<typename T> inline bb_cpu_gpu vec2<T> Max(const vec2<T> &v1, const vec2<T> &v2){
     return vec2<T>(Max(v1.x, v2.x), Max(v1.y, v2.y));
 }
 
-template<typename T> inline __bidevice__ vec3<T> Max(const vec3<T> &v1, const vec3<T> &v2){
+template<typename T> inline bb_cpu_gpu vec3<T> Max(const vec3<T> &v1, const vec3<T> &v2){
     return vec3<T>(Max(v1.x, v2.x), Max(v1.y, v2.y), Max(v1.z, v2.z));
 }
 
-template<typename T> inline __bidevice__ vec4<T> Max(const vec4<T> &v1, const vec4<T> &v2){
+template<typename T> inline bb_cpu_gpu vec4<T> Max(const vec4<T> &v1, const vec4<T> &v2){
     return vec4<T>(Max(v1.x, v2.x), Max(v1.y, v2.y), Max(v1.z, v2.z), Max(v1.w, v2.w));
 }
 
-template<typename T> inline __bidevice__ vec3<T> Permute(const vec3<T> &v, int x, int y, int z){
+template<typename T> inline bb_cpu_gpu vec3<T> Permute(const vec3<T> &v, int x, int y, int z){
     return vec3<T>(v[x], v[y], v[z]);
 }
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 vec3<T> Flip(const vec3<T> &p){ return vec3<T>(p.z, p.y, p.x); }
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 vec2<T> Flip(const vec2<T> &p){ return vec2<T>(p.y, p.x); }
 
-template<typename T> inline __bidevice__ void
+template<typename T> inline bb_cpu_gpu void
 CoordinateSystem(const vec3<T> &v1, vec3<T> *v2, vec3<T> *v3){
     if(Absf(v1.x) > Absf(v1.y)){
         Float f = sqrt(v1.x * v1.x + v1.z * v1.z);
@@ -1022,17 +1022,17 @@ CoordinateSystem(const vec3<T> &v1, vec3<T> *v2, vec3<T> *v3){
     *v3 = Cross(v1, *v2);
 }
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 vec3<T> Sqrt(const vec3<T> &v){
     return vec3<T>(std::sqrt(v.x), std::sqrt(v.y), std::sqrt(v.z));
 }
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 vec3<T> Pow(const vec3<T> &v, Float val){
     return vec3<T>(std::pow(v.x, val), std::pow(v.y, val), std::pow(v.z, val));
 }
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 vec3<T> Exp(const vec3<T> &v){
     return vec3<T>(std::exp(v.x), std::exp(v.y), std::exp(v.z));
 }
@@ -1057,39 +1057,39 @@ typedef vec4<Float> vec4f;
 typedef vec4<unsigned int> vec4ui;
 typedef vec4<int> vec4i;
 
-inline __bidevice__ vec3f Max(vec3f a, vec3f b){
+inline bb_cpu_gpu vec3f Max(vec3f a, vec3f b){
     return vec3f(Max(a.x, b.x), Max(a.y, b.y), Max(a.z, b.z));
 }
 
-inline __bidevice__ vec3f Min(vec3f a, vec3f b){
+inline bb_cpu_gpu vec3f Min(vec3f a, vec3f b){
     return vec3f(Min(a.x, b.x), Min(a.y, b.y), Min(a.z, b.z));
 }
 
-template<typename T> inline __bidevice__ T Mix(const T &p0, const T &p1, T t){
+template<typename T> inline bb_cpu_gpu T Mix(const T &p0, const T &p1, T t){
     return (1 - t) * p0 + t * p1;
 }
 
-template<typename T, typename Q> inline __bidevice__ T Lerp(const T &p0, const T &p1, Q t){
+template<typename T, typename Q> inline bb_cpu_gpu T Lerp(const T &p0, const T &p1, Q t){
     return (1 - t) * p0 + t * p1;
 }
 
-inline __bidevice__ Float Floor(const Float &v){
+inline bb_cpu_gpu Float Floor(const Float &v){
     return std::floor(v);
 }
 
-template<typename T> inline __bidevice__ vec2<T> Floor(const vec2<T> &v){
+template<typename T> inline bb_cpu_gpu vec2<T> Floor(const vec2<T> &v){
     return vec2<T>(std::floor(v.x), std::floor(v.y));
 }
 
-template<typename T> inline __bidevice__ vec3<T> Floor(const vec3<T> &v){
+template<typename T> inline bb_cpu_gpu vec3<T> Floor(const vec3<T> &v){
     return vec3<T>(std::floor(v.x), std::floor(v.y), std::floor(v.z));
 }
 
-template<typename T> inline __bidevice__ T Fract(T val){
+template<typename T> inline bb_cpu_gpu T Fract(T val){
     return val - Floor(val);
 }
 
-template <typename T> inline __bidevice__ T Mod(T a, T b) {
+template <typename T> inline bb_cpu_gpu T Mod(T a, T b) {
     T result = a - (a / b) * b;
     return (T)((result < 0) ? result + b : result);
 }
@@ -1097,148 +1097,148 @@ template <typename T> inline __bidevice__ T Mod(T a, T b) {
 template<typename T> class Normal3{
     public:
     T x, y, z;
-    __bidevice__ Normal3(){ x = y = z = (T)0; }
-    __bidevice__ Normal3(T a){ x = y = z = a; }
-    __bidevice__ Normal3(T a, T b, T c): x(a), y(b), z(c)
+    bb_cpu_gpu Normal3(){ x = y = z = (T)0; }
+    bb_cpu_gpu Normal3(T a){ x = y = z = a; }
+    bb_cpu_gpu Normal3(T a, T b, T c): x(a), y(b), z(c)
     {
         Assert(!HasNaN());
     }
 
-    template<typename U> __bidevice__ Normal3(const vec3<U> &v):x(v.x), y(v.y), z(v.z){
+    template<typename U> bb_cpu_gpu Normal3(const vec3<U> &v):x(v.x), y(v.y), z(v.z){
         Assert(!HasNaN());
     }
 
-    __bidevice__ bool HasNaN(){
+    bb_cpu_gpu bool HasNaN(){
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
 
-    __bidevice__ bool HasNaN() const{
+    bb_cpu_gpu bool HasNaN() const{
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
 
-    __bidevice__ Normal3<T> operator-() const { return Normal3(-x, -y, -z); }
+    bb_cpu_gpu Normal3<T> operator-() const { return Normal3(-x, -y, -z); }
 
-    __bidevice__ Normal3<T> operator+(const Normal3<T> &n) const {
+    bb_cpu_gpu Normal3<T> operator+(const Normal3<T> &n) const {
         Assert(!n.HasNaN());
         return Normal3<T>(x + n.x, y + n.y, z + n.z);
     }
 
-    __bidevice__ Normal3<T> &operator+=(const Normal3<T> &n) {
+    bb_cpu_gpu Normal3<T> &operator+=(const Normal3<T> &n) {
         Assert(!n.HasNaN());
         x += n.x; y += n.y; z += n.z;
         return *this;
     }
-    __bidevice__ Normal3<T> operator-(const Normal3<T> &n) const {
+    bb_cpu_gpu Normal3<T> operator-(const Normal3<T> &n) const {
         Assert(!n.HasNaN());
         return Normal3<T>(x - n.x, y - n.y, z - n.z);
     }
 
-    __bidevice__ Normal3<T> &operator-=(const Normal3<T> &n) {
+    bb_cpu_gpu Normal3<T> &operator-=(const Normal3<T> &n) {
         Assert(!n.HasNaN());
         x -= n.x; y -= n.y; z -= n.z;
         return *this;
     }
 
-    template <typename U> __bidevice__ Normal3<T> operator*(U f) const {
+    template <typename U> bb_cpu_gpu Normal3<T> operator*(U f) const {
         return Normal3<T>(f * x, f * y, f * z);
     }
 
-    template <typename U> __bidevice__ Normal3<T> &operator*=(U f) {
+    template <typename U> bb_cpu_gpu Normal3<T> &operator*=(U f) {
         x *= f; y *= f; z *= f;
         return *this;
     }
-    template <typename U> __bidevice__ Normal3<T> operator/(U f) const {
+    template <typename U> bb_cpu_gpu Normal3<T> operator/(U f) const {
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         return Normal3<T>(x * inv, y * inv, z * inv);
     }
 
-    template <typename U> __bidevice__ Normal3<T> &operator/=(U f) {
+    template <typename U> bb_cpu_gpu Normal3<T> &operator/=(U f) {
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         x *= inv; y *= inv; z *= inv;
         return *this;
     }
 
-    __bidevice__ explicit Normal3<T>(const vec3<T> &v) : x(v.x), y(v.y), z(v.z) {}
+    bb_cpu_gpu explicit Normal3<T>(const vec3<T> &v) : x(v.x), y(v.y), z(v.z) {}
 
-    __bidevice__ bool operator==(const Normal3<T> &n) const {
+    bb_cpu_gpu bool operator==(const Normal3<T> &n) const {
         return x == n.x && y == n.y && z == n.z;
     }
 
-    __bidevice__ bool operator!=(const Normal3<T> &n) const {
+    bb_cpu_gpu bool operator!=(const Normal3<T> &n) const {
         return x != n.x || y != n.y || z != n.z;
     }
 
-    __bidevice__ T operator[](int i) const {
+    bb_cpu_gpu T operator[](int i) const {
         Assert(i >= 0 && i < 3);
         if (i == 0) return x;
         if (i == 1) return y;
         return z;
     }
 
-    __bidevice__ T &operator[](int i) {
+    bb_cpu_gpu T &operator[](int i) {
         Assert(i >= 0 && i < 3);
         if (i == 0) return x;
         if (i == 1) return y;
         return z;
     }
 
-    __bidevice__ Float LengthSquared() const { return x * x + y * y + z * z; }
-    __bidevice__ Float Length() const { return sqrt(LengthSquared()); }
+    bb_cpu_gpu Float LengthSquared() const { return x * x + y * y + z * z; }
+    bb_cpu_gpu Float Length() const { return sqrt(LengthSquared()); }
 };
 
-template <typename T, typename U> inline __bidevice__
+template <typename T, typename U> inline bb_cpu_gpu
 Normal3<T> operator*(U s, const Normal3<T> &n){
     return n * s;
 }
 
-template <typename T> inline __bidevice__ Normal3<T> Normalize(const Normal3<T> &n) {
+template <typename T> inline bb_cpu_gpu Normal3<T> Normalize(const Normal3<T> &n) {
     return n / n.Length();
 }
 
 template <typename T>
-inline __bidevice__ Normal3<T> Faceforward(const Normal3<T> &n, const vec3<T> &v) {
+inline bb_cpu_gpu Normal3<T> Faceforward(const Normal3<T> &n, const vec3<T> &v) {
     return (Dot(n, v) < 0.f) ? -n : n;
 }
 
 template <typename T>
-inline __bidevice__ Normal3<T> Faceforward(const Normal3<T> &n, const Normal3<T> &n2) {
+inline bb_cpu_gpu Normal3<T> Faceforward(const Normal3<T> &n, const Normal3<T> &n2) {
     return (Dot(n, n2) < 0.f) ? -n : n;
 }
 
 template <typename T>
-inline __bidevice__ vec3<T> Faceforward(const vec3<T> &v, const vec3<T> &v2) {
+inline bb_cpu_gpu vec3<T> Faceforward(const vec3<T> &v, const vec3<T> &v2) {
     return (Dot(v, v2) < 0.f) ? -v : v;
 }
 
 template <typename T>
-inline __bidevice__ vec3<T> Faceforward(const vec3<T> &v, const Normal3<T> &n2) {
+inline bb_cpu_gpu vec3<T> Faceforward(const vec3<T> &v, const Normal3<T> &n2) {
     return (Dot(v, n2) < 0.f) ? -v : v;
 }
 
 template <typename T>
-inline __bidevice__ Normal3<T> Abs(const Normal3<T> &v) {
+inline bb_cpu_gpu Normal3<T> Abs(const Normal3<T> &v) {
     return Normal3<T>(Absf(v.x), Absf(v.y), Absf(v.z));
 }
 
-template <typename T> inline __bidevice__ T Dot(const Normal3<T> &n1, const Normal3<T> &n2) {
+template <typename T> inline bb_cpu_gpu T Dot(const Normal3<T> &n1, const Normal3<T> &n2) {
     return n1.x * n2.x + n1.y * n2.y + n1.z * n2.z;
 }
 
-template <typename T> inline __bidevice__ T Dot(const Normal3<T> &n1, const vec3<T> &v) {
+template <typename T> inline bb_cpu_gpu T Dot(const Normal3<T> &n1, const vec3<T> &v) {
     return n1.x * v.x + n1.y * v.y + n1.z * v.z;
 }
 
-template <typename T> inline __bidevice__ T AbsDot(const Normal3<T> &n1, const vec3<T> &v2) {
+template <typename T> inline bb_cpu_gpu T AbsDot(const Normal3<T> &n1, const vec3<T> &v2) {
     return Absf(n1.x * v2.x + n1.y * v2.y + n1.z * v2.z);
 }
 
-template<typename T> inline __bidevice__ vec3<T> ToVec3(const Normal3<T> &n){
+template<typename T> inline bb_cpu_gpu vec3<T> ToVec3(const Normal3<T> &n){
     return vec3<T>(n.x, n.y, n.z);
 }
 
-template<typename T> inline __bidevice__ Normal3<T> toNormal3(const vec3<T> &v){
+template<typename T> inline bb_cpu_gpu Normal3<T> toNormal3(const vec3<T> &v){
     return Normal3<T>(v.x, v.y, v.z);
 }
 
@@ -1248,63 +1248,63 @@ template<typename T>
 class Bounds1{
     public:
     T pMin, pMax;
-    __bidevice__ Bounds1(){
+    bb_cpu_gpu Bounds1(){
         pMin = T(-FLT_MAX);
         pMax = T(FLT_MAX);
     }
 
-    __bidevice__ explicit Bounds1(const T &p): pMin(p), pMax(p) {}
-    __bidevice__ Bounds1(const T &p1, const T &p2)
+    bb_cpu_gpu explicit Bounds1(const T &p): pMin(p), pMax(p) {}
+    bb_cpu_gpu Bounds1(const T &p1, const T &p2)
         : pMin(Min(p1, p2)), pMax(Max(p1, p2)) {}
 
-    __bidevice__ const T &operator[](int i) const{
+    bb_cpu_gpu const T &operator[](int i) const{
         Assert(i == 0 || i == 1);
         return (i == 0) ? pMin : pMax;
 
     }
-    __bidevice__ T &operator[](int i){
+    bb_cpu_gpu T &operator[](int i){
         Assert(i == 0 || i == 1);
         return (i == 0) ? pMin : pMax;
     }
 
-    __bidevice__ T LengthAt(int i, int axis) const{
+    bb_cpu_gpu T LengthAt(int i, int axis) const{
         Assert(axis == 0);
         return (i == 0) ? pMin : pMax;
     }
 
-    __bidevice__ bool operator==(const Bounds1<T> &b) const{
+    bb_cpu_gpu bool operator==(const Bounds1<T> &b) const{
         return b.pMin == pMin && b.pMax == pMax;
     }
 
-    __bidevice__ T Center() const{
+    bb_cpu_gpu T Center() const{
         return (pMin + pMax) * 0.5;
     }
 
-    __bidevice__ T ExtentOn(int i) const{
+    bb_cpu_gpu T ExtentOn(int i) const{
         Assert(i == 0);
         return Absf(pMax - pMin);
     }
 
-    __bidevice__ int MaximumExtent() const{
+    bb_cpu_gpu int MaximumExtent() const{
         return 0;
     }
 
-    __bidevice__ int MinimumExtent() const{
+    bb_cpu_gpu int MinimumExtent() const{
         return 0;
     }
 
-    __bidevice__ T Offset(const T &p) const{
+    bb_cpu_gpu T Offset(const T &p) const{
         T o = p - pMin;
         if (pMax > pMin) o /= pMax - pMin;
         return o;
     }
 
-    __bidevice__ T MinDistance(const T &p) const{
+    bb_cpu_gpu T MinDistance(const T &p) const{
         Float x0 = Absf(pMin - p), x1 = Absf(pMax - p);
         return Min(x0, x1);
     }
 
-    __bidevice__ void PrintSelf() const{
+    bb_cpu_gpu void PrintSelf() const{
         printf("pMin = {x : %g} pMax = {x : %g}", pMin, pMax);
     }
 };
@@ -1314,76 +1314,76 @@ class Bounds2 {
     public:
     vec2<T> pMin, pMax;
 
-    __bidevice__ Bounds2(){
+    bb_cpu_gpu Bounds2(){
         T minNum = FLT_MIN;
         T maxNum = FLT_MAX;
         pMin = vec2<T>(maxNum, maxNum);
         pMax = vec2<T>(minNum, minNum);
     }
 
-    __bidevice__ explicit Bounds2(const vec2<T> &p) : pMin(p), pMax(p) {}
-    __bidevice__ Bounds2(const vec2<T> &p1, const vec2<T> &p2)
+    bb_cpu_gpu explicit Bounds2(const vec2<T> &p) : pMin(p), pMax(p) {}
+    bb_cpu_gpu Bounds2(const vec2<T> &p1, const vec2<T> &p2)
         : pMin(Min(p1.x, p2.x), Min(p1.y, p2.y)), pMax(Max(p1.x, p2.x), Max(p1.y, p2.y)) {}
 
-    __bidevice__ const vec2<T> &operator[](int i) const;
-    __bidevice__ vec2<T> &operator[](int i);
-    __bidevice__ bool operator==(const Bounds2<T> &b) const{
+    bb_cpu_gpu const vec2<T> &operator[](int i) const;
+    bb_cpu_gpu vec2<T> &operator[](int i);
+    bb_cpu_gpu bool operator==(const Bounds2<T> &b) const{
         return b.pMin == pMin && b.pMax == pMax;
     }
 
-    __bidevice__ bool operator!=(const Bounds2<T> &b) const{
+    bb_cpu_gpu bool operator!=(const Bounds2<T> &b) const{
         return b.pMin != pMin || b.pMax != pMax;
     }
 
-    __bidevice__ vec2<T> Corner(int corner) const{
+    bb_cpu_gpu vec2<T> Corner(int corner) const{
         Assert(corner >= 0 && corner < 4);
         return vec2<T>((*this)[(corner & 1)].x,
                        (*this)[(corner & 2) ? 1 : 0].y);
     }
 
-    __bidevice__ vec2<T> Corner(int corner){
+    bb_cpu_gpu vec2<T> Corner(int corner){
         Assert(corner >= 0 && corner < 4);
         return vec2<T>((*this)[(corner & 1)].x,
                        (*this)[(corner & 2) ? 1 : 0].y);
     }
 
-    __bidevice__ void Expand(Float d){
+    bb_cpu_gpu void Expand(Float d){
         pMin -= vec2<T>(Absf(d));
         pMax += vec2<T>(Absf(d));
     }
 
-    __bidevice__ void Reduce(Float d){
+    bb_cpu_gpu void Reduce(Float d){
         pMin += vec2<T>(Absf(d));
         pMax -= vec2<T>(Absf(d));
     }
 
-    __bidevice__ T LengthAt(int i, int axis) const{
+    bb_cpu_gpu T LengthAt(int i, int axis) const{
         Assert(axis == 0 || axis == 1);
         return (i == 0) ? pMin[axis] : pMax[axis];
     }
 
-    __bidevice__ vec2<T> Diagonal() const { return pMax - pMin; }
-    __bidevice__ T SurfaceArea() const{
+    bb_cpu_gpu vec2<T> Diagonal() const { return pMax - pMin; }
+    bb_cpu_gpu T SurfaceArea() const{
         vec2<T> d = Diagonal();
         return (d.x * d.y);
     }
 
-    __bidevice__ T Volume() const{
+    bb_cpu_gpu T Volume() const{
         printf("Warning: Called for volume on 2D surface\n");
         return 0;
     }
 
-    __bidevice__ vec2<T> Center() const{
+    bb_cpu_gpu vec2<T> Center() const{
         return (pMin + pMax) * 0.5;
     }
 
-    __bidevice__ T ExtentOn(int i) const{
+    bb_cpu_gpu T ExtentOn(int i) const{
         Assert(i >= 0 && i < 2);
         if(i == 0) return Absf(pMax.x - pMin.x);
         return Absf(pMax.y - pMin.y);
     }
 
-    __bidevice__ int MaximumExtent() const{
+    bb_cpu_gpu int MaximumExtent() const{
         vec2<T> d = Diagonal();
         if (d.x > d.y)
             return 0;
@@ -1391,7 +1391,7 @@ class Bounds2 {
             return 1;
     }
 
-    __bidevice__ int MinimumExtent() const{
+    bb_cpu_gpu int MinimumExtent() const{
         vec2<T> d = Diagonal();
         if (d.x > d.y)
             return 1;
@@ -1399,36 +1399,36 @@ class Bounds2 {
             return 0;
     }
 
-    __bidevice__ vec2<T> Offset(const vec2<T> &p) const{
+    bb_cpu_gpu vec2<T> Offset(const vec2<T> &p) const{
         vec2<T> o = p - pMin;
         if (pMax.x > pMin.x) o.x /= pMax.x - pMin.x;
         if (pMax.y > pMin.y) o.y /= pMax.y - pMin.y;
         return o;
     }
 
-    __bidevice__ void BoundingSphere(vec2<T> *center, Float *radius) const{
+    bb_cpu_gpu void BoundingSphere(vec2<T> *center, Float *radius) const{
         *center = (pMin + pMax) / 2;
         *radius = Inside(*center, *this) ? Distance(*center, pMax) : 0;
     }
 
-    __bidevice__ vec2<T> MinDistance(const vec2<T> &p) const{
+    bb_cpu_gpu vec2<T> MinDistance(const vec2<T> &p) const{
         Float x0 = Absf(pMin.x - p.x), x1 = Absf(pMax.x - p.x);
         Float y0 = Absf(pMin.y - p.y), y1 = Absf(pMax.y - p.y);
         return vec2<T>(Min(x0, x1), Min(y0, y1));
     }
 
-    __bidevice__ bool Intersect(const Ray2 &ray, Float *tHit0=nullptr,
+    bb_cpu_gpu bool Intersect(const Ray2 &ray, Float *tHit0=nullptr,
                                 Float *tHit1=nullptr) const;
 
-    template <typename U> __bidevice__ explicit operator Bounds2<U>() const{
+    template <typename U> bb_cpu_gpu explicit operator Bounds2<U>() const{
         return Bounds2<U>((vec2<U>)pMin, (vec2<U>)pMax);
     }
 
-    __bidevice__ vec2<T> Clamped(const vec2<T> &point, T of=0) const{
+    bb_cpu_gpu vec2<T> Clamped(const vec2<T> &point, T of=0) const{
         return Clamp(point, pMin+vec2<T>(of), pMax-vec2<T>(of));
     }
 
-    __bidevice__ void PrintSelf() const{
+    bb_cpu_gpu void PrintSelf() const{
         printf("pMin = {x : %g, y : %g} pMax = {x : %g, y : %g}",
                pMin.x, pMin.y, pMax.x, pMax.y);
     }
@@ -1439,80 +1439,80 @@ class Bounds3 {
     public:
     vec3<T> pMin, pMax;
 
-    __bidevice__ Bounds3(){
+    bb_cpu_gpu Bounds3(){
         T minNum = FLT_MIN;
         T maxNum = FLT_MAX;
         pMin = vec3<T>(maxNum, maxNum, maxNum);
         pMax = vec3<T>(minNum, minNum, minNum);
     }
 
-    __bidevice__ explicit Bounds3(const vec3<T> &p) : pMin(p), pMax(p) {}
-    __bidevice__ Bounds3(const vec3<T> &p1, const vec3<T> &p2)
+    bb_cpu_gpu explicit Bounds3(const vec3<T> &p) : pMin(p), pMax(p) {}
+    bb_cpu_gpu Bounds3(const vec3<T> &p1, const vec3<T> &p2)
         : pMin(Min(p1.x, p2.x), Min(p1.y, p2.y), Min(p1.z, p2.z)),
     pMax(Max(p1.x, p2.x), Max(p1.y, p2.y), Max(p1.z, p2.z)) {}
 
-    __bidevice__ const vec3<T> &operator[](int i) const;
-    __bidevice__ vec3<T> &operator[](int i);
-    __bidevice__ bool operator==(const Bounds3<T> &b) const{
+    bb_cpu_gpu const vec3<T> &operator[](int i) const;
+    bb_cpu_gpu vec3<T> &operator[](int i);
+    bb_cpu_gpu bool operator==(const Bounds3<T> &b) const{
         return b.pMin == pMin && b.pMax == pMax;
     }
 
-    __bidevice__ bool operator!=(const Bounds3<T> &b) const{
+    bb_cpu_gpu bool operator!=(const Bounds3<T> &b) const{
         return b.pMin != pMin || b.pMax != pMax;
     }
 
-    __bidevice__ void Expand(Float d){
+    bb_cpu_gpu void Expand(Float d){
         pMin -= vec3<T>(Absf(d));
         pMax += vec3<T>(Absf(d));
     }
 
-    __bidevice__ void Reduce(Float d){
+    bb_cpu_gpu void Reduce(Float d){
         pMin += vec3<T>(Absf(d));
         pMax -= vec3<T>(Absf(d));
     }
 
-    __bidevice__ vec3<T> Corner(int corner) const{
+    bb_cpu_gpu vec3<T> Corner(int corner) const{
         Assert(corner >= 0 && corner < 8);
         return vec3<T>((*this)[(corner & 1)].x,
                        (*this)[(corner & 2) ? 1 : 0].y,
                        (*this)[(corner & 4) ? 1 : 0].z);
     }
 
-    __bidevice__ vec3<T> Corner(int corner){
+    bb_cpu_gpu vec3<T> Corner(int corner){
         Assert(corner >= 0 && corner < 8);
         return vec3<T>((*this)[(corner & 1)].x,
                        (*this)[(corner & 2) ? 1 : 0].y,
                        (*this)[(corner & 4) ? 1 : 0].z);
     }
 
-    __bidevice__ T LengthAt(int i, int axis) const{
+    bb_cpu_gpu T LengthAt(int i, int axis) const{
         Assert(axis == 0 || axis == 1 || axis == 2);
         return (i == 0) ? pMin[axis] : pMax[axis];
     }
 
-    __bidevice__ vec3<T> Diagonal() const { return pMax - pMin; }
-    __bidevice__ T SurfaceArea() const{
+    bb_cpu_gpu vec3<T> Diagonal() const { return pMax - pMin; }
+    bb_cpu_gpu T SurfaceArea() const{
         vec3<T> d = Diagonal();
         return 2 * (d.x * d.y + d.x * d.z + d.y * d.z);
     }
 
-    __bidevice__ vec3<T> Center() const{
+    bb_cpu_gpu vec3<T> Center() const{
         return (pMin + pMax) * 0.5;
     }
 
-    __bidevice__ T Volume() const{
+    bb_cpu_gpu T Volume() const{
         vec3<T> d = Diagonal();
         return d.x * d.y * d.z;
     }
 
-    __bidevice__ T ExtentOn(int i) const{
+    bb_cpu_gpu T ExtentOn(int i) const{
         Assert(i >= 0 && i < 3);
         if(i == 0) return Absf(pMax.x - pMin.x);
         if(i == 1) return Absf(pMax.y - pMin.y);
         return Absf(pMax.z - pMin.z);
     }
 
-    __bidevice__ int MaximumExtent() const{
+    bb_cpu_gpu int MaximumExtent() const{
         vec3<T> d = Diagonal();
         if (d.x > d.y && d.x > d.z)
             return 0;
@@ -1522,7 +1522,7 @@ class Bounds3 {
             return 2;
     }
 
-    __bidevice__ int MinimumExtent() const{
+    bb_cpu_gpu int MinimumExtent() const{
         vec3<T> d = Diagonal();
         if (d.x > d.z && d.y > d.z)
             return 2;
@@ -1532,7 +1532,7 @@ class Bounds3 {
             return 0;
     }
 
-    __bidevice__ vec3<T> Offset(const vec3<T> &p) const{
+    bb_cpu_gpu vec3<T> Offset(const vec3<T> &p) const{
         vec3<T> o = p - pMin;
         if (pMax.x > pMin.x) o.x /= pMax.x - pMin.x;
         if (pMax.y > pMin.y) o.y /= pMax.y - pMin.y;
@@ -1540,30 +1540,30 @@ class Bounds3 {
         return o;
     }
 
-    __bidevice__ vec3<T> Clamped(const vec3<T> &point, T of=0) const{
+    bb_cpu_gpu vec3<T> Clamped(const vec3<T> &point, T of=0) const{
         return Clamp(point, pMin+vec3<T>(of), pMax-vec3<T>(of));
     }
 
-    __bidevice__ void BoundingSphere(vec3<T> *center, Float *radius) const{
+    bb_cpu_gpu void BoundingSphere(vec3<T> *center, Float *radius) const{
         *center = (pMin + pMax) / 2;
         *radius = Inside(*center, *this) ? Distance(*center, pMax) : 0;
     }
 
-    __bidevice__ vec3<T> MinDistance(const vec3<T> &p) const{
+    bb_cpu_gpu vec3<T> MinDistance(const vec3<T> &p) const{
         Float x0 = Absf(pMin.x - p.x), x1 = Absf(pMax.x - p.x);
         Float y0 = Absf(pMin.y - p.y), y1 = Absf(pMax.y - p.y);
         Float z0 = Absf(pMin.z - p.z), z1 = Absf(pMax.z - p.z);
         return vec3<T>(Min(x0, x1), Min(y0, y1), Min(z0, z1));
     }
 
-    __bidevice__ bool Intersect(const Ray &ray, Float *tHit0=nullptr,
+    bb_cpu_gpu bool Intersect(const Ray &ray, Float *tHit0=nullptr,
                                 Float *tHit1=nullptr) const;
 
-    template <typename U> __bidevice__ explicit operator Bounds3<U>() const{
+    template <typename U> bb_cpu_gpu explicit operator Bounds3<U>() const{
         return Bounds3<U>((vec3<U>)pMin, (vec3<U>)pMax);
     }
 
-    __bidevice__ void PrintSelf() const{
+    bb_cpu_gpu void PrintSelf() const{
         printf("pMin = {x : %g, y : %g, z : %g} pMax = {x : %g, y : %g, z : %g}",
                pMin.x, pMin.y, pMin.z, pMax.x, pMax.y, pMax.z);
     }
@@ -1593,7 +1593,7 @@ inline std::ostream &operator<<(std::ostream &out, const Bounds3<T> &bounds){
                << " ]";
 }
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 int SplitBounds(const Bounds2<T> &bounds, Bounds2<T> *split){
     vec2f center = bounds.Center();
     vec2f pMin = bounds.pMin;
@@ -1605,13 +1605,13 @@ int SplitBounds(const Bounds2<T> &bounds, Bounds2<T> *split){
     return 4;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 vec2<T> &Bounds2<T>::operator[](int i){
     Assert(i == 0 || i == 1);
     return (i == 0) ? pMin : pMax;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 Bounds2<T> Union(const Bounds2<T> &b, const vec2<T> &p){
     Bounds2<T> ret;
     ret.pMin = Min(b.pMin, p);
@@ -1619,7 +1619,7 @@ Bounds2<T> Union(const Bounds2<T> &b, const vec2<T> &p){
     return ret;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 Bounds2<T> Union(const Bounds2<T> &b1, const Bounds2<T> &b2){
     Bounds2<T> ret;
     ret.pMin = Min(b1.pMin, b2.pMin);
@@ -1627,7 +1627,7 @@ Bounds2<T> Union(const Bounds2<T> &b1, const Bounds2<T> &b2){
     return ret;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 Bounds2<T> Intersect(const Bounds2<T> &b1, const Bounds2<T> &b2){
     Bounds2<T> ret;
     ret.pMin = Max(b1.pMin, b2.pMin);
@@ -1635,21 +1635,21 @@ Bounds2<T> Intersect(const Bounds2<T> &b1, const Bounds2<T> &b2){
     return ret;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 bool Overlaps(const Bounds2<T> &b1, const Bounds2<T> &b2){
     bool x = (b1.pMax.x >= b2.pMin.x) && (b1.pMin.x <= b2.pMax.x);
     bool y = (b1.pMax.y >= b2.pMin.y) && (b1.pMin.y <= b2.pMax.y);
     return (x && y);
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 bool Inside(const Bounds2<T> &b1, const Bounds2<T> &b2){
     bool x = (b1.pMax.x <= b2.pMax.x) && (b1.pMin.x >= b2.pMin.x);
     bool y = (b1.pMax.y <= b2.pMax.y) && (b1.pMin.y >= b2.pMin.y);
     return (x && y);
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 bool Inside(const vec2<T> &p, const Bounds2<T> &b){
     bool rv = (p.x >= b.pMin.x && p.x <= b.pMax.x &&
                p.y >= b.pMin.y && p.y <= b.pMax.y);
@@ -1661,26 +1661,26 @@ bool Inside(const vec2<T> &p, const Bounds2<T> &b){
     return rv;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 bool InsideExclusive(const vec2<T> &p, const Bounds2<T> &b){
     return (p.x >= b.pMin.x && p.x < b.pMax.x &&
             p.y >= b.pMin.y && p.y < b.pMax.y);
 }
 
-template <typename T, typename U> inline __bidevice__
+template <typename T, typename U> inline bb_cpu_gpu
 Bounds2<T> Expand(const Bounds2<T> &b, U delta){
     return Bounds2<T>(b.pMin - vec2<T>(delta, delta),
                       b.pMax + vec2<T>(delta, delta));
 }
 
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 vec3<T> &Bounds3<T>::operator[](int i){
     Assert(i == 0 || i == 1);
     return (i == 0) ? pMin : pMax;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 Bounds1<T> Union(const Bounds1<T> &b, const T &p){
     Bounds1<T> ret;
     ret.pMin = Min(b.pMin, p);
@@ -1688,7 +1688,7 @@ Bounds1<T> Union(const Bounds1<T> &b, const T &p){
     return ret;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 Bounds3<T> Union(const Bounds3<T> &b, const vec3<T> &p){
     Bounds3<T> ret;
     ret.pMin = Min(b.pMin, p);
@@ -1696,7 +1696,7 @@ Bounds3<T> Union(const Bounds3<T> &b, const vec3<T> &p){
     return ret;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 Bounds3<T> Union(const Bounds3<T> &b1, const Bounds3<T> &b2){
     Bounds3<T> ret;
     ret.pMin = Min(b1.pMin, b2.pMin);
@@ -1704,7 +1704,7 @@ Bounds3<T> Union(const Bounds3<T> &b1, const Bounds3<T> &b2){
     return ret;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 Bounds3<T> Intersect(const Bounds3<T> &b1, const Bounds3<T> &b2){
     Bounds3<T> ret;
     ret.pMin = Max(b1.pMin, b2.pMin);
@@ -1712,7 +1712,7 @@ Bounds3<T> Intersect(const Bounds3<T> &b1, const Bounds3<T> &b2){
     return ret;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 bool Overlaps(const Bounds3<T> &b1, const Bounds3<T> &b2){
     bool x = (b1.pMax.x >= b2.pMin.x) && (b1.pMin.x <= b2.pMax.x);
     bool y = (b1.pMax.y >= b2.pMin.y) && (b1.pMin.y <= b2.pMax.y);
@@ -1720,7 +1720,7 @@ bool Overlaps(const Bounds3<T> &b1, const Bounds3<T> &b2){
     return (x && y && z);
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 bool Inside(const Bounds3<T> &b1, const Bounds3<T> &b2){
     bool x = (b1.pMax.x <= b2.pMax.x) && (b1.pMin.x >= b2.pMin.x);
     bool y = (b1.pMax.y <= b2.pMax.y) && (b1.pMin.y >= b2.pMin.y);
@@ -1728,7 +1728,7 @@ bool Inside(const Bounds3<T> &b1, const Bounds3<T> &b2){
     return (x && y && z);
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 bool Inside(const T &p, const Bounds1<T> &b){
     bool rv = (p >= b.pMin && p <= b.pMin);
     if(!rv){
@@ -1739,7 +1739,7 @@ bool Inside(const T &p, const Bounds1<T> &b){
     return rv;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 bool Inside(const vec3<T> &p, const Bounds3<T> &b){
     bool rv = (p.x >= b.pMin.x && p.x <= b.pMax.x && p.y >= b.pMin.y &&
                p.y <= b.pMax.y && p.z >= b.pMin.z && p.z <= b.pMax.z);
@@ -1751,19 +1751,19 @@ bool Inside(const vec3<T> &p, const Bounds3<T> &b){
     return rv;
 }
 
-template <typename T> inline __bidevice__
+template <typename T> inline bb_cpu_gpu
 bool InsideExclusive(const vec3<T> &p, const Bounds3<T> &b){
     return (p.x >= b.pMin.x && p.x < b.pMax.x && p.y >= b.pMin.y &&
             p.y < b.pMax.y && p.z >= b.pMin.z && p.z < b.pMax.z);
 }
 
-template <typename T, typename U> inline __bidevice__
+template <typename T, typename U> inline bb_cpu_gpu
 Bounds3<T> Expand(const Bounds3<T> &b, U delta){
     return Bounds3<T>(b.pMin - vec3<T>(delta, delta, delta),
                       b.pMax + vec3<T>(delta, delta, delta));
 }
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 int SplitBounds(const Bounds3<T> &bounds, Bounds3<T> *split){
     vec3<T> A = bounds.pMin;
     vec3<T> B = bounds.pMax;
@@ -1788,27 +1788,27 @@ class Ray2{
     public:
     vec2f o, d;
     Float tMax;
-    __bidevice__ Ray2(const vec2f &origin, const vec2f &direction, Float maxt=Infinity){
+    bb_cpu_gpu Ray2(const vec2f &origin, const vec2f &direction, Float maxt=Infinity){
         o = origin; d = direction; tMax = maxt;
     }
 
-    __bidevice__ vec2f operator()(Float t){ return o + t * d; }
-    __bidevice__ vec2f operator()(Float t) const{ return o + t * d; }
+    bb_cpu_gpu vec2f operator()(Float t){ return o + t * d; }
+    bb_cpu_gpu vec2f operator()(Float t) const{ return o + t * d; }
 };
 
 class Ray{
     public:
     vec3f o, d;
     mutable Float tMax;
-    __bidevice__ Ray(const vec3f &origin, const vec3f &direction, Float maxt=Infinity){
+    bb_cpu_gpu Ray(const vec3f &origin, const vec3f &direction, Float maxt=Infinity){
         o = origin; d = direction; tMax = maxt;
     }
 
-    __bidevice__ vec3f operator()(Float t){ return o + t * d; }
-    __bidevice__ vec3f operator()(Float t) const{ return o + t * d; }
+    bb_cpu_gpu vec3f operator()(Float t){ return o + t * d; }
+    bb_cpu_gpu vec3f operator()(Float t) const{ return o + t * d; }
 };
 
-inline __bidevice__
+inline bb_cpu_gpu
 vec3f OffsetRayOrigin(const vec3f &p, const vec3f &pError,
                       const Normal3f &n, const vec3f &w)
 {
@@ -1826,7 +1826,7 @@ vec3f OffsetRayOrigin(const vec3f &p, const vec3f &pError,
     return po;
 }
 
-template<typename T> inline  __bidevice__
+template<typename T> inline  bb_cpu_gpu
 bool Bounds2<T>::Intersect(const Ray2 &ray, Float *tHit0, Float *tHit1) const{
     Float t0 = 0, t1 = ray.tMax;
     for(int i = 0; i < 2; i++){
@@ -1846,7 +1846,7 @@ bool Bounds2<T>::Intersect(const Ray2 &ray, Float *tHit0, Float *tHit1) const{
     return true;
 }
 
-template<typename T> inline  __bidevice__
+template<typename T> inline  bb_cpu_gpu
 bool Bounds3<T>::Intersect(const Ray &ray, Float *tHit0, Float *tHit1) const{
     Float t0 = 0, t1 = ray.tMax;
     for(int i = 0; i < 3; i++){
@@ -1866,7 +1866,7 @@ bool Bounds3<T>::Intersect(const Ray &ray, Float *tHit0, Float *tHit1) const{
     return true;
 }
 
-inline __host__ Float rand_float(){
+inline Float rand_float(){
     return rand() / (RAND_MAX+1.f);
 }
 

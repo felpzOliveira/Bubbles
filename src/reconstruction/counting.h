@@ -29,17 +29,17 @@
 */
 
 template<typename T>
-inline __bidevice__ vec3f AsFloat(vec3<T> vf){
+inline bb_cpu_gpu vec3f AsFloat(vec3<T> vf){
     return vec3f(Float(vf.x), Float(vf.y), Float(vf.z));
 }
 
 template<typename T>
-inline __bidevice__ vec2f AsFloat(vec2<T> vf){
+inline bb_cpu_gpu vec2f AsFloat(vec2<T> vf){
     return vec2f(Float(vf.x), Float(vf.y));
 }
 
 template<typename U>
-inline __bidevice__ U ClampedIndex(U u, U sizes, int dims, int &clamped){
+inline bb_cpu_gpu U ClampedIndex(U u, U sizes, int dims, int &clamped){
     U copy = u;
     u[0] = Clamp(u[0], 0, sizes[0]-1);
     u[1] = Clamp(u[1], 0, sizes[1]-1);
@@ -71,17 +71,17 @@ class LightweightGrid{
     Q bounds;
     DataType *stored;
 
-    __bidevice__ LightweightGrid(){}
+    bb_cpu_gpu LightweightGrid(){}
     void SetDimension(vec2f){ dimensions = 2; }
     void SetDimension(vec3f){ dimensions = 3; }
-    __bidevice__ unsigned int GetCellCount(){ return total; }
-    __bidevice__ Q GetBounds(){ return bounds; }
-    __bidevice__ T GetCellSize(){ return cellsLen; }
-    __bidevice__ U GetIndexCount(){ return usizes; }
-    __bidevice__ int GetDimensions(){ return dimensions; }
+    bb_cpu_gpu unsigned int GetCellCount(){ return total; }
+    bb_cpu_gpu Q GetBounds(){ return bounds; }
+    bb_cpu_gpu T GetCellSize(){ return cellsLen; }
+    bb_cpu_gpu U GetIndexCount(){ return usizes; }
+    bb_cpu_gpu int GetDimensions(){ return dimensions; }
 
     /* Get offset for dimension value 'p' on axis 'axis' in case it lies on boundary */
-    __bidevice__ Float ExtremeEpsilon(Float p, int axis){
+    bb_cpu_gpu Float ExtremeEpsilon(Float p, int axis){
         Float eps = 0;
         Float p0 = bounds.LengthAt(0, axis);
         Float p1 = bounds.LengthAt(1, axis);
@@ -95,12 +95,12 @@ class LightweightGrid{
     }
 
     /* Get logical index of cell */
-    __bidevice__ U GetCellIndex(unsigned int i){
+    bb_cpu_gpu U GetCellIndex(unsigned int i){
         return DimensionalIndex(i, usizes, dimensions);
     }
 
     /* Hash position 'p' into a cell index */
-    __bidevice__ U GetHashedPosition(const T &p){
+    bb_cpu_gpu U GetHashedPosition(const T &p){
         U u;
         if(!Inside(p, bounds)){
             printf(" [ERROR] : Requested for hash on point outside domain ");
@@ -128,14 +128,14 @@ class LightweightGrid{
     }
 
     /* Get the ordered cell index of a cell */
-    __bidevice__ unsigned int GetLinearCellIndex(const U &u){
+    bb_cpu_gpu unsigned int GetLinearCellIndex(const U &u){
         unsigned int h = LinearIndex(u, usizes, dimensions);
         AssertA(h < total, "Invalid cell id computation");
         return h;
     }
 
     /* Hash position 'p' and get the linear cell index */
-    __bidevice__ unsigned int GetLinearHashedPosition(const T &p){
+    bb_cpu_gpu unsigned int GetLinearHashedPosition(const T &p){
         U u = GetHashedPosition(p);
         return GetLinearCellIndex(u);
     }
@@ -210,13 +210,13 @@ struct FilterSolver2D{
     Float sigmaSquared;
     Float invTwoPiSigmaSquared;
 
-    __bidevice__ FilterSolver2D(Float _sigma){
+    bb_cpu_gpu FilterSolver2D(Float _sigma){
         sigmaSquared = _sigma * _sigma;
         invTwoPiSigmaSquared = 1.f / (TwoPi * sigmaSquared);
     }
 
     template<typename Fn>
-    __bidevice__ void Convolution(int radius, Fn fn){
+    bb_cpu_gpu void Convolution(int radius, Fn fn){
         AssertA(radius % 2 != 0, "Radius is even");
         int s = (radius-1) / 2;
         for(int x = -s; x <= s; x++){
@@ -227,7 +227,7 @@ struct FilterSolver2D{
     }
 
     template<typename SamplerFn>
-    __bidevice__ Float Box(vec2ui u, SamplerFn sampler, Float ratio){
+    bb_cpu_gpu Float Box(vec2ui u, SamplerFn sampler, Float ratio){
         int i = u.x, j = u.y;
         Float val = Float(0);
         Float iterations = 0;
@@ -241,7 +241,7 @@ struct FilterSolver2D{
     }
 
     template<typename SamplerFn>
-    __bidevice__ Float Gaussian(vec2ui u, SamplerFn sampler, Float ratio){
+    bb_cpu_gpu Float Gaussian(vec2ui u, SamplerFn sampler, Float ratio){
         int i = u.x, j = u.y;
         Float val = Float(0);
         int radius = 5 + ratio * 2;
@@ -263,13 +263,13 @@ struct FilterSolver3D{
     Float sigmaSquared;
     Float invTwoPiSigmaSquared;
 
-    __bidevice__ FilterSolver3D(Float _sigma){
+    bb_cpu_gpu FilterSolver3D(Float _sigma){
         sigmaSquared = _sigma * _sigma;
         invTwoPiSigmaSquared = 1.f / (TwoPi * sigmaSquared);
     }
 
     template<typename Fn>
-    __bidevice__ void Convolution(int radius, Fn fn){
+    bb_cpu_gpu void Convolution(int radius, Fn fn){
         AssertA(radius % 2 != 0, "Radius is even");
         int s = (radius-1) / 2;
         for(int x = -s; x <= s; x++){
@@ -282,7 +282,7 @@ struct FilterSolver3D{
     }
 
     template<typename SamplerFn>
-    __bidevice__ Float Box(vec3ui u, SamplerFn sampler, Float ratio){
+    bb_cpu_gpu Float Box(vec3ui u, SamplerFn sampler, Float ratio){
         int i = u.x, j = u.y, k = u.z;
         Float val = Float(0);
         Float iterations = 0;
@@ -296,7 +296,7 @@ struct FilterSolver3D{
     }
 
     template<typename SamplerFn>
-    __bidevice__ Float Gaussian(vec3ui u, SamplerFn sampler, Float ratio){
+    bb_cpu_gpu Float Gaussian(vec3ui u, SamplerFn sampler, Float ratio){
         int i = u.x, j = u.y, k = u.z;
         Float val = Float(0);
         int radius = 5 + ratio * 2;
@@ -353,7 +353,7 @@ class CountingGrid{
     Float *smoothFieldDIF;
     int dimensions;
 
-    __bidevice__ CountingGrid(){}
+    bb_cpu_gpu CountingGrid(){}
     void SetDimension(vec2f){ dimensions = 2; }
     void SetDimension(vec3f){ dimensions = 3; }
 

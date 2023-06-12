@@ -2,15 +2,13 @@
 #include <collider.h>
 #include <sstream>
 
-__host__ Shape *MakeSphere(const Transform &toWorld, Float radius,
-                           bool reverseOrientation)
-{
+Shape *MakeSphere(const Transform &toWorld, Float radius, bool reverseOrientation){
     Shape *shape = cudaAllocateVx(Shape, 1);
     shape->InitSphere(toWorld, radius, reverseOrientation);
     return shape;
 }
 
-__host__ std::string Shape::SphereSerialize() const{
+std::string Shape::SphereSerialize() const{
     std::stringstream ss;
 
     ss << "ShapeBegin\n";
@@ -32,7 +30,7 @@ __host__ std::string Shape::SphereSerialize() const{
     return ss.str();
 }
 
-__bidevice__ void Shape::InitSphere(const Transform &toWorld, Float rad,
+bb_cpu_gpu void Shape::InitSphere(const Transform &toWorld, Float rad,
                                     bool reverseOr)
 {
     ObjectToWorld = toWorld;
@@ -42,16 +40,16 @@ __bidevice__ void Shape::InitSphere(const Transform &toWorld, Float rad,
     type = ShapeType::ShapeSphere;
 }
 
-__bidevice__ Bounds3f Shape::SphereGetBounds(){
+bb_cpu_gpu Bounds3f Shape::SphereGetBounds(){
     return ObjectToWorld(Bounds3f(vec3f(-radius), vec3f(radius)));
 }
 
-__bidevice__ Float Shape::SphereClosestDistance(const vec3f &point) const{
+bb_cpu_gpu Float Shape::SphereClosestDistance(const vec3f &point) const{
     vec3f pLocal = WorldToObject.Point(point);
     return Distance(pLocal, vec3f(0)) - radius;
 }
 
-__bidevice__ void Shape::SphereClosestPoint(const vec3f &point, 
+bb_cpu_gpu void Shape::SphereClosestPoint(const vec3f &point, 
                                             ClosestPointQuery *query) const
 {
     Float d = SphereClosestDistance(point);
@@ -71,7 +69,7 @@ __bidevice__ void Shape::SphereClosestPoint(const vec3f &point,
     *query = ClosestPointQuery(p, ObjectToWorld.Normal(N), d, VelocityAt(p));
 }
 
-__bidevice__ bool Shape::SphereIntersect(const Ray &ray, SurfaceInteraction *isect,
+bb_cpu_gpu bool Shape::SphereIntersect(const Ray &ray, SurfaceInteraction *isect,
                                          Float *tShapeHit) const
 {
     vec3f pHit;

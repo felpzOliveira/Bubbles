@@ -1,7 +1,7 @@
 #include <collider.h>
 
 template<class Collider, class T, class PointQuery>
-__bidevice__ bool CollisionHandle(Collider *collider, Float radius,
+bb_cpu_gpu bool CollisionHandle(Collider *collider, Float radius,
                                   Float restitutionCoefficient,
                                   Float frictionCoefficient,
                                   T *position, T *velocity)
@@ -46,31 +46,31 @@ __bidevice__ bool CollisionHandle(Collider *collider, Float radius,
 ////////////////////////
 // Collider2 
 ///////////////////////
-__bidevice__ Collider2::Collider2(){ shape = nullptr; frictionCoefficient = 0; isActive = true; }
-__bidevice__ Collider2::Collider2(Shape2 *shape) : shape(shape), frictionCoefficient(0), isActive(true){}
+bb_cpu_gpu Collider2::Collider2(){ shape = nullptr; frictionCoefficient = 0; isActive = true; }
+bb_cpu_gpu Collider2::Collider2(Shape2 *shape) : shape(shape), frictionCoefficient(0), isActive(true){}
 
-__host__ void Collider2::SetActive(bool active){
+void Collider2::SetActive(bool active){
     isActive = active;
 }
 
-__bidevice__ bool Collider2::IsActive(){
+bb_cpu_gpu bool Collider2::IsActive(){
     return isActive;
 }
 
-__bidevice__ void Collider2::Initialize(Shape2 *shp, Float frictionCoef){
+bb_cpu_gpu void Collider2::Initialize(Shape2 *shp, Float frictionCoef){
     shape = shp;
     frictionCoefficient = frictionCoef;
     isActive = true;
 }
 
-__bidevice__ bool Collider2::IsPenetrating(const ClosestPointQuery2 &colliderPoint,
+bb_cpu_gpu bool Collider2::IsPenetrating(const ClosestPointQuery2 &colliderPoint,
                                            const vec2f &position, Float radius)
 {
     AssertA(shape, "Invalid shape pointer for Collider2");
     return shape->IsInside(position) || Absf(colliderPoint.signedDistance) < radius;
 }
 
-__bidevice__ bool Collider2::ResolveCollision(Float radius, Float restitutionCoefficient,
+bb_cpu_gpu bool Collider2::ResolveCollision(Float radius, Float restitutionCoefficient,
                                               vec2f *position, vec2f *velocity)
 {
     AssertA(shape, "Invalid shape pointer for Collider2::ResolveCollision");
@@ -81,11 +81,11 @@ __bidevice__ bool Collider2::ResolveCollision(Float radius, Float restitutionCoe
                                                                  position, velocity);
 }
 
-__bidevice__ bool Collider2::OptmizedClosestPointCheck(const vec2f &position){
+bb_cpu_gpu bool Collider2::OptmizedClosestPointCheck(const vec2f &position){
     return true;
 }
 
-__host__ void Collider2::GenerateSDFs(){
+void Collider2::GenerateSDFs(){
     AssertA(shape != nullptr, "Invalid shape pointer for SDF generation");
     GenerateShapeSDF(shape);
 }
@@ -93,24 +93,24 @@ __host__ void Collider2::GenerateSDFs(){
 ////////////////////////
 // Collider 
 ///////////////////////
-__bidevice__ Collider3::Collider3(){ shape = nullptr; frictionCoefficient = 0; isActive = true; }
-__bidevice__ Collider3::Collider3(Shape *shape): shape(shape), frictionCoefficient(0), isActive(true){}
+bb_cpu_gpu Collider3::Collider3(){ shape = nullptr; frictionCoefficient = 0; isActive = true; }
+bb_cpu_gpu Collider3::Collider3(Shape *shape): shape(shape), frictionCoefficient(0), isActive(true){}
 
-__bidevice__ void Collider3::Initialize(Shape *shp, Float frictionCoef){
+bb_cpu_gpu void Collider3::Initialize(Shape *shp, Float frictionCoef){
     shape = shp;
     frictionCoefficient = frictionCoef;
     isActive = true;
 }
 
-__host__ void Collider3::SetActive(bool active){
+void Collider3::SetActive(bool active){
     isActive = active;
 }
 
-__bidevice__ bool Collider3::IsActive(){
+bb_cpu_gpu bool Collider3::IsActive(){
     return isActive;
 }
 
-__bidevice__ bool Collider3::OptmizedClosestPointCheck(const vec3f &position){
+bb_cpu_gpu bool Collider3::OptmizedClosestPointCheck(const vec3f &position){
     if(shape->type == ShapeType::ShapeMesh){
         if(!Inside(position, shape->GetBounds())){
             return false;
@@ -120,7 +120,7 @@ __bidevice__ bool Collider3::OptmizedClosestPointCheck(const vec3f &position){
     return true;
 }
 
-__bidevice__ bool Collider3::IsPenetrating(const ClosestPointQuery &colliderPoint,
+bb_cpu_gpu bool Collider3::IsPenetrating(const ClosestPointQuery &colliderPoint,
                                            const vec3f &position, Float radius)
 {
     AssertA(shape, "Invalid shape pointer for Collider");
@@ -132,7 +132,7 @@ __bidevice__ bool Collider3::IsPenetrating(const ClosestPointQuery &colliderPoin
     return shape->IsInside(position) || Absf(colliderPoint.signedDistance) < radius;
 }
 
-__bidevice__ bool Collider3::ResolveCollision(Float radius, Float restitutionCoefficient,
+bb_cpu_gpu bool Collider3::ResolveCollision(Float radius, Float restitutionCoefficient,
                                               vec3f *position, vec3f *velocity)
 {
     AssertA(shape, "Invalid shape pointer for Collider::ResolveCollision");
@@ -143,7 +143,7 @@ __bidevice__ bool Collider3::ResolveCollision(Float radius, Float restitutionCoe
                                                                 position, velocity);
 }
 
-__host__ void Collider3::GenerateSDFs(){
+void Collider3::GenerateSDFs(){
     AssertA(shape != nullptr, "Invalid shape pointer for SDF generation");
     GenerateShapeSDF(shape);
 }
@@ -152,20 +152,20 @@ __host__ void Collider3::GenerateSDFs(){
 // ColliderSet2 
 ///////////////////////
 
-__bidevice__ ColliderSet2::ColliderSet2(){ nColiders = 0; colliders = nullptr; }
+bb_cpu_gpu ColliderSet2::ColliderSet2(){ nColiders = 0; colliders = nullptr; }
 
-__bidevice__ void ColliderSet2::Initialize(Collider2 **colls, int count){
+bb_cpu_gpu void ColliderSet2::Initialize(Collider2 **colls, int count){
     colliders = colls;
     nColiders = count;
 }
 
-__host__ void ColliderSet2::SetActive(int which, bool active){
+void ColliderSet2::SetActive(int which, bool active){
     if(which >= 0 && which < nColiders){
         colliders[which]->SetActive(active);
     }
 }
 
-__bidevice__ bool ColliderSet2::IsActive(int which){
+bb_cpu_gpu bool ColliderSet2::IsActive(int which){
     if(which >= 0 && which < nColiders){
         return colliders[which]->IsActive();
     }
@@ -173,7 +173,7 @@ __bidevice__ bool ColliderSet2::IsActive(int which){
     return false;
 }
 
-__bidevice__ bool ColliderSet2::ResolveCollision(Float radius, Float restitutionCoefficient,
+bb_cpu_gpu bool ColliderSet2::ResolveCollision(Float radius, Float restitutionCoefficient,
                                                  vec2f *position, vec2f *velocity)
 {
     AssertA(nColiders > 0, "No Colliders present for ColliderSet2::ResolveCollision");
@@ -201,7 +201,7 @@ __bidevice__ bool ColliderSet2::ResolveCollision(Float radius, Float restitution
                                                        position, velocity);
 }
 
-__host__ void ColliderSet2::GenerateSDFs(){
+void ColliderSet2::GenerateSDFs(){
     AssertA(nColiders > 0, "No Colliders present for ColliderSet2::GenerateSDFs");
     for(int i = 0; i < nColiders; i++){
         if(colliders[i]->shape->grid == nullptr){
@@ -214,14 +214,14 @@ __host__ void ColliderSet2::GenerateSDFs(){
 // ColliderSet 
 ///////////////////////
 
-__bidevice__ ColliderSet3::ColliderSet3(){ nColiders = 0; colliders = nullptr; }
+bb_cpu_gpu ColliderSet3::ColliderSet3(){ nColiders = 0; colliders = nullptr; }
 
-__bidevice__ void ColliderSet3::Initialize(Collider3 **colls, int count){
+bb_cpu_gpu void ColliderSet3::Initialize(Collider3 **colls, int count){
     colliders = colls;
     nColiders = count;
 }
 
-__bidevice__ bool ColliderSet3::IsActive(int which){
+bb_cpu_gpu bool ColliderSet3::IsActive(int which){
     if(which >= 0 && which < nColiders){
         return colliders[which]->IsActive();
     }
@@ -229,13 +229,13 @@ __bidevice__ bool ColliderSet3::IsActive(int which){
     return false;
 }
 
-__host__ void ColliderSet3::SetActive(int which, bool active){
+void ColliderSet3::SetActive(int which, bool active){
     if(which >= 0 && which < nColiders){
         colliders[which]->SetActive(active);
     }
 }
 
-__bidevice__ bool ColliderSet3::ResolveCollision(Float radius, Float restitutionCoefficient,
+bb_cpu_gpu bool ColliderSet3::ResolveCollision(Float radius, Float restitutionCoefficient,
                                                  vec3f *position, vec3f *velocity)
 {
     AssertA(nColiders > 0, "No Colliders present for ColliderSet::ResolveCollision");
@@ -263,7 +263,7 @@ __bidevice__ bool ColliderSet3::ResolveCollision(Float radius, Float restitution
                                                        position, velocity);
 }
 
-__host__ void ColliderSet3::GenerateSDFs(){
+void ColliderSet3::GenerateSDFs(){
     AssertA(nColiders > 0, "No Colliders present for ColliderSet2::GenerateSDFs");
     for(int i = 0; i < nColiders; i++){
         if(colliders[i]->shape->grid == nullptr){
@@ -277,17 +277,17 @@ __host__ void ColliderSet3::GenerateSDFs(){
 // ColliderSet2 Builder
 ///////////////////////
 
-__host__ ColliderSetBuilder2::ColliderSetBuilder2(){ setReference = nullptr; }
+ColliderSetBuilder2::ColliderSetBuilder2(){ setReference = nullptr; }
 
-__host__ void ColliderSetBuilder2::AddCollider2(Collider2 *collider){
+void ColliderSetBuilder2::AddCollider2(Collider2 *collider){
     colliders.push_back(collider);
 }
 
-__host__ void ColliderSetBuilder2::AddCollider2(Shape2 *shape, Float frictionCoef){
+void ColliderSetBuilder2::AddCollider2(Shape2 *shape, Float frictionCoef){
     colliders.push_back(MakeCollider2(shape, frictionCoef));
 }
 
-__host__ ColliderSet2 *ColliderSetBuilder2::GetColliderSet(){
+ColliderSet2 *ColliderSetBuilder2::GetColliderSet(){
     AssertA(colliders.size() > 0, "No colliders given for {GetColliderSet}");
     setReference = cudaAllocateVx(ColliderSet2, 1);
     Collider2 **colliderList = cudaAllocateVx(Collider2*, colliders.size());
@@ -304,17 +304,17 @@ __host__ ColliderSet2 *ColliderSetBuilder2::GetColliderSet(){
 // ColliderSet Builder
 ///////////////////////
 
-__host__ ColliderSetBuilder3::ColliderSetBuilder3(){ setReference = nullptr; }
+ColliderSetBuilder3::ColliderSetBuilder3(){ setReference = nullptr; }
 
-__host__ void ColliderSetBuilder3::AddCollider3(Collider3 *collider){
+void ColliderSetBuilder3::AddCollider3(Collider3 *collider){
     colliders.push_back(collider);
 }
 
-__host__ void ColliderSetBuilder3::AddCollider3(Shape *shape, Float frictionCoef){
+void ColliderSetBuilder3::AddCollider3(Shape *shape, Float frictionCoef){
     colliders.push_back(MakeCollider3(shape, frictionCoef));
 }
 
-__host__ ColliderSet3 *ColliderSetBuilder3::GetColliderSet(){
+ColliderSet3 *ColliderSetBuilder3::GetColliderSet(){
     AssertA(colliders.size() > 0, "No colliders given for {GetColliderSet}");
     setReference = cudaAllocateVx(ColliderSet3, 1);
     Collider3 **colliderList = cudaAllocateVx(Collider3*, colliders.size());
@@ -331,13 +331,13 @@ __host__ ColliderSet3 *ColliderSetBuilder3::GetColliderSet(){
 // Utility 
 ///////////////
 
-__host__ Collider2 *MakeCollider2(Shape2 *shape, Float frictionCoef){
+Collider2 *MakeCollider2(Shape2 *shape, Float frictionCoef){
     Collider2 *collider = cudaAllocateVx(Collider2, 1);
     collider->Initialize(shape, frictionCoef);
     return collider;
 }
 
-__host__ Collider3 *MakeCollider3(Shape *shape, Float frictionCoef){
+Collider3 *MakeCollider3(Shape *shape, Float frictionCoef){
     Collider3 *collider = cudaAllocateVx(Collider3, 1);
     collider->Initialize(shape, frictionCoef);
     if(shape->type == ShapeMesh){

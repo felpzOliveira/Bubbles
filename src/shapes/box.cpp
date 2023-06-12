@@ -3,34 +3,30 @@
 #include <collider.h>
 #include <sstream>
 
-__host__ Shape *MakeBox(const Transform &toWorld, const vec3f &size,
-                        bool reverseOrientation)
-{
+Shape *MakeBox(const Transform &toWorld, const vec3f &size, bool reverseOrientation){
     Shape *shape = cudaAllocateVx(Shape, 1);
     shape->InitBox(toWorld, size.x, size.y, size.z, reverseOrientation);
     return shape;
 }
 
-__bidevice__ Plane3::Plane3(){}
-__bidevice__ Plane3::Plane3(const vec3f &p, const Normal3f &n){
+bb_cpu_gpu Plane3::Plane3(){}
+bb_cpu_gpu Plane3::Plane3(const vec3f &p, const Normal3f &n){
     Set(p, n);
 }
 
-__bidevice__ void Plane3::Set(const vec3f &p, const Normal3f &n){
+bb_cpu_gpu void Plane3::Set(const vec3f &p, const Normal3f &n){
     point = p;
     normal = n;
 }
 
-__bidevice__ vec3f Plane3::ClosestPoint(const vec3f &p) const{
+bb_cpu_gpu vec3f Plane3::ClosestPoint(const vec3f &p) const{
     vec3f r = p - point;
     vec3f vn = ToVec3(normal);
     return r - Dot(r, vn) * vn + point;
 }
 
 
-__host__ void Shape::InitBox(const Transform &toWorld, Float sx, Float sy,
-                             Float sz, bool reverseOr)
-{
+void Shape::InitBox(const Transform &toWorld, Float sx, Float sy, Float sz, bool reverseOr){
     type = ShapeType::ShapeBox;
     ObjectToWorld = toWorld;
     WorldToObject = Inverse(toWorld);
@@ -38,7 +34,7 @@ __host__ void Shape::InitBox(const Transform &toWorld, Float sx, Float sy,
     sizex = sx; sizey = sy; sizez = sz;
 }
 
-__host__ std::string Shape::BoxSerialize() const{
+std::string Shape::BoxSerialize() const{
     std::stringstream ss;
 
     ss << "ShapeBegin\n";
@@ -60,22 +56,22 @@ __host__ std::string Shape::BoxSerialize() const{
     return ss.str();
 }
 
-__bidevice__ Bounds3f Shape::BoxGetBounds(){
+bb_cpu_gpu Bounds3f Shape::BoxGetBounds(){
     Float hx = sizex/2.0;
     Float hy = sizey/2.0;
     Float hz = sizez/2.0;
     return ObjectToWorld(Bounds3f(vec3f(-hx, -hy, -hz), vec3f(hx, hy, hz)));
 }
 
-__bidevice__ bool Shape::BoxIntersect(const Ray &ray, SurfaceInteraction *isect,
-                                      Float *tShapeHit) const
+bb_cpu_gpu bool Shape::BoxIntersect(const Ray &ray, SurfaceInteraction *isect,
+                                    Float *tShapeHit) const
 {
     // TODO
     printf("Warning: Called unimplemented method\n");
     return false;
 }
 
-__bidevice__ Float Shape::BoxClosestDistance(const vec3f &point) const{
+bb_cpu_gpu Float Shape::BoxClosestDistance(const vec3f &point) const{
     vec3f pLocal = WorldToObject.Point(point);
     Float hx = sizex/2.0;
     Float hy = sizey/2.0;
@@ -112,8 +108,8 @@ __bidevice__ Float Shape::BoxClosestDistance(const vec3f &point) const{
     return isNeg ? -Distance(pLocal, closest) : Distance(pLocal, closest);
 }
 
-__bidevice__ void Shape::BoxClosestPoint(const vec3f &point,
-                                         ClosestPointQuery *query) const
+bb_cpu_gpu void Shape::BoxClosestPoint(const vec3f &point,
+                                       ClosestPointQuery *query) const
 {
     vec3f pLocal = WorldToObject.Point(point);
     Float hx = sizex/2.0;

@@ -42,161 +42,155 @@ typedef struct{
 }SphSolverData3;
 
 
-__host__ void SphSolverData2SetupFor(SphSolverData2 *solverData,
-                                     int expectedParticleCount);
-__host__ void SphSolverData3SetupFor(SphSolverData3 *solverData,
-                                     int expectedParticleCount);
+void SphSolverData2SetupFor(SphSolverData2 *solverData, int expectedParticleCount);
+void SphSolverData3SetupFor(SphSolverData3 *solverData, int expectedParticleCount);
 
 class SphSolver2{
     public:
     SphSolverData2 *solverData;
     Float stepInterval;
-    __bidevice__ SphSolver2();
-    __bidevice__ void Initialize(SphSolverData2 *data);
-    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
-                        Grid2 *domain, SphParticleSet2 *pSet);
+    bb_cpu_gpu SphSolver2();
+    bb_cpu_gpu void Initialize(SphSolverData2 *data);
+    void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
+               Grid2 *domain, SphParticleSet2 *pSet);
 
-    __host__ void SetColliders(ColliderSet2 *colliders);
-    __bidevice__ SphSolverData2 *GetSphSolverData();
-    __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
-    __host__ void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);
+    void SetColliders(ColliderSet2 *colliders);
+    bb_cpu_gpu SphSolverData2 *GetSphSolverData();
+    void SetViscosityCoefficient(Float viscosityCoefficient);
+    void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);
 
-    __bidevice__ Float GetKernelRadius();
-    __bidevice__ SphParticleSet2 *GetSphParticleSet();
-    __host__ void UpdateDensity();
-    __host__ void Advance(Float timeIntervalInSeconds);
+    bb_cpu_gpu Float GetKernelRadius();
+    bb_cpu_gpu SphParticleSet2 *GetSphParticleSet();
+    void UpdateDensity();
+    void Advance(Float timeIntervalInSeconds);
 };
 
 class SphSolver3{
     public:
     SphSolverData3 *solverData;
     Float stepInterval;
-    __bidevice__ SphSolver3();
-    __bidevice__ void Initialize(SphSolverData3 *data);
-    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
-                        Grid3 *domain, SphParticleSet3 *pSet);
+    bb_cpu_gpu SphSolver3();
+    bb_cpu_gpu void Initialize(SphSolverData3 *data);
+    void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
+               Grid3 *domain, SphParticleSet3 *pSet);
 
-    __host__ void SetColliders(ColliderSet3 *colliders);
-    __host__ ColliderSet3 *GetColliders();
+    void SetColliders(ColliderSet3 *colliders);
+    ColliderSet3 *GetColliders();
 
-    __bidevice__ SphSolverData3 *GetSphSolverData();
-    __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
-    __host__ void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);
+    bb_cpu_gpu SphSolverData3 *GetSphSolverData();
+    void SetViscosityCoefficient(Float viscosityCoefficient);
+    void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);
 
-    __bidevice__ Float GetKernelRadius();
-    __bidevice__ SphParticleSet3 *GetSphParticleSet();
+    bb_cpu_gpu Float GetKernelRadius();
+    bb_cpu_gpu SphParticleSet3 *GetSphParticleSet();
 
-    __host__ void Advance(Float timeIntervalInSeconds);
+    void Advance(Float timeIntervalInSeconds);
 };
 
 class SphGasSolver2{
     public:
     SphSolver2 *solver;
 
-    __bidevice__ SphGasSolver2();
+    bb_cpu_gpu SphGasSolver2();
 
-    __host__ void Initialize();
+    void Initialize();
 
-    __host__ void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
-                        Grid2 *domain, SphParticleSet2 *pSet);
+    void Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
+               Grid2 *domain, SphParticleSet2 *pSet);
 
-    __host__ void SetColliders(ColliderSet2 *colliders);
+    void SetColliders(ColliderSet2 *colliders);
 
-    __host__ void SetViscosityCoefficient(Float viscosityCoefficient);
-    __host__ void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);
+    void SetViscosityCoefficient(Float viscosityCoefficient);
+    void SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient);
 
-    __bidevice__ Float GetKernelRadius();
+    bb_cpu_gpu Float GetKernelRadius();
 
-    __bidevice__ SphSolverData2 *GetSphSolverData();
+    bb_cpu_gpu SphSolverData2 *GetSphSolverData();
 
-    __host__ void UpdateDensity();
-    __host__ void Advance(Float timeIntervalInSeconds);
+    void UpdateDensity();
+    void Advance(Float timeIntervalInSeconds);
 };
 
 // Generic SphSolver routines
 
 // Compute standard sph density, for the simple formulation can also compute
 // pressure in a single pass increasing performance.
-__bidevice__ void ComputeDensityFor(SphSolverData2 *data, int particleId,
-                                    int compute_pressure = 1);
-__bidevice__ void ComputeDensityFor(SphSolverData3 *data, int particleId,
-                                    int compute_pressure = 1);
+bb_cpu_gpu void ComputeDensityFor(SphSolverData2 *data, int particleId,
+                                  int compute_pressure = 1);
+bb_cpu_gpu void ComputeDensityFor(SphSolverData3 *data, int particleId,
+                                  int compute_pressure = 1);
 // Compute pressure for a given particle with density di
-__bidevice__ void ComputePressureFor(SphSolverData2 *data, int particleId, Float di);
-__bidevice__ void ComputePressureFor(SphSolverData3 *data, int particleId, Float di);
+bb_cpu_gpu void ComputePressureFor(SphSolverData2 *data, int particleId, Float di);
+bb_cpu_gpu void ComputePressureFor(SphSolverData3 *data, int particleId, Float di);
 
 // Compute viscosity, gravity and drag forces to particle force vector
-__bidevice__ void ComputeNonPressureForceFor(SphSolverData2 *data, int particleId);
-__bidevice__ void ComputeNonPressureForceFor(SphSolverData3 *data, int particleId);
+bb_cpu_gpu void ComputeNonPressureForceFor(SphSolverData2 *data, int particleId);
+bb_cpu_gpu void ComputeNonPressureForceFor(SphSolverData3 *data, int particleId);
 // Compute viscosity/gravity/drag/pressure forces in a single call
-__bidevice__ void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
-                                      Float timeStep, int extended = 0,
-                                      int integrate = 1);
-__bidevice__ void ComputeAllForcesFor(SphSolverData3 *data, int particleId,
-                                      Float timeStep, int extended = 0);
+bb_cpu_gpu void ComputeAllForcesFor(SphSolverData2 *data, int particleId,
+                                    Float timeStep, int extended = 0, int integrate = 1);
+bb_cpu_gpu void ComputeAllForcesFor(SphSolverData3 *data, int particleId,
+                                    Float timeStep, int extended = 0);
 // Evolve particles
-__bidevice__ void TimeIntegrationFor(SphSolverData2 *data, int particleId,
-                                     Float timeStep, int extended);
-__bidevice__ void TimeIntegrationFor(SphSolverData3 *data, int particleId,
-                                     Float timeStep, int extended);
-__bidevice__ void ComputeInitialTemperatureFor(SphSolverData2 *data, int particleId,
-                                               Float Tmin, Float Tmax, int maxLevel);
+bb_cpu_gpu void TimeIntegrationFor(SphSolverData2 *data, int particleId,
+                                   Float timeStep, int extended);
+bb_cpu_gpu void TimeIntegrationFor(SphSolverData3 *data, int particleId,
+                                   Float timeStep, int extended);
+bb_cpu_gpu void ComputeInitialTemperatureFor(SphSolverData2 *data, int particleId,
+                                             Float Tmin, Float Tmax, int maxLevel);
 
 // Generic calls for sph solvers wrappers
 // Perform computation on CPU {easy debug}
-__host__ void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure = 1);
-__host__ void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure = 1);
-__host__ void ComputeNormalCPU(SphSolverData3 *data);
-__host__ void ComputeNormalCPU(SphSolverData2 *data);
-__host__ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
+void ComputeDensityCPU(SphSolverData2 *data, int compute_pressure = 1);
+void ComputeDensityCPU(SphSolverData3 *data, int compute_pressure = 1);
+void ComputeNormalCPU(SphSolverData3 *data);
+void ComputeNormalCPU(SphSolverData2 *data);
+void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
                                           int integrate=1);
-__host__ void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
-__host__ void ComputeNonPressureForceCPU(SphSolverData2 *data);
-__host__ void ComputeNonPressureForceCPU(SphSolverData3 *data);
-__host__ void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended=0);
-__host__ void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended=0);
-__host__ void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
-                                                  Float Tmax, int maxLevel);
-__host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float timeStep);
-__host__ void ComputePseudoViscosityInterpolationCPU(SphSolverData3 *data, Float timeStep);
+void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
+void ComputeNonPressureForceCPU(SphSolverData2 *data);
+void ComputeNonPressureForceCPU(SphSolverData3 *data);
+void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended=0);
+void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended=0);
+void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
+                                     Float Tmax, int maxLevel);
+void ComputePseudoViscosityInterpolationCPU(SphSolverData2 *data, Float timeStep);
+void ComputePseudoViscosityInterpolationCPU(SphSolverData3 *data, Float timeStep);
 
 // Perform computation on GPU
-__host__ void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure = 1);
-__host__ void ComputeDensityGPU(SphSolverData3 *data, int compute_pressure = 1);
-__host__ void ComputeNormalGPU(SphSolverData3 *data);
-__host__ void ComputeNormalGPU(SphSolverData2 *data);
-__host__ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep,
-                                      int integrate=1);
-__host__ void ComputePressureForceGPU(SphSolverData3 *data, Float timeStep);
-__host__ void ComputeNonPressureForceGPU(SphSolverData2 *data);
-__host__ void ComputeNonPressureForceGPU(SphSolverData3 *data);
-__host__ void TimeIntegrationGPU(SphSolverData2 *data, Float timeStep, int extended=0);
-__host__ void TimeIntegrationGPU(SphSolverData3 *data, Float timeStep, int extended=0);
-__host__ void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin,
-                                              Float Tmax, int maxLevel);
-__host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float timeStep);
-__host__ void ComputePseudoViscosityInterpolationGPU(SphSolverData3 *data, Float timeStep);
+void ComputeDensityGPU(SphSolverData2 *data, int compute_pressure = 1);
+void ComputeDensityGPU(SphSolverData3 *data, int compute_pressure = 1);
+void ComputeNormalGPU(SphSolverData3 *data);
+void ComputeNormalGPU(SphSolverData2 *data);
+void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep, int integrate=1);
+void ComputePressureForceGPU(SphSolverData3 *data, Float timeStep);
+void ComputeNonPressureForceGPU(SphSolverData2 *data);
+void ComputeNonPressureForceGPU(SphSolverData3 *data);
+void TimeIntegrationGPU(SphSolverData2 *data, Float timeStep, int extended=0);
+void TimeIntegrationGPU(SphSolverData3 *data, Float timeStep, int extended=0);
+void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin,
+                                     Float Tmax, int maxLevel);
+void ComputePseudoViscosityInterpolationGPU(SphSolverData2 *data, Float timeStep);
+void ComputePseudoViscosityInterpolationGPU(SphSolverData3 *data, Float timeStep);
 
 // Computes the average temperature of all particles
-__bidevice__ Float ComputeAverageTemperature(SphSolverData2 *data);
+bb_cpu_gpu Float ComputeAverageTemperature(SphSolverData2 *data);
 
 // Generic update grid methods
-__host__ void UpdateGridDistributionCPU(SphSolverData2 *data);
-__host__ void UpdateGridDistributionGPU(SphSolverData2 *data);
-__host__ void UpdateGridDistributionCPU(SphSolverData3 *data);
-__host__ void UpdateGridDistributionGPU(SphSolverData3 *data);
+void UpdateGridDistributionCPU(SphSolverData2 *data);
+void UpdateGridDistributionGPU(SphSolverData2 *data);
+void UpdateGridDistributionCPU(SphSolverData3 *data);
+void UpdateGridDistributionGPU(SphSolverData3 *data);
 
 // Sph utilities for other modules
-__bidevice__ Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &p);
+bb_cpu_gpu Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &p);
 
 // Generate a set of default SPH properties
-__host__ SphSolverData2 *DefaultSphSolverData2();
-__host__ SphSolverData3 *DefaultSphSolverData3();
+SphSolverData2 *DefaultSphSolverData2();
+SphSolverData3 *DefaultSphSolverData3();
 
 // Display routines
-__host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet);
-__host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer);
-__host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer,
-                                                 float *colors);
-__host__ void Debug_GraphyDisplayParticles(int n, float *buffer, float *colors,
-                                           Float pSize = 5.0);
+void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet);
+void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer);
+void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer, float *colors);
+void Debug_GraphyDisplayParticles(int n, float *buffer, float *colors, Float pSize = 5.0);

@@ -2,51 +2,47 @@
 #include <cutil.h>
 #include <shape.h>
 
-__host__ void SphSolverData2SetupFor(SphSolverData2 *solverData,
-                                     int expectedParticleCount)
-{
+void SphSolverData2SetupFor(SphSolverData2 *solverData, int expectedParticleCount){
     solverData->smoothedVelocities = cudaAllocateVx(vec2f, expectedParticleCount);
 }
 
-__bidevice__ SphSolver2::SphSolver2(){ solverData = nullptr; }
+bb_cpu_gpu SphSolver2::SphSolver2(){ solverData = nullptr; }
 
-__bidevice__ void SphSolver2::Initialize(SphSolverData2 *data){
+bb_cpu_gpu void SphSolver2::Initialize(SphSolverData2 *data){
     solverData = data;
 }
 
-__bidevice__ SphSolverData2 *SphSolver2::GetSphSolverData(){
+bb_cpu_gpu SphSolverData2 *SphSolver2::GetSphSolverData(){
     return solverData;
 }
 
-__host__ void SphSolver2::SetViscosityCoefficient(Float viscosityCoefficient){
+void SphSolver2::SetViscosityCoefficient(Float viscosityCoefficient){
     AssertA(solverData, "Invalid solverData for {SetViscosityCoefficient}");
     solverData->viscosity = Max(0, viscosityCoefficient);
 }
 
-__host__ void SphSolver2::SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient){
+void SphSolver2::SetPseudoViscosityCoefficient(Float pseudoViscosityCoefficient){
     AssertA(solverData, "Invalid solverData for {SetPseudoViscosityCoefficient}");
     solverData->pseudoViscosity = Max(0, pseudoViscosityCoefficient);
 }
 
-__bidevice__ Float SphSolver2::GetKernelRadius(){
+bb_cpu_gpu Float SphSolver2::GetKernelRadius(){
     AssertA(solverData, "Invalid solverData for {GetKernelRadius}");
     AssertA(solverData->sphpSet, "No Particle set in solver data");
     return solverData->sphpSet->GetKernelRadius();
 }
 
-__host__ void SphSolver2::SetColliders(ColliderSet2 *col){
+void SphSolver2::SetColliders(ColliderSet2 *col){
     AssertA(solverData, "Invalid solverData for {SetColliders}");
     solverData->collider = col;
 }
 
-__bidevice__ SphParticleSet2 *SphSolver2::GetSphParticleSet(){
+bb_cpu_gpu SphParticleSet2 *SphSolver2::GetSphParticleSet(){
     AssertA(solverData, "Invalid solverData for {GetSphParticleSet}");
     return solverData->sphpSet;
 }
 
-__host__ void AdvanceTimeStep(SphSolver2 *solver, Float timeStep,
-                              int use_cpu = 0)
-{
+void AdvanceTimeStep(SphSolver2 *solver, Float timeStep, int use_cpu = 0){
     SphSolverData2 *data = solver->solverData;
 
     if(use_cpu)
@@ -70,7 +66,7 @@ __host__ void AdvanceTimeStep(SphSolver2 *solver, Float timeStep,
         ComputePseudoViscosityInterpolationGPU(data, timeStep);
 }
 
-__host__ void SphSolver2::Advance(Float timeIntervalInSeconds){
+void SphSolver2::Advance(Float timeIntervalInSeconds){
     TimerList lnmTimer;
     unsigned int numberOfIntervals = 0;
     unsigned int numberOfIntervalsRunned = 0;
@@ -105,8 +101,8 @@ __host__ void SphSolver2::Advance(Float timeIntervalInSeconds){
 }
 
 
-__host__ void SphSolver2::Setup(Float targetDensity, Float targetSpacing,
-                                Float relativeRadius, Grid2 *dom, SphParticleSet2 *pSet)
+void SphSolver2::Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
+                       Grid2 *dom, SphParticleSet2 *pSet)
 {
     solverData->domain = dom;
     solverData->sphpSet = pSet;
@@ -130,12 +126,12 @@ __host__ void SphSolver2::Setup(Float targetDensity, Float targetSpacing,
     solverData->frame_index = 1;
 }
 
-__host__ void SphSolver2::UpdateDensity(){
+void SphSolver2::UpdateDensity(){
     UpdateGridDistributionCPU(solverData);
     ComputeDensityCPU(solverData);
 }
 
-__host__ SphSolverData2 *DefaultSphSolverData2(){
+SphSolverData2 *DefaultSphSolverData2(){
     SphSolverData2 *data = cudaAllocateVx(SphSolverData2, 1);
     data->eosExponent = 7.0;
     data->negativePressureScale = 0.0;
@@ -155,11 +151,11 @@ __host__ SphSolverData2 *DefaultSphSolverData2(){
 
 
 #include <graphy.h>
-__host__ void Debug_GraphyDisplayParticles(int n, float *buffer, float *colors, Float pSize){
+void Debug_GraphyDisplayParticles(int n, float *buffer, float *colors, Float pSize){
     graphy_render_points_size(buffer, colors, pSize, n, -1, 1, 1, -1);
 }
 
-__host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer){
+void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer){
     AssertA(pSet, "Invalid SPHParticle pointer for Debug Display");
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         vec2f pi = pSet->GetParticlePosition(i);
@@ -176,9 +172,7 @@ __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buff
 }
 
 #include <graphy-inl.h>
-__host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer,
-                                                 float *colors)
-{
+void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer, float *colors){
 #if 0
     static GWindow *gui = nullptr;
     if(!gui) gui = new GWindow("Solver", 800, 600);
@@ -215,7 +209,7 @@ __host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buff
 #endif
 }
 
-__host__ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet){
+void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet){
     AssertA(pSet, "Invalid SPHParticle pointer for Debug Display");
     float *position = new float[pSet->GetParticleCount() * 3];
     Debug_GraphyDisplaySolverParticles(pSet, position);

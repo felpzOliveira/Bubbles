@@ -1,6 +1,6 @@
 #include <pcisph_solver.h>
 
-__bidevice__ void PredictVelocityAndPositionFor(PciSphSolverData3 *data, int particleId,
+bb_cpu_gpu void PredictVelocityAndPositionFor(PciSphSolverData3 *data, int particleId,
                                                 Float timeIntervalInSeconds, int is_first)
 {
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
@@ -27,8 +27,8 @@ __bidevice__ void PredictVelocityAndPositionFor(PciSphSolverData3 *data, int par
     data->tempPositions[particleId] = tmpPi;
 }
 
-__host__ void PredictVelocityAndPositionCPU(PciSphSolverData3 *data,
-                                            Float timeIntervalInSeconds, int is_first=0)
+void PredictVelocityAndPositionCPU(PciSphSolverData3 *data,
+                                   Float timeIntervalInSeconds, int is_first=0)
 {
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
@@ -37,7 +37,7 @@ __host__ void PredictVelocityAndPositionCPU(PciSphSolverData3 *data,
     });
 }
 
-__global__ void PredictVelocityAndPositionKernel(PciSphSolverData3 *data,
+bb_kernel void PredictVelocityAndPositionKernel(PciSphSolverData3 *data,
                                                  Float timeIntervalInSeconds, int is_first)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -47,8 +47,8 @@ __global__ void PredictVelocityAndPositionKernel(PciSphSolverData3 *data,
     }
 }
 
-__host__ void PredictVelocityAndPositionGPU(PciSphSolverData3 *data,
-                                            Float timeIntervalInSeconds, int is_first=0)
+void PredictVelocityAndPositionGPU(PciSphSolverData3 *data,
+                                   Float timeIntervalInSeconds, int is_first=0)
 {
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
@@ -57,7 +57,7 @@ __host__ void PredictVelocityAndPositionGPU(PciSphSolverData3 *data,
 
 // NOTE: Potential error as tmpPi was not reditributed in the grid
 //       neighbor querying might not be correct
-__bidevice__ void PredictPressureFor(PciSphSolverData3 *pciData, Float delta, int particleId)
+bb_cpu_gpu void PredictPressureFor(PciSphSolverData3 *pciData, Float delta, int particleId)
 {
     SphSolverData3 *data = pciData->sphData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
@@ -89,7 +89,7 @@ __bidevice__ void PredictPressureFor(PciSphSolverData3 *pciData, Float delta, in
     pciData->densityPredicted[particleId] = density;
 }
 
-__host__ void PredictPressureCPU(PciSphSolverData3 *data, Float delta){
+void PredictPressureCPU(PciSphSolverData3 *data, Float delta){
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
     ParallelFor(0, count, [&](int i){
@@ -97,7 +97,7 @@ __host__ void PredictPressureCPU(PciSphSolverData3 *data, Float delta){
     });
 }
 
-__global__ void PredictPressureKernel(PciSphSolverData3 *data, Float delta){
+bb_kernel void PredictPressureKernel(PciSphSolverData3 *data, Float delta){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -105,13 +105,13 @@ __global__ void PredictPressureKernel(PciSphSolverData3 *data, Float delta){
     }
 }
 
-__host__ void PredictPressureGPU(PciSphSolverData3 *data, Float delta){
+void PredictPressureGPU(PciSphSolverData3 *data, Float delta){
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, PredictPressureKernel, data, delta);
 }
 
-__bidevice__ void PredictPressureForceFor(PciSphSolverData3 *pciData, int particleId){
+bb_cpu_gpu void PredictPressureForceFor(PciSphSolverData3 *pciData, int particleId){
     SphSolverData3 *data = pciData->sphData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     vec3f pi = pSet->GetParticlePosition(particleId);
@@ -154,7 +154,7 @@ __bidevice__ void PredictPressureForceFor(PciSphSolverData3 *pciData, int partic
     pciData->pressureForces[particleId] = fi;
 }
 
-__host__ void PredictPressureForceCPU(PciSphSolverData3 *data){
+void PredictPressureForceCPU(PciSphSolverData3 *data){
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
     ParallelFor(0, count, [&](int i){
@@ -162,7 +162,7 @@ __host__ void PredictPressureForceCPU(PciSphSolverData3 *data){
     });
 }
 
-__global__ void PredictPressureForceKernel(PciSphSolverData3 *data){
+bb_kernel void PredictPressureForceKernel(PciSphSolverData3 *data){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -170,14 +170,14 @@ __global__ void PredictPressureForceKernel(PciSphSolverData3 *data){
     }
 }
 
-__host__ void PredictPressureForceGPU(PciSphSolverData3 *data){
+void PredictPressureForceGPU(PciSphSolverData3 *data){
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, PredictPressureForceKernel, data);
 }
 
-__bidevice__ void AccumulateForcesFor(PciSphSolverData3 *pciData, int particleId,
-                                      Float timeStep)
+bb_cpu_gpu void AccumulateForcesFor(PciSphSolverData3 *pciData, int particleId,
+                                    Float timeStep)
 {
     SphSolverData3 *data = pciData->sphData;
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
@@ -187,7 +187,7 @@ __bidevice__ void AccumulateForcesFor(PciSphSolverData3 *pciData, int particleId
     pSet->SetParticleForce(particleId, fi);
 }
 
-__host__ void AccumulateAndIntegrateCPU(PciSphSolverData3 *data, Float timeStep){
+void AccumulateAndIntegrateCPU(PciSphSolverData3 *data, Float timeStep){
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int count = pSet->GetParticleCount();
     ParallelFor(0, count, [&](int i){
@@ -196,7 +196,7 @@ __host__ void AccumulateAndIntegrateCPU(PciSphSolverData3 *data, Float timeStep)
     });
 }
 
-__global__ void AccumulateAndIntegrateKernel(PciSphSolverData3 *data, Float timeStep){
+bb_kernel void AccumulateAndIntegrateKernel(PciSphSolverData3 *data, Float timeStep){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     if(i < pSet->GetParticleCount()){
@@ -204,22 +204,20 @@ __global__ void AccumulateAndIntegrateKernel(PciSphSolverData3 *data, Float time
     }
 }
 
-__host__ void AccumulateAndIntegrateGPU(PciSphSolverData3 *data, Float timeStep){
+void AccumulateAndIntegrateGPU(PciSphSolverData3 *data, Float timeStep){
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, AccumulateAndIntegrateKernel, data, timeStep);
     TimeIntegrationGPU(data->sphData, timeStep, 0);
 }
 
-__bidevice__ inline Float AbsfMax(Float x, Float y){
+bb_cpu_gpu inline Float AbsfMax(Float x, Float y){
     return (x*x > y*y) ? x : y;
 }
 
-__host__ void ComputePressureForceAndIntegrate(PciSphSolverData3 *data,
-                                               Float timeIntervalInSeconds,
-                                               Float maxDensityErrorRatio,
-                                               Float delta, int maxIt,
-                                               int use_cpu)
+void ComputePressureForceAndIntegrate(PciSphSolverData3 *data, Float timeIntervalInSeconds,
+                                      Float maxDensityErrorRatio, Float delta, int maxIt,
+                                      int use_cpu)
 {
     ParticleSet3 *pSet = data->sphData->sphpSet->GetParticleSet();
     Float targetDensity = data->sphData->sphpSet->GetTargetDensity();

@@ -17,7 +17,7 @@ struct DelaunaySet{
     vec3f *positions;
     vec3f *normals;
 
-    __bidevice__ vec3f GetParticlePosition(int id){
+    bb_cpu_gpu vec3f GetParticlePosition(int id){
         if(nPos > 0){
             int trueId = id - offset;
             return positions[trueId];
@@ -25,14 +25,14 @@ struct DelaunaySet{
         return vec3f();
     }
 
-    __bidevice__ void SetParticlePosition(int id, vec3f p){
+    bb_cpu_gpu void SetParticlePosition(int id, vec3f p){
         if(nPos > 0){
             int trueId = id - offset;
             positions[trueId] = p;
         }
     }
 
-    __bidevice__ vec3f GetParticleNormal(int id){
+    bb_cpu_gpu vec3f GetParticleNormal(int id){
         if(nNor > 0){
             int trueId = id - offset;
             return normals[trueId];
@@ -40,7 +40,7 @@ struct DelaunaySet{
         return vec3f();
     }
 
-    __bidevice__ bool InSet(int id){
+    bb_cpu_gpu bool InSet(int id){
         return id >= offset;
     }
 
@@ -94,7 +94,7 @@ struct DelaunaySetBuilder{
 
 
 inline
-__bidevice__ vec3f DelaunayPosition(ParticleSet3 *pSet, DelaunaySet *dSet, int id){
+bb_cpu_gpu vec3f DelaunayPosition(ParticleSet3 *pSet, DelaunaySet *dSet, int id){
     int count = pSet->GetParticleCount();
     if(id < count)
         return pSet->GetParticlePosition(id);
@@ -103,7 +103,7 @@ __bidevice__ vec3f DelaunayPosition(ParticleSet3 *pSet, DelaunaySet *dSet, int i
 }
 
 inline
-__bidevice__ void DelaunaySetPosition(ParticleSet3 *pSet, DelaunaySet *dSet,
+bb_cpu_gpu void DelaunaySetPosition(ParticleSet3 *pSet, DelaunaySet *dSet,
                                       int id, vec3f p)
 {
     int count = pSet->GetParticleCount();
@@ -113,12 +113,12 @@ __bidevice__ void DelaunaySetPosition(ParticleSet3 *pSet, DelaunaySet *dSet,
         dSet->SetParticlePosition(id, p);
 }
 
-inline __bidevice__ void DelaunaySetBoundary(DelaunaySet *dSet, int id, int *u_bound){
+inline bb_cpu_gpu void DelaunaySetBoundary(DelaunaySet *dSet, int id, int *u_bound){
     if(!dSet->InSet(id))
         u_bound[id] = 1;
 }
 
-__bidevice__ vec3f
+bb_cpu_gpu vec3f
 GeometricalNormal(vec3f a, vec3f b, vec3f c, bool normalized=true){
     vec3f n;
     vec3f n1 = a - b;
@@ -129,7 +129,7 @@ GeometricalNormal(vec3f a, vec3f b, vec3f c, bool normalized=true){
     return normalized ? SafeNormalize(n) : n;
 }
 
-__bidevice__ void ParticleFlag(ParticleSet3 *pSet, Grid3 *grid, int pId, Float radius,
+bb_cpu_gpu void ParticleFlag(ParticleSet3 *pSet, Grid3 *grid, int pId, Float radius,
                                int threshold)
 {
     int *neighbors = nullptr;
@@ -208,7 +208,7 @@ void DumpPoints(ParticleSet3 *pSet){
     }
 }
 
-
+void SpawnTetra2(vec3f pi, vec3f n, Float edgeLen);
 void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
                                Float spacing, Float mu)
 {
@@ -224,6 +224,7 @@ void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
         ParticleFlag(pSet, domain, i, radius, threshold);
     });
 
+    //SpawnTetra2(vec3f(0,1,0), vec3f(0,1,0), 0.5);
     //DumpPoints(pSet);
     //exit(0);
 }
@@ -243,6 +244,17 @@ void SpawnTetra1(vec3f pi, int pId, vec3f n, int id, DelaunaySetBuilder &dBuilde
     vec3f p2 = pi + d1 * edgeLen;
     vec3f p3 = pi + d2 * edgeLen;
 
+    if(!IsZero(n.LengthSquared()) && false){
+        vec3f dir = -n;
+        vec3f med = (p1 + p2 + p3) * (1.f / 3.f);
+        vec3f edir = Normalize(med - pi);
+        Float angle = Dot(edir, n);
+        Transform R = Rotate(angle, edir);
+        p1 = R.Point(p1);
+        p2 = R.Point(p2);
+        p3 = R.Point(p3);
+    }
+
     ids.push_back(pId);
     pointVec.push_back({pi.x, pi.y, pi.z});
 
@@ -257,6 +269,44 @@ void SpawnTetra1(vec3f pi, int pId, vec3f n, int id, DelaunaySetBuilder &dBuilde
     dBuilder.PushParticle(p1, n);
     dBuilder.PushParticle(p2, n);
     dBuilder.PushParticle(p3, n);
+}
+
+void SpawnTetra2(vec3f pi, vec3f n, Float edgeLen){
+    const vec3f u0 = vec3f(0.57735, 0.57735, 0.57735);
+    const vec3f u1 = vec3f(0.57735, -0.57735, -0.57735);
+    const vec3f u2 = vec3f(-0.57735, 0.57735, -0.57735);
+    const vec3f u3 = vec3f(-0.57735, -0.57735, 0.57735);
+    const vec3f d0 = Normalize(u1 - u0);
+    const vec3f d1 = Normalize(u2 - u0);
+    const vec3f d2 = Normalize(u3 - u0);
+
+    vec3f p1 = pi + d0 * edgeLen;
+    vec3f p2 = pi + d1 * edgeLen;
+    vec3f p3 = pi + d2 * edgeLen;
+
+    if(!IsZero(n.LengthSquared())){
+        vec3f dir = -n;
+        vec3f med = (p1 + p2 + p3) * (1.f / 3.f);
+        vec3f edir = Normalize(med - pi);
+        Float angle = Dot(edir, n);
+        Transform R = Rotate(angle, edir);
+        p1 = R.Point(p1);
+        p2 = R.Point(p2);
+        p3 = R.Point(p3);
+    }
+
+    const vec3f points[] = {pi, p1, p2, p3};
+    for(int i = 0; i < 4; i++){
+        for(int j = 0; j < 4; j++){
+            if(i != j){
+                Float d = Distance(points[i], points[j]);
+                std::cout << "Distance { " << i << " " << j << " } " << d << std::endl;
+            }
+        }
+    }
+    std::cout << p1 << std::endl;
+    std::cout << p2 << std::endl;
+    std::cout << p3 << std::endl;
 }
 
 
@@ -309,9 +359,7 @@ void CheckPart(ParticleSet3 *pSet, Grid3 *grid, int pId, DelaunaySetBuilder &dBu
         vec3f n = pSet->GetParticleNormal(pId);
         int bi = pSet->GetParticleV0(pId);
         if(bi > 0){
-            //SpawnTetra2(pi, pId, n, totalP, dBuilder, ids, pointVec, 0.9 * dist);
             SpawnTetra1(pi, pId, n, totalP, dBuilder, ids, pointVec, 0.9 * dist);
-            //SpawnParticles(pi, pId, n, totalP, dBuilder, ids, pointVec, cellId, grid, pSet);
         }else{
             ids.push_back(pId);
             pointVec.push_back({pi.x, pi.y, pi.z});
@@ -322,7 +370,7 @@ void CheckPart(ParticleSet3 *pSet, Grid3 *grid, int pId, DelaunaySetBuilder &dBu
     }
 }
 
-__bidevice__ bool DelaunayIsTetValid(Tet tet, TetOpp opp, char v, uint32_t pLen){
+bb_cpu_gpu bool DelaunayIsTetValid(Tet tet, TetOpp opp, char v, uint32_t pLen){
     bool valid = true;
     if(!isTetAlive(v)) valid = false;
 
@@ -334,7 +382,7 @@ __bidevice__ bool DelaunayIsTetValid(Tet tet, TetOpp opp, char v, uint32_t pLen)
     return valid;
 }
 
-__bidevice__ int matching_faces(i3 *tFaces, i3 face){
+bb_cpu_gpu int matching_faces(i3 *tFaces, i3 face){
     for(int i = 0; i < 4; i++){
         if(tFaces[i] == face)
             return i;
@@ -343,7 +391,7 @@ __bidevice__ int matching_faces(i3 *tFaces, i3 face){
     return -1;
 }
 
-__bidevice__ vec3ui matching_orientation(i3 face, Tet &tet){
+bb_cpu_gpu vec3ui matching_orientation(i3 face, Tet &tet){
     for(int i = 0; i < 4; i++){
         const int *orderVi = TetViAsSeenFrom[i];
         i3 _face(tet._v[orderVi[0]], tet._v[orderVi[1]], tet._v[orderVi[2]]);

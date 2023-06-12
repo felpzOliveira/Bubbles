@@ -1,6 +1,6 @@
 #include <espic_solver.h>
 
-__bidevice__ void TimeIntegrationFor(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
+bb_cpu_gpu void TimeIntegrationFor(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
                                      Float dt, ColliderSet2 *collider, int particleId)
 {
     vec2f v = pSet->GetParticleVelocity(particleId);
@@ -21,7 +21,7 @@ __bidevice__ void TimeIntegrationFor(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
     pSet->SetParticleVelocity(particleId, v);
 }
 
-__global__ void TimeIntegrationKernel(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
+bb_kernel void TimeIntegrationKernel(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
                                       ColliderSet2 *collider, Float dt)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -30,8 +30,8 @@ __global__ void TimeIntegrationKernel(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
     }
 }
 
-__host__ void TimeIntegrationCPU(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
-                                 ColliderSet2 *collider, Float dt)
+void TimeIntegrationCPU(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
+                        ColliderSet2 *collider, Float dt)
 {
     int n = pSet->GetParticleCount();
     for(int i = 0; i < n; i++){
@@ -39,15 +39,15 @@ __host__ void TimeIntegrationCPU(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
     }
 }
 
-__host__ void TimeIntegrationGPU(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
-                                 ColliderSet2 *collider, Float dt)
+void TimeIntegrationGPU(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
+                        ColliderSet2 *collider, Float dt)
 {
     int N = pSet->GetParticleCount();
     GPULaunch(N, TimeIntegrationKernel, ef, pSet, collider, dt);
 }
 
-__host__ void TimeIntegration(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
-                              ColliderSet2 *collider, Float dt, int is_cpu)
+void TimeIntegration(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
+                     ColliderSet2 *collider, Float dt, int is_cpu)
 {
     if(is_cpu) TimeIntegrationCPU(ef, pSet, collider, dt);
     else TimeIntegrationGPU(ef, pSet, collider, dt);
@@ -55,8 +55,8 @@ __host__ void TimeIntegration(NodeEdgeGrid2v *ef, SpecieSet2 *pSet,
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-__bidevice__ void ComputeChargeDensityFor(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
-                                          NodeEdgeGrid2f **dens, int n, unsigned int nodeId)
+bb_cpu_gpu void ComputeChargeDensityFor(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
+                                        NodeEdgeGrid2f **dens, int n, unsigned int nodeId)
 {
     Float cRho = 0;
     for(int i = 0; i < n; i++){
@@ -68,7 +68,7 @@ __bidevice__ void ComputeChargeDensityFor(NodeEdgeGrid2f *rho, SpecieSet2 **ppSe
     rho->SetValue(nodeId, cRho);
 }
 
-__global__ void ComputeChargeDensityKernel(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
+bb_kernel void ComputeChargeDensityKernel(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
                                            NodeEdgeGrid2f **dens, int n)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -77,8 +77,8 @@ __global__ void ComputeChargeDensityKernel(NodeEdgeGrid2f *rho, SpecieSet2 **ppS
     }
 }
 
-__host__ void ComputeChargeDensityCPU(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
-                                      NodeEdgeGrid2f **dens, int n)
+void ComputeChargeDensityCPU(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
+                             NodeEdgeGrid2f **dens, int n)
 {
     unsigned int N = rho->GetNodeCount();
     for(unsigned int i = 0; i < N; i++){
@@ -86,15 +86,15 @@ __host__ void ComputeChargeDensityCPU(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
     }
 }
 
-__host__ void ComputeChargeDensityGPU(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
-                                      NodeEdgeGrid2f **dens, int n)
+void ComputeChargeDensityGPU(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
+                             NodeEdgeGrid2f **dens, int n)
 {
     unsigned int N = rho->GetNodeCount();
     GPULaunch(N, ComputeChargeDensityKernel, rho, ppSet, dens, n);
 }
 
-__host__ void ComputeChargeDensity(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
-                                   NodeEdgeGrid2f **dens, int n, int is_cpu)
+void ComputeChargeDensity(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
+                          NodeEdgeGrid2f **dens, int n, int is_cpu)
 {
     if(is_cpu) ComputeChargeDensityCPU(rho, ppSet, dens, n);
     else ComputeChargeDensityGPU(rho, ppSet, dens, n);
@@ -102,8 +102,8 @@ __host__ void ComputeChargeDensity(NodeEdgeGrid2f *rho, SpecieSet2 **ppSet,
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-__bidevice__ void ComputeNumberDensityFor(NodeEdgeGrid2f *den, SpecieSet2 *pSet,
-                                          unsigned int nodeId)
+bb_cpu_gpu void ComputeNumberDensityFor(NodeEdgeGrid2f *den, SpecieSet2 *pSet,
+                                        unsigned int nodeId)
 {
     int cells[4];
     int count = den->GetCellsFrom(nodeId, cells);
@@ -129,34 +129,34 @@ __bidevice__ void ComputeNumberDensityFor(NodeEdgeGrid2f *den, SpecieSet2 *pSet,
     den->SetValue(nodeId, val / vol);
 }
 
-__global__ void ComputeNumberDensityKernel(NodeEdgeGrid2f *den, SpecieSet2 *ppSet){
+bb_kernel void ComputeNumberDensityKernel(NodeEdgeGrid2f *den, SpecieSet2 *ppSet){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < den->GetNodeCount()){
         ComputeNumberDensityFor(den, ppSet, i);
     }
 }
 
-__host__ void ComputeNumberDensityCPU(NodeEdgeGrid2f *den, SpecieSet2 *ppSet){
+void ComputeNumberDensityCPU(NodeEdgeGrid2f *den, SpecieSet2 *ppSet){
     unsigned int h = den->GetNodeCount();
     for(unsigned int i = 0; i < h; i++){
         ComputeNumberDensityFor(den, ppSet, i);
     }
 }
 
-__host__ void ComputeNumberDensityGPU(NodeEdgeGrid2f *den, SpecieSet2 *ppSet){
+void ComputeNumberDensityGPU(NodeEdgeGrid2f *den, SpecieSet2 *ppSet){
     int N = den->GetNodeCount();
     GPULaunch(N, ComputeNumberDensityKernel, den, ppSet);
 }
 
-__host__ void ComputeNumberDensity(NodeEdgeGrid2f *den, SpecieSet2 *ppSet, int is_cpu){
+void ComputeNumberDensity(NodeEdgeGrid2f *den, SpecieSet2 *ppSet, int is_cpu){
     if(is_cpu) ComputeNumberDensityCPU(den, ppSet);
     else ComputeNumberDensityGPU(den, ppSet);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-__bidevice__ void ComputeElectricFieldFor(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi,
-                                          unsigned int x, unsigned int y, vec2ui count)
+bb_cpu_gpu void ComputeElectricFieldFor(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi,
+                                        unsigned int x, unsigned int y, vec2ui count)
 {
     vec2f h = ef->GetSpacing();
     Float i2hx = 1.0 / (2.0 * h.x);
@@ -191,7 +191,7 @@ __bidevice__ void ComputeElectricFieldFor(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *ph
     ef->SetValue(vec2ui(x, y), efij);
 }
 
-__global__ void ComputeElectricFieldKernel(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
+bb_kernel void ComputeElectricFieldKernel(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
     unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
     unsigned int j = threadIdx.y + blockIdx.y * blockDim.y;
     vec2ui count = ef->GetNodeIndexCount();
@@ -200,7 +200,7 @@ __global__ void ComputeElectricFieldKernel(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *p
     }
 }
 
-__host__ void ComputeElectricFieldCPU(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
+void ComputeElectricFieldCPU(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
     vec2ui count = ef->GetNodeIndexCount();
     for(unsigned int x = 0; x < count.x; x++){
         for(unsigned int y = 0; y < count.y; y++){
@@ -209,7 +209,7 @@ __host__ void ComputeElectricFieldCPU(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
     }
 }
 
-__host__ void ComputeElectricFieldGPU(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
+void ComputeElectricFieldGPU(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
     vec2ui count = ef->GetNodeIndexCount();
     int tx = 8;
     int ty = 8;
@@ -220,7 +220,7 @@ __host__ void ComputeElectricFieldGPU(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi){
 }
 
 // Compute E = -grad(phi)
-__host__ void ComputeElectricField(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi, int is_cpu){
+void ComputeElectricField(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi, int is_cpu){
     if(is_cpu) ComputeElectricFieldCPU(ef, phi);
     else ComputeElectricFieldGPU(ef, phi);
 }
@@ -229,8 +229,8 @@ __host__ void ComputeElectricField(NodeEdgeGrid2v *ef, NodeEdgeGrid2f *phi, int 
 
 // Apply Gauss-Seidel SOR to compute L(phi) = -rho / e
 // I have no idea how to solve this with CUDA, see later the solution for Fluids
-__host__ void ComputePotentialField(NodeEdgeGrid2f *phi, NodeEdgeGrid2f *rho,
-                                    Float tolerance, unsigned int max_it)
+void ComputePotentialField(NodeEdgeGrid2f *phi, NodeEdgeGrid2f *rho,
+                           Float tolerance, unsigned int max_it)
 {
     Float L2 = 0;
     bool converged = false;

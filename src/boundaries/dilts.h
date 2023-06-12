@@ -29,12 +29,12 @@
 //       don't apply this Dilts will fail for SSS, so I'll hardcode this
 //       value here for now. It will increase the boundary for LIT
 //       but it is stable enough for all these renderers.
-inline __bidevice__
+inline bb_cpu_gpu
 Float DiltsGetParticleRadius(Float simRadius){
     return simRadius * DILTS_RADIUS_MULTIPLIER;
 }
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 bool DoesSpheresIntersect(T pi, T pj, Float ri, Float rj){
     Float d = Distance(pi, pj);
     return !(d > (ri + rj) - Epsilon);
@@ -44,7 +44,7 @@ bool DoesSpheresIntersect(T pi, T pj, Float ri, Float rj){
 /*
 * Uniformly samples the circle around pi in 2D.
 */
-inline __bidevice__
+inline bb_cpu_gpu
 vec2f DiltsSpokeTakeUniformPoint(vec2f pi, Float r, int &done,
                                  int &sp, int &unused, int spoke_samples)
 {
@@ -67,7 +67,7 @@ vec2f DiltsSpokeTakeUniformPoint(vec2f pi, Float r, int &done,
 * Uniformly samples the sphere around pi in 3D.
 * TODO: It would be best to sample this with the sphere density method.
 */
-inline __bidevice__
+inline bb_cpu_gpu
 vec3f DiltsSpokeTakeUniformPoint(vec3f pi, Float r, int &done,
                                  int &i, int &j, int spoke_samples)
 {
@@ -98,7 +98,7 @@ vec3f DiltsSpokeTakeUniformPoint(vec3f pi, Float r, int &done,
 * Computes if the particle with id 'pId' present in the set 'pSet' over the domain
 * 'domain' is classified as boundary by the Spoke version of Dilts method.
 */
-template<typename T, typename U, typename Q> inline __bidevice__
+template<typename T, typename U, typename Q> inline bb_cpu_gpu
 int DiltsSpokeParticleIsBoundary(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, int pId){
     int *neighbors = nullptr;
     T candidates[1024];
@@ -153,7 +153,7 @@ int DiltsSpokeParticleIsBoundary(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, in
     return 0;
 }
 
-template<typename T, typename U, typename Q> __host__
+template<typename T, typename U, typename Q>
 void DiltsSpokeBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain){
     int N = pSet->GetParticleCount();
     AutoParallelFor("DiltsSpokeBoundary", N, AutoLambda(int i){

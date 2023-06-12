@@ -4,7 +4,7 @@
 #include <bits/stdc++.h>
 #include <sstream>
 
-__global__ void GetKernelStats(int *buffer);
+bb_kernel void GetKernelStats(int *buffer);
 
 class Execution{
     public:
@@ -19,7 +19,7 @@ class Execution{
     int has_cached;
 
     std::string callName;
-    __host__ Execution(std::string name){
+    Execution(std::string name){
         callName = name;
         minCpu = Infinity;
         minGpu = Infinity;
@@ -27,7 +27,7 @@ class Execution{
         runs = 0;
     }
 
-    __host__ void Increase(Float gpuDt, Float cpuDt){
+    void Increase(Float gpuDt, Float cpuDt){
         gpuTime.push_back(gpuDt);
         cpuTime.push_back(cpuDt);
         minGpu = minGpu > gpuDt ? gpuDt : minGpu;
@@ -36,7 +36,7 @@ class Execution{
         has_cached = 0;
     }
 
-    __host__ void GetLatest(double &gpu, double &cpu){
+    void GetLatest(double &gpu, double &cpu){
         gpu = 0;
         cpu = 0;
         if(runs > 0){
@@ -45,7 +45,7 @@ class Execution{
         }
     }
 
-    __host__ long int GetAverage(double &gpu, double &cpu){
+    long int GetAverage(double &gpu, double &cpu){
         if(!has_cached){
             double invRuns = 1.0 / (double)runs;
             gpu = 0;
@@ -66,7 +66,7 @@ class Execution{
         return runs;
     }
 
-    __host__ void GetMin(double &gpu, double &cpu){
+    void GetMin(double &gpu, double &cpu){
         gpu = minGpu;
         cpu = minCpu;
     }
@@ -99,7 +99,7 @@ class Profiler{
     Execution *manualExec;
     Float fastestStep;
 
-    __host__ Profiler(){
+    Profiler(){
         exec = nullptr;
         manualExec = nullptr;
         cpuTimer = new CPUTimer;
@@ -108,14 +108,14 @@ class Profiler{
         fastestStep = FLT_MAX;
     }
 
-    __host__ void AllocateKernelBuffers(int pCount){
+    void AllocateKernelBuffers(int pCount){
         if(pCount > 0){
             particleCount = pCount;
             particleInteraction = cudaAllocateVx(int, pCount);
         }
     }
 
-    __host__ double GetResult(const std::string &fname){
+    double GetResult(const std::string &fname){
         double es = -1, ev = -1;
         if(execMap.find(fname) != execMap.end()){
             Execution *e = execMap[fname];
@@ -125,7 +125,7 @@ class Profiler{
         return ev;
     }
 
-    __host__ void ManualPrepare(const std::string &fname){
+    void ManualPrepare(const std::string &fname){
         if(execMap.find(fname) == execMap.end()){
             Execution *execution = new Execution(fname);
             execMap[fname] = execution;
@@ -136,7 +136,7 @@ class Profiler{
         manualExec->cpuTimer->Start();
     }
 
-    __host__ void ManualFinish(){
+    void ManualFinish(){
         if(manualExec){
             manualExec->cpuTimer->Stop();
             Float cpums = manualExec->cpuTimer->TimeElapsed();
@@ -150,7 +150,7 @@ class Profiler{
         }
     }
 
-    __host__ void Prepare(const std::string &fname){
+    void Prepare(const std::string &fname){
         if(execMap.find(fname) == execMap.end()){
             Execution *execution = new Execution(fname);
             execMap[fname] = execution;
@@ -161,7 +161,7 @@ class Profiler{
         cpuTimer->Start();
     }
 
-    __host__ void Finish(){
+    void Finish(){
         if(exec){
             gpuTimer->Stop();
             cpuTimer->Stop();
@@ -172,7 +172,7 @@ class Profiler{
         }
     }
 
-    __host__ void Report(){
+    void Report(){
         std::vector<std::pair<std::string, Execution *>> pairVector;
         int maxIteractions = 0, minIteractions = 99999;
         double averageIteractions = 0;
@@ -251,12 +251,12 @@ class ProfilerKernel{
     int *particleDeviceBuffer;
     int size;
 
-    __bidevice__ ProfilerKernel(){
+    bb_cpu_gpu ProfilerKernel(){
         particleDeviceBuffer = nullptr;
         size = 0;
     }
 
-    __bidevice__ void SetupParticleBuffer(int pCount){
+    bb_cpu_gpu void SetupParticleBuffer(int pCount){
         if(pCount > 0){
             if(particleDeviceBuffer) delete[] particleDeviceBuffer;
             particleDeviceBuffer = new int[pCount];
@@ -265,15 +265,15 @@ class ProfilerKernel{
         }
     }
 
-    __bidevice__ void ReleaseParticleBuffer(){
+    bb_cpu_gpu void ReleaseParticleBuffer(){
         if(particleDeviceBuffer) delete[] particleDeviceBuffer;
         particleDeviceBuffer = nullptr;
         size = 0;
     }
 
-    __bidevice__ int Size(){ return size; }
+    bb_cpu_gpu int Size(){ return size; }
 
-    __bidevice__ void Set(int value, int i){
+    bb_cpu_gpu void Set(int value, int i){
         if(size > i){
             particleDeviceBuffer[i] = value;
         }
@@ -282,7 +282,7 @@ class ProfilerKernel{
 
 __device__ ProfilerKernel *kernelProfiler = nullptr;
 
-__global__ void InitializeKernelProfiler(int storage){
+bb_kernel void InitializeKernelProfiler(int storage){
     if(threadIdx.x == 0 && blockIdx.x == 0){
         kernelProfiler = new ProfilerKernel;
         kernelProfiler->SetupParticleBuffer(storage);
@@ -290,14 +290,14 @@ __global__ void InitializeKernelProfiler(int storage){
     }
 }
 
-__global__ void ReleaseKernelProfiler(){
+bb_kernel void ReleaseKernelProfiler(){
     if(threadIdx.x == 0 && blockIdx.x == 0){
         kernelProfiler->ReleaseParticleBuffer();
         delete kernelProfiler;
     }
 }
 
-__global__ void GetKernelStats(int *buffer){
+bb_kernel void GetKernelStats(int *buffer){
     if(threadIdx.x == 0 && blockIdx.x == 0){
         if(kernelProfiler->Size() > 0){
             memcpy(buffer, kernelProfiler->particleDeviceBuffer,
@@ -306,7 +306,7 @@ __global__ void GetKernelStats(int *buffer){
     }
 }
 
-__host__ __device__
+bb_cpu_gpu
 void _ProfilerSetParticle(int value, int id){
 #if defined(__CUDA_ARCH__)
     if(kernelProfiler)

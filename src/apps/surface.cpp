@@ -303,15 +303,15 @@ std::map<const char *, arg_desc> surface_arg_map = {
 };
 
 template <typename T>
-__bidevice__ T cubic(T x){ return x * x * x; }
-__bidevice__ Float k_cub(Float s) { return Max(0.0, cubic(1.0 - s * s)); }
-__bidevice__ Float wij(Float distance, Float r) {
+bb_cpu_gpu T cubic(T x){ return x * x * x; }
+bb_cpu_gpu Float k_cub(Float s) { return Max(0.0, cubic(1.0 - s * s)); }
+bb_cpu_gpu Float wij(Float distance, Float r) {
     if(distance < r)
         return 1.f - cubic(distance / r);
     return 0.f;
 }
 
-__bidevice__
+bb_cpu_gpu
 inline double k_p(double distance){
     const double distanceSquared = distance * distance;
     if(distanceSquared >= 1.0){
@@ -322,13 +322,13 @@ inline double k_p(double distance){
     }
 }
 
-__bidevice__
+bb_cpu_gpu
 inline Float k_w(const vec3f& m,  Float gDet){
     const Float sigma = 315.0 / (64 * Pi);
     return sigma * gDet * k_p(m.Length());
 }
 
-__bidevice__ Float SphSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet, Float kernelRadius){
+bb_cpu_gpu Float SphSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet, Float kernelRadius){
     const Float cutOff = 0.5; // ??
     int *neighbors = nullptr;
     Float inf = grid->GetBounds().Diagonal().Length();
@@ -361,7 +361,7 @@ __bidevice__ Float SphSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet, Float kernel
     return cutOff - wSum;
 }
 
-__bidevice__ Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
+bb_cpu_gpu Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
                                  Float kernelRadius, Float threshold)
 {
     int *neighbors = nullptr;

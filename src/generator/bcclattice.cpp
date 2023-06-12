@@ -1,8 +1,8 @@
 #include <point_generator.h>
 
-__host__ BccLatticePointGenerator::BccLatticePointGenerator() : PointGenerator3(){}
+BccLatticePointGenerator::BccLatticePointGenerator() : PointGenerator3(){}
 
-__host__ void
+void
 BccLatticePointGenerator::ForEach(const Bounds3f &domain, Float spacing,
                                   const std::function<bool(const vec3f &)> &callback) const
 {
@@ -35,11 +35,11 @@ BccLatticePointGenerator::ForEach(const Bounds3f &domain, Float spacing,
     }
 }
 
-__bidevice__ BccLatticePointGeneratorDevice::BccLatticePointGeneratorDevice(){}
+bb_cpu_gpu BccLatticePointGeneratorDevice::BccLatticePointGeneratorDevice(){}
 
-__bidevice__ int BccLatticePointGeneratorDevice::Generate(const Bounds3f &domain,
-                                                          Float spacing, vec3f *points,
-                                                          int maxn)
+bb_cpu_gpu int BccLatticePointGeneratorDevice::Generate(const Bounds3f &domain,
+                                                        Float spacing, vec3f *points,
+                                                        int maxn)
 {
     Float halfSpacing = spacing / 2;
     Float width  = domain.ExtentOn(0);

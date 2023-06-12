@@ -3,15 +3,13 @@
 #include <interaction.h>
 #include <cutil.h>
 
-__host__ Shape2 *MakeRectangle2(const Transform2 &toWorld, vec2f extension,
-                                bool reverseOrientation)
-{
+Shape2 *MakeRectangle2(const Transform2 &toWorld, vec2f extension, bool reverseOrientation){
     Shape2 *shape = cudaAllocateVx(Shape2, 1);
     shape->InitRectangle2(toWorld, extension, reverseOrientation);
     return shape;
 }
 
-__bidevice__ void Shape2::InitRectangle2(const Transform2 &toWorld, vec2f extension,
+bb_cpu_gpu void Shape2::InitRectangle2(const Transform2 &toWorld, vec2f extension,
                                          bool reverseOr)
 {
     grid = nullptr;
@@ -23,10 +21,10 @@ __bidevice__ void Shape2::InitRectangle2(const Transform2 &toWorld, vec2f extens
     rect = Bounds2f(vec2f(-half.x, -half.y), vec2f(half.x, half.y));
 }
 
-__bidevice__ Bounds2f Shape2::Rectangle2GetBounds(){ return ObjectToWorld(rect); }
+bb_cpu_gpu Bounds2f Shape2::Rectangle2GetBounds(){ return ObjectToWorld(rect); }
 
-__bidevice__ bool Shape2::Rectangle2Intersect(const Ray2 &ray, SurfaceInteraction2 *isect,
-                                              Float *tShapeHit) const
+bb_cpu_gpu bool Shape2::Rectangle2Intersect(const Ray2 &ray, SurfaceInteraction2 *isect,
+                                            Float *tShapeHit) const
 {
     vec2f pHit;
     Ray2 r = WorldToObject(ray);
@@ -63,15 +61,15 @@ __bidevice__ bool Shape2::Rectangle2Intersect(const Ray2 &ray, SurfaceInteractio
     return true;
 }
 
-__bidevice__ Float Shape2::Rectangle2ClosestDistance(const vec2f &point) const{
+bb_cpu_gpu Float Shape2::Rectangle2ClosestDistance(const vec2f &point) const{
     vec2f pLocal = WorldToObject.Point(point);
     vec2f half = vec2f(rect.ExtentOn(0), rect.ExtentOn(1)) * 0.5;
     vec2f pRef = Abs(pLocal) - half;
     return Max(pRef, vec2f(0,0)).Length() + Min(MaxComponent(pRef), 0);
 }
 
-__bidevice__ void Shape2::Rectangle2ClosestPoint(const vec2f &point,
-                                                 ClosestPointQuery2 *query) const
+bb_cpu_gpu void Shape2::Rectangle2ClosestPoint(const vec2f &point,
+                                               ClosestPointQuery2 *query) const
 {
     Float d = Absf(Rectangle2ClosestDistance(point));
     vec2f pLocal = WorldToObject.Point(point);

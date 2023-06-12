@@ -18,7 +18,7 @@
 */
 #define XIAOWEI_KERNEL_EXPANSION 6.0
 
-template<typename T, typename U, typename Q> __bidevice__
+template<typename T, typename U, typename Q> bb_cpu_gpu
 int XiaoweiParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                               Float h, int pId)
 {
@@ -78,7 +78,7 @@ int XiaoweiParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     return 0;
 }
 
-template<typename T, typename U, typename Q> __host__
+template<typename T, typename U, typename Q>
 void XiaoweiBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
     int N = pSet->GetParticleCount();
     AutoParallelFor("XiaoweiParticleIsBoundary", N, AutoLambda(int i){

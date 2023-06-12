@@ -29,7 +29,7 @@ struct Cell{
     int active;
     int level;
 
-    __bidevice__ void Reset(){
+    bb_cpu_gpu void Reset(){
         head = nullptr;
         tail = nullptr;
         headAux = nullptr;
@@ -40,65 +40,65 @@ struct Cell{
         level = -1;
     }
 
-    __bidevice__ void SetNeighborListPtr(int *list){
+    bb_cpu_gpu void SetNeighborListPtr(int *list){
         neighborList = list;
     }
 
-    __bidevice__ void SetNeighborList(int *list, int n){
+    bb_cpu_gpu void SetNeighborList(int *list, int n){
         memcpy(neighborList, list, n * sizeof(int));
         neighborListCount = n;
     }
 
-    __bidevice__ void SwapActive(){ active = 1 - active; }
+    bb_cpu_gpu void SwapActive(){ active = 1 - active; }
 
-    __bidevice__ int IsActive(){ return active; }
+    bb_cpu_gpu int IsActive(){ return active; }
 
-    __bidevice__ ParticleChain *GetChain(){
+    bb_cpu_gpu ParticleChain *GetChain(){
         if(active) return headAux;
         return head;
     }
 
-    __bidevice__ ParticleChain *GetTail(){
+    bb_cpu_gpu ParticleChain *GetTail(){
         if(active) return tailAux;
         return tail;
     }
 
-    __bidevice__ int GetChainLength(){
+    bb_cpu_gpu int GetChainLength(){
         if(active) return chainAuxLength;
         return chainLength;
     }
 
-    __bidevice__ ParticleChain **GetActiveChain(){
+    bb_cpu_gpu ParticleChain **GetActiveChain(){
         if(active) return &headAux;
         return &head;
     }
 
-    __bidevice__ ParticleChain **GetActiveTail(){
+    bb_cpu_gpu ParticleChain **GetActiveTail(){
         if(active) return &tailAux;
         return &tail;
     }
 
-    __bidevice__ ParticleChain **GetNextChain(){
+    bb_cpu_gpu ParticleChain **GetNextChain(){
         if(!active) return &headAux;
         return &head;
     }
 
-    __bidevice__ ParticleChain **GetNextTail(){
+    bb_cpu_gpu ParticleChain **GetNextTail(){
         if(!active) return &tailAux;
         return &tail;
     }
 
-    __bidevice__ void IncreaseNextChainCount(){
+    bb_cpu_gpu void IncreaseNextChainCount(){
         if(!active) chainAuxLength++;
         else chainLength ++;
     }
 
-    __bidevice__ void IncreaseActiveChainCount(){
+    bb_cpu_gpu void IncreaseActiveChainCount(){
         if(active) chainAuxLength++;
         else chainLength ++;
     }
 
-    __bidevice__ void ResetNext(){
+    bb_cpu_gpu void ResetNext(){
         if(active){
             head = nullptr;
             tail = nullptr;
@@ -110,7 +110,7 @@ struct Cell{
         }
     }
 
-    __bidevice__ void AddToNextChain(ParticleChain *node){
+    bb_cpu_gpu void AddToNextChain(ParticleChain *node){
         ParticleChain **cHead = GetNextChain();
         ParticleChain **cTail = GetNextTail();
         if(!*cHead){
@@ -125,7 +125,7 @@ struct Cell{
         IncreaseNextChainCount();
     }
 
-    __bidevice__ void AddToChain(ParticleChain *node){
+    bb_cpu_gpu void AddToChain(ParticleChain *node){
         ParticleChain **cHead = GetActiveChain();
         ParticleChain **cTail = GetActiveTail();
         if(!*cHead){
@@ -140,15 +140,15 @@ struct Cell{
         IncreaseActiveChainCount();
     }
 
-    __bidevice__ void SetLevel(int L){
+    bb_cpu_gpu void SetLevel(int L){
         level = L;
     }
 
-    __bidevice__ int GetLevel(){
+    bb_cpu_gpu int GetLevel(){
         return level;
     }
 
-    __bidevice__ void Set(T b, int _id){
+    bb_cpu_gpu void Set(T b, int _id){
         bounds = b;
         id = _id;
         Reset();
@@ -159,7 +159,7 @@ typedef Cell<Bounds1f> Cell1;
 typedef Cell<Bounds2f> Cell2;
 typedef Cell<Bounds3f> Cell3;
 
-template<typename U> inline __bidevice__
+template<typename U> inline bb_cpu_gpu
 U DimensionalIndex(unsigned int id, const U &usizes, int dimensions){
     AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3,
             "Unknown dimension distribution");
@@ -179,7 +179,7 @@ U DimensionalIndex(unsigned int id, const U &usizes, int dimensions){
     return u;
 }
 
-template<typename U> inline __bidevice__
+template<typename U> inline bb_cpu_gpu
 unsigned int LinearIndex(const U &u, const U &usizes, int dimensions){
     AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3,
             "Unknown dimension distribution {GetLinearIndex}");
@@ -210,34 +210,34 @@ class Grid{
     int *activeCells; // list of cells that actually have particle in them
     int activeCellsCount; // amount of active cells at any given moment
 
-    __bidevice__ Grid(){ SetDimension(T(0)); }
-    __bidevice__ void SetDimension(const Float &u){ (void)u; dimensions = 1; }
-    __bidevice__ void SetDimension(const vec2f &u){ (void)u; dimensions = 2; }
-    __bidevice__ void SetDimension(const vec3f &u){ (void)u; dimensions = 3; }
-    __bidevice__ void SetLNMMaxLevel(const int &level){ maxLevels = level; }
-    __bidevice__ int GetLNMMaxLevel() { return maxLevels; }
-    __bidevice__ Q GetBounds(){ return bounds; }
-    __bidevice__ T GetCellSize(){ return cellsLen; }
-    __bidevice__ int GetDimensions(){ return dimensions; }
-    __bidevice__ unsigned int GetCellCount(){ return total; }
-    __bidevice__ int GetActiveCellCount(){ return activeCellsCount; }
-    __bidevice__ U GetIndexCount(){ return usizes; }
-    __bidevice__ Float GetCellSizeOn(int axis){
+    bb_cpu_gpu Grid(){ SetDimension(T(0)); }
+    bb_cpu_gpu void SetDimension(const Float &u){ (void)u; dimensions = 1; }
+    bb_cpu_gpu void SetDimension(const vec2f &u){ (void)u; dimensions = 2; }
+    bb_cpu_gpu void SetDimension(const vec3f &u){ (void)u; dimensions = 3; }
+    bb_cpu_gpu void SetLNMMaxLevel(const int &level){ maxLevels = level; }
+    bb_cpu_gpu int GetLNMMaxLevel() { return maxLevels; }
+    bb_cpu_gpu Q GetBounds(){ return bounds; }
+    bb_cpu_gpu T GetCellSize(){ return cellsLen; }
+    bb_cpu_gpu int GetDimensions(){ return dimensions; }
+    bb_cpu_gpu unsigned int GetCellCount(){ return total; }
+    bb_cpu_gpu int GetActiveCellCount(){ return activeCellsCount; }
+    bb_cpu_gpu U GetIndexCount(){ return usizes; }
+    bb_cpu_gpu Float GetCellSizeOn(int axis){
         AssertA(axis >= 0 && axis < dimensions, "Invalid axis given for CellSizeOn");
         return cellsLen[axis];
     }
-    __bidevice__ unsigned int GetCountOn(int axis){
+    bb_cpu_gpu unsigned int GetCountOn(int axis){
         AssertA(axis >= 0 && axis < dimensions, "Invalid axis given for CountOn");
         return usizes[axis];
     }
 
-    __bidevice__ int GetCellLevel(int cellId){
+    bb_cpu_gpu int GetCellLevel(int cellId){
         AssertA(cellId >= 0 && cellId < total, "Invalid cellId for GetCellLevel");
         Cell<Q> *cell = &cells[cellId];
         return cell->GetLevel();
     }
 
-    __bidevice__ int GetActiveCellId(int qid){
+    bb_cpu_gpu int GetActiveCellId(int qid){
         if(!(qid >= 0 && qid < activeCellsCount)){
             printf("Got query for %d but have only %d\n", qid, activeCellsCount);
         }
@@ -245,18 +245,18 @@ class Grid{
         return activeCells[qid];
     }
 
-    __bidevice__ Cell<Q> *GetActiveCell(int qid){
+    bb_cpu_gpu Cell<Q> *GetActiveCell(int qid){
         AssertA(qid >= 0 && qid < activeCellsCount, "Invalid cellId for GetActiveCell");
         return &cells[activeCells[qid]];
     }
 
-    __bidevice__ Cell<Q> *GetCell(int cellId){
+    bb_cpu_gpu Cell<Q> *GetCell(int cellId){
         if(cellId >= total || cellId < 0) return nullptr;
         return &cells[cellId];
     }
 
     /* Get offset for dimension value 'p' on axis 'axis' in case it lies on boundary */
-    __bidevice__ Float ExtremeEpsilon(Float p, int axis){
+    bb_cpu_gpu Float ExtremeEpsilon(Float p, int axis){
         Float eps = 0;
         Float p0 = bounds.LengthAt(0, axis);
         Float p1 = bounds.LengthAt(1, axis);
@@ -270,7 +270,7 @@ class Grid{
     }
 
     /* Hash position 'p' into a cell index */
-    __bidevice__ U GetHashedPosition(const T &p){
+    bb_cpu_gpu U GetHashedPosition(const T &p){
         U u;
         if(!Inside(p, bounds)){
             printf(" [ERROR] : Requested for hash on point outside domain ");
@@ -298,30 +298,30 @@ class Grid{
     }
 
     /* Check if a point 'p' lies inside this grid */
-    __bidevice__ bool Contains(const T &p){
+    bb_cpu_gpu bool Contains(const T &p){
         return Inside(p, bounds);
     }
 
     /* Get logical index of cell */
-    __bidevice__ U GetCellIndex(unsigned int i){
+    bb_cpu_gpu U GetCellIndex(unsigned int i){
         return DimensionalIndex(i, usizes, dimensions);
     }
 
     /* Get the ordered cell index of a cell */
-    __bidevice__ unsigned int GetLinearCellIndex(const U &u){
+    bb_cpu_gpu unsigned int GetLinearCellIndex(const U &u){
         unsigned int h = LinearIndex(u, usizes, dimensions);
         AssertA(h < total, "Invalid cell id computation");
         return h;
     }
 
     /* Hash position 'p' and get the linear cell index */
-    __bidevice__ unsigned int GetLinearHashedPosition(const T &p){
+    bb_cpu_gpu unsigned int GetLinearHashedPosition(const T &p){
         U u = GetHashedPosition(p);
         return GetLinearCellIndex(u);
     }
 
     /* Distribute routines for multiple particle types, low level control */
-    __bidevice__ void DistributeResetCell(unsigned int cellId){
+    bb_cpu_gpu void DistributeResetCell(unsigned int cellId){
         AssertA(cellId < total, "Invalid distribution cell id");
         Cell<Q> *cell = &cells[cellId];
         cell->Reset();
@@ -329,7 +329,7 @@ class Grid{
 
     /* Distribute to specific cell, low level */
     template<typename ParticleType = ParticleSet<T>>
-        __bidevice__ void DistributeAddToCell(ParticleType *pSet, unsigned int cellId){
+        bb_cpu_gpu void DistributeAddToCell(ParticleType *pSet, unsigned int cellId){
         AssertA(cellId < total, "Invalid distribution cell id");
         Cell<Q> *cell = &cells[cellId];
         /* Insert particles [that belong here] to this chain */
@@ -356,7 +356,7 @@ class Grid{
     * allow for distributing a list of particles.
     */
     template<typename ParticleType = ParticleSet<T>>
-        __host__ void DistributeByParticleList(ParticleType *pSet, T *pList,
+        void DistributeByParticleList(ParticleType *pSet, T *pList,
                                                int pCount, int startId,
                                                Float kernelRadius)
     {
@@ -388,7 +388,7 @@ class Grid{
 
     /* Distribute by particle, faster for initialization. Can only run on CPU */
     template<typename ParticleType = ParticleSet<T>>
-        __host__ void DistributeByParticle(ParticleType *pSet){
+        void DistributeByParticle(ParticleType *pSet){
         int pCount = pSet->GetParticleCount();
         for(int i = 0; i < pCount; i++){
             T p = pSet->GetParticlePosition(i);
@@ -408,19 +408,19 @@ class Grid{
 
     /* Distribute particles from given ParticleSet by cell Id with optmized search */
     template<typename ParticleType = ParticleSet<T>>
-        __bidevice__ void DistributeToCellOpt(ParticleType *pSet, unsigned int cellId){
+        bb_cpu_gpu void DistributeToCellOpt(ParticleType *pSet, unsigned int cellId){
         DistributeToCellOpt(&pSet, 1, cellId);
     }
 
     /* Distribute particles from given ParticleSet by cell Id */
     template<typename ParticleType = ParticleSet<T>>
-        __bidevice__ void DistributeToCell(ParticleType *pSet, unsigned int cellId){
+        bb_cpu_gpu void DistributeToCell(ParticleType *pSet, unsigned int cellId){
         DistributeResetCell(cellId);
         DistributeAddToCell(pSet, cellId);
     }
 
     template<typename ParticleType = ParticleSet<T>>
-        __bidevice__ void DistributeParticleBucket(ParticleType *pSet, int pid,
+        bb_cpu_gpu void DistributeParticleBucket(ParticleType *pSet, int pid,
                                                    Float kernelRadius)
     {
         T pi = pSet->GetParticlePosition(pid);
@@ -447,7 +447,7 @@ class Grid{
     }
 
     template<typename ParticleType = ParticleSet<T>>
-        __bidevice__ void DistributeToCellOpt(ParticleType **ppSet, int n,
+        bb_cpu_gpu void DistributeToCellOpt(ParticleType **ppSet, int n,
                                               unsigned int cellId)
     {
         AssertA(cellId < total, "Invalid distribution cell id");
@@ -493,14 +493,14 @@ class Grid{
         }
     }
 
-    __bidevice__ void SwapCellList(int cellId){
+    bb_cpu_gpu void SwapCellList(int cellId){
         AssertA(cellId < total, "Invalid distribution cell id");
         Cell<Q> *cell = &cells[cellId];
         cell->SwapActive();
     }
 
     /* Query the cell neighbor list */
-    __bidevice__ int GetNeighborsOf(int id, int **neighbors){
+    bb_cpu_gpu int GetNeighborsOf(int id, int **neighbors){
         AssertA(id < total, "Invalid cell id given for {GetNeighborsOf}");
         Cell<Q> *cell = &cells[id];
         if(neighbors){
@@ -510,7 +510,7 @@ class Grid{
     }
 
     template<typename Fn>
-    __bidevice__ int ForAllNeighborsOf(int id, int depth, const Fn fn){
+    bb_cpu_gpu int ForAllNeighborsOf(int id, int depth, const Fn fn){
         AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3,
                 "Unknown dimension distribution {ForAllNeighborsOf}");
         U u = GetCellIndex(id);
@@ -552,7 +552,7 @@ class Grid{
     }
 
     /* Get neighbors from a cell with a depth 'depth' */
-    __bidevice__ int GetNeighborListFor(int id, int depth, int *neighbors){
+    bb_cpu_gpu int GetNeighborListFor(int id, int depth, int *neighbors){
         AssertA(dimensions == 1 || dimensions == 2 || dimensions == 3,
                 "Unknown dimension distribution {GetNeighborListFor}");
         int count = 0;
@@ -593,14 +593,14 @@ class Grid{
     }
 
     /* Computes and allocates the cells for this grid */
-    __host__ void Build(const U &resolution, const T &dp0, const T &dp1);
+    void Build(const U &resolution, const T &dp0, const T &dp1);
 
     /* Sets and compute grid usage */
-    __host__ void UpdateQueryState();
+    void UpdateQueryState();
 };
 
 template<typename T, typename U, typename Q>
-__global__ void BuildNeighborListKernel(Grid<T, U, Q> *grid){
+bb_kernel void BuildNeighborListKernel(Grid<T, U, Q> *grid){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < grid->total){
         int neighbor[27];
@@ -624,7 +624,7 @@ __global__ void BuildNeighborListKernel(Grid<T, U, Q> *grid){
 }
 
 template<typename T, typename U, typename Q>
-__host__ void Grid<T, U, Q>::Build(const U &resolution, const T &dp0, const T &dp1){
+void Grid<T, U, Q>::Build(const U &resolution, const T &dp0, const T &dp1){
     SetDimension(T(0));
     T lower(Infinity), high(-Infinity);
     T p0 = Max(dp0, dp1);
@@ -666,7 +666,7 @@ __host__ void Grid<T, U, Q>::Build(const U &resolution, const T &dp0, const T &d
 }
 
 template<typename T, typename U, typename Q>
-__host__ void Grid<T, U, Q>::UpdateQueryState(){
+void Grid<T, U, Q>::UpdateQueryState(){
     int it = 0;
     for(int i = 0; i < total; i++){
         Cell<Q> *cell = &cells[i];
@@ -686,7 +686,7 @@ typedef Grid<vec3f, vec3ui, Bounds3f> Grid3;
 
 
 template<typename T, typename U, typename Q>
-__host__ void ResetAndDistribute(Grid<T, U, Q> *grid, ParticleSet<T> *pSet){
+void ResetAndDistribute(Grid<T, U, Q> *grid, ParticleSet<T> *pSet){
     if(grid && pSet){
         for(int i = 0; i < grid->GetCellCount(); i++){
             grid->DistributeResetCell(i);
@@ -696,13 +696,13 @@ __host__ void ResetAndDistribute(Grid<T, U, Q> *grid, ParticleSet<T> *pSet){
     }
 }
 
-inline __host__ Grid2 *MakeGrid(const vec2ui &size, const vec2f &pMin, const vec2f &pMax){
+inline Grid2 *MakeGrid(const vec2ui &size, const vec2f &pMin, const vec2f &pMax){
     Grid2 *grid = cudaAllocateVx(Grid2, 1);
     grid->Build(size, pMin, pMax);
     return grid;
 }
 
-inline __host__ Grid3 *MakeGrid(const vec3ui &size, const vec3f &pMin, const vec3f &pMax){
+inline Grid3 *MakeGrid(const vec3ui &size, const vec3f &pMin, const vec3f &pMax){
     Grid3 *grid = cudaAllocateVx(Grid3, 1);
     grid->Build(size, pMin, pMax);
     return grid;
@@ -729,19 +729,19 @@ class NodeEdgeGrid{
     int nodesPerCell; // amount of nodes per cell
     int gridDim; // grid dimension
 
-    __bidevice__ NodeEdgeGrid(){
+    bb_cpu_gpu NodeEdgeGrid(){
         grid = nullptr; data = nullptr;
         totalCount = 0; nodesPerCell = 0;
     }
 
-    __bidevice__ int GetNodeCount(){ return totalCount; }
-    __bidevice__ int GetDimensions(){ return gridDim; }
-    __bidevice__ T GetSpacing(){ return grid->GetCellSize(); }
-    __bidevice__ U GetNodeIndexCount(){ return usizes; }
-    __bidevice__ int GetNodesPerCell(){ return nodesPerCell; }
+    bb_cpu_gpu int GetNodeCount(){ return totalCount; }
+    bb_cpu_gpu int GetDimensions(){ return gridDim; }
+    bb_cpu_gpu T GetSpacing(){ return grid->GetCellSize(); }
+    bb_cpu_gpu U GetNodeIndexCount(){ return usizes; }
+    bb_cpu_gpu int GetNodesPerCell(){ return nodesPerCell; }
 
     /* Get Cell from index *INDEX IS FROM GRID* */
-    __bidevice__ Cell<Q> *GetCell(unsigned int id){
+    bb_cpu_gpu Cell<Q> *GetCell(unsigned int id){
         return grid->GetCell(id);
     }
 
@@ -749,7 +749,7 @@ class NodeEdgeGrid{
     * Initializes the NodeEdgeGrid with the underlying grid,
     * the grid needs to be already built.
     */
-    __host__ void Build(Grid<T, U, Q> *gridPtr, F initialValue = F(0)){
+    void Build(Grid<T, U, Q> *gridPtr, F initialValue = F(0)){
         AssertA(gridPtr, "Invalid grid pointer given for {NodeEdgeGrid::Setup}");
         // Get grid properties
         U ucount = gridPtr->GetIndexCount();
@@ -773,17 +773,17 @@ class NodeEdgeGrid{
     }
 
     /* Get linear index of a node */
-    __bidevice__ unsigned int GetNodeLinearIndex(const U &u){
+    bb_cpu_gpu unsigned int GetNodeLinearIndex(const U &u){
         return LinearIndex(u, usizes, gridDim);
     }
 
     /* Get index for a specific node */
-    __bidevice__ U GetNodeIndex(unsigned int nodeId){
+    bb_cpu_gpu U GetNodeIndex(unsigned int nodeId){
         return DimensionalIndex(nodeId, usizes, gridDim);
     }
 
     /* Get cells that contains a node */ // TODO: Review for 3D
-    __bidevice__ int GetCellsFrom(unsigned int nodeId, int *cells){
+    bb_cpu_gpu int GetCellsFrom(unsigned int nodeId, int *cells){
         AssertA(gridDim == 2, "Unsupported routine");
         int count = 0;
         U u = DimensionalIndex(nodeId, usizes, gridDim);
@@ -809,7 +809,7 @@ class NodeEdgeGrid{
     }
 
     /* Get the nodes from a given a cell */ // TODO: Review for 3D
-    __bidevice__ int GetNodesFrom(unsigned int cellId, int *nodes){
+    bb_cpu_gpu int GetNodesFrom(unsigned int cellId, int *nodes){
         AssertA(gridDim == 2, "Unsupported routine");
         // compute d-dimension index, this is the same as the first node
         U u = grid->GetCellIndex(cellId);
@@ -821,46 +821,46 @@ class NodeEdgeGrid{
     }
 
     /* Get field value for the given linear index */
-    __bidevice__ F GetValue(unsigned int u){
+    bb_cpu_gpu F GetValue(unsigned int u){
         AssertA(u < totalCount, "Invalid index for {NodeEdgeGrid::GetValue}");
         return data[u];
     }
 
     /* Get field value for the given index */
-    __bidevice__ F GetValue(const U &u){
+    bb_cpu_gpu F GetValue(const U &u){
         unsigned int h = LinearIndex(u, usizes, gridDim);
         AssertA(h < totalCount, "Invalid index for {NodeEdgeGrid::GetValue}");
         return data[h];
     }
 
     /* Set field value at a particular index */
-    __bidevice__ void SetValue(const U &u, F value){
+    bb_cpu_gpu void SetValue(const U &u, F value){
         unsigned int h = LinearIndex(u, usizes, gridDim);
         AssertA(h < totalCount, "Invalid index for {NodeEdgeGrid::SetValue}");
         data[h] = value;
     }
 
     /* Set field value at a particular linear index */
-    __bidevice__ void SetValue(unsigned int u, F value){
+    bb_cpu_gpu void SetValue(unsigned int u, F value){
         AssertA(u < totalCount, "Invalid index for {NodeEdgeGrid::SetValue}");
         data[u] = value;
     }
 
     /* Distribute the value of a particle to the node given by 'nodeId' */
-    __bidevice__ void ParticleToNodes(const T &pos, F value, unsigned int nodeId){
+    bb_cpu_gpu void ParticleToNodes(const T &pos, F value, unsigned int nodeId){
         AssertA(nodeId < totalCount, "Invalid index for {NodeEdgeGrid::ParticleToNode}");
         U u = DimensionalIndex(nodeId, usizes, gridDim); // get d-dimensional index
         ParticleToNodes(pos, value, u, nodeId);
     }
 
     /* Distribute the value of a particle to the node given by 'u' */
-    __bidevice__ void ParticleToNodes(const T &pos, F value, const U &u){
+    bb_cpu_gpu void ParticleToNodes(const T &pos, F value, const U &u){
         unsigned nodeId = LinearIndex(u, usizes, gridDim);
         ParticleToNodes(pos, value, u, nodeId);
     }
 
     /* Distribute the value of a particle to the node given by 'u' and 'nodeId' */
-    __bidevice__ void ParticleToNodes(const T &pos, F value, const U &u, unsigned int nodeId){
+    bb_cpu_gpu void ParticleToNodes(const T &pos, F value, const U &u, unsigned int nodeId){
         T nP;
         for(int i = 0; i < gridDim; i++) nP[i] = u[i];
         T h = GetSpacing(); // spacing used in this grid
@@ -887,7 +887,7 @@ class NodeEdgeGrid{
     }
 
     /* Distribute the node values to obtain interpolated particle value */
-    __bidevice__ F NodesToParticle(const T &pos){
+    bb_cpu_gpu F NodesToParticle(const T &pos){
         int nodes[8]; // since we only deal with max 3D 8 is the maximum nodes
         unsigned int cellId = grid->GetLinearHashedPosition(pos);
         int count = GetNodesFrom(cellId, &nodes[0]);
@@ -922,7 +922,7 @@ class NodeEdgeGrid{
     }
 
     /* Compute Node Volume */
-    __bidevice__ Float NodeVolume(unsigned int id){
+    bb_cpu_gpu Float NodeVolume(unsigned int id){
         AssertA(id < totalCount, "Invalid index for {NodeEdgeGrid::NodeVolume}");
         U u = DimensionalIndex(id, usizes, gridDim);
         Float V = 1;
@@ -968,16 +968,16 @@ class FieldGrid{
     int dimensions; // number of dimensions of the grid
     VertexType type; // where should position hash to
     int filled; // flag indicating if this grid has values set
-    __bidevice__ FieldGrid(){ SetDimension(T(0)); }
-    __bidevice__ void SetDimension(const Float &u){ (void)u; dimensions = 1; }
-    __bidevice__ void SetDimension(const vec2f &u){ (void)u; dimensions = 2; }
-    __bidevice__ void SetDimension(const vec3f &u){ (void)u; dimensions = 3; }
-    __bidevice__ int Filled(){ return filled; }
-    __bidevice__ void MarkFilled(){ filled = 1; }
-    __bidevice__ U GetResolution(){ return resolution; }
-    __bidevice__ T GetSpacing(){ return spacing; }
+    bb_cpu_gpu FieldGrid(){ SetDimension(T(0)); }
+    bb_cpu_gpu void SetDimension(const Float &u){ (void)u; dimensions = 1; }
+    bb_cpu_gpu void SetDimension(const vec2f &u){ (void)u; dimensions = 2; }
+    bb_cpu_gpu void SetDimension(const vec3f &u){ (void)u; dimensions = 3; }
+    bb_cpu_gpu int Filled(){ return filled; }
+    bb_cpu_gpu void MarkFilled(){ filled = 1; }
+    bb_cpu_gpu U GetResolution(){ return resolution; }
+    bb_cpu_gpu T GetSpacing(){ return spacing; }
 
-    __bidevice__ U GetComponentDimension(int component){
+    bb_cpu_gpu U GetComponentDimension(int component){
         AssertA(component < dimensions, "Invalid component dimension");
         U size(0);
         size[component] = resolution[component] + 1;
@@ -990,7 +990,7 @@ class FieldGrid{
         return size;
     }
 
-    __bidevice__ T GetDataPosition(const U &index, int component){
+    bb_cpu_gpu T GetDataPosition(const U &index, int component){
         T res(0);
         AssertA(type == FaceCentered, "Incorrect query");
         if(component < dimensions){
@@ -1007,7 +1007,7 @@ class FieldGrid{
         return res;
     }
 
-    __bidevice__ T GetDataPosition(const U &index){
+    bb_cpu_gpu T GetDataPosition(const U &index){
         T res(0);
         T origin(0);
         AssertA(type != FaceCentered, "Incorrect query");
@@ -1031,7 +1031,7 @@ class FieldGrid{
     * i.e.: VertexCentered for example requires n+1 points while CellCentered only n.
     */
     //TODO: Implement other types
-    __bidevice__ unsigned int Get1DLengthFor(int count){
+    bb_cpu_gpu unsigned int Get1DLengthFor(int count){
         switch(type){
             case VertexCentered: return count+1;
             case CellCentered: return count;
@@ -1042,32 +1042,32 @@ class FieldGrid{
         }
     }
 
-    __bidevice__ void SetValueAt(const F &value, const U &u){
+    bb_cpu_gpu void SetValueAt(const F &value, const U &u){
         unsigned int h = LinearIndex(u, resolution, dimensions);
         field[h] = value;
     }
 
-    __bidevice__ F GetValueAt(const vec3ui &u){
+    bb_cpu_gpu F GetValueAt(const vec3ui &u){
         vec3ui r(resolution[0], resolution[1], resolution[2]);
         unsigned int h = LinearIndex<vec3ui>(u, r, dimensions);
         return field[h];
     }
 
-    __bidevice__ F GetValueAt(size_t i, size_t j, size_t k){
+    bb_cpu_gpu F GetValueAt(size_t i, size_t j, size_t k){
         vec3ui r(resolution[0], resolution[1], resolution[2]);
         vec3ui u(i, j, k);
         unsigned int h = LinearIndex<vec3ui>(u, r, dimensions);
         return field[h];
     }
 
-    __bidevice__ F GetValueAt(size_t i, size_t j){
+    bb_cpu_gpu F GetValueAt(size_t i, size_t j){
         vec2ui r(resolution[0], resolution[1]);
         vec2ui u(i, j);
         unsigned int h = LinearIndex<vec2ui>(u, r, dimensions);
         return field[h];
     }
 
-    __bidevice__ F GetValueAt(const vec2ui &u){
+    bb_cpu_gpu F GetValueAt(const vec2ui &u){
         vec2ui r(resolution[0], resolution[1]);
         unsigned int h = LinearIndex<vec2ui>(u, r, dimensions);
         return field[h];
@@ -1076,7 +1076,7 @@ class FieldGrid{
     /*
     * Sample the field in the given point p.
     */
-    __bidevice__ F Sample(const T &p){
+    bb_cpu_gpu F Sample(const T &p){
         U ii(0);
         U jj(0);
         T weight(0);
@@ -1117,7 +1117,7 @@ class FieldGrid{
     }
 
 
-    __bidevice__ F DivergenceAtVertex(const U &index){
+    bb_cpu_gpu F DivergenceAtVertex(const U &index){
         F value(0);
         for(int i = 0; i < dimensions; i++){
             unsigned int idn = index[i] > 0 ? index[i]-1 : index[i];
@@ -1136,7 +1136,7 @@ class FieldGrid{
         return value;
     }
 
-    __bidevice__ T Gradient(const T &p){
+    bb_cpu_gpu T Gradient(const T &p){
         T value;
         // the way our setup works is we adjust resolution in Y/Z axis
         // so the reference spacing is X
@@ -1154,7 +1154,7 @@ class FieldGrid{
         return value;
     }
 
-    __host__ void BuildFaceCentered(const F &initialValue = F(0)){
+    void BuildFaceCentered(const F &initialValue = F(0)){
         T fres;
         perComponent[0] = 0, perComponent[1] = 0;
         perComponent[2] = 0;
@@ -1194,9 +1194,8 @@ class FieldGrid{
         }
     }
 
-    __host__ void Build(const U &resol, const T &space,
-                        const T &origin, VertexType vtype,
-                        const F &initialValue = F(0))
+    void Build(const U &resol, const T &space, const T &origin, VertexType vtype,
+               const F &initialValue = F(0))
     {
         T fres;
         SetDimension(T(0));
@@ -1247,7 +1246,6 @@ class ContinuousParticleSetBuilder{
     std::set<unsigned int> mappedCellSet;
     std::map<unsigned int, std::vector<T>> mappedPositions;
 
-    __host__
     ContinuousParticleSetBuilder(int maxParticles=kDefaultContinuousMaxParticles,
                                  bool _reemitOnce=false)
     {
@@ -1269,11 +1267,11 @@ class ContinuousParticleSetBuilder{
         warned = false;
     }
 
-    __host__ void SetKernelRadius(Float radius){
+    void SetKernelRadius(Float radius){
         kernelRadius = radius;
     }
 
-    __host__ void MapGrid(Grid<T, U, Q> *grid){
+    void MapGrid(Grid<T, U, Q> *grid){
         int count = particleSet->GetParticleCount();
         mappedDomain = grid;
         for(int i = 0; i < count; i++){
@@ -1308,9 +1306,8 @@ class ContinuousParticleSetBuilder{
         }
     }
 
-    __host__ void MapGridEmitToOther(ContinuousParticleSetBuilder<T, U, Q> *other,
-                                     const std::function<T(const T &)> velocity,
-                                     Float d=0.02)
+    void MapGridEmitToOther(ContinuousParticleSetBuilder<T, U, Q> *other,
+                            const std::function<T(const T &)> velocity, Float d=0.02)
     {
         if(reemitions > 0 && reemitOnce) return;
 
@@ -1353,7 +1350,7 @@ class ContinuousParticleSetBuilder{
         reemitions += 1;
     }
 
-    __host__ void MapGridEmit(const std::function<T(const T &)> velocity, Float d=0.02){
+    void MapGridEmit(const std::function<T(const T &)> velocity, Float d=0.02){
         if(reemitions > 0 && reemitOnce) return;
         std::set<unsigned int>::iterator it;
         int numNewParticles = 0;
@@ -1393,7 +1390,7 @@ class ContinuousParticleSetBuilder{
         reemitions += 1;
     }
 
-    __host__ int AddParticle(const T &pos, const T &vel = T(0),
+    int AddParticle(const T &pos, const T &vel = T(0),
                              const T &force = T(0))
     {
         int total = particleSet->GetParticleCount() + positions.size();
@@ -1411,7 +1408,7 @@ class ContinuousParticleSetBuilder{
         return ok;
     }
 
-    __host__ void Commit(){
+    void Commit(){
         if(positions.size() > 0){
             int startId = particleSet->GetParticleCount();
             particleSet->AppendData(positions.data(), velocities.data(),
@@ -1427,11 +1424,11 @@ class ContinuousParticleSetBuilder{
         }
     }
 
-    __host__ ParticleSet<T> *GetParticleSet(){
+    ParticleSet<T> *GetParticleSet(){
         return particleSet;
     }
 
-    __host__ int GetParticleCount(){
+    int GetParticleCount(){
         return particleSet->GetParticleCount();
     }
 };
@@ -1439,5 +1436,5 @@ class ContinuousParticleSetBuilder{
 typedef ContinuousParticleSetBuilder<vec2f, vec2ui, Bounds2f> ContinuousParticleSetBuilder2;
 typedef ContinuousParticleSetBuilder<vec3f, vec3ui, Bounds3f> ContinuousParticleSetBuilder3;
 
-__host__ SphParticleSet2 *SphParticleSet2FromContinuousBuilder(ContinuousParticleSetBuilder2 *builder);
-__host__ SphParticleSet3 *SphParticleSet3FromContinuousBuilder(ContinuousParticleSetBuilder3 *builder);
+SphParticleSet2 *SphParticleSet2FromContinuousBuilder(ContinuousParticleSetBuilder2 *builder);
+SphParticleSet3 *SphParticleSet3FromContinuousBuilder(ContinuousParticleSetBuilder3 *builder);

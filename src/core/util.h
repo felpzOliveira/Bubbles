@@ -78,10 +78,10 @@ struct i3{
     public:
     int t[3];
 
-    __bidevice__
+    bb_cpu_gpu
     i3(){ t[0] = 0; t[1] = 0; t[2] = 0; }
 
-    __bidevice__
+    bb_cpu_gpu
     i3(int a, int b, int c){
         if(a > c) Swap(a, c);
         if(a > b) Swap(a, b);
@@ -91,7 +91,7 @@ struct i3{
         t[2] = c;
     }
 
-    __bidevice__
+    bb_cpu_gpu
     bool operator==(const i3 &other){
         return t[0] == other.t[0] && t[1] == other.t[1] && t[2] == other.t[2];
     }
@@ -100,7 +100,7 @@ struct i3{
 
 struct i3Hasher{
     public:
-    __bidevice__
+    bb_cpu_gpu
     size_t operator()(const i3 &a) const{
         int f = a.t[0] + a.t[1] + a.t[2];
         return f;
@@ -110,7 +110,7 @@ struct i3Hasher{
 
 struct i3IsSame{
     public:
-    __bidevice__
+    bb_cpu_gpu
     bool operator()(const i3 &a, const i3 &b) const{
         return b.t[0] == a.t[0] && b.t[1] == a.t[1] && b.t[2] == a.t[2];
     }

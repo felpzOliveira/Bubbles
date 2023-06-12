@@ -29,11 +29,14 @@ typedef enum{
 #define cudaDeviceAssert(fname) if(cudaKernelSynchronize()){ printf("Failure for %s\n", fname); cudaSafeExit(); }
 #define cudaAllocateUnregisterVx(type, n) (type *)_cudaAllocateUnregister(sizeof(type)*n, __LINE__, __FILE__, true)
 
-#define __bidevice__ __host__ __device__
+#define bb_kernel __global__
+#define bb_cpu __host__
+#define bb_gpu __device__
+#define bb_cpu_gpu __host__ __device__
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-#define GPU_LAMBDA(...) [=] __device__(__VA_ARGS__)
+#define GPU_LAMBDA(...) [=] bb_gpu(__VA_ARGS__)
 
 typedef struct{
     size_t free_bytes;
@@ -138,18 +141,18 @@ class DataBuffer{
     T *data;
     int size;
 
-    __bidevice__ DataBuffer(){ size = 0; data = nullptr; }
+    bb_cpu_gpu DataBuffer(){ size = 0; data = nullptr; }
 
-    __bidevice__ int GetSize(){
+    bb_cpu_gpu int GetSize(){
         return size;
     }
 
-    __host__ void SetSize(int n){
+    void SetSize(int n){
         size = n;
         data = cudaAllocateVx(T, size);
     }
 
-    __host__ int SetDataAt(T *values, int n, int at){
+    int SetDataAt(T *values, int n, int at){
         int rv = 1;
         if(size >= at + n){
             memcpy(&data[at], values, n * sizeof(T));
@@ -161,29 +164,29 @@ class DataBuffer{
         return rv;
     }
 
-    __host__ void Clear(){
+    void Clear(){
         memset(data, 0x0, sizeof(T) * size);
     }
 
-    __host__ void SetData(T *values, int n){
+    void SetData(T *values, int n){
         size = n;
         data = cudaAllocateVx(T, size);
         memcpy(data, values, sizeof(T) * size);
     }
 
-    __bidevice__ T At(int i){
+    bb_cpu_gpu T At(int i){
         if(i < size) return data[i];
         printf("Warning: Invalid query index {%d >= %d}\n", i, size);
         return T(0);
     }
 
-    __bidevice__ T *Get(int i){
+    bb_cpu_gpu T *Get(int i){
         if(i < size) return &data[i];
         printf("Warning: Invalid get index {%d >= %d}\n", i, size);
         return nullptr;
     }
 
-    __bidevice__ void Set(T val, int i){
+    bb_cpu_gpu void Set(T val, int i){
         if(i < size) data[i] = val;
         else printf("Warning: Invalid set index {%d >= %d}\n", i, size);
     }
@@ -211,7 +214,7 @@ inline int GetBlockSize(F kernel, const char *fname){
     return blockSize;
 }
 
-template<typename F> __global__ void GenericKernel(F fn, int items){
+template<typename F> bb_kernel void GenericKernel(F fn, int items){
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if(tid >= items) return;
 
@@ -219,7 +222,7 @@ template<typename F> __global__ void GenericKernel(F fn, int items){
 }
 
 template<typename F> inline
-__host__ void GPUParallelLambda(const char *desc, int nItems, F fn){
+void GPUParallelLambda(const char *desc, int nItems, F fn){
     auto kernel = &GenericKernel<F>;
     int blockSize = GetBlockSize(kernel, desc);
     int gridSize = (nItems + blockSize - 1) / blockSize;

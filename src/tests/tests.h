@@ -10,7 +10,7 @@
 * and calling them in a separate functions, deal with it.
 */
 
-inline __host__
+inline
 void test_check(bool v, const char *name, const char *filename, int line, const char *msg){
     if(!v){
         if(!msg)

@@ -2,6 +2,9 @@
 
 #ifndef PROFILER_H
 #define PROFILER_H
+#define bb_cpu __host__
+#define bb_gpu __device__
+
 
 #define PROFILER_ALL
 
@@ -26,7 +29,7 @@ void   ProfilerReport();
 void   ProfilerManualStart(const char *funcname);
 void   ProfilerManualFinish();
 
-__host__ __device__
+bb_cpu bb_gpu
 void _ProfilerSetParticle(int value, int id);
 
 

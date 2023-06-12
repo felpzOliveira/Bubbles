@@ -46,7 +46,7 @@
  * particle stores the id of the lowest particle sister that will be resolved +1.
  * This avoids the 0 particle. I'm also negating this value for simpler tests.
  */
-template<typename T, typename U, typename Q> __bidevice__
+template<typename T, typename U, typename Q> bb_cpu_gpu
 void SandimComputeWorkQueueFor(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                int *workQ, int pId)
 {
@@ -74,7 +74,7 @@ void SandimComputeWorkQueueFor(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     workQ[pId] = minCandidate;
 }
 
-template<typename T, typename U, typename Q> inline __host__
+template<typename T, typename U, typename Q> inline
 void SandimComputeWorkQueue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *workQ){
     int N = pSet->GetParticleCount();
     AutoParallelFor("SandimComputeWorkQueue", N, AutoLambda(int i){
@@ -89,7 +89,7 @@ void SandimComputeWorkQueue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *wo
  * This reduces *a lot* the memory required to store the inverted points for
  * some voxels.
  */
-template<typename T, typename U, typename Q, typename SandimWorkQueue> __bidevice__
+template<typename T, typename U, typename Q, typename SandimWorkQueue> bb_cpu_gpu
 void SandimComputeVP(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                      SandimWorkQueue *vpWorkQ, unsigned int id)
 {
@@ -123,7 +123,7 @@ void SandimComputeVP(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     }
 }
 
-template<typename T, typename U, typename Q, typename SandimWorkQueue> inline __host__
+template<typename T, typename U, typename Q, typename SandimWorkQueue> inline
 void SandimComputeViewPointsImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                  SandimWorkQueue *vpWorkQ)
 {
@@ -133,15 +133,15 @@ void SandimComputeViewPointsImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     });
 }
 
-inline __host__ void SandimComputeViewPoints(ParticleSet3 *pSet, Grid3 *domain,
-                                             SandimWorkQueue3 *vpWorkQ)
+inline void SandimComputeViewPoints(ParticleSet3 *pSet, Grid3 *domain,
+                                    SandimWorkQueue3 *vpWorkQ)
 {
     SandimComputeViewPointsImpl<vec3f, vec3ui, Bounds3f, SandimWorkQueue3>(
                                                         pSet, domain, vpWorkQ);
 }
 
-inline __host__ void SandimComputeViewPoints(ParticleSet2 *pSet, Grid2 *domain,
-                                             SandimWorkQueue2 *vpWorkQ)
+inline void SandimComputeViewPoints(ParticleSet2 *pSet, Grid2 *domain,
+                                    SandimWorkQueue2 *vpWorkQ)
 {
     SandimComputeViewPointsImpl<vec2f, vec2ui, Bounds2f, SandimWorkQueue2>(
                                                         pSet, domain, vpWorkQ);
@@ -154,7 +154,7 @@ inline __host__ void SandimComputeViewPoints(ParticleSet2 *pSet, Grid2 *domain,
  * implementation instead of the default one. This grid is not completely symmetric,
  * use with care.
  */
-template<typename T, typename U, typename Q> inline __host__
+template<typename T, typename U, typename Q> inline
 Grid<T, U, Q> *SandimComputeCompatibleGridImpl(ParticleSet<T> *pSet, Float h){
     Float rho = h;
     Float cellSize = 2.0 * rho;
@@ -167,18 +167,18 @@ Grid<T, U, Q> *SandimComputeCompatibleGridImpl(ParticleSet<T> *pSet, Float h){
     return MakeGrid(idim, grid_min, grid_max);
 }
 
-inline __host__ Grid3 *SandimComputeCompatibleGrid(ParticleSet3 *pSet, Float h){
+inline Grid3 *SandimComputeCompatibleGrid(ParticleSet3 *pSet, Float h){
     return SandimComputeCompatibleGridImpl<vec3f, vec3ui, Bounds3f>(pSet, h);
 }
 
-inline __host__ Grid2 *SandimComputeCompatibleGrid(ParticleSet2 *pSet, Float h){
+inline Grid2 *SandimComputeCompatibleGrid(ParticleSet2 *pSet, Float h){
     return SandimComputeCompatibleGridImpl<vec2f, vec2ui, Bounds2f>(pSet, h);
 }
 
 /*
  * Performs exponential flip.
  */
-template<typename T, typename U, typename Q, typename SandimWorkQ> __bidevice__
+template<typename T, typename U, typename Q, typename SandimWorkQ> bb_cpu_gpu
 int SandimExponentialFlip(T vp, Float gamma, IndexedParticle<T> *invPoints,
                           int max, ParticleSet<T> *pSet,
                           Grid<T, U, Q> *domain, int *partQ)
@@ -239,7 +239,7 @@ int SandimExponentialFlip(T vp, Float gamma, IndexedParticle<T> *invPoints,
     return n;
 }
 
-template<typename T, typename U, typename Q, typename SandimWorkQ> __bidevice__
+template<typename T, typename U, typename Q, typename SandimWorkQ> bb_cpu_gpu
 void SandimComputeVPFlip(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *partQ,
                          SandimWorkQ *vpWorkQ, IndexedParticle<T> *points,
                          int *vp_count, int maxp)
@@ -257,7 +257,7 @@ void SandimComputeVPFlip(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *partQ
 /*
  * Simple JarvisMarch for the 2D case where solving in the GPU is easy.
  */
-__bidevice__ inline
+bb_cpu_gpu inline
 void ConvexHullJarvisMarch2D(IndexedParticle<vec2f> *points, int length,
                              ParticleSet2 *pSet)
 {
@@ -301,7 +301,7 @@ void ConvexHullJarvisMarch2D(IndexedParticle<vec2f> *points, int length,
     }while(chosen != source);
 }
 
-static __bidevice__
+static bb_cpu_gpu
 void SandimComputeConvexHull2D(IndexedParticle<vec2f> *points, int *vp_count,
                                SandimWorkQueue2 *vpWorkQ, ParticleSet2 *pSet, int maxp)
 {
@@ -316,7 +316,7 @@ void SandimComputeConvexHull2D(IndexedParticle<vec2f> *points, int *vp_count,
  * Apply QuickHull to 3D case. Solves on CPU using the multi-threading framework
  * from cutil.h.
  */
-inline __host__
+inline
 void SandimConvexHull3(IndexedParticle<vec3f> *points, int *vp_count,
                        SandimWorkQueue3 *vpWorkQ, ParticleSet3 *pSet,
                        int maxp)
@@ -347,7 +347,7 @@ void SandimConvexHull3(IndexedParticle<vec3f> *points, int *vp_count,
     ConvexHullFinish();
 }
 
-template<typename T, typename U, typename Q, typename SandimWorkQ> inline __host__
+template<typename T, typename U, typename Q, typename SandimWorkQ> inline
 void SandimComputeHPRImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *partQ,
                           SandimWorkQ *vpWorkQ, IndexedParticle<T> **pts,
                           int **vps, const int maxN)
@@ -369,7 +369,7 @@ void SandimComputeHPRImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, int *part
     *vps = vp_count;
 }
 
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 void SandimRemapUnboundedParticles(ParticleSet<T> *pSet, int *partQ, int i){
     if(i < pSet->GetParticleCount()){
         int id = partQ[i];
@@ -380,7 +380,7 @@ void SandimRemapUnboundedParticles(ParticleSet<T> *pSet, int *partQ, int i){
     }
 }
 
-inline __host__
+inline
 void SandimComputeHPR(ParticleSet3 *pSet, Grid3 *domain, int *partQ,
                       SandimWorkQueue3 *vpWorkQ, int maxFlipSlots)
 {
@@ -401,7 +401,7 @@ void SandimComputeHPR(ParticleSet3 *pSet, Grid3 *domain, int *partQ,
     cudaFree(vp_count);
 }
 
-inline __host__
+inline
 void SandimComputeHPR(ParticleSet2 *pSet, Grid2 *domain, int *partQ,
                       SandimWorkQueue2 *vpWorkQ, int maxFlipSlots)
 {
@@ -424,7 +424,7 @@ void SandimComputeHPR(ParticleSet2 *pSet, Grid2 *domain, int *partQ,
     cudaFree(vp_count);
 }
 
-template<typename T, typename U, typename Q, typename SandimWorkQ> inline __host__
+template<typename T, typename U, typename Q, typename SandimWorkQ> inline
 void SandimBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                     SandimWorkQ *vpWorkQ, int maxFlipSlots=512)
 {

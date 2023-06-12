@@ -13,8 +13,8 @@ template<typename T> struct IndexedParticle{
     T p;
 };
 
-__host__ void ConvexHullPrepare();
-__host__ void ConvexHullFinish();
+void ConvexHullPrepare();
+void ConvexHullFinish();
 
-__host__ void ConvexHull3D(IndexedParticle<vec3f> *ips, int maxLen,
-                           int len, std::function<void(int)> reporter);
+void ConvexHull3D(IndexedParticle<vec3f> *ips, int maxLen,
+                  int len, std::function<void(int)> reporter);

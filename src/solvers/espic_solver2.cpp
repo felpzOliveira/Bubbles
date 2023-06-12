@@ -1,28 +1,28 @@
 #include <espic_solver.h>
 
-__global__ void SwapGridStates(Grid2 *grid){
+bb_kernel void SwapGridStates(Grid2 *grid){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < grid->GetCellCount()){
         grid->SwapCellList(i);
     }
 }
 
-__global__ void UpdateGridSpeciesKernel(Grid2 *grid, SpecieSet2 **ppSet, int n){
+bb_kernel void UpdateGridSpeciesKernel(Grid2 *grid, SpecieSet2 **ppSet, int n){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < grid->GetCellCount()){
         grid->DistributeToCellOpt(ppSet, n, i);
     }
 }
 
-__host__ void UpdateGridDistribution(Grid2 *grid, SpecieSet2 **ppSet, int n){
+void UpdateGridDistribution(Grid2 *grid, SpecieSet2 **ppSet, int n){
     int N = grid->GetCellCount();
     GPULaunch(N, UpdateGridSpeciesKernel, grid, ppSet, n);
     GPULaunch(N, SwapGridStates, grid);
 }
 
-__bidevice__ EspicSolver2::EspicSolver2(){}
+bb_cpu_gpu EspicSolver2::EspicSolver2(){}
 
-__host__ void EspicSolver2::Advance(Float dt){
+void EspicSolver2::Advance(Float dt){
     // Compute number density
     for(int i = 0; i < spCount; i++){
         SpecieSet2 *pSet = spSet[i];
@@ -49,7 +49,7 @@ __host__ void EspicSolver2::Advance(Float dt){
     UpdateGridDistribution(ef->grid, spSet, spCount);
 }
 
-__host__ void EspicSolver2::Setup(Grid2 *domain, SpecieSet2 **species, int speciesCount){
+void EspicSolver2::Setup(Grid2 *domain, SpecieSet2 **species, int speciesCount){
     spSet = species;
     spCount = speciesCount;
     phi = cudaAllocateVx(NodeEdgeGrid2f, 1);
@@ -80,6 +80,6 @@ __host__ void EspicSolver2::Setup(Grid2 *domain, SpecieSet2 **species, int speci
     ComputeElectricField(ef, phi);
 }
 
-__host__ void EspicSolver2::SetColliders(ColliderSet2 *coll){
+void EspicSolver2::SetColliders(ColliderSet2 *coll){
     collider = coll;
 }

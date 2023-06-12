@@ -17,17 +17,17 @@
 
 #define CF_KERNEL_EXPANSION 3.0
 
-inline __bidevice__ vec3f KernelGradient(Float rho, Float distance, vec3f dir){
+inline bb_cpu_gpu vec3f KernelGradient(Float rho, Float distance, vec3f dir){
     SphStdKernel3 kernel3d(rho);
     return kernel3d.gradW(distance, dir);
 }
 
-inline __bidevice__ vec2f KernelGradient(Float rho, Float distance, vec2f dir){
+inline bb_cpu_gpu vec2f KernelGradient(Float rho, Float distance, vec2f dir){
     SphStdKernel2 kernel2d(rho);
     return kernel2d.gradW(distance, dir);
 }
 
-template<typename T, typename U, typename Q> __bidevice__
+template<typename T, typename U, typename Q> bb_cpu_gpu
 int CFParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                              Float h, int pId)
 {
@@ -67,7 +67,7 @@ int CFParticleIsBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     return 0;
 }
 
-template<typename T, typename U, typename Q> __host__
+template<typename T, typename U, typename Q>
 void CFBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
     int N = pSet->GetParticleCount();
     AutoParallelFor("CFParticleIsBoundary", N, AutoLambda(int i){

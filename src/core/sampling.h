@@ -4,7 +4,7 @@
 #define Accessor2D(acc, i, j, x) acc[(i) + (x) * (j)]
 
 template<typename T>
-inline __bidevice__ void GetBarycentric(const T &x, int low, int high,
+inline bb_cpu_gpu void GetBarycentric(const T &x, int low, int high,
                                         int *i, T *f)
 {
     T s = Floor(x);
@@ -30,12 +30,12 @@ inline __bidevice__ void GetBarycentric(const T &x, int low, int high,
     *i -= offset;
 }
 
-template<typename T, typename Q> inline __bidevice__
+template<typename T, typename Q> inline bb_cpu_gpu
 T Bilerp(const T &f00, const T &f10, const T &f01, const T &f11, Q tx, Q ty){
     return Lerp<T, Q>(Lerp<T, Q>(f00, f10, tx), Lerp(f01, f11, tx), ty);
 }
 
-template<typename T, typename Q> inline __bidevice__
+template<typename T, typename Q> inline bb_cpu_gpu
 T Trilerp(const T &f000, const T &f100, const T &f010, const T &f110,
           const T &f001, const T &f101, const T &f011, const T &f111,
           Q tx, Q ty, Q tz)
@@ -44,7 +44,7 @@ T Trilerp(const T &f000, const T &f100, const T &f010, const T &f110,
                       Bilerp<T, Q>(f001, f101, f011, f111, tx, ty), tz);
 }
 
-template<typename T, typename Q> inline __bidevice__
+template<typename T, typename Q> inline bb_cpu_gpu
 T LinearGridSampler2Sample(const vec2f &pt, T *data, const vec2f &spacing,
                            const vec2f &origin, const vec2ui &res)
 {
@@ -69,7 +69,7 @@ T LinearGridSampler2Sample(const vec2f &pt, T *data, const vec2f &spacing,
                         Accessor2D(data, ip1, jp1, res.x), fx, fy);
 }
 
-template<typename T = Float> inline __bidevice__
+template<typename T = Float> inline bb_cpu_gpu
 void LinearGridSampler2Weights(const vec2f &pt, const vec2f &spacing,
                                const vec2f &origin, const vec2ui &res,
                                vec2ui *indices, T *weights)
@@ -101,7 +101,7 @@ void LinearGridSampler2Weights(const vec2f &pt, const vec2f &spacing,
     weights[3] = fx * fy;
 }
 
-inline __bidevice__
+inline bb_cpu_gpu
 Float CubicCatmullRom(Float a, Float b, Float c, Float d, Float x){
     Float xsq = x*x;
     Float xcu = xsq*x;
@@ -117,7 +117,7 @@ Float CubicCatmullRom(Float a, Float b, Float c, Float d, Float x){
     return min(max(t, minV), maxV);
 }
 
-inline __bidevice__
+inline bb_cpu_gpu
 Float MonotonicCatmullRom(const Float &f0, const Float &f1,
                           const Float &f2, const Float &f3, Float f)
 {
@@ -149,7 +149,7 @@ struct LinearInterpolator{
     LinearInterpolator() = default;
 
     template<typename Fn>
-    __bidevice__ Float Interpolate(Float x, Float y, vec2ui resolution, const Fn &fn){
+    bb_cpu_gpu Float Interpolate(Float x, Float y, vec2ui resolution, const Fn &fn){
         int iSize = resolution.x, jSize = resolution.y;
         int ix = (int)x;
         int iy = (int)y;
@@ -163,7 +163,7 @@ struct LinearInterpolator{
         return Mix(Mix(x00, x10, x), Mix(x01, x11, x), y);
     }
 
-    __bidevice__ Float Pulse(Float x){
+    bb_cpu_gpu Float Pulse(Float x){
         return 1;
     }
 };
@@ -172,7 +172,7 @@ struct MonotonicCatmull{
     MonotonicCatmull() = default;
 
     template<typename Fn>
-    __bidevice__ Float Interpolate(Float x, Float y, vec2ui resolution, const Fn &fn){
+    bb_cpu_gpu Float Interpolate(Float x, Float y, vec2ui resolution, const Fn &fn){
         int iSize = resolution.x, jSize = resolution.y;
         int ix = (int)x;
         int iy = (int)y;
@@ -200,7 +200,7 @@ struct MonotonicCatmull{
         return CubicCatmullRom(values[0], values[1], values[2], values[3], y);
     }
 
-    __bidevice__ Float Pulse(Float x){
+    bb_cpu_gpu Float Pulse(Float x){
         x = Min(Absf(x), 1.f);
         return 1.f - x * x * (3.0 - 2.0 * x);
     }

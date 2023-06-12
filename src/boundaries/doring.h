@@ -41,12 +41,12 @@
 // this μ is from the paper, I could not find a correct value
 #define RDM_MU_3D 0.75
 
-inline __bidevice__ vec2f RandlesDoringGradient(Float rho, Float distance, vec2f dir){
+inline bb_cpu_gpu vec2f RandlesDoringGradient(Float rho, Float distance, vec2f dir){
     SphStdKernel2 kernel(rho);
     return kernel.gradW(distance, dir);
 }
 
-inline __bidevice__ vec3f RandlesDoringGradient(Float rho, Float distance, vec3f dir){
+inline bb_cpu_gpu vec3f RandlesDoringGradient(Float rho, Float distance, vec3f dir){
     SphStdKernel3 kernel(rho);
     return kernel.gradW(distance, dir);
 }
@@ -58,7 +58,7 @@ inline __bidevice__ vec3f RandlesDoringGradient(Float rho, Float distance, vec3f
 *     λ1 = trace(A)/2 + sqrt(T²/4 - det(A))
 *     λ2 = trace(A)/2 - sqrt(T²/4 - det(A))
 */
-inline __bidevice__ Float ComputeMinEigenvalue(const Matrix2x2 &m){
+inline bb_cpu_gpu Float ComputeMinEigenvalue(const Matrix2x2 &m){
     Float trace  = Trace(m);
     Float det    = Determinant(m);
     Float trace2 = trace * trace;
@@ -79,7 +79,7 @@ inline __bidevice__ Float ComputeMinEigenvalue(const Matrix2x2 &m){
 * possible to invert the renormalization matrix I'll won't return
 * 0 here.
 */
-inline __bidevice__ Float ComputeMinEigenvalueZero(const Matrix2x2 &m){
+inline bb_cpu_gpu Float ComputeMinEigenvalueZero(const Matrix2x2 &m){
     return Trace(m);
 }
 
@@ -91,7 +91,7 @@ inline __bidevice__ Float ComputeMinEigenvalueZero(const Matrix2x2 &m){
 * I'll use double to increase precision but there are a lot of sqrts
 * and cbrt so precision will struggle.
 */
-inline __bidevice__ Float ComputeMinEigenvalue(const Matrix3x3 &m){
+inline bb_cpu_gpu Float ComputeMinEigenvalue(const Matrix3x3 &m){
     Matrix3x3 m2 = Matrix3x3::Mul(m, m);
     /* division by A = -1 to bring this to: x³ + bx² + cx + d = 0 */
     double B = -Trace(m);
@@ -147,7 +147,7 @@ inline __bidevice__ Float ComputeMinEigenvalue(const Matrix3x3 &m){
 * besides 0, so it will need to return here, but I'm not sure
 * about consequences of doing so.
 */
-inline __bidevice__ Float ComputeMinEigenvalueZero(const Matrix3x3 &m){
+inline bb_cpu_gpu Float ComputeMinEigenvalueZero(const Matrix3x3 &m){
     Matrix3x3 m2 = Matrix3x3::Mul(m, m);
     /* Divide by A = -1 to get x² + bx + c = 0 */
     double B = -Trace(m);
@@ -174,7 +174,7 @@ inline __bidevice__ Float ComputeMinEigenvalueZero(const Matrix3x3 &m){
 * So this algorithm is kind of a guess based on the paper, since I couldn't
 * find any base implementation and was unable to get any response from the author.
 */
-template<typename T, typename U, typename Q, typename M> inline __bidevice__
+template<typename T, typename U, typename Q, typename M> inline bb_cpu_gpu
 void RandlesDoringEigenvalue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                              Float h, Float *L, int pId)
 {
@@ -241,7 +241,7 @@ void RandlesDoringEigenvalue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     }
 }
 
-inline __bidevice__
+inline bb_cpu_gpu
 int RandlesDoringIsBoundaryParticle(Float *L, Float mu, Float Lmax,
                                     Float Lmin, int pId)
 {
@@ -262,19 +262,19 @@ inline vec2f RandlesDoringGetEigenvalueLimits(Float *L, int N){
     return vec2f(Lmin, Lmax);
 }
 
-inline __bidevice__ void
+inline bb_cpu_gpu void
 RandlesDoringEigenvalueDecl(ParticleSet3 *pSet, Grid3 *domain, Float h, Float *L, int i)
 {
     RandlesDoringEigenvalue<vec3f, vec3ui, Bounds3f, Matrix3x3>(pSet, domain, h, L, i);
 }
 
-inline __bidevice__ void
+inline bb_cpu_gpu void
 RandlesDoringEigenvalueDecl(ParticleSet2 *pSet, Grid2 *domain, Float h, Float *L, int i)
 {
     RandlesDoringEigenvalue<vec2f, vec2ui, Bounds2f, Matrix2x2>(pSet, domain, h, L, i);
 }
 
-template<typename T, typename U, typename Q> inline __host__
+template<typename T, typename U, typename Q> inline
 void RandlesDoringEigenvalueImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                  Float h, Float *L)
 {
@@ -284,7 +284,7 @@ void RandlesDoringEigenvalueImpl(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     });
 }
 
-template<typename T, typename U, typename Q> inline __host__
+template<typename T, typename U, typename Q> inline
 void RandlesDoringBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                            Float h, Float mu=-1)
 {

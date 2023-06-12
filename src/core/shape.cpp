@@ -6,11 +6,11 @@
 /*************************************************************/
 //                   2 D    S H A P E S                      //
 /*************************************************************/
-__bidevice__ Shape2::Shape2(const Transform2 &toWorld, bool reverseOrientation)
+bb_cpu_gpu Shape2::Shape2(const Transform2 &toWorld, bool reverseOrientation)
 : ObjectToWorld(toWorld), WorldToObject(Inverse(toWorld)),
 reverseOrientation(reverseOrientation), linearVelocity(vec2f(0)), angularVelocity(0){}
 
-__bidevice__ bool Shape2::IsInside(const vec2f &point) const{
+bb_cpu_gpu bool Shape2::IsInside(const vec2f &point) const{
     if(grid){
         if(grid->Filled()){
             return (grid->Sample(point) < 0);
@@ -19,13 +19,13 @@ __bidevice__ bool Shape2::IsInside(const vec2f &point) const{
     return reverseOrientation == !(ClosestDistance(point) < 0);
 }
 
-__bidevice__ Float Shape2::SignedDistance(const vec2f &point) const{
+bb_cpu_gpu Float Shape2::SignedDistance(const vec2f &point) const{
     Float d = ClosestDistance(point);
     if(IsInside(point)) return -Absf(d);
     return Absf(d);
 }
 
-__bidevice__ Bounds2f Shape2::GetBounds(){
+bb_cpu_gpu Bounds2f Shape2::GetBounds(){
     switch(type){
         case ShapeType::ShapeSphere2:{
             return Sphere2GetBounds();
@@ -42,7 +42,7 @@ __bidevice__ Bounds2f Shape2::GetBounds(){
     }
 }
 
-__bidevice__ bool Shape2::Intersect(const Ray2 &ray, SurfaceInteraction2 *isect,
+bb_cpu_gpu bool Shape2::Intersect(const Ray2 &ray, SurfaceInteraction2 *isect,
                                     Float *tShapeHit) const
 {
     switch(type){
@@ -61,7 +61,7 @@ __bidevice__ bool Shape2::Intersect(const Ray2 &ray, SurfaceInteraction2 *isect,
     }
 }
 
-__bidevice__ Float Shape2::ClosestDistance(const vec2f &point) const{
+bb_cpu_gpu Float Shape2::ClosestDistance(const vec2f &point) const{
     switch(type){
         case ShapeType::ShapeSphere2:{
             return Sphere2ClosestDistance(point);
@@ -84,7 +84,7 @@ __bidevice__ Float Shape2::ClosestDistance(const vec2f &point) const{
     }
 }
 
-__bidevice__ void Shape2::ClosestPoint(const vec2f &point,
+bb_cpu_gpu void Shape2::ClosestPoint(const vec2f &point,
                                        ClosestPointQuery2 *query) const
 {
     if(grid){
@@ -106,17 +106,17 @@ __bidevice__ void Shape2::ClosestPoint(const vec2f &point,
     }
 }
 
-__bidevice__ void Shape2::SetVelocities(const vec2f &vel, const Float &angular){
+bb_cpu_gpu void Shape2::SetVelocities(const vec2f &vel, const Float &angular){
     linearVelocity = vel;
     angularVelocity = angular;
 }
 
-__host__ void Shape2::Update(const Transform2 &toWorld){
+void Shape2::Update(const Transform2 &toWorld){
     ObjectToWorld = toWorld;
     WorldToObject = Inverse(toWorld);
 }
 
-__bidevice__ vec2f Shape2::VelocityAt(const vec2f &point) const{
+bb_cpu_gpu vec2f Shape2::VelocityAt(const vec2f &point) const{
     vec2f translation = Translation(ObjectToWorld.m);
     vec2f p = point - translation;
     vec2f angularVel = angularVelocity * vec2f(-p.y, p.x);
@@ -126,11 +126,11 @@ __bidevice__ vec2f Shape2::VelocityAt(const vec2f &point) const{
 /*************************************************************/
 //                   3 D    S H A P E S                      //
 /*************************************************************/
-__bidevice__ Shape::Shape(const Transform &toWorld, bool reverseOrientation) :
+bb_cpu_gpu Shape::Shape(const Transform &toWorld, bool reverseOrientation) :
 ObjectToWorld(toWorld), WorldToObject(Inverse(toWorld)),
 reverseOrientation(reverseOrientation), linearVelocity(vec3f(0)), angularVelocity(vec3f(0)){}
 
-__bidevice__ bool Shape::CanSolveSdf() const{
+bb_cpu_gpu bool Shape::CanSolveSdf() const{
     switch(type){
         case ShapeType::ShapeSphere:{
             return true;
@@ -155,7 +155,7 @@ __bidevice__ bool Shape::CanSolveSdf() const{
     }
 }
 
-__bidevice__ Bounds3f Shape::GetBounds(){
+bb_cpu_gpu Bounds3f Shape::GetBounds(){
     switch(type){
         case ShapeType::ShapeSphere:{
             return SphereGetBounds();
@@ -180,7 +180,7 @@ __bidevice__ Bounds3f Shape::GetBounds(){
     }
 }
 
-__bidevice__ bool Shape::Intersect(const Ray &ray, SurfaceInteraction *isect,
+bb_cpu_gpu bool Shape::Intersect(const Ray &ray, SurfaceInteraction *isect,
                                    Float *tShapeHit) const
 {
     switch(type){
@@ -203,7 +203,7 @@ __bidevice__ bool Shape::Intersect(const Ray &ray, SurfaceInteraction *isect,
     }
 }
 
-__bidevice__ Float Shape::ClosestDistance(const vec3f &point) const{
+bb_cpu_gpu Float Shape::ClosestDistance(const vec3f &point) const{
     switch(type){
         case ShapeType::ShapeSphere:{
             return SphereClosestDistance(point);
@@ -230,7 +230,7 @@ __bidevice__ Float Shape::ClosestDistance(const vec3f &point) const{
     }
 }
 
-__bidevice__ void Shape::ClosestPoint(const vec3f &point,
+bb_cpu_gpu void Shape::ClosestPoint(const vec3f &point,
                                       ClosestPointQuery *query) const
 {
     if(grid){
@@ -252,7 +252,7 @@ __bidevice__ void Shape::ClosestPoint(const vec3f &point,
     }
 }
 
-__host__ std::string Shape::Serialize() const{
+std::string Shape::Serialize() const{
     switch(type){
         case ShapeType::ShapeSphere:{
             return SphereSerialize();
@@ -271,7 +271,7 @@ __host__ std::string Shape::Serialize() const{
     }
 }
 
-__bidevice__ bool Shape::IsInside(const vec3f &point) const{
+bb_cpu_gpu bool Shape::IsInside(const vec3f &point) const{
     if(grid){
         if(grid->Filled()){
             return (grid->Sample(point) < 0);
@@ -280,30 +280,30 @@ __bidevice__ bool Shape::IsInside(const vec3f &point) const{
     return reverseOrientation == !(ClosestDistance(point) < 0);
 }
 
-__bidevice__ Float Shape::SignedDistance(const vec3f &point) const{
+bb_cpu_gpu Float Shape::SignedDistance(const vec3f &point) const{
     Float d = ClosestDistance(point);
     if(IsInside(point)) return -Absf(d);
     return Absf(d);
 }
 
-__bidevice__ void Shape::SetVelocities(const vec3f &vel, const vec3f &angular){
+bb_cpu_gpu void Shape::SetVelocities(const vec3f &vel, const vec3f &angular){
     linearVelocity = vel;
     angularVelocity = angular;
 }
 
-__host__ void Shape::Update(const Transform &toWorld){
+void Shape::Update(const Transform &toWorld){
     ObjectToWorld = toWorld;
     WorldToObject = Inverse(toWorld);
 }
 
-__bidevice__ vec3f Shape::VelocityAt(const vec3f &point) const{
+bb_cpu_gpu vec3f Shape::VelocityAt(const vec3f &point) const{
     vec3f translation = Translation(ObjectToWorld.m);
     vec3f p = point - translation;
     vec3f angularVel = Cross(angularVelocity, p);
     return linearVelocity + angularVel;
 }
 
-__host__ std::string Shape::MeshSerialize() const{
+std::string Shape::MeshSerialize() const{
     std::stringstream ss;
     Transform transform = mesh->transform;
     ss << "ShapeBegin\n";
@@ -329,7 +329,7 @@ __host__ std::string Shape::MeshSerialize() const{
 * Compute a ray direction from a point and a bounding box being sampled,
 * all computations must be performed centered at the origin.
 */
-__bidevice__ vec3f GenerateMinimalRayDirection(const vec3f &origin, const Bounds3f &bound){
+bb_cpu_gpu vec3f GenerateMinimalRayDirection(const vec3f &origin, const Bounds3f &bound){
     vec3f dir(0);
     Float dx = Absf(bound.ExtentOn(0) * 0.5f - origin.x);
     Float dy = Absf(bound.ExtentOn(1) * 0.5f - origin.y);
@@ -354,7 +354,7 @@ __bidevice__ vec3f GenerateMinimalRayDirection(const vec3f &origin, const Bounds
     return dir;
 }
 
-__bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
+bb_cpu_gpu bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
                                     const Bounds3f &bounds)
 {
     int hits = 0;
@@ -375,7 +375,7 @@ __bidevice__ bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
     return (hits % 2 != 0 && hits > 0);
 }
 
-__bidevice__ void SetNodeSDFKernel(FieldGrid2f *grid, Shape2 *shape, int i){
+bb_cpu_gpu void SetNodeSDFKernel(FieldGrid2f *grid, Shape2 *shape, int i){
     vec2ui u = DimensionalIndex(i, grid->resolution, 2);
     vec2f p = grid->GetDataPosition(u);
     Float d = shape->ClosestDistance(p);
@@ -384,7 +384,7 @@ __bidevice__ void SetNodeSDFKernel(FieldGrid2f *grid, Shape2 *shape, int i){
     grid->SetValueAt(interior ? -psd : psd, u);
 }
 
-__bidevice__ void SetNodeSDFKernel(FieldGrid3f *grid, Shape *shape, int i){
+bb_cpu_gpu void SetNodeSDFKernel(FieldGrid3f *grid, Shape *shape, int i){
     vec3ui u = DimensionalIndex(i, grid->resolution, 3);
     vec3f p = grid->GetDataPosition(u);
     Float d = shape->ClosestDistance(p);
@@ -399,21 +399,21 @@ __bidevice__ void SetNodeSDFKernel(FieldGrid3f *grid, Shape *shape, int i){
     grid->SetValueAt(interior ? -psd : psd, u);
 }
 
-__global__ void CreateShapeSDFGPU(Shape *shape){
+bb_kernel void CreateShapeSDFGPU(Shape *shape){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < shape->grid->total){
         SetNodeSDFKernel(shape->grid, shape, i);
     }
 }
 
-__global__ void CreateShapeSDFGPU2D(Shape2 *shape){
+bb_kernel void CreateShapeSDFGPU2D(Shape2 *shape){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < shape->grid->total){
         SetNodeSDFKernel(shape->grid, shape, i);
     }
 }
 
-__bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p,
+bb_cpu_gpu bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p,
                                          Float radius, Float offset)
 {
     if(meshShape == nullptr) return false;
@@ -423,7 +423,7 @@ __bidevice__ bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p,
     return Absf(colliderPoint.signedDistance) < radius + offset;
 }
 
-__host__ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
+void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
     //TODO: Update grid if already exists
 
     int resolution = 0;
@@ -451,7 +451,7 @@ __host__ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
     printf("OK\n");
 }
 
-__host__ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
+void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
     //TODO: Update grid if already exists
     int resolution = 0;
     dx = 0.005;

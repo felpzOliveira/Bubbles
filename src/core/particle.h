@@ -24,24 +24,24 @@ struct Bucket{
     int size;
     int count;
 
-    __host__ void SetSize(int n){
+    void SetSize(int n){
         size = n;
         pids = cudaAllocateVx(int, size);
     }
 
-    __host__ void SetPointer(int *ptr, int n){
+    void SetPointer(int *ptr, int n){
         pids = ptr;
         size = n;
         count = 0;
     }
 
-    __bidevice__ int Count(){ return count; }
+    bb_cpu_gpu int Count(){ return count; }
 
-    __bidevice__ void Reset(){
+    bb_cpu_gpu void Reset(){
         count = 0;
     }
 
-    __bidevice__ void Insert(int pid){
+    bb_cpu_gpu void Insert(int pid){
         if(count < size){
             pids[count++] = pid;
         }else{
@@ -49,7 +49,7 @@ struct Bucket{
         }
     }
 
-    __bidevice__ int Get(int where){
+    bb_cpu_gpu int Get(int where){
         int r = -1;
         if(where < count){
             r = pids[where];
@@ -76,16 +76,16 @@ class SpecieSet{
     int count;
     unsigned int familyId;
 
-    __bidevice__ SpecieSet(){ count = 0; }
+    bb_cpu_gpu SpecieSet(){ count = 0; }
 
-    __bidevice__ void SetMass(Float m){ mass = m; }
-    __bidevice__ Float GetMass(){ return mass; }
-    __bidevice__ void SetCharge(Float ch){ charge = ch; }
-    __bidevice__ Float GetCharge(){ return charge; }
-    __bidevice__ void SetFamilyId(unsigned int id){ familyId = id; }
-    __bidevice__ unsigned int GetFamilyId(){ return familyId; }
+    bb_cpu_gpu void SetMass(Float m){ mass = m; }
+    bb_cpu_gpu Float GetMass(){ return mass; }
+    bb_cpu_gpu void SetCharge(Float ch){ charge = ch; }
+    bb_cpu_gpu Float GetCharge(){ return charge; }
+    bb_cpu_gpu void SetFamilyId(unsigned int id){ familyId = id; }
+    bb_cpu_gpu unsigned int GetFamilyId(){ return familyId; }
 
-    __host__ void SetSize(int n){
+    void SetSize(int n){
         chainNodes.SetSize(n);
         chainAuxNodes.SetSize(n);
         positions.SetSize(n);
@@ -94,7 +94,7 @@ class SpecieSet{
         count = 0;
     }
 
-    __host__ void SetData(T *pos, T *vel, Float *mass, int n){
+    void SetData(T *pos, T *vel, Float *mass, int n){
         positions.SetData(pos, n);
         velocities.SetData(vel, n);
         mpWeight.SetData(mass, n);
@@ -103,43 +103,43 @@ class SpecieSet{
         count = n;
     }
 
-    __bidevice__ int GetParticleCount(){ return count; }
-    __bidevice__ ParticleChain *GetParticleAuxChainNode(int pId){
+    bb_cpu_gpu int GetParticleCount(){ return count; }
+    bb_cpu_gpu ParticleChain *GetParticleAuxChainNode(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle aux chain node");
         return chainAuxNodes.Get(pId);
     }
 
-    __bidevice__ ParticleChain *GetParticleChainNode(int pId){
+    bb_cpu_gpu ParticleChain *GetParticleChainNode(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle chain node");
         return chainNodes.Get(pId);
     }
 
-    __bidevice__ Float GetParticleMPW(int pId){
+    bb_cpu_gpu Float GetParticleMPW(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle mpw");
         return mpWeight.At(pId);
     }
 
-    __bidevice__ T GetParticlePosition(int pId){
+    bb_cpu_gpu T GetParticlePosition(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle position");
         return positions.At(pId);
     }
 
-    __bidevice__ T GetParticleVelocity(int pId){
+    bb_cpu_gpu T GetParticleVelocity(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle velocity");
         return velocities.At(pId);
     }
 
-    __bidevice__ void SetParticlePosition(int pId, const T &pos){
+    bb_cpu_gpu void SetParticlePosition(int pId, const T &pos){
         AssertA(pId < count && pId >= 0, "Invalid set for particle position");
         positions.Set(pos, pId);
     }
 
-    __bidevice__ void SetParticleVelocity(int pId, const T &vel){
+    bb_cpu_gpu void SetParticleVelocity(int pId, const T &vel){
         AssertA(pId < count && pId >= 0, "Invalid set for particle velocity");
         velocities.Set(vel, pId);
     }
 
-    __bidevice__ void SetParticleMPW(int pId, Float mpw){
+    bb_cpu_gpu void SetParticleMPW(int pId, Float mpw){
         AssertA(pId < count && pId >= 0, "Invalid set for particle MPW");
         mpWeight.Set(mpw, pId);
     }
@@ -176,17 +176,17 @@ class ParticleSet{
     Float radius;
     Float mass;
 
-    __bidevice__ ParticleSet(){
+    bb_cpu_gpu ParticleSet(){
         count = 0;
         radius = 1e-3;
         mass = 1e-3;
     }
 
-    __bidevice__ int GetReservedSize(){
+    bb_cpu_gpu int GetReservedSize(){
         return positions.GetSize();
     }
 
-    __host__ void SetSize(int n){
+    void SetSize(int n){
         chainNodes.SetSize(n);
         chainAuxNodes.SetSize(n);
         positions.SetSize(n);
@@ -203,12 +203,12 @@ class ParticleSet{
         count = 0;
     }
 
-    template<typename S> __host__ S *GetRawData(DataBuffer<S> buffer, int where){
+    template<typename S> S *GetRawData(DataBuffer<S> buffer, int where){
         AssertA(where >= 0 && where < buffer.GetSize(), "Invalid raw data index");
         return buffer.Get(where);
     }
 
-    __host__ void AppendData(T *pos, T *vel, T *force, int n){
+    void AppendData(T *pos, T *vel, T *force, int n){
         int rv = 0;
         rv |= positions.SetDataAt(pos, n, count);
         rv |= velocities.SetDataAt(vel, n, count);
@@ -218,7 +218,7 @@ class ParticleSet{
         }
     }
 
-    __host__ void SetData(T *pos, T *vel, T *force, int n)
+    void SetData(T *pos, T *vel, T *force, int n)
     {
         positions.SetData(pos, n); velocities.SetData(vel, n);
         forces.SetData(force, n); densities.SetSize(n);
@@ -231,124 +231,124 @@ class ParticleSet{
         familyId = 0;
     }
 
-    __host__ void SetExtendedData(){
+    void SetExtendedData(){
         densitiesEx.SetSize(count);
         temperature.SetSize(count);
     }
 
-    template<typename F> __host__ void ClearDataBuffer(DataBuffer<F> *buffer){
+    template<typename F> void ClearDataBuffer(DataBuffer<F> *buffer){
         buffer->Clear();
     }
 
-    __bidevice__ void SetRadius(Float rad){ radius = Max(0, rad); }
-    __bidevice__ void SetMass(Float ms){ mass = Max(0, ms); }
-    __bidevice__ Float GetRadius(){ return radius; }
-    __bidevice__ Float GetMass(){ return mass; }
-    __bidevice__ int GetParticleCount(){ return count; }
-    __bidevice__ bool HasNormal(){ return normals.size > 0; }
-    __bidevice__ void SetFamilyId(unsigned int id){ familyId = id; }
-    __bidevice__ unsigned int GetFamilyId(){ return familyId; }
+    bb_cpu_gpu void SetRadius(Float rad){ radius = Max(0, rad); }
+    bb_cpu_gpu void SetMass(Float ms){ mass = Max(0, ms); }
+    bb_cpu_gpu Float GetRadius(){ return radius; }
+    bb_cpu_gpu Float GetMass(){ return mass; }
+    bb_cpu_gpu int GetParticleCount(){ return count; }
+    bb_cpu_gpu bool HasNormal(){ return normals.size > 0; }
+    bb_cpu_gpu void SetFamilyId(unsigned int id){ familyId = id; }
+    bb_cpu_gpu unsigned int GetFamilyId(){ return familyId; }
 
-    __bidevice__ Bucket *GetParticleBucket(int pId){
+    bb_cpu_gpu Bucket *GetParticleBucket(int pId){
         AssertA(pId < count && pId >= 0, "Invalid set for particle bucket");
         return buckets.Get(pId);
     }
 
-    __bidevice__ ParticleChain *GetParticleAuxChainNode(int pId){
+    bb_cpu_gpu ParticleChain *GetParticleAuxChainNode(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle aux chain node");
         return chainAuxNodes.Get(pId);
     }
 
-    __bidevice__ ParticleChain *GetParticleChainNode(int pId){
+    bb_cpu_gpu ParticleChain *GetParticleChainNode(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle chain node");
         return chainNodes.Get(pId);
     }
 
-    __bidevice__ Float GetParticleV0(int pId){
+    bb_cpu_gpu Float GetParticleV0(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle v0");
         return v0s.At(pId);
     }
 
-    __bidevice__ Float GetParticleTemperature(int pId){
+    bb_cpu_gpu Float GetParticleTemperature(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle temperature");
         return temperature.At(pId);
     }
 
-    __bidevice__ void SetParticleTemperature(int pId, Float temp){
+    bb_cpu_gpu void SetParticleTemperature(int pId, Float temp){
         AssertA(pId < count && pId >= 0, "Invalid set for particle temperature");
         temperature.Set(temp, pId);
     }
 
-    __bidevice__ T GetParticleNormal(int pId){
+    bb_cpu_gpu T GetParticleNormal(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle normal");
         return normals.At(pId);
     }
 
-    __bidevice__ Float GetParticleDensityEx(int pId){
+    bb_cpu_gpu Float GetParticleDensityEx(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle densityEx");
         return densitiesEx.At(pId);
     }
 
-    __bidevice__ T GetParticlePosition(int pId){
+    bb_cpu_gpu T GetParticlePosition(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle position");
         return positions.At(pId);
     }
 
-    __bidevice__ T GetParticleVelocity(int pId){
+    bb_cpu_gpu T GetParticleVelocity(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle velocity");
         return velocities.At(pId);
     }
 
-    __bidevice__ T GetParticleForce(int pId){
+    bb_cpu_gpu T GetParticleForce(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle forces");
         return forces.At(pId);
     }
 
-    __bidevice__ Float GetParticleDensity(int pId){
+    bb_cpu_gpu Float GetParticleDensity(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle density");
         return densities.At(pId);
     }
 
-    __bidevice__ Float GetParticlePressure(int pId){
+    bb_cpu_gpu Float GetParticlePressure(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle pressure");
         return pressures.At(pId);
     }
 
-    __bidevice__ void SetParticleNormal(int pId, const T &nor){
+    bb_cpu_gpu void SetParticleNormal(int pId, const T &nor){
         AssertA(pId < count && pId >= 0, "Invalid set for particle normal");
         normals.Set(nor, pId);
     }
 
-    __bidevice__ void SetParticlePosition(int pId, const T &pos){
+    bb_cpu_gpu void SetParticlePosition(int pId, const T &pos){
         AssertA(pId < count && pId >= 0, "Invalid set for particle position");
         positions.Set(pos, pId);
     }
-    __bidevice__ void SetParticleVelocity(int pId, const T &vel){
+    bb_cpu_gpu void SetParticleVelocity(int pId, const T &vel){
         AssertA(pId < count && pId >= 0, "Invalid set for particle velocity");
         velocities.Set(vel, pId);
     }
 
-    __bidevice__ void SetParticleForce(int pId, const T &force){
+    bb_cpu_gpu void SetParticleForce(int pId, const T &force){
         AssertA(pId < count && pId >= 0, "Invalid set for particle forces");
         forces.Set(force, pId);
     }
 
-    __bidevice__ void SetParticleDensity(int pId, Float density){
+    bb_cpu_gpu void SetParticleDensity(int pId, Float density){
         AssertA(pId < count && pId >= 0, "Invalid set for particle density");
         densities.Set(density, pId);
     }
 
-    __bidevice__ void SetParticlePressure(int pId, Float pressure){
+    bb_cpu_gpu void SetParticlePressure(int pId, Float pressure){
         AssertA(pId < count && pId >= 0, "Invalid set for particle pressure");
         pressures.Set(pressure, pId);
     }
 
-    __bidevice__ void SetParticleDensityEx(int pId, Float density){
+    bb_cpu_gpu void SetParticleDensityEx(int pId, Float density){
         AssertA(pId < count && pId >= 0, "Invalid set for particle densityEx");
         densitiesEx.Set(density, pId);
     }
 
-    __bidevice__ void SetParticleV0(int pId, Float v0){
+    bb_cpu_gpu void SetParticleV0(int pId, Float v0){
         AssertA(pId < count && pId >= 0, "Invalid set for particle v0s");
         v0s.Set(v0, pId);
     }
@@ -366,20 +366,20 @@ class SphParticleSet2{
     Float kernelRadius;
     int requiresHigherLevelUpdate;
 
-    __bidevice__ SphParticleSet2() : targetDensity(WaterDensity), targetSpacing(0.1),
+    bb_cpu_gpu SphParticleSet2() : targetDensity(WaterDensity), targetSpacing(0.1),
     kernelRadiusOverTargetSpacing(2.0)
     {
         particleSet = nullptr;
     }
 
-    __bidevice__ ParticleSet2 *GetParticleSet(){ return particleSet; }
-    __bidevice__ Float GetKernelRadius(){ return kernelRadius; }
-    __bidevice__ Float GetTargetDensity(){ return targetDensity; }
-    __bidevice__ Float GetTargetSpacing(){ return targetSpacing; }
-    __bidevice__ void SetHigherLevel(){ requiresHigherLevelUpdate = 1; }
-    __bidevice__ void ResetHigherLevel(){ requiresHigherLevelUpdate = 0; }
+    bb_cpu_gpu ParticleSet2 *GetParticleSet(){ return particleSet; }
+    bb_cpu_gpu Float GetKernelRadius(){ return kernelRadius; }
+    bb_cpu_gpu Float GetTargetDensity(){ return targetDensity; }
+    bb_cpu_gpu Float GetTargetSpacing(){ return targetSpacing; }
+    bb_cpu_gpu void SetHigherLevel(){ requiresHigherLevelUpdate = 1; }
+    bb_cpu_gpu void ResetHigherLevel(){ requiresHigherLevelUpdate = 0; }
 
-    __bidevice__ void SetParticleData(ParticleSet2 *set){
+    bb_cpu_gpu void SetParticleData(ParticleSet2 *set){
         targetDensity = WaterDensity;
         targetSpacing = 0.1;
         kernelRadiusOverTargetSpacing = 2.0;
@@ -387,7 +387,7 @@ class SphParticleSet2{
         particleSet = set;
     }
 
-    __bidevice__ void SetTargetSpacing(Float spacing){
+    bb_cpu_gpu void SetTargetSpacing(Float spacing){
         AssertA(particleSet, "Invalid call to SphParticleSet::SetTargetSpacing");
         particleSet->SetRadius(spacing);
         targetSpacing = spacing;
@@ -395,18 +395,18 @@ class SphParticleSet2{
         ComputeMass();
     }
 
-    __bidevice__ void SetTargetDensity(Float density){
+    bb_cpu_gpu void SetTargetDensity(Float density){
         targetDensity = density;
         ComputeMass();
     }
 
-    __bidevice__ void SetRelativeKernelRadius(Float relativeRadius){
+    bb_cpu_gpu void SetRelativeKernelRadius(Float relativeRadius){
         kernelRadiusOverTargetSpacing = relativeRadius;
         kernelRadius = kernelRadiusOverTargetSpacing * targetSpacing;
         ComputeMass();
     }
 
-    __bidevice__ void ComputeMass(){
+    bb_cpu_gpu void ComputeMass(){
         int max_points = 128;
         vec2f points[128];
         TrianglePointGeneratorDevice pGenerastor;
@@ -433,8 +433,8 @@ class SphParticleSet2{
         particleSet->SetMass(mass);
     }
 
-    __bidevice__ unsigned int ComputeNumberOfTimeSteps(Float timeStep, Float speedOfSound,
-                                                       Float timeStepScale = 1.0)
+    bb_cpu_gpu unsigned int ComputeNumberOfTimeSteps(Float timeStep, Float speedOfSound,
+                                                     Float timeStepScale = 1.0)
     {
         AssertA(particleSet, "Invalid ParticleSet pointer for ComputeNumberOfTimeSteps");
         int count = particleSet->GetParticleCount();
@@ -468,20 +468,20 @@ class SphParticleSet3{
     Float kernelRadius;
     int requiresHigherLevelUpdate;
 
-    __bidevice__ SphParticleSet3() : targetDensity(WaterDensity), targetSpacing(0.1),
+    bb_cpu_gpu SphParticleSet3() : targetDensity(WaterDensity), targetSpacing(0.1),
     kernelRadiusOverTargetSpacing(2.0)
     {
         particleSet = nullptr;
     }
 
-    __bidevice__ ParticleSet3 *GetParticleSet(){ return particleSet; }
-    __bidevice__ Float GetKernelRadius(){ return kernelRadius; }
-    __bidevice__ Float GetTargetDensity(){ return targetDensity; }
-    __bidevice__ Float GetTargetSpacing(){ return targetSpacing; }
-    __bidevice__ void SetHigherLevel(){ requiresHigherLevelUpdate = 1; }
-    __bidevice__ void ResetHigherLevel(){ requiresHigherLevelUpdate = 0; }
+    bb_cpu_gpu ParticleSet3 *GetParticleSet(){ return particleSet; }
+    bb_cpu_gpu Float GetKernelRadius(){ return kernelRadius; }
+    bb_cpu_gpu Float GetTargetDensity(){ return targetDensity; }
+    bb_cpu_gpu Float GetTargetSpacing(){ return targetSpacing; }
+    bb_cpu_gpu void SetHigherLevel(){ requiresHigherLevelUpdate = 1; }
+    bb_cpu_gpu void ResetHigherLevel(){ requiresHigherLevelUpdate = 0; }
 
-    __bidevice__ void SetParticleData(ParticleSet3 *set){
+    bb_cpu_gpu void SetParticleData(ParticleSet3 *set){
         targetDensity = WaterDensity;
         targetSpacing = 0.1;
         kernelRadiusOverTargetSpacing = 2.0;
@@ -489,7 +489,7 @@ class SphParticleSet3{
         particleSet = set;
     }
 
-    __bidevice__ void SetTargetSpacing(Float spacing){
+    bb_cpu_gpu void SetTargetSpacing(Float spacing){
         AssertA(particleSet, "Invalid call to SphParticleSet::SetTargetSpacing");
         particleSet->SetRadius(spacing);
         targetSpacing = spacing;
@@ -497,18 +497,18 @@ class SphParticleSet3{
         ComputeMass();
     }
 
-    __bidevice__ void SetTargetDensity(Float density){
+    bb_cpu_gpu void SetTargetDensity(Float density){
         targetDensity = density;
         ComputeMass();
     }
 
-    __bidevice__ void SetRelativeKernelRadius(Float relativeRadius){
+    bb_cpu_gpu void SetRelativeKernelRadius(Float relativeRadius){
         kernelRadiusOverTargetSpacing = relativeRadius;
         kernelRadius = kernelRadiusOverTargetSpacing * targetSpacing;
         ComputeMass();
     }
 
-    __bidevice__ void ComputeMass(){
+    bb_cpu_gpu void ComputeMass(){
         int max_points = 1024;
         vec3f points[1024];
         BccLatticePointGeneratorDevice pGenerator;
@@ -535,8 +535,8 @@ class SphParticleSet3{
         particleSet->SetMass(mass);
     }
 
-    __bidevice__ unsigned int ComputeNumberOfTimeSteps(Float timeStep, Float speedOfSound,
-                                                       Float timeStepScale = 1.0)
+    bb_cpu_gpu unsigned int ComputeNumberOfTimeSteps(Float timeStep, Float speedOfSound,
+                                                     Float timeStepScale = 1.0)
     {
         AssertA(particleSet, "Invalid ParticleSet pointer for ComputeNumberOfTimeSteps");
         int count = particleSet->GetParticleCount();
@@ -572,35 +572,33 @@ class ParticleSetBuilder{
 
     std::vector<ParticleSet<T> *> sets;
     std::vector<SpecieSet<T> *> ssets;
-    __host__ ParticleSetBuilder(){}
+    ParticleSetBuilder(){}
 
-    __host__ void SetVelocityForAll(const T &vel){
+    void SetVelocityForAll(const T &vel){
         for(int i = 0; i < positions.size(); i++){
             velocities[i] = vel;
         }
     }
 
-    __host__ int AddParticle(const T &pos, const T &vel = T(0),
-                             const T &force = T(0))
-    {
+    int AddParticle(const T &pos, const T &vel = T(0), const T &force = T(0)){
         positions.push_back(pos);
         velocities.push_back(vel);
         forces.push_back(force);
         return 1;
     }
 
-    __host__ int AddParticle(const T &pos, Float mpW, const T &vel = T(0)){
+    int AddParticle(const T &pos, Float mpW, const T &vel = T(0)){
         positions.push_back(pos);
         velocities.push_back(vel);
         mpw.push_back(mpW);
         return 1;
     }
 
-    __host__ void Commit(){}
+    void Commit(){}
 
-    __host__ int GetParticleCount(){ return positions.size(); }
+    int GetParticleCount(){ return positions.size(); }
 
-    __host__ SpecieSet<T> * MakeSpecieSet(Float mass, Float charge){
+    SpecieSet<T> * MakeSpecieSet(Float mass, Float charge){
         AssertA(positions.size() > 0, "No particles in builder");
         int cp = positions.size();
         int cv = velocities.size();
@@ -620,7 +618,7 @@ class ParticleSetBuilder{
         return pSet;
     }
 
-    __host__ ParticleSet<T> * MakeExtendedParticleSet(){
+    ParticleSet<T> * MakeExtendedParticleSet(){
         AssertA(positions.size() > 0, "No particles in builder");
         int cp = positions.size();
         int cv = velocities.size();
@@ -638,7 +636,7 @@ class ParticleSetBuilder{
         return pSet;
     }
 
-    __host__ ParticleSet<T> * MakeParticleSet(){
+    ParticleSet<T> * MakeParticleSet(){
         AssertA(positions.size() > 0, "No particles in builder");
         int cp = positions.size();
         int cv = velocities.size();
@@ -668,9 +666,9 @@ class ParticleSetBuilder{
 typedef ParticleSetBuilder<vec2f> ParticleSetBuilder2;
 typedef ParticleSetBuilder<vec3f> ParticleSetBuilder3;
 
-__host__ SphParticleSet2 *SphParticleSet2FromBuilder(ParticleSetBuilder2 *builder);
-__host__ SphParticleSet2 *SphParticleSet2ExFromBuilder(ParticleSetBuilder2 *builder);
-__host__ SpecieSet2 *SpecieSet2FromBuilder(ParticleSetBuilder2 *builder,
+SphParticleSet2 *SphParticleSet2FromBuilder(ParticleSetBuilder2 *builder);
+SphParticleSet2 *SphParticleSet2ExFromBuilder(ParticleSetBuilder2 *builder);
+SpecieSet2 *SpecieSet2FromBuilder(ParticleSetBuilder2 *builder,
                                            Float mass, Float charge, int familyId = 0);
 
-__host__ SphParticleSet3 *SphParticleSet3FromBuilder(ParticleSetBuilder3 *builder);
+SphParticleSet3 *SphParticleSet3FromBuilder(ParticleSetBuilder3 *builder);

@@ -42,13 +42,13 @@ class Stack{
     unsigned int _top;
     unsigned int capacity;
     unsigned int size;
-    __bidevice__ Stack(){
+    bb_cpu_gpu Stack(){
         _top = 0;
         capacity = 256;
         size = 0;
     }
 
-    __bidevice__ void push(T item){
+    bb_cpu_gpu void push(T item){
         if(!(_top < capacity)){
             printf("Not enough space\n");
             return;
@@ -58,22 +58,22 @@ class Stack{
         size += 1;
     }
 
-    __bidevice__ bool empty(){ return size < 1; }
+    bb_cpu_gpu bool empty(){ return size < 1; }
 
-    __bidevice__ void pop(){
+    bb_cpu_gpu void pop(){
         if(size > 0 && _top > 0){
             _top--;
             size--;
         }
     }
 
-    __bidevice__ void top(T *item){
+    bb_cpu_gpu void top(T *item){
         if(size > 0 && _top > 0){
             memcpy(item, &data[_top-1], sizeof(T));
         }
     }
 
-    __bidevice__ ~Stack(){}
+    bb_cpu_gpu ~Stack(){}
 };
 
 /*
@@ -87,7 +87,7 @@ class BBSubdivisionGeometry{
     BBSubdivisionGeometry() = default;
     ~BBSubdivisionGeometry() = default;
 
-    __bidevice__ vec2f ComputeInterval(T pj, Float h){
+    bb_cpu_gpu vec2f ComputeInterval(T pj, Float h){
         auto square = [](Float tmin, Float tmax, Float t) -> vec2f{
             vec2f f;
             tmin = tmin - t;
@@ -124,7 +124,7 @@ class BBSubdivisionGeometry{
         return vec2f(rmin - h * h, rmax - h * h);
     }
 
-    __bidevice__ int CountVerticesInside(T p, Float h, int *max_query){
+    bb_cpu_gpu int CountVerticesInside(T p, Float h, int *max_query){
         int inside = 1;
         vec2f ival = ComputeInterval(p, h);
 
@@ -139,7 +139,7 @@ class BBSubdivisionGeometry{
     }
 
     /* External routines for the solver */
-    __bidevice__ void Subdivide(BBSubdivisionGeometry *slabs,
+    bb_cpu_gpu void Subdivide(BBSubdivisionGeometry *slabs,
                                 int *nSlabs, T pi, Float h)
     {
         (void)pi;
@@ -153,17 +153,17 @@ class BBSubdivisionGeometry{
         *nSlabs = s;
     }
 
-    __bidevice__ int BallIntersectionCount(T pi, T pj, Float h, int *max_query){
+    bb_cpu_gpu int BallIntersectionCount(T pi, T pj, Float h, int *max_query){
         return CountVerticesInside(pj, h, max_query);
     }
 
-    __bidevice__ bool IsGeometryClipped(T pi, Float h){
+    bb_cpu_gpu bool IsGeometryClipped(T pi, Float h){
         int m_query = 0;
         int inside = CountVerticesInside(pi, h, &m_query);
         return inside == m_query;
     }
 
-    static __bidevice__
+    static bb_cpu_gpu
     void SlabsForParticle(T p, Float h, BBSubdivisionGeometry *slabs, int *nSlabs){
         slabs[0].bounds = Q(p - T(h), p + T(h));
         *nSlabs = 1;
@@ -178,7 +178,7 @@ class PolygonSubdivisionGeometry{
     PolygonSubdivisionGeometry() = default;
     ~PolygonSubdivisionGeometry() = default;
 
-    __bidevice__ void Subdivide(PolygonSubdivisionGeometry *slabs,
+    bb_cpu_gpu void Subdivide(PolygonSubdivisionGeometry *slabs,
                                 int *nSlabs, vec2f pi, Float h)
     {
         // We need to subdivide a segment that is a quad. The main idea is to generate
@@ -232,11 +232,11 @@ class PolygonSubdivisionGeometry{
         *nSlabs = 2;
     }
 
-    __bidevice__ bool IsGeometryClipped(vec2f pi, Float h){
+    bb_cpu_gpu bool IsGeometryClipped(vec2f pi, Float h){
         return false;
     }
 
-    __bidevice__ int BallIntersectionCount(vec2f pi, vec2f pj, Float h, int *max_query){
+    bb_cpu_gpu int BallIntersectionCount(vec2f pi, vec2f pj, Float h, int *max_query){
         int inside = 0;
         inside += (Distance(p0, pj) < h ? 1 : 0);
         inside += (Distance(p1, pj) < h ? 1 : 0);
@@ -246,7 +246,7 @@ class PolygonSubdivisionGeometry{
         return inside;
     }
 
-    static __bidevice__
+    static bb_cpu_gpu
     void SlabsForParticle(vec2f p, Float h, PolygonSubdivisionGeometry *slabs, int *nSlabs){
         // In the 2D circle we have P(t) = r(cos(t), sin(t)) + P
         // we take the first point at 90 so we get P0 = (0, r) + P
@@ -318,7 +318,7 @@ class VolumetricSubdivisionGeometry{
     VolumetricSubdivisionGeometry() = default;
     ~VolumetricSubdivisionGeometry() = default;
 
-    __bidevice__ int BallIntersectionCount(vec3f pi, vec3f pj, Float h, int *max_query){
+    bb_cpu_gpu int BallIntersectionCount(vec3f pi, vec3f pj, Float h, int *max_query){
         // The only difference from previous implementations is that since the
         // testing particle is located at the origin we need to shift the neighboor
         // particle to the testing particle's coordinates, i.e.: (pj - pi) / h.
@@ -334,11 +334,11 @@ class VolumetricSubdivisionGeometry{
         return inside;
     }
 
-    __bidevice__ bool IsGeometryClipped(vec3f pi, Float h){
+    bb_cpu_gpu bool IsGeometryClipped(vec3f pi, Float h){
         return false;
     }
 
-    __bidevice__ void Subdivide(VolumetricSubdivisionGeometry *slabs,
+    bb_cpu_gpu void Subdivide(VolumetricSubdivisionGeometry *slabs,
                                 int *nSlabs, vec3f pi, Float h)
     {
         // Subdividing a slab is simply taking the half point over all edges
@@ -358,7 +358,7 @@ class VolumetricSubdivisionGeometry{
         *nSlabs = 4;
     }
 
-    static __bidevice__ void ComputeSlab(vec3f A, vec3f B, vec3f C,
+    static bb_cpu_gpu void ComputeSlab(vec3f A, vec3f B, vec3f C,
                                          VolumetricSubdivisionGeometry *slab)
     {
         const Float one_over_three = 0.333333333;
@@ -381,7 +381,7 @@ class VolumetricSubdivisionGeometry{
         slab->c = e2;
     }
 
-    static __bidevice__ void
+    static bb_cpu_gpu void
     SlabsForParticle(vec3f p, Float R, VolumetricSubdivisionGeometry *slabs, int *nSlabs){
         // Building the tetrahedron over the sphere of center 'p' and radius R
         // is kinda of annoying because there are infinite solutions so we would
@@ -427,7 +427,7 @@ class VolumetricSubdivisionGeometry{
 
 
 // The method
-template<typename T, typename U, typename Q, typename Geometry> __bidevice__
+template<typename T, typename U, typename Q, typename Geometry> bb_cpu_gpu
 bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
                                 int max_depth, Float h, int pId)
 {
@@ -526,7 +526,7 @@ bool IntervalParticleIsInterior(Grid<T, U, Q> *domain, ParticleSet<T> *pSet,
     return !reached_max_depth;
 }
 
-inline __host__
+inline
 void IntervalBoundary(ParticleSet2 *pSet, Grid2 *domain, Float h,
                       SubdivisionMethod method = PolygonSubdivision,
                       int max_depth = INTERVAL_MAX_SUBDIVISIONS)
@@ -551,7 +551,7 @@ void IntervalBoundary(ParticleSet2 *pSet, Grid2 *domain, Float h,
     });
 }
 
-inline __host__
+inline
 void IntervalBoundary(ParticleSet3 *pSet, Grid3 *domain, Float h,
                       SubdivisionMethod method = PolygonSubdivision,
                       int max_depth = INTERVAL_MAX_SUBDIVISIONS)

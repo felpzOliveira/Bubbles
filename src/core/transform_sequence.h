@@ -27,19 +27,19 @@ class TransformSequence{
     Transform lastInterpolatedTransform;
     Float scopeStart, scopeEnd;
 
-    __host__ TransformSequence();
-    __host__ void AddInterpolation(Transform *t0, Transform *t1, Float s0, Float s1);
-    __host__ void AddInterpolation(InterpolatedTransform *inp);
-    __host__ void AddInterpolation(AggregatedTransform *kTransform);
-    __host__ void AddInterpolation(AggregatedTransform *kTransform, Float s0, Float s1);
-    __host__ void AddRestore(Float s0, Float s1);
+    TransformSequence();
+    void AddInterpolation(Transform *t0, Transform *t1, Float s0, Float s1);
+    void AddInterpolation(InterpolatedTransform *inp);
+    void AddInterpolation(AggregatedTransform *kTransform);
+    void AddInterpolation(AggregatedTransform *kTransform, Float s0, Float s1);
+    void AddRestore(Float s0, Float s1);
 
-    __host__ void GetLastTransform(Transform *transform);
-    __host__ void Interpolate(Float t, Transform *transform, vec3f *linear=nullptr,
+    void GetLastTransform(Transform *transform);
+    void Interpolate(Float t, Transform *transform, vec3f *linear=nullptr,
                               vec3f *angular=nullptr);
 
-    __host__ void ComputeInitialTransform();
-    __host__ void UpdateInterval(Float start, Float end);
+    void ComputeInitialTransform();
+    void UpdateInterval(Float start, Float end);
 
     ~TransformSequence();
 };
@@ -53,11 +53,11 @@ class QuaternionSequence{
     std::vector<AggregatedQuaternion> quaternions;
     Float scopeStart, scopeEnd;
 
-    __host__ QuaternionSequence();
-    __host__ void AddQuaternion(const Quaternion &q1, const Float &t);
-    __host__ void AddQuaternion(const Float &angle, const vec3f &axis,
+    QuaternionSequence();
+    void AddQuaternion(const Quaternion &q1, const Float &t);
+    void AddQuaternion(const Float &angle, const vec3f &axis,
                                 const Float &t);
-    __host__ void Interpolate(Float t, Transform *transform, vec3f *angular=nullptr);
+    void Interpolate(Float t, Transform *transform, vec3f *angular=nullptr);
 };
 
 /*

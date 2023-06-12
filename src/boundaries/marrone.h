@@ -30,7 +30,7 @@
 
 
 // Frisvald method with the fast fix presented by Pixar
-inline __bidevice__ vec3f GetNormalTangent(vec3f n){
+inline bb_cpu_gpu vec3f GetNormalTangent(vec3f n){
     // apply modified frisvald method
     Float sign = copysignf(1.f, n.z);
     Float a = -1.f / (sign + n.z);
@@ -38,27 +38,27 @@ inline __bidevice__ vec3f GetNormalTangent(vec3f n){
     return vec3f(1.f + sign * n.x * n.x * a, sign * b, -sign * n.x);
 }
 
-inline __bidevice__ vec2f GetNormalTangent(vec2f n){
+inline bb_cpu_gpu vec2f GetNormalTangent(vec2f n){
     // for 2D a simple clokwise rotation gets it
     return vec2f(n.y, -n.x);
 }
 
 // Reference point 'T' and τ in the paper
-template<typename T> inline __bidevice__
+template<typename T> inline bb_cpu_gpu
 void MarroneAuxiliarVectors(T p, T normal, T &t, T &tau, Float h){
     tau = GetNormalTangent(normal);
     t = p + normal * h;
 }
 
 // Check for the 2D case the conditions under equation 4, page 7.
-inline __bidevice__
+inline bb_cpu_gpu
 bool MarroneConeArcCheck(vec2f pji, vec2f pjt, vec2f tau, vec2f ni, Float pji_len, Float h){
     Float arc = Absf(Dot(ni, pjt)) + Absf(Dot(tau, pjt));
     return arc <= h;
 }
 
 // Check for the 3D case the conditions under equation 5, page 10.
-inline __bidevice__
+inline bb_cpu_gpu
 bool MarroneConeArcCheck(vec3f pji, vec3f pjt, vec3f tau, vec3f ni, Float pji_len, Float h){
     Float arc = acos(Dot(ni, pji) / pji_len);
     return arc <= PiOver4;
@@ -67,7 +67,7 @@ bool MarroneConeArcCheck(vec3f pji, vec3f pjt, vec3f tau, vec3f ni, Float pji_le
 // The method: simply apply geometric test under all particles that have normal.
 // Note that Bubbles can have normal vector as (0,0,0) since normal vectors
 // are computed using SPH.
-template<typename T, typename U, typename Q> inline __bidevice__
+template<typename T, typename U, typename Q> inline bb_cpu_gpu
 int MarroneBoundaryConeCheck(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                              Float h, T pi, T ni, int pId)
 {
@@ -112,7 +112,7 @@ int MarroneBoundaryConeCheck(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     return inside;
 }
 
-template<typename T, typename U, typename Q> inline __bidevice__
+template<typename T, typename U, typename Q> inline bb_cpu_gpu
 int MarroneBoundaryIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                       Float h, int pId)
 {
@@ -127,7 +127,7 @@ int MarroneBoundaryIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domai
     return MarroneBoundaryConeCheck(pSet, domain, h, pi, ni, pId);
 }
 
-template<typename T, typename U, typename Q> inline __host__
+template<typename T, typename U, typename Q> inline
 void MarroneBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
     int N = pSet->GetParticleCount();
 
@@ -144,7 +144,7 @@ void MarroneBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
 * Adaptation from Marrone using the cover vector and small radius considerations from:
 *    Simple free-surface detection in two and three-dimensional SPH solver
 */
-template<typename T, typename U, typename Q> inline __bidevice__
+template<typename T, typename U, typename Q> inline bb_cpu_gpu
 T MarroneAdaptComputeCoverVector(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                  Float h, T pi, int pId, int &n_counter)
 {
@@ -182,7 +182,7 @@ T MarroneAdaptComputeCoverVector(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     return bi;
 }
 
-template<typename T, typename U, typename Q> inline __bidevice__
+template<typename T, typename U, typename Q> inline bb_cpu_gpu
 int MarroneAdaptIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                    Float h, int pId)
 {
@@ -199,7 +199,7 @@ int MarroneAdaptIsInteriorParticle(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     return MarroneBoundaryConeCheck(pSet, domain, h, pi, bi, pId);
 }
 
-template<typename T, typename U, typename Q> inline __bidevice__
+template<typename T, typename U, typename Q> inline bb_cpu_gpu
 void MarroneAdaptComputeWorkQueue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                   WorkQueue<vec4f> *workQ, Float h, int pId)
 {
@@ -224,7 +224,7 @@ void MarroneAdaptComputeWorkQueue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     }
 }
 
-template<typename T, typename U, typename Q> inline __bidevice__
+template<typename T, typename U, typename Q> inline bb_cpu_gpu
 void MarroneAdaptProcessWorkQueue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
                                   WorkQueue<vec4f> *workQ, Float h)
 {
@@ -240,7 +240,7 @@ void MarroneAdaptProcessWorkQueue(ParticleSet<T> *pSet, Grid<T, U, Q> *domain,
     pSet->SetParticleV0(pId, 1-inside);
 }
 
-template<typename T, typename U, typename Q> inline __host__
+template<typename T, typename U, typename Q> inline
 void MarroneAdaptBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h,
                           WorkQueue<vec4f> *workQ)
 {
@@ -254,7 +254,7 @@ void MarroneAdaptBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h,
     });
 }
 
-template<typename T, typename U, typename Q> inline __host__
+template<typename T, typename U, typename Q> inline
 void MarroneAdaptBoundary(ParticleSet<T> *pSet, Grid<T, U, Q> *domain, Float h){
     int N = pSet->GetParticleCount();
     AutoParallelFor("MarroneAdaptBoundary", N, AutoLambda(int i){

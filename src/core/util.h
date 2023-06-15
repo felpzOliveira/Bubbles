@@ -21,58 +21,31 @@
     #define BB_MSG(name) printf("* %s - Built %s at %s *\n", name, __DATE__, __TIME__)
 #endif
 
-// Structures for hashing triangles for delaunay
-template<int N>
-struct iN{
+struct i2{
     public:
-    int t[N];
+    int t[2];
 
-    iN(){
-        for(int i = 0; i < N; i++) t[i] = 0;
+    bb_cpu_gpu
+    i2(){ t[0] = 0; t[1] = 0; }
+
+    bb_cpu_gpu
+    i2(int a, int b){
+        if(a > b) Swap(a, b);
+        t[0] = a;
+        t[1] = b;
     }
 
-    iN(std::vector<int> f){
-        bool sorting = false;
-        if(f.size() != N){
-            printf("INVALID INITIALIZATION\n");
-        }else{
-            for(int i = 0; i < N; i++){
-                t[i] = f[i];
-            }
-        }
-
-        for(int i = 0; i < N-1; i++){
-            for(int j = 0; j < N - i - 1; j++){
-                if(t[j] > t[j+1]){
-                    Swap(t[j], t[j+1]);
-                }
-            }
-        }
+    bb_cpu_gpu
+    bool operator==(const i2 &other){
+        return t[0] == other.t[0] && t[1] == other.t[1];
     }
 };
 
-
-template<int N> struct iNHasher{
-    public:
-    size_t operator()(const iN<N> &a) const{
-        int f = 0;
-        for(int i = 0; i < N; i++){
-            f += a.t[i];
-        }
-        return std::hash<int>()(f);
+struct i2Comp{
+    bool operator()(i2 a, i2 b) const{
+        return std::make_pair(a.t[0], a.t[1]) > std::make_pair(b.t[0], b.t[1]);
     }
 };
-
-template<int N> struct iNIsSame{
-    public:
-    bool operator()(const iN<N> &a, const iN<N> &b) const{
-        for(int i = 0; i < N; i++){
-            if(b.t[i] != a.t[i]) return false;
-        }
-        return true;
-    }
-};
-
 
 struct i3{
     public:

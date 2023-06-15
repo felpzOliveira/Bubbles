@@ -72,7 +72,6 @@ void GetMethodNames(std::vector<std::string> &names){
 }
 
 void default_surface_opts(surface_opts *opts){
-    opts->output = "surface.out";
     opts->method = SDF_ZHU_BRIDSON;
     opts->legacy = 0;
     opts->inflags = SERIALIZER_POSITION;
@@ -448,7 +447,7 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     if(opts->delaunayUseBoundary){
         timer.Start("Interval Boundary Computation");
         IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision, 2);
-        //LNMBoundarySingle(pSet, grid, opts->spacing, false);
+        //XiaoweiBoundary(pSet, grid, opts->spacing);
         timer.Stop();
     }
     else{
@@ -759,15 +758,16 @@ void surface_command(int argc, char **argv){
     surface_arg_map["-method"] = desc;
 
     argument_process(surface_arg_map, argc, argv, "surface", &opts);
+    if(opts.output.size() == 0){
+        if(opts.outformat == FORMAT_OBJ)
+            opts.output = "surface.obj";
+        else
+            opts.output = "surface.ply";
+    }
     print_surface_configs(&opts);
 
     if(opts.input.size() == 0){
         printf("No input file\n");
-        return;
-    }
-
-    if(opts.output.size() == 0){
-        printf("No output path\n");
         return;
     }
 

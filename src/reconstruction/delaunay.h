@@ -8,7 +8,21 @@
 #include <sph_solver.h>
 #include <statics.h>
 
-typedef WorkQueue<vec4ui> DelaunayWorkQueue;
+struct DelaunayTriangleInfo{
+    vec3ui tri;
+    int opp;
+
+    bb_cpu_gpu
+    DelaunayTriangleInfo(int){}
+
+    bb_cpu_gpu
+    DelaunayTriangleInfo(vec3ui _tri, int op){
+        tri = _tri;
+        opp = op;
+    }
+};
+
+typedef WorkQueue<DelaunayTriangleInfo> DelaunayWorkQueue;
 
 struct DelaunayTriangulation{
     Point3HVec pointVec;

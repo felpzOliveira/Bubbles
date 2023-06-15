@@ -339,7 +339,7 @@ class VolumetricSubdivisionGeometry{
     }
 
     bb_cpu_gpu void Subdivide(VolumetricSubdivisionGeometry *slabs,
-                                int *nSlabs, vec3f pi, Float h)
+                              int *nSlabs, vec3f pi, Float h)
     {
         // Subdividing a slab is simply taking the half point over all edges
         // and creating three new triangles-slabs
@@ -359,7 +359,7 @@ class VolumetricSubdivisionGeometry{
     }
 
     static bb_cpu_gpu void ComputeSlab(vec3f A, vec3f B, vec3f C,
-                                         VolumetricSubdivisionGeometry *slab)
+                                       VolumetricSubdivisionGeometry *slab)
     {
         const Float one_over_three = 0.333333333;
         vec3f a = A;

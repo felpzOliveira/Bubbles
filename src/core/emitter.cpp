@@ -116,12 +116,6 @@ void VolumeParticleEmitter2::Emit(ContinuousParticleSetBuilder2 *Builder,
     _Emit<ContinuousParticleSetBuilder2>(Builder, this, velocity);
 }
 
-void VolumeParticleEmitter2::Emit(ProgressiveParticleSetBuilder2 *Builder,
-                                  const std::function<vec2f(const vec2f &)> &velocity)
-{
-    _Emit<ProgressiveParticleSetBuilder2>(Builder, this, velocity);
-}
-
 void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder,
                                   const std::function<vec2f(const vec2f &)> &velocity)
 {
@@ -168,15 +162,6 @@ void VolumeParticleEmitterSet2::SetJitter(Float jitter){
 }
 
 void VolumeParticleEmitterSet2::Emit(ContinuousParticleSetBuilder2 *Builder,
-                                     const std::function<vec2f(const vec2f &)> &velocity)
-{
-    AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
-    for(int i = 0; i < emitters.size(); i++){
-        emitters[i]->Emit(Builder, velocity);
-    }
-}
-
-void VolumeParticleEmitterSet2::Emit(ProgressiveParticleSetBuilder2 *Builder,
                                      const std::function<vec2f(const vec2f &)> &velocity)
 {
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
@@ -350,12 +335,6 @@ void VolumeParticleEmitter3::Emit(ContinuousParticleSetBuilder3 *Builder,
     _Emit<ContinuousParticleSetBuilder3>(Builder, this, velocity);
 }
 
-void VolumeParticleEmitter3::Emit(ProgressiveParticleSetBuilder3 *Builder,
-                                  const std::function<vec3f(const vec3f &)> &velocity)
-{
-    _Emit<ProgressiveParticleSetBuilder3>(Builder, this, velocity);
-}
-
 void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder,
                                   const std::function<vec3f(const vec3f &)> &velocity)
 {
@@ -411,15 +390,6 @@ void VolumeParticleEmitterSet3::SetJitter(Float jitter){
 }
 
 void VolumeParticleEmitterSet3::Emit(ContinuousParticleSetBuilder3 *Builder,
-                                     const std::function<vec3f(const vec3f &)> &velocity)
-{
-    AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::Emit");
-    for(int i = 0; i < emitters.size(); i++){
-        emitters[i]->Emit(Builder, velocity);
-    }
-}
-
-void VolumeParticleEmitterSet3::Emit(ProgressiveParticleSetBuilder3 *Builder,
                                      const std::function<vec3f(const vec3f &)> &velocity)
 {
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::Emit");

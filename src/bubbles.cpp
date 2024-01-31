@@ -75,131 +75,6 @@ void run_self_tests(){
 }
 #endif
 
-void test_pcisph3_pathing();
-void test_pcisph3_box_drop();
-void test_bounds_split3();
-void test_pcisph3_water_block();
-void test_pcisph3_dissolve();
-void test_pcisph3_emit_test();
-void test_pcisph2_progressive_emitter();
-
-bb_cpu_gpu Float BVHMeshBoundedClosestDistance(const vec3f &point, int *closest,
-                                         ParsedMesh *mesh, Node *bvh, Bounds3f bounds);
-
-void load_test(std::vector<Shape *> &vShapes, std::vector<Bounds3f> &vBounds){
-    const char *meshPath = "Meshes/test_mesh_";
-    for(int i = 1; i < 30; i++){
-        Float targetScale = 0;
-        std::string mesh_i = std::string(meshPath);
-        mesh_i += std::to_string(i);
-        mesh_i += ".obj";
-        ParsedMesh *pmesh = LoadObj(mesh_i.c_str());
-        Transform scale = UtilComputeFitTransform(pmesh, 1.9f, &targetScale);
-
-        Shape *shape = MakeMesh(pmesh, scale);
-        GenerateShapeSDF(shape, 0.01, 0.01);
-
-        vShapes.push_back(shape);
-        printf(" >> Loaded %d\n", i);
-
-        std::string boundsPath(meshPath);
-        boundsPath += std::to_string(i) + std::string("_bounds.txt");
-        FILE *fp = fopen(boundsPath.c_str(), "rb");
-        if(!fp){
-            printf("Could not load bounds\n");
-            exit(0);
-        }
-
-        Bounds3f bounds;
-        fscanf(fp, "%g %g %g\n", &bounds.pMin.x, &bounds.pMin.y, &bounds.pMin.z);
-        fscanf(fp, "%g %g %g\n", &bounds.pMax.x, &bounds.pMax.y, &bounds.pMax.z);
-
-        vBounds.push_back(bounds);
-
-        fclose(fp);
-        bounds.PrintSelf();
-        std::cout << std::endl;
-    }
-}
-
-#include <marching_cubes.h>
-void test_split(){
-    CudaMemoryManagerStart(__FUNCTION__);
-
-    Float targetScale = 0;
-    const char *meshPath = "/home/felpz/Documents/CGStuff/models/head.obj";
-    ParsedMesh *pmesh = LoadObj(meshPath);
-    Transform scale = UtilComputeFitTransform(pmesh, 4.0f, &targetScale);
-    printf("Target scale = %g\n", targetScale);
-
-    Shape *shape = MakeMesh(pmesh, scale);
-    GenerateShapeSDF(shape, 0.005, 0.01);
-
-    printf("Updating...\n");
-    FieldGrid3f *grid = nullptr;
-    Node *bvh = shape->bvh;
-    Float height = bvh->bound.ExtentOn(1);
-    int stepCount = 30;
-    Float dy = height / (Float)stepCount;
-
-    HostTriangleMesh3 mesh0;
-    printf("Running Marching Cubes { 0 }\n");
-
-    MarchingCubes(shape->grid, &mesh0, 0.f, false);
-    mesh0.writeToDisk("Meshes/test_mesh_0.obj", FORMAT_OBJ);
-
-    for(int i = 1; i <= stepCount; i++){
-        vec3f pMax = shape->GetBounds().pMax;
-        vec3f pMin = shape->GetBounds().pMin;
-        Bounds3f cbounds(vec3f(pMin.x-0.001, pMax.y - i * dy, pMin.z-0.001), pMax);
-
-        grid = UpdatedSDFToOther(shape->grid, grid,
-        GPU_LAMBDA(vec3f point, FieldGrid3f *field, int index) -> Float{
-            if(index == 0){
-                printf("{%g %g %g} x {%g %g %g}\n",
-                       cbounds.pMin.x, cbounds.pMin.y, cbounds.pMin.z,
-                       cbounds.pMax.x, cbounds.pMax.y, cbounds.pMax.z);
-            }
-            ParsedMesh *mesh = shape->mesh;
-            Node *bvh = shape->bvh;
-            Float currSdf = field->Sample(point);
-            int closestId = -1;
-            Float sign = 1.f;
-            if(!InsideExclusive(point, cbounds) && currSdf < 0)
-                sign = -1.f;
-
-            Float dist =
-                BVHMeshBoundedClosestDistance(point, &closestId, mesh, bvh, cbounds);
-            Float psd = Max(Absf(dist), 0.00001);
-            return sign * psd;
-        });
-
-        printf("Running Marching Cubes { %d }\n", i);
-        HostTriangleMesh3 meshi;
-        MarchingCubes(grid, &meshi, 0.f, false);
-        std::string path("Meshes/test_mesh_");
-        path += std::to_string(i);
-        std::string meshPath = path + ".obj";
-
-        std::string boundsPath = path + "_bounds.txt";
-
-        meshi.writeToDisk(meshPath.c_str(), FORMAT_OBJ);
-
-        std::ofstream ofs(boundsPath);
-        if(ofs.is_open()){
-            ofs << cbounds.pMin.x << " " << cbounds.pMin.y << " " << cbounds.pMin.z << std::endl;
-            ofs << cbounds.pMax.x << " " << cbounds.pMax.y << " " << cbounds.pMax.z << std::endl;
-            ofs.close();
-        }
-    }
-
-    printf("OK\n");
-
-    CudaMemoryManagerClearCurrent();
-}
-
-
-void test_pcisph3_prog();
 int main(int argc, char **argv){
     BB_MSG("Bubbles Fluid Simulator");
     /* Initialize cuda API */
@@ -208,15 +83,7 @@ int main(int argc, char **argv){
     /* Sets the default kernel launching parameters */
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
 
-    //std::vector<Shape *> shapes;
-    //std::vector<Bounds3f> bounds;
-    //test_split();
-    //load_test(shapes, bounds);
-
-    //test_pcisph3_box_drop();
-    //test_pcisph3_prog();
-    test_pcisph3_progressive();
-    //test_pcisph2_progressive_emitter();
+    test_pcisph3_box_drop();
     //test_pcisph2_water_block();
     //test_pcisph2_marching_squares();
 

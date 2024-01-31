@@ -47,27 +47,23 @@ bb_cpu_gpu SphParticleSet3 *SphSolver3::GetSphParticleSet(){
 
 void AdvanceTimeStep(SphSolver3 *solver, Float timeStep, int use_cpu = 0){
     SphSolverData3 *data = solver->solverData;
-    if(use_cpu)
+    if(use_cpu){
         UpdateGridDistributionCPU(data);
-    else
-        UpdateGridDistributionGPU(data);
+        data->sphpSet->ResetHigherLevel();
 
-    data->sphpSet->ResetHigherLevel();
-
-    if(use_cpu)
+        ComputeParticleInteractionCPU(data);
         ComputeDensityCPU(data);
-    else
-        ComputeDensityGPU(data);
-
-    if(use_cpu)
         ComputePressureForceCPU(data, timeStep);
-    else
-        ComputePressureForceGPU(data, timeStep);
-
-    if(use_cpu)
         ComputePseudoViscosityInterpolationCPU(data, timeStep);
-    else
+    }else{
+        UpdateGridDistributionGPU(data);
+        data->sphpSet->ResetHigherLevel();
+
+        ComputeParticleInteractionGPU(data);
+        ComputeDensityGPU(data);
+        ComputePressureForceGPU(data, timeStep);
         ComputePseudoViscosityInterpolationGPU(data, timeStep);
+    }
 }
 
 void SphSolver3::Advance(Float timeIntervalInSeconds){
@@ -132,7 +128,7 @@ void SphSolver3::Setup(Float targetDensity, Float targetSpacing, Float relativeR
     solverData->frame_index = 1;
 }
 
-SphSolverData3 *DefaultSphSolverData3(){
+SphSolverData3 *DefaultSphSolverData3(bool with_gravity){
     SphSolverData3 *data = cudaAllocateVx(SphSolverData3, 1);
     data->eosExponent = 7.0;
     data->negativePressureScale = 0.0;
@@ -147,5 +143,16 @@ SphSolverData3 *DefaultSphSolverData3(){
     data->Tmin = 1;
     data->Tmax = 20;
     data->Tamb = 0;
+    data->cInteractionsCount = 0;
+    data->cInteractions = nullptr;
+
+    if(with_gravity){
+        InteractionsBuilder3 builder;
+        builder.AddConstantInteraction(vec3f(0.f, -9.8f, 0.f));
+
+        data->cInteractionsCount = 1;
+        data->cInteractions = builder.MakeConstantInteractions();
+    }
+
     return data;
 }

@@ -60,8 +60,21 @@ bb_cpu_gpu void ComputeDensityFor(SphSolverData3 *data, int particleId,
 /**************************************************************/
 //            F O R C E S    C O M P U T A T I O N            //
 /**************************************************************/
+bb_cpu_gpu void ComputeParticleInteraction(SphSolverData3 *data, int particleId){
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    vec3f pi = pSet->GetParticlePosition(particleId);
+
+    // TODO: Adjust for all components
+    vec3f extAcc = SampleInteraction(data->cInteractions, pi);
+    //if(particleId == 0)
+        //printf("{%g %g %g}\n", extAcc.x, extAcc.y, extAcc.z);
+
+    pSet->SetParticleInteraction(particleId, extAcc);
+}
+
 bb_cpu_gpu void ComputeNonPressureForceFor(SphSolverData3 *data, int particleId){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    vec3f intr = pSet->GetParticleInteraction(particleId);
     vec3f pi = pSet->GetParticlePosition(particleId);
     vec3f vi = pSet->GetParticleVelocity(particleId);
 
@@ -73,8 +86,8 @@ bb_cpu_gpu void ComputeNonPressureForceFor(SphSolverData3 *data, int particleId)
     SphSpikyKernel3 kernel(sphRadius);
 
     vec3f fi(0);
-    const vec3f Gravity3D(0, -9.8, 0);
-    fi += mass * Gravity3D;
+
+    fi += mass * intr;
     fi += -data->dragCoefficient * vi;
 
     for(int i = 0; i < bucket->Count(); i++){
@@ -167,6 +180,7 @@ bb_cpu_gpu void ComputeAllForcesFor(SphSolverData3 *data, int particleId,
                                     Float timeStep, int extended)
 {
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    vec3f intr = pSet->GetParticleInteraction(particleId);
     vec3f pi = pSet->GetParticlePosition(particleId);
     Bucket *bucket = pSet->GetParticleBucket(particleId);
 
@@ -185,8 +199,7 @@ bb_cpu_gpu void ComputeAllForcesFor(SphSolverData3 *data, int particleId,
     vec3f vi = pSet->GetParticleVelocity(particleId);
     Float Tout = Ti;
 
-    const vec3f Gravity3D(0, -9.8, 0);
-    fi += mass * Gravity3D;
+    fi += mass * intr;
     fi += -data->dragCoefficient * vi;
 
     AssertA(!IsZero(di2), "Zero source density {ComputePressureForceFor}");
@@ -554,6 +567,28 @@ void ComputeNormalGPU(SphSolverData3 *data){
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     int N = pSet->GetParticleCount();
     GPULaunch(N, ComputeNormalKernel, data);
+}
+
+
+void ComputeParticleInteractionCPU(SphSolverData3 *data){
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    ParallelFor(0, pSet->GetParticleCount(), [&](int i){
+        ComputeParticleInteraction(data, i);
+    });
+}
+
+bb_kernel void ComputeParticleInteractionKernel(SphSolverData3 *data){
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    if(i < pSet->GetParticleCount()){
+        ComputeParticleInteraction(data, i);
+    }
+}
+
+void ComputeParticleInteractionGPU(SphSolverData3 *data){
+    ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
+    int N = pSet->GetParticleCount();
+    GPULaunch(N, ComputeParticleInteractionKernel, data);
 }
 
 void ComputePressureForceGPU(SphSolverData3 *data, Float timeStep){

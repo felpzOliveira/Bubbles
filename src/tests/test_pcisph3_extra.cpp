@@ -17,129 +17,101 @@
 void set_particle_color(float *pos, float *col, ParticleSet3 *pSet);
 void simple_color(float *pos, float *col, ParticleSet3 *pSet);
 
-void test_pcisph3_progressive(){
-    printf("===== PCISPH Solver 3D -- Progressive\n");
+
+void test_pcisph3_box_drop(){
+    printf("===== PCISPH Solver 3D -- Box Drop\n");
     CudaMemoryManagerStart(__FUNCTION__);
 
-    const char *pFile = "output.txt";
-    const int maxParticles = 5.0 * kDefaultMaxParticles;
-    ProgressiveParticleSetBuilder3 tmpBuilder(maxParticles), pBuilder(maxParticles);
-
-    int flags = SERIALIZER_POSITION;
-    std::vector<vec3f> points;
-    SerializerLoadPoints3(&points, pFile, flags);
-
-    ColliderSetBuilder3 cBuilder;
-    vec3f origin(-3.0f, 0.f, 4.f);
+    vec3f origin(4.0, 0, 0);
     vec3f target(0.0f);
-    vec3f containerSize;
-
-    Float spacing = 0.012;
+    vec3f containerSize(2.0);
+    vec3f boxEmitSize(0.4, 0.1, 0.4);
+    vec3f boxSize0(0.4);
+    Float spacing = 0.02;
     Float spacingScale = 1.8;
-
-    Bounds3f bounds;
-
-    bounds = Bounds3f(points[0]);
-    for(vec3f p : points){
-        bounds = Union(bounds, p);
-    }
-
-    vec3f offset = bounds.Center();
-    bounds = Bounds3f(points[0] - offset);
-
-    tmpBuilder.SetKernelRadius(spacing * spacingScale);
-    pBuilder.SetKernelRadius(spacing * spacingScale);
-
-    for(int i = 1; i < points.size(); i++){
-        vec3f pi = points[i] - offset;
-        tmpBuilder.AddParticle(pi);
-        bounds = Union(bounds, pi);
-    }
-
-    tmpBuilder.Commit();
-    bounds.Expand(5.0f * spacing * spacingScale);
-
-    containerSize = bounds.Size();
 
     Shape *container = MakeBox(Transform(), containerSize, true);
 
-    //const char *meshPath = "Meshes/test_mesh_1.obj";
-    //ParsedMesh *pmesh = LoadObj(meshPath);
-    //Shape *meshShape = MakeMesh(pmesh, Translate(-offset.x, -offset.y, -offset.z));
-    //GenerateShapeSDF(meshShape, 0.03, 0.03);
+    Float y0of = (containerSize.y - boxSize0.y) * 0.5; y0of -= spacing;
+    Shape *box0 = MakeBox(RotateY(45) * RotateX(45.0), boxSize0);
 
-    //cBuilder.AddCollider3(meshShape);
+    Float yEof = (containerSize.y - boxEmitSize.y) * 0.5; yEof -= spacing;
+    Shape *boxEmitter = MakeBox(Translate(0, yEof, 0), boxEmitSize);
+
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(box0);
     cBuilder.AddCollider3(container);
 
-    ColliderSet3 *colliders = cBuilder.GetColliderSet();
-    SphParticleSet3 *tmpSphSet = SphParticleSet3FromProgressiveBuilder(&tmpBuilder);
-    SphParticleSet3 *sphSet  = SphParticleSet3FromProgressiveBuilder(&pBuilder);
+    ContinuousParticleSetBuilder3 pBuilder;
+    VolumeParticleEmitterSet3 emitterSet;
+    emitterSet.AddEmitter(boxEmitter, spacing);
 
-    Grid3 *mapGrid = UtilBuildGridForDomain(container->GetBounds(),
-                                            spacing, spacingScale);
+    pBuilder.SetKernelRadius(spacing * spacingScale);
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    Assure(UtilIsEmitterOverlapping(&emitterSet, colliders) == 0);
+
+    emitterSet.Emit(&pBuilder);
+    SphParticleSet3 *sphSet = SphParticleSet3FromContinuousBuilder(&pBuilder);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
     Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(),
                                                spacing, spacingScale);
 
-    ResetAndDistribute(mapGrid, tmpSphSet->GetParticleSet());
-    ResetAndDistribute(domainGrid, sphSet->GetParticleSet());
-
-    tmpBuilder.MapGrid(mapGrid);
-    pBuilder.MapGrid(domainGrid);
-
-    Bounds3f boundList[] = {Bounds3f(vec3f(-1.95255, 0.700118, -1.9521) - offset,
-                                  vec3f(2.04845, 0.900118, 0.471892) - offset) };
-
-    tmpBuilder.MapGridEmitToOther(&pBuilder, ZeroVelocityField3, boundList[0]);
-
-    ParticleSet3 *pSet = sphSet->GetParticleSet();
     PciSphSolver3 solver;
     solver.Initialize(DefaultSphSolverData3());
     solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
     solver.SetColliders(colliders);
 
-    pSet->SetUserVec3Buffer(1);
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
-        vec3f p = pSet->GetParticlePosition(i);
-        if(p.x > 0)
-            pSet->SetParticleUserBufferVec3(i, vec3f(1,0,0), 0);
-        else
-            pSet->SetParticleUserBufferVec3(i, vec3f(0,1,0), 0);
-    }
-
-    Assure(UtilIsDistributionConsistent(pSet, domainGrid) == 1);
     Float targetInterval =  1.0 / 240.0;
+    pBuilder.MapGrid(domainGrid);
+    int extraParts = 24 * 10;
 
-    int count = pSet->GetParticleCount();
-    AssureA(count > 0, "No initial particles in the system!");
+    auto velocityField = [&](const vec3f &p) -> vec3f{
+        Float u1 = rand_float();
+        Float u2 = rand_float();
+        Float sign1 = rand_float() < 0.5 ? 1 : -1;
+        Float sign2 = rand_float() < 0.5 ? 1 : -1;
+        return vec3f(u1 * sign1 * 5.f, -10, u2 * sign2 * 5.f);
+    };
 
-    float *pos = new float[count * 3];
-    float *col = new float[count * 3];
-    memset(col, 0, sizeof(float) * 3 * count);
+    auto filler = [&](float *pos, float *col) -> int{
+        int f = UtilGenerateBoxPoints(pos, col, vec3f(1,1,0), containerSize,
+                                      extraParts * 0.8, container->ObjectToWorld);
+        f += UtilGenerateBoxPoints(&pos[3 * f], &col[3 * f], vec3f(1,1,0), boxSize0,
+                                   extraParts * 0.2, box0->ObjectToWorld);
+        return f;
+    };
 
-    graphy_vector_set(origin, target);
-    simple_color(pos, col, pSet);
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        for(int i = 0; i < pCount; i++){
+            colors[3 * i + 0] = 1; colors[3 * i + 1] = 0;
+            colors[3 * i + 2] = 1;
+        }
+    };
 
-    graphy_render_points3f(pos, col, count, spacing/2.0);
-
-    int frame_index = 0;
-    while(true){
-        solver.Advance(targetInterval);
-        simple_color(pos, col, pSet);
-        graphy_render_points3f(pos, col, count, spacing/2.0);
-        frame_index++;
-        if(frame_index == 100 && false){
-            tmpBuilder.MapGridEmitToOther(&pBuilder, ZeroVelocityField3, boundList[1]);
-            count = pSet->GetParticleCount();
-            delete[] col;
-            delete[] pos;
-            pos = new float[count * 3];
-            col = new float[count * 3];
-            memset(col, 0, sizeof(float) * 3 * count);
+    auto onStepUpdate = [&](int step) -> int{
+        if(step == 0) return 1;
+        if(pSet->GetParticleCount() < 300000){
+            pBuilder.MapGridEmit(velocityField, spacing);
         }
 
-        printf("Current frame= %d\n", frame_index);
-    }
+        UtilPrintStepSimple(&solver, step-1);
+#if 0
+        std::string path("/media/felipe/FluidStuff/box/out_");
+        path += std::to_string(step-1);
+        path += ".txt";
+        SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
+                                        SERIALIZER_POSITION);
+#endif
+        return 1;
+    };
+
+    UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
+                                                           target, targetInterval, extraParts,
+                                                           {}, onStepUpdate, colorFunction,
+                                                           filler);
 
     CudaMemoryManagerClearCurrent();
+
     printf("===== OK\n");
 }
+

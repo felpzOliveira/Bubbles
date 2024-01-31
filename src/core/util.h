@@ -759,12 +759,19 @@ inline void UtilRunDynamicSimulation3(Solver *solver, ParticleAccessor *pSet,
         extra = filler(&pos[3 * (sdfSize + end)], &col[3 * (sdfSize + end)]);
 
         visible = particles.size() + end + extra;
-        graphy_render_points3f(pos, col, visible, spacing/2.0);
+        graphy_render_points3f(pos, col, visible, spacing/3.0);
         frame++;
     }
 
     graphy_close_display();
     delete[] ptr;
+}
+
+template<typename Solver>
+inline void UtilPrintStepSimple(Solver *solver, int step){
+    Float advTime = solver->GetAdvanceTime();
+    int pCount = solver->GetParticleCount();
+    printf("\rStep (%d) : %d ms - Particles: %d    ", step, (int)advTime, pCount);
 }
 
 /*

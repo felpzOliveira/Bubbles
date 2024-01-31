@@ -12,6 +12,8 @@ typedef struct{
     Grid2 *domain;
     ColliderSet2 *collider;
     vec2f *smoothedVelocities;
+    ConstantInteraction2v *cInteractions;
+    int cInteractionsCount;
     Float dragCoefficient;
     Float eosExponent;
     Float negativePressureScale;
@@ -27,6 +29,8 @@ typedef struct{
 typedef struct{
     SphParticleSet3 *sphpSet;
     Grid3 *domain;
+    ConstantInteraction3v *cInteractions;
+    int cInteractionsCount;
     ColliderSet3 *collider;
     vec3f *smoothedVelocities;
     Float dragCoefficient;
@@ -150,6 +154,8 @@ void ComputePressureForceCPU(SphSolverData2 *data, Float timeStep,
 void ComputePressureForceCPU(SphSolverData3 *data, Float timeStep);
 void ComputeNonPressureForceCPU(SphSolverData2 *data);
 void ComputeNonPressureForceCPU(SphSolverData3 *data);
+void ComputeParticleInteractionCPU(SphSolverData2 *data);
+void ComputeParticleInteractionCPU(SphSolverData3 *data);
 void TimeIntegrationCPU(SphSolverData2 *data, Float timeStep, int extended=0);
 void TimeIntegrationCPU(SphSolverData3 *data, Float timeStep, int extended=0);
 void ComputeInitialTemperatureMapCPU(SphSolverData2 *data, Float Tmin,
@@ -166,6 +172,8 @@ void ComputePressureForceGPU(SphSolverData2 *data, Float timeStep, int integrate
 void ComputePressureForceGPU(SphSolverData3 *data, Float timeStep);
 void ComputeNonPressureForceGPU(SphSolverData2 *data);
 void ComputeNonPressureForceGPU(SphSolverData3 *data);
+void ComputeParticleInteractionGPU(SphSolverData2 *data);
+void ComputeParticleInteractionGPU(SphSolverData3 *data);
 void TimeIntegrationGPU(SphSolverData2 *data, Float timeStep, int extended=0);
 void TimeIntegrationGPU(SphSolverData3 *data, Float timeStep, int extended=0);
 void ComputeInitialTemperatureMapGPU(SphSolverData2 *data, Float Tmin,
@@ -186,8 +194,8 @@ void UpdateGridDistributionGPU(SphSolverData3 *data);
 bb_cpu_gpu Float ComputeDensityForPoint(SphSolverData2 *data, const vec2f &p);
 
 // Generate a set of default SPH properties
-SphSolverData2 *DefaultSphSolverData2();
-SphSolverData3 *DefaultSphSolverData3();
+SphSolverData2 *DefaultSphSolverData2(bool with_gravity=true);
+SphSolverData3 *DefaultSphSolverData3(bool with_gravity=true);
 
 // Display routines
 void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet);

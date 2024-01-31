@@ -158,6 +158,7 @@ class ParticleSet{
     DataBuffer<T> positions;
     DataBuffer<T> velocities;
     DataBuffer<T> forces;
+    DataBuffer<T> interaction;
     DataBuffer<Float> pressures;
     DataBuffer<Float> densities;
     DataBuffer<T> normals;
@@ -202,6 +203,7 @@ class ParticleSet{
         normals.SetSize(n);
         v0s.SetSize(n);
         buckets.SetSize(n);
+        interaction.SetSize(n);
         radius = 1e-3;
         mass = 1e-3;
         familyId = 0;
@@ -244,6 +246,7 @@ class ParticleSet{
         pressures.SetSize(n);      chainNodes.SetSize(n);
         chainAuxNodes.SetSize(n);  v0s.SetSize(n);
         normals.SetSize(n);        buckets.SetSize(n);
+        interaction.SetSize(n);
         count = n;
         radius = 1e-3;
         mass = 1e-3;
@@ -325,6 +328,11 @@ class ParticleSet{
         return forces.At(pId);
     }
 
+    bb_cpu_gpu T GetParticleInteraction(int pId){
+        AssertA(pId < count && pId >= 0, "Invalid query for particle forces");
+        return interaction.At(pId);
+    }
+
     bb_cpu_gpu Float GetParticleDensity(int pId){
         AssertA(pId < count && pId >= 0, "Invalid query for particle density");
         return densities.At(pId);
@@ -352,6 +360,11 @@ class ParticleSet{
     bb_cpu_gpu void SetParticleForce(int pId, const T &force){
         AssertA(pId < count && pId >= 0, "Invalid set for particle forces");
         forces.Set(force, pId);
+    }
+
+    bb_cpu_gpu void SetParticleInteraction(int pId, const T &inter){
+        AssertA(pId < count && pId >= 0, "Invalid set for particle interaction");
+        interaction.Set(inter, pId);
     }
 
     bb_cpu_gpu void SetParticleDensity(int pId, Float density){

@@ -34,8 +34,6 @@ class VolumeParticleEmitter2{
               const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
     void Emit(ContinuousParticleSetBuilder2 *Builder,
               const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
-    void Emit(ProgressiveParticleSetBuilder2 *Builder,
-              const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
 };
 
 class VolumeParticleEmitter3{
@@ -67,8 +65,6 @@ class VolumeParticleEmitter3{
     void Emit(ParticleSetBuilder<vec3f> *Builder,
               const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
     void Emit(ContinuousParticleSetBuilder3 *Builder,
-              const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
-    void Emit(ProgressiveParticleSetBuilder3 *Builder,
               const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
 };
 
@@ -102,8 +98,6 @@ class VolumeParticleEmitterSet2{
               const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
     void Emit(ContinuousParticleSetBuilder2 *Builder,
               const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
-    void Emit(ProgressiveParticleSetBuilder2 *Builder,
-              const std::function<vec2f(const vec2f &)> &velocity=ZeroVelocityField2);
     void Release();
 };
 
@@ -129,8 +123,6 @@ class VolumeParticleEmitterSet3{
     void Emit(ParticleSetBuilder<vec3f> *Builder,
               const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
     void Emit(ContinuousParticleSetBuilder3 *Builder,
-              const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
-    void Emit(ProgressiveParticleSetBuilder3 *Builder,
               const std::function<vec3f(const vec3f &)> &velocity=ZeroVelocityField3);
     void Release();
 };

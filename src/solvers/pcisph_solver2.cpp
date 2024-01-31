@@ -39,20 +39,17 @@ void PciSphSolver2::SetViscosityCoefficient(Float viscosityCoefficient){
 
 void AdvanceTimeStep(PciSphSolver2 *solver, Float timeStep, int use_cpu = 0){
     SphSolverData2 *data = solver->solverData->sphData;
-    if(use_cpu)
+    if(use_cpu){
         UpdateGridDistributionCPU(data);
-    else
-        UpdateGridDistributionGPU(data);
-
-    if(use_cpu)
+        ComputeParticleInteractionCPU(data);
         ComputeDensityCPU(data);
-    else
-        ComputeDensityGPU(data);
-
-    if(use_cpu)
         ComputeNonPressureForceCPU(data);
-    else
+    }else{
+        UpdateGridDistributionGPU(data);
+        ComputeParticleInteractionGPU(data);
+        ComputeDensityGPU(data);
         ComputeNonPressureForceGPU(data);
+    }
 
     Float delta = solver->ComputeDelta(timeStep);
     ComputePressureForceAndIntegrate(solver->solverData, timeStep, 0.01, delta, 5);

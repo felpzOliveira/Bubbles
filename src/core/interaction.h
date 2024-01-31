@@ -2,7 +2,9 @@
 
 #include <geometry.h>
 #include <transform.h>
+#include <vector>
 
+// Geometry interactions
 class Shape2;
 class Shape;
 
@@ -51,3 +53,56 @@ Ray SpawnRayInDirection(const SurfaceInteraction &isect, const vec3f &dir){
     //vec3f o = isect.p + Epsilon * dir;
     return Ray(o, dir, Infinity);
 }
+
+// Physics interactions, these are meant to hold acceleration
+template<typename T>
+struct ConstantInteraction{
+    T value;
+};
+
+template<typename T>
+void SetConstantInteraction(ConstantInteraction<T> *interaction, T value){
+    interaction->value = value;
+}
+
+template<typename T> inline bb_cpu_gpu
+T SampleInteraction(ConstantInteraction<T> *interaction, T p){
+    return interaction->value;
+}
+
+typedef ConstantInteraction<vec2f> ConstantInteraction2v;
+typedef ConstantInteraction<vec3f> ConstantInteraction3v;
+
+template<typename T>
+class InteractionsBuilder{
+    public:
+    std::vector<T> cInteractionsVecs;
+
+    InteractionsBuilder() = default;
+    ~InteractionsBuilder() = default;
+
+    void AddConstantInteraction(T value){
+        cInteractionsVecs.push_back(value);
+    }
+
+    template<typename Q>
+    ConstantInteraction<Q> *MakeConstantInteractions(std::vector<Q> *ref){
+        size_t n = ref->size();
+        if(n < 1)
+            return nullptr;
+
+        ConstantInteraction<Q> *ptr = cudaAllocateVx(ConstantInteraction<Q>, n);
+        for(size_t i = 0; i < n; i++){
+            SetConstantInteraction<Q>(&ptr[i], ref->at(i));
+        }
+
+        return ptr;
+    }
+
+    ConstantInteraction<T> *MakeConstantInteractions(){
+        return MakeConstantInteractions<T>(&cInteractionsVecs);
+    }
+};
+
+typedef InteractionsBuilder<vec2f> InteractionsBuilder2;
+typedef InteractionsBuilder<vec3f> InteractionsBuilder3;

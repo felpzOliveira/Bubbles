@@ -225,20 +225,15 @@ void ComputePressureForceAndIntegrate(PciSphSolverData3 *data, Float timeInterva
     Float densityErrorRatio = 0;
 
     for(int k = 0; k < maxIt; k++){
-        if(use_cpu)
+        if(use_cpu){
             PredictVelocityAndPositionCPU(data, timeIntervalInSeconds, k == 0);
-        else
-            PredictVelocityAndPositionGPU(data, timeIntervalInSeconds, k == 0);
-
-        if(use_cpu)
             PredictPressureCPU(data, delta);
-        else
-            PredictPressureGPU(data, delta);
-
-        if(use_cpu)
             PredictPressureForceCPU(data);
-        else
+        }else{
+            PredictVelocityAndPositionGPU(data, timeIntervalInSeconds, k == 0);
+            PredictPressureGPU(data, delta);
             PredictPressureForceGPU(data);
+        }
 
         Float maxDensityError = 0;
         for(int i = 0; i < count; i++){
@@ -251,14 +246,11 @@ void ComputePressureForceAndIntegrate(PciSphSolverData3 *data, Float timeInterva
         }
     }
 
-    if(use_cpu)
+    if(use_cpu){
         AccumulateAndIntegrateCPU(data, timeIntervalInSeconds);
-    else
-        AccumulateAndIntegrateGPU(data, timeIntervalInSeconds);
-
-    if(use_cpu)
         ComputePseudoViscosityInterpolationCPU(data->sphData, timeIntervalInSeconds);
-    else
+    }else{
+        AccumulateAndIntegrateGPU(data, timeIntervalInSeconds);
         ComputePseudoViscosityInterpolationGPU(data->sphData, timeIntervalInSeconds);
-
+    }
 }

@@ -136,6 +136,13 @@ void test_pcisph3_dam_break_double_dragon();
 void test_pcisph3_box_mesh();
 void test_pcisph3_progressive();
 
+void test_pcisph3_pathing();
+void test_pcisph3_box_drop();
+void test_bounds_split3();
+void test_pcisph3_water_block();
+void test_pcisph3_dissolve();
+void test_pcisph3_emit_test();
+
 void test_pbf2_double_dam_break();
 
 void test_lnm_happy_whale();

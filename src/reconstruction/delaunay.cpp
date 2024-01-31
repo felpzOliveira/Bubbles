@@ -11,32 +11,19 @@
 #include <cutil.h>
 #include <unordered_map>
 
+#define is_bit_set(n, b) (((n) >> (b)) & 1)
+#define set_bit(n, b) ((n) |= (1 << (b)))
+
 struct DelaunaySet{
     int nPos = 0;
-    int nNor = 0;
     int offset = 0;
-    vec3f *positions;
-    vec3f *normals;
+    Point3 *positions;
 
     bb_cpu_gpu vec3f GetParticlePosition(int id){
         if(nPos > 0){
             int trueId = id - offset;
-            return positions[trueId];
-        }
-        return vec3f();
-    }
-
-    bb_cpu_gpu void SetParticlePosition(int id, vec3f p){
-        if(nPos > 0){
-            int trueId = id - offset;
-            positions[trueId] = p;
-        }
-    }
-
-    bb_cpu_gpu vec3f GetParticleNormal(int id){
-        if(nNor > 0){
-            int trueId = id - offset;
-            return normals[trueId];
+            Point3 p = positions[trueId];
+            return vec3f(p._p[0], p._p[1], p._p[2]);
         }
         return vec3f();
     }
@@ -45,59 +32,22 @@ struct DelaunaySet{
         return id >= offset;
     }
 
-    void Build(std::vector<vec3f> &pos, std::vector<vec3f> &nor, int off){
-        nPos = pos.size();
-        nNor = nor.size();
-        offset = off;
-
-        if(nPos > 0 && nNor > 0){
-            positions = cudaAllocateUnregisterVx(vec3f, nPos);
-            normals = cudaAllocateUnregisterVx(vec3f, nNor);
-            memcpy(positions, pos.data(), pos.size() * sizeof(vec3f));
-            memcpy(normals, nor.data(), nor.size() * sizeof(vec3f));
-        }
-    }
-
     void Cleanup(){
         cudaFree(positions);
-        cudaFree(normals);
     }
 };
 
-
-struct DelaunaySmallBucket{
-    int id;
-    int neighbors[3];
-    vec3f pneighbors[3];
-    int size;
-    int density;
-};
-
-struct DelaunaySetBuilder{
-    std::vector<vec3f> pos;
-    std::vector<vec3f> nor;
-
-    void PushParticle(vec3f p, vec3f n){
-        pos.push_back(p);
-        nor.push_back(n);
+bb_cpu_gpu
+void printBinary(int num, char bin[9]){
+    for(int i = 7; i >= 0; i--){
+        if(is_bit_set(num, i))
+            bin[7-i] = '1';
+        else
+            bin[7-i] = '0';
     }
 
-    void Reserve(uint32_t n){
-        pos.reserve(n);
-        nor.reserve(n);
-    }
-
-    size_t Size(){
-        return pos.size();
-    }
-
-    DelaunaySet *Build(int total_p){
-        DelaunaySet *dSet = cudaAllocateUnregisterVx(DelaunaySet, 1);
-        dSet->Build(pos, nor, total_p);
-        return dSet;
-    }
-};
-
+    bin[8] = 0;
+}
 
 inline
 bb_cpu_gpu vec3f DelaunayPosition(ParticleSet3 *pSet, DelaunaySet *dSet, int id){
@@ -108,31 +58,9 @@ bb_cpu_gpu vec3f DelaunayPosition(ParticleSet3 *pSet, DelaunaySet *dSet, int id)
         return dSet->GetParticlePosition(id);
 }
 
-inline
-bb_cpu_gpu void DelaunaySetPosition(ParticleSet3 *pSet, DelaunaySet *dSet,
-                                      int id, vec3f p)
-{
-    int count = pSet->GetParticleCount();
-    if(id < count)
-        pSet->SetParticlePosition(id, p);
-    else
-        dSet->SetParticlePosition(id, p);
-}
-
 inline bb_cpu_gpu void DelaunaySetBoundary(DelaunaySet *dSet, int id, int *u_bound){
     if(!dSet->InSet(id))
         u_bound[id] = 1;
-}
-
-bb_cpu_gpu vec3f
-GeometricalNormal(vec3f a, vec3f b, vec3f c, bool normalized=true){
-    vec3f n;
-    vec3f n1 = a - b;
-    vec3f n2 = b - c;
-    n.x = n1.y * n2.z - n1.z * n2.y;
-    n.y = n1.z * n2.x - n1.x * n2.z;
-    n.z = n1.x * n2.y - n1.y * n2.x;
-    return normalized ? SafeNormalize(n) : n;
 }
 
 template<unsigned int N>
@@ -233,102 +161,6 @@ void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
     });
 }
 
-void SpawnTetra1(vec3f pi, int pId, vec3f n, int id, DelaunaySetBuilder &dBuilder,
-                 std::vector<uint32_t> &ids, Point3HVec &pointVec, Float edgeLen)
-{
-    const Float one_over_sqrt2 = 0.7071067811865475;
-
-    Float a = edgeLen * one_over_sqrt2;
-    Float ha = 0.5 * a;
-
-    vec3f u0 = vec3f(+ha, +ha, +ha);
-    vec3f u1 = vec3f(-ha, +ha, -ha);
-    vec3f u2 = vec3f(-ha, -ha, +ha);
-    vec3f u3 = vec3f(+ha, -ha, -ha);
-
-    vec3f p0 = pi + u0;
-    vec3f p1 = pi + u1;
-    vec3f p2 = pi + u2;
-    vec3f p3 = pi + u3;
-
-    ids.push_back(id + 0);
-    ids.push_back(id + 1);
-    ids.push_back(id + 2);
-    ids.push_back(id + 3);
-    pointVec.push_back({p0.x, p0.y, p0.z});
-    pointVec.push_back({p1.x, p1.y, p1.z});
-    pointVec.push_back({p2.x, p2.y, p2.z});
-    pointVec.push_back({p3.x, p3.y, p3.z});
-    dBuilder.PushParticle(p0, n);
-    dBuilder.PushParticle(p1, n);
-    dBuilder.PushParticle(p2, n);
-    dBuilder.PushParticle(p3, n);
-}
-
-std::unordered_map<uint32_t, int> verticesFlag;
-void CheckPart(ParticleSet3 *pSet, Grid3 *grid, int pId, DelaunaySetBuilder &dBuilder,
-               std::vector<uint32_t> &ids, Point3HVec &pointVec, Float dist)
-{
-    int acceptpart = 1;
-    vec3f pi = pSet->GetParticlePosition(pId);
-#if 1
-    Bucket *bucket = pSet->GetParticleBucket(pId);
-    for(int i = 0; i < bucket->Count(); i++){
-        int j = bucket->Get(i);
-        if(j != pId){
-            vec3f pj = pSet->GetParticlePosition(j);
-            Float d = Distance(pi, pj);
-            if(d < 1e-4){
-                if(pId > j){
-                    acceptpart = 0;
-                    break;
-                }
-            }
-        }
-    }
-#else
-    int *neighbors = nullptr;
-    unsigned int cellId = grid->GetLinearHashedPosition(pi);
-    int count = grid->GetNeighborsOf(cellId, &neighbors);
-    int n_in = 0;
-    for(int i = 0; i < count; i++){
-        Cell3 *cell = grid->GetCell(neighbors[i]);
-        ParticleChain *pChain = cell->GetChain();
-        int size = cell->GetChainLength();
-
-        for(int j = 0; j < size; j++){
-            if(pChain->pId != pId){
-                vec3f pj = pSet->GetParticlePosition(pChain->pId);
-                Float d = Distance(pi, pj);
-                if(d < 1e-4){
-                    if(pId > j){
-                        acceptpart = 0;
-                        break;
-                    }
-                }
-
-                if(d < dist)
-                    n_in += 1;
-            }
-        }
-    }
-#endif
-    if(acceptpart == 1){
-        int totalP = pSet->GetParticleCount() + dBuilder.Size();
-        vec3f n = pSet->GetParticleNormal(pId);
-        int bi = pSet->GetParticleV0(pId);
-        if(bi > 0){
-            SpawnTetra1(pi, pId, n, totalP, dBuilder, ids, pointVec, 0.9 * dist);
-        }else{
-            //ids.push_back(pId);
-            //pointVec.push_back({pi.x, pi.y, pi.z});
-        }
-    }else{
-        verticesFlag[pId] = -1;
-        pSet->SetParticleV0(pId, -1);
-    }
-}
-
 bb_cpu_gpu bool DelaunayIsTetValid(Tet tet, TetOpp opp, char v, uint32_t pLen){
     bool valid = true;
     if(!isTetAlive(v)) valid = false;
@@ -363,10 +195,24 @@ bb_cpu_gpu vec3ui matching_orientation(i3 face, Tet &tet){
     return vec3ui();
 }
 
-bb_cpu_gpu void get_face_edges(i3 face, i2 edges[3]){
-    edges[0] = i2(face.t[0], face.t[1]);
-    edges[1] = i2(face.t[0], face.t[2]);
-    edges[2] = i2(face.t[1], face.t[2]);
+bb_cpu_gpu bool
+__debug_check_triangle(i3 tri, uint32_t *ids, ParticleSet3 *pSet, DelaunaySet *dSet,
+                       Float radius)
+{
+    int idA = ids[tri.t[0]], idB = ids[tri.t[1]], idC = ids[tri.t[2]];
+    Float r = 2.0 * radius;
+    vec3f pA = DelaunayPosition(pSet, dSet, idA);
+    vec3f pB = DelaunayPosition(pSet, dSet, idB);
+    vec3f pC = DelaunayPosition(pSet, dSet, idC);
+    Float aB = Distance(pA, pB);
+    Float aC = Distance(pA, pC);
+    Float bD = Distance(pB, pC);
+
+    bool valid = aB < r && aC < r && bD < r;
+    if(!valid){
+        //printf("AB= %g, AC= %g, BD= %g, R= %g, [%d](%s)\n", aB, aC, bD, r, s, bin);
+    }
+    return valid;
 }
 
 static void
@@ -381,11 +227,13 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
 
     uint32_t size = triangulator->_tetVec.size();
     uint32_t pLen = triangulation.pLen;
-    delQ->SetSlots(size, false);
+    delQ->SetSlots(size * 4, false);
 
     Float radius = mu * spacing;
     char *tetFlags = cudaAllocateUnregisterVx(char, size);
+    int *extraCounter = cudaAllocateUnregisterVx(int, 1);
 
+    *extraCounter = 0;
     timer.Start("Tetrahedra Filtering");
     AutoParallelFor("Delaunay_Filter", size, AutoLambda(int i){
         Tet tet = kernTet[i];
@@ -393,7 +241,7 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
             C = tet._v[2], D = tet._v[3];
         const TetOpp botOpp = loadOpp(kernTetOpp, i);
 
-        tetFlags[i] = 0;
+        tetFlags[i] = -1;
 
         if(DelaunayIsTetValid(tet, botOpp, kernChar[i], pLen)){
 
@@ -423,40 +271,65 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
             Float bD = Distance(pB, pD);
             Float cD = Distance(pC, pD);
 
+#if 1
             bool is_tetra_valid =  aB < rAB && aC < rAC && aD < rAD &&
                                    bC < rBC && bD < rBD &&
                                    cD < rCD;
-
             if(!is_tetra_valid){
                 DelaunaySetBoundary(dSet, idA, bound);
                 DelaunaySetBoundary(dSet, idB, bound);
                 DelaunaySetBoundary(dSet, idC, bound);
                 DelaunaySetBoundary(dSet, idD, bound);
+                tetFlags[i] = 0;
             }else
-                tetFlags[i] = 1;
+                tetFlags[i] = 0x0f;
+#else
+            int ABCvalid = aB < rAB && aC < rAC && bC < rBC;
+            int ABDvalid = aB < rAB && bD < rBD && aD < rAD;
+            int BCDvalid = bC < rBC && bD < rBD && cD < rCD;
+            int ACDvalid = aC < rAC && aD < rAD && cD < rCD;
+            // ABC ABD ACD BCD
+            //  1   1   1   1
+            if(ABCvalid) { set_bit(tetFlags[i], 0); }
+            if(ABDvalid) { set_bit(tetFlags[i], 1); }
+            if(ACDvalid) { set_bit(tetFlags[i], 2); }
+            if(BCDvalid) { set_bit(tetFlags[i], 3); }
+
+
+            //tetFlags[i] |= ABCvalid ? (1 << 0) : 0;
+            //tetFlags[i] |= ABDvalid ? (1 << 1) : 0;
+            //tetFlags[i] |= ACDvalid ? (1 << 2) : 0;
+            //tetFlags[i] |= BCDvalid ? (1 << 3) : 0;
+#endif
         }
     });
 
-    timer.StopAndNext("Find Unique Triangles");
-    AutoParallelFor("Delaunay_UniqueTriangles", size, AutoLambda(int tetIndex){
+    /*
+    * TODO: The following two kernels can be merged into a single one
+    * it is just splitted so we can compute the actual contribution of each one
+    */
+    timer.StopAndNext("Find Unique Triangles - Part 1");
+    AutoParallelFor("Delaunay_UniqueTriangles_NoTetras", size, AutoLambda(int tetIndex){
         Tet tet = kernTet[tetIndex];
         int A = tet._v[0], B = tet._v[1],
             C = tet._v[2], D = tet._v[3];
         const TetOpp botOpp = loadOpp(kernTetOpp, tetIndex);
 
+        int triStates = tetFlags[tetIndex];
         i3 faces[] = { i3(A, B, C), i3(A, B, D), i3(A, D, C), i3(B, D, C) };
         int info[] = { 0, 0, 0, 0 };
         int opp[] = { D, C, B, A };
 
-        if(tetFlags[tetIndex] == 0)
+        if(triStates <= 0)
             return;
 
         for(int botVi = 0; botVi < 4; botVi++){
             const int topTi = botOpp.getOppTet(botVi);
             const int topVi = botOpp.getOppVi(botVi);
             const Tet topTet  = kernTet[topTi];
+            int triStatesTi = tetFlags[topTi];
 
-            if(tetFlags[topTi] == 0)
+            if(triStatesTi <= 0)
                 continue;
 
             int a = topTet._v[0], b = topTet._v[1],
@@ -477,8 +350,70 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
             }
         }
     });
+
+    timer.StopAndNext("Find Unique Triangles - Part 2");
+    AutoParallelFor("Delaunay_UniqueTriangles_Tetras", size, AutoLambda(int tetIndex){
+        Tet tet = kernTet[tetIndex];
+        const TetOpp botOpp = loadOpp(kernTetOpp, tetIndex);
+        int A = tet._v[0], B = tet._v[1],
+            C = tet._v[2], D = tet._v[3];
+
+        int tetState = tetFlags[tetIndex];
+        i3 faces[] = { i3(A, B, C), i3(A, B, D), i3(A, D, C), i3(B, D, C) };
+        int info[] = { 0, 0, 0, 0 };
+        int opp[] = { D, C, B, A };
+
+        if(tetState != 0)
+            return;
+
+        for(int botVi = 0; botVi < 4; botVi++){
+            const int topTi = botOpp.getOppTet(botVi);
+            const int topVi = botOpp.getOppVi(botVi);
+            const Tet topTet  = kernTet[topTi];
+            int triStatesTi = tetFlags[topTi];
+
+            int a = topTet._v[0], b = topTet._v[1],
+                c = topTet._v[2], d = topTet._v[3];
+            i3 topFaces[] = {i3(a, b, c), i3(a, b, d), i3(a, d, c), i3(b, d, c)};
+
+            for(int k = 0; k < 4; k++){
+                int where = matching_faces(faces, topFaces[k]);
+                if(where >= 0){
+                    // found a matching face, check if neighboor is valid
+                    if(triStatesTi == -1){
+                        // this tetra is invalid (virtual)
+                    }else if(triStatesTi == 0 && info[where] == 0){
+                        // this tetra is broken (a face was removed)
+                        // if the index of this tetra is bigger we process it
+                        if(tetIndex < topTi)
+                            info[where] = 2;
+                        else // solved by neighbor
+                            info[where] = 1;
+                    }else{
+                        // this tetra is valid, face was already processed
+                        info[where] = 1;
+                    }
+                }
+            }
+        }
+
+        for(int s = 0; s < 4; s++){
+            bool valid_face = __debug_check_triangle(faces[s], ids, pSet, dSet, radius);
+            if(!valid_face)
+                continue;
+
+            if(info[s] == 0 || info[s] == 2){
+                vec3ui tri = matching_orientation(faces[s], tet);
+                delQ->Push({tri, opp[s]});
+                atomic_increase_get(extraCounter);
+            }
+        }
+    });
+
     timer.Stop();
 
+    printf("Extra info = %d\n", *extraCounter);
+    cudaFree(extraCounter);
     cudaFree(tetFlags);
 }
 
@@ -491,9 +426,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     int *u_bound = nullptr;
     vec3i *u_tri = nullptr;
     uint32_t *u_ids = nullptr;
-    std::vector<uint32_t> *ids = nullptr;
     DelaunayWorkQueue *delQ = nullptr;
-    DelaunaySetBuilder dBuilder;
     int pointNum = 0;
 
     Float kernel = sphSet->GetKernelRadius();
@@ -513,25 +446,127 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
 
     int totalCount = 0;
     for(int i = 0; i < pSet->GetParticleCount(); i++){
-        totalCount += pSet->GetParticleV0(i) > 0 ? 1 : 0;
+        //totalCount += 1;
+        totalCount += pSet->GetParticleV0(i) > 0 ? 4 : 1;
     }
 
-    triangulation.ids.reserve(totalCount);
-    triangulation.pointVec.reserve(totalCount);
-    dBuilder.Reserve(totalCount);
+    dSet = cudaAllocateUnregisterVx(DelaunaySet, 1);
+    u_ids = cudaAllocateUnregisterVx(uint32_t, totalCount);
+    dSet->positions = cudaAllocateUnregisterVx(Point3, totalCount);
+    dSet->offset = pSet->GetParticleCount();
+
+    int *iIndex = cudaAllocateUnregisterVx(int, 1);
+    int *refIndex = cudaAllocateUnregisterVx(int, 1);
+    *iIndex = 0;
+    *refIndex = 0;
 
     timer.Start("Particle Filter and Spawn");
-    for(int i = 0; i < pSet->GetParticleCount(); i++){
-        CheckPart(pSet, domain, i, dBuilder, triangulation.ids,
-                  triangulation.pointVec, dist);
-        u_bound[i] = 0;
-    }
+
+#if defined(DELAUNAY_WITH_INTERIOR)
+    AutoParallelFor("Delaunay_Particle-Filter",pSet->GetParticleCount(),AutoLambda(int pId)
+    {
+        int bi = pSet->GetParticleV0(pId);
+        if(bi > 0)
+            return;
+
+        int acceptpart = 1;
+        Bucket *bucket = pSet->GetParticleBucket(pId);
+        vec3f pi = pSet->GetParticlePosition(pId);
+        for(int i = 0; i < bucket->Count(); i++){
+            int j = bucket->Get(i);
+            if(j != pId){
+                vec3f pj = pSet->GetParticlePosition(j);
+                Float d = Distance(pi, pj);
+                if(d < 1e-4){
+                    if(pId > j){
+                        acceptpart = 0;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if(acceptpart == 1){
+            int key = atomic_increase_get(iIndex);
+            int id = pSet->GetParticleCount() + key;
+            dSet->positions[key] = {pi.x, pi.y, pi.z};
+            u_ids[key] = id;
+        }
+
+        u_bound[pId] = 0;
+    });
+#endif
+
+    *refIndex = *iIndex;
+    *iIndex = 0;
+#if 1
+    AutoParallelFor("Delaunay_Tet-Spawn", pSet->GetParticleCount(), AutoLambda(int pId){
+        int bi = pSet->GetParticleV0(pId);
+
+        if(bi == 0)
+            return;
+
+        int acceptpart = 1;
+        Bucket *bucket = pSet->GetParticleBucket(pId);
+        vec3f pi = pSet->GetParticlePosition(pId);
+
+        for(int i = 0; i < bucket->Count(); i++){
+            int j = bucket->Get(i);
+            if(j != pId){
+                vec3f pj = pSet->GetParticlePosition(j);
+                Float d = Distance(pi, pj);
+                if(d < 1e-4){
+                    if(pId > j){
+                        acceptpart = 0;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if(acceptpart == 1){
+            int key = atomic_increase_get(iIndex);
+            int id = pSet->GetParticleCount() + *refIndex + 4 * key;
+            Float edgeLen = mu * spacing * 0.9;
+            const Float one_over_sqrt2 = 0.7071067811865475;
+
+            Float a = edgeLen * one_over_sqrt2;
+            Float ha = 0.5 * a;
+
+            vec3f u0 = vec3f(+ha, +ha, +ha);
+            vec3f u1 = vec3f(-ha, +ha, -ha);
+            vec3f u2 = vec3f(-ha, -ha, +ha);
+            vec3f u3 = vec3f(+ha, -ha, -ha);
+
+            vec3f p0 = pi + u0;//
+            vec3f p1 = pi + u1;// - u0;
+            vec3f p2 = pi + u2;// - u0;
+            vec3f p3 = pi + u3;// - u0;
+
+            dSet->positions[*refIndex + 4 * key + 0] = {p0.x, p0.y, p0.z};
+            dSet->positions[*refIndex + 4 * key + 1] = {p1.x, p1.y, p1.z};
+            dSet->positions[*refIndex + 4 * key + 2] = {p2.x, p2.y, p2.z};
+            dSet->positions[*refIndex + 4 * key + 3] = {p3.x, p3.y, p3.z};
+            u_ids[*refIndex + 4 * key + 0] = id + 0;
+            u_ids[*refIndex + 4 * key + 1] = id + 1;
+            u_ids[*refIndex + 4 * key + 2] = id + 2;
+            u_ids[*refIndex + 4 * key + 3] = id + 3;
+        }
+
+        u_bound[pId] = 0;
+    });
+#endif
     timer.Stop();
 
-    pointNum = triangulation.pointVec.size();
-    std::cout << "done\n - Support points " << dBuilder.Size() << std::endl;
+    dSet->nPos = *refIndex + 4 * (*iIndex);
+    triangulation.pointVec.resize(dSet->nPos);
 
-    dSet = dBuilder.Build(pSet->GetParticleCount());
+    for(int i = 0, j = 0; i < dSet->nPos; i++){
+        triangulation.pointVec[j++] = dSet->positions[i];
+    }
+
+    pointNum = triangulation.pointVec.size();
+    std::cout << "done\n - Support points " << dSet->nPos << std::endl;
 
     std::cout << " - Running delaunay triangulation..." << std::flush;
     timer.Start("Delaunay Triangulation");
@@ -539,10 +574,6 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     timer.Stop();
     triangulation.pLen = pointNum;
     std::cout << "done" << std::endl;
-
-    ids = &triangulation.ids;
-    u_ids = cudaAllocateUnregisterVx(uint32_t, ids->size());
-    memcpy(u_ids, ids->data(), sizeof(uint32_t) * ids->size());
 
     delQ = cudaAllocateUnregisterVx(DelaunayWorkQueue, 1);
     DelaunayWorkQueueAndFilter(&triangulator, triangulation, pSet, dSet,
@@ -594,7 +625,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     //       recompute vertices indices so that we can output a smaller
     //       file without unusefull points
     // TODO: We can probably remove this and do some changes in kernel
-    //       but it is not actually affecting performance
+    //       but it is not actually important
     std::unordered_map<uint32_t, uint32_t> remap;
     std::map<i2, uint32_t, i2Comp> edgeMap;
     uint32_t runningId = 0;
@@ -609,12 +640,13 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
             int idB = u_ids[B];
             int idC = u_ids[C];
 
-            i2 edges[] = {i2(A, B), i2(A, C), i2(B, C)};
+            i2 edges[3] = {i2(A, B), i2(A, C), i2(B, C)};
             for(int s = 0; s < 3; s++){
-                if(edgeMap.find(edges[s]) == edgeMap.end())
+                if(edgeMap.find(edges[s]) == edgeMap.end()){
                     edgeMap[edges[s]] = 1;
-                else
+                }else{
                     edgeMap[edges[s]] += 1;
+                }
             }
 
             vec3f pA = DelaunayPosition(pSet, dSet, idA);
@@ -625,7 +657,6 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
             if(remap.find(idA) == remap.end()){
                 aId = runningId++;
                 remap[idA] = aId;
-                verticesFlag[idA] = 1;
                 triangulation.shrinkedPs.push_back(pA);
             }else
                 aId = remap[idA];
@@ -633,7 +664,6 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
             if(remap.find(idB) == remap.end()){
                 bId = runningId++;
                 remap[idB] = bId;
-                verticesFlag[idB] = 1;
                 triangulation.shrinkedPs.push_back(pB);
             }else
                 bId = remap[idB];
@@ -641,7 +671,6 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
             if(remap.find(idC) == remap.end()){
                 cId = runningId++;
                 remap[idC] = cId;
-                verticesFlag[idC] = 1;
                 triangulation.shrinkedPs.push_back(pC);
             }else
                 cId = remap[idC];
@@ -656,7 +685,14 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     }
     timer.Stop();
 
+    int counter = 0;
+    for(auto it : edgeMap){
+        if(it.second > 2)
+            counter += 1;
+    }
+
     std::cout << "done ( boundary: " << b_len << " / " << n_it << " ) " << std::endl;
+    std::cout << " - Edges with > 2 : " << counter << std::endl;
     std::cout << " - Finished building mesh" << " ( " << triangulation.shrinkedPs.size() << " vertices | "
               << triangulation.shrinked.size() << " triangles )" << std::endl;
 
@@ -668,6 +704,8 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     cudaFree(u_tri);
     cudaFree(u_ids);
     cudaFree(u_bound);
+    cudaFree(iIndex);
+    cudaFree(refIndex);
 }
 
 void

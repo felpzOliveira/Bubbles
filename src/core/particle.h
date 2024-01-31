@@ -168,6 +168,10 @@ class ParticleSet{
     DataBuffer<Float> densitiesEx;
     DataBuffer<Float> v0s;
 
+    // TODO: other datatypes
+    DataBuffer<vec3f> *userVec3Buffers;
+    int userVec3Count;
+
     DataBuffer<ParticleChain> chainNodes;
     DataBuffer<ParticleChain> chainAuxNodes;
     int count;
@@ -180,6 +184,7 @@ class ParticleSet{
         count = 0;
         radius = 1e-3;
         mass = 1e-3;
+        userVec3Buffers = nullptr;
     }
 
     bb_cpu_gpu int GetReservedSize(){
@@ -201,6 +206,20 @@ class ParticleSet{
         mass = 1e-3;
         familyId = 0;
         count = 0;
+        userVec3Buffers = nullptr;
+        userVec3Count = 0;
+    }
+
+    void SetUserVec3Buffer(int n){
+        n = Max(0, n);
+        if(n == 0 || count == 0)
+            return;
+
+        userVec3Buffers = cudaAllocateVx(DataBuffer<vec3f>, n);
+        for(int i = 0; i < n; i++)
+            userVec3Buffers[i].SetSize(count);
+
+        userVec3Count = n;
     }
 
     template<typename S> S *GetRawData(DataBuffer<S> buffer, int where){
@@ -221,14 +240,16 @@ class ParticleSet{
     void SetData(T *pos, T *vel, T *force, int n)
     {
         positions.SetData(pos, n); velocities.SetData(vel, n);
-        forces.SetData(force, n); densities.SetSize(n);
-        pressures.SetSize(n); chainNodes.SetSize(n);
-        chainAuxNodes.SetSize(n); v0s.SetSize(n);
-        normals.SetSize(n); buckets.SetSize(n);
+        forces.SetData(force, n);  densities.SetSize(n);
+        pressures.SetSize(n);      chainNodes.SetSize(n);
+        chainAuxNodes.SetSize(n);  v0s.SetSize(n);
+        normals.SetSize(n);        buckets.SetSize(n);
         count = n;
         radius = 1e-3;
         mass = 1e-3;
         familyId = 0;
+        userVec3Buffers = nullptr;
+        userVec3Count = 0;
     }
 
     void SetExtendedData(){
@@ -351,6 +372,18 @@ class ParticleSet{
     bb_cpu_gpu void SetParticleV0(int pId, Float v0){
         AssertA(pId < count && pId >= 0, "Invalid set for particle v0s");
         v0s.Set(v0, pId);
+    }
+
+    bb_cpu_gpu vec3f GetParticleUserBufferVec3(int pId, int bufId){
+        AssertA(pId < count && pId >= 0, "Invalid set for particle user vec3");
+        AssertA(bufId >= 0 && bufId < userVec3Count, "Invalid buffer id for vec3 buffer");
+        return userVec3Buffers[bufId].At(pId);
+    }
+
+    bb_cpu_gpu void SetParticleUserBufferVec3(int pId, vec3f value, int bufId){
+        AssertA(pId < count && pId >= 0, "Invalid set for particle user vec3");
+        AssertA(bufId >= 0 && bufId < userVec3Count, "Invalid buffer id for vec3 buffer");
+        userVec3Buffers[bufId].Set(value, pId);
     }
 };
 

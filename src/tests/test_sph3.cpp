@@ -24,6 +24,17 @@ void simple_color(float *pos, float *col, ParticleSet3 *pSet){
     }
 }
 
+void set_particle_color(float *pos, float *col, ParticleSet3 *pSet){
+    int count = pSet->GetParticleCount();
+    for(int i = 0; i < count; i++){
+        vec3f pi = pSet->GetParticlePosition(i);
+        vec3f rgb = pSet->GetParticleUserBufferVec3(i, 0);
+        pos[3 * i + 0] = pi.x; pos[3 * i + 1] = pi.y;
+        pos[3 * i + 2] = pi.z; col[3 * i + 0] = rgb.x;
+        col[3 * i + 1] = rgb.y; col[3 * i + 2] = rgb.z;
+    }
+}
+
 void test_sph3_double_dam_break(){
     printf("===== SPH Solver 3D -- Double Dam Break\n");
     vec3f origin(1, 2, 0);

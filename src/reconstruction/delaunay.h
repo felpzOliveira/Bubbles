@@ -8,6 +8,17 @@
 #include <sph_solver.h>
 #include <statics.h>
 
+/*
+* NOTE: We have to include the interior particles otherwise we could generate
+* incorrect geometry in the interior. While this geometry would not break the surface
+* and it makes the algorithm runs faster it will generate a larger error on the
+* Hausdorff computation. It also affects the shape of the mesh with regards to the
+* weizenbock quality. So it is kinda of a trade-off, do you want faster computation
+* with smaller memory footprint even if there are some incorrect geometry in the
+* interior of the mesh and possibly some lower quality triangles?
+*/
+#define DELAUNAY_WITH_INTERIOR
+
 struct DelaunayTriangleInfo{
     vec3ui tri;
     int opp;

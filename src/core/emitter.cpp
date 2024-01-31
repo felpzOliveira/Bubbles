@@ -1,5 +1,6 @@
 #include <emitter.h>
 #include <statics.h>
+#include <collider.h>
 
 vec2f ZeroVelocityField2(const vec2f &p){ return vec2f(0); }
 vec3f ZeroVelocityField3(const vec3f &p){ return vec3f(0); }
@@ -115,6 +116,12 @@ void VolumeParticleEmitter2::Emit(ContinuousParticleSetBuilder2 *Builder,
     _Emit<ContinuousParticleSetBuilder2>(Builder, this, velocity);
 }
 
+void VolumeParticleEmitter2::Emit(ProgressiveParticleSetBuilder2 *Builder,
+                                  const std::function<vec2f(const vec2f &)> &velocity)
+{
+    _Emit<ProgressiveParticleSetBuilder2>(Builder, this, velocity);
+}
+
 void VolumeParticleEmitter2::Emit(ParticleSetBuilder<vec2f> *Builder,
                                   const std::function<vec2f(const vec2f &)> &velocity)
 {
@@ -161,6 +168,15 @@ void VolumeParticleEmitterSet2::SetJitter(Float jitter){
 }
 
 void VolumeParticleEmitterSet2::Emit(ContinuousParticleSetBuilder2 *Builder,
+                                     const std::function<vec2f(const vec2f &)> &velocity)
+{
+    AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
+    for(int i = 0; i < emitters.size(); i++){
+        emitters[i]->Emit(Builder, velocity);
+    }
+}
+
+void VolumeParticleEmitterSet2::Emit(ProgressiveParticleSetBuilder2 *Builder,
                                      const std::function<vec2f(const vec2f &)> &velocity)
 {
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet2::Emit");
@@ -219,6 +235,11 @@ isOneShot(isOneShot), allowOverlapping(allowOverlapping)
     generator = new BccLatticePointGenerator();
     emittedParticles = 0;
     withValidator = 0;
+    // NOTE: Adding a SDF generator as it is more stable than ray tracing. Seems
+    //       like we need a better ray tracing routine!
+    if(shape->type == ShapeMesh && shape->grid == nullptr){
+        GenerateShapeSDF(shape);
+    }
 }
 
 void
@@ -240,7 +261,22 @@ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
     TimerList timers;
     Float maxJitter = 0.5 * emitter->jitter * emitter->spacing;
     int numNewParticles = 0;
-    bool isSdf = emitter->shape->CanSolveSdf();
+    // 1 - call SignedDistance for point target
+    // 2 - call grid->Sample for point target
+    // 0 - fall back into mesh sampling
+    // need to do this because calling SignedDistance if the shape supports
+    // sdf and is a mesh will trigger Sample and BVHQuery and therefore take
+    // ages to emit all particles.
+    int sdfFlag = emitter->shape->CanSolveSdf() ? 1 : 0;
+
+    if(sdfFlag == 0 && emitter->shape->grid){
+        sdfFlag = emitter->shape->grid->Filled() != 0 ? 2 : 0;
+    }
+
+    if(sdfFlag == 0){
+        printf("[Warning] Shape does not support SDF query.\n"
+               "          Emittion can generate unstable particles.\n");
+    }
 
     if(emitter->isOneShot){
         auto Accept = [&](const vec3f &point) -> bool{
@@ -252,8 +288,11 @@ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
             vec3f randomDir = SampleSphere(u);
             vec3f offset = maxJitter * randomDir;
             vec3f target = point + offset;
-            if(isSdf){
-                if(emitter->shape->SignedDistance(target) <= 0){
+            if(sdfFlag > 0){
+                Float signedDistance = sdfFlag == 1 ?
+                                emitter->shape->SignedDistance(target) :
+                                emitter->shape->grid->Sample(target);
+                if(signedDistance <= 0){
                     if(emitter->emittedParticles < emitter->maxParticles){
                         vec3f vel = velocity(target) + emitter->initVel;
                         if(Builder->AddParticle(target, vel)){
@@ -269,7 +308,13 @@ void _Emit(ParticleBuilder3 *Builder, VolumeParticleEmitter3 *emitter,
             }else{
                 /*
                 * If the Shape does not provide a SDF map, perform Ray Tracing
-                * for detecting interior points, for meshes only.
+                * for detecting interior points, for meshes only and the mesh should
+                * instead use GenerateShapeSDF(...) and avoid doing this. This is more
+                * memory efficient but ray tracing the mesh might generate unstable
+                * hits depending on the size of mesh and the tightness of the
+                * intersection routine. We do not do perfect tight ray tracing here.
+                * It is more of a life guard here just so that we don't actually have
+                * to stop simulation.
                 */
                 if(MeshIsPointInside(target, emitter->shape, emitter->bound)){
                     if(emitter->emittedParticles < emitter->maxParticles){
@@ -303,6 +348,12 @@ void VolumeParticleEmitter3::Emit(ContinuousParticleSetBuilder3 *Builder,
                                   const std::function<vec3f(const vec3f &)> &velocity)
 {
     _Emit<ContinuousParticleSetBuilder3>(Builder, this, velocity);
+}
+
+void VolumeParticleEmitter3::Emit(ProgressiveParticleSetBuilder3 *Builder,
+                                  const std::function<vec3f(const vec3f &)> &velocity)
+{
+    _Emit<ProgressiveParticleSetBuilder3>(Builder, this, velocity);
 }
 
 void VolumeParticleEmitter3::Emit(ParticleSetBuilder<vec3f> *Builder,
@@ -360,6 +411,15 @@ void VolumeParticleEmitterSet3::SetJitter(Float jitter){
 }
 
 void VolumeParticleEmitterSet3::Emit(ContinuousParticleSetBuilder3 *Builder,
+                                     const std::function<vec3f(const vec3f &)> &velocity)
+{
+    AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::Emit");
+    for(int i = 0; i < emitters.size(); i++){
+        emitters[i]->Emit(Builder, velocity);
+    }
+}
+
+void VolumeParticleEmitterSet3::Emit(ProgressiveParticleSetBuilder3 *Builder,
                                      const std::function<vec3f(const vec3f &)> &velocity)
 {
     AssertA(emitters.size() > 0, "No Emitter given for VolumeParticleEmitterSet3::Emit");

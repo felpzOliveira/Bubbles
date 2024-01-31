@@ -134,6 +134,7 @@ void test_pcisph3_rotating_water_box();
 void test_pcisph3_water_box_forward();
 void test_pcisph3_dam_break_double_dragon();
 void test_pcisph3_box_mesh();
+void test_pcisph3_progressive();
 
 void test_pbf2_double_dam_break();
 

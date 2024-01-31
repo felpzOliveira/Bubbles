@@ -11,9 +11,25 @@ SphParticleSet2 *SphParticleSet2FromBuilder(ParticleSetBuilder2 *builder){
 }
 
 SphParticleSet2 *SphParticleSet2FromContinuousBuilder(ContinuousParticleSetBuilder2 *builder){
-    AssertA(builder, "Invalid builder pointer for SphParticleSet2FromBuilder");
+    AssertA(builder, "Invalid builder pointer for SphParticleSet2FromContinuousBuilder");
     ParticleSet2 *pSet = builder->GetParticleSet();
     SphParticleSet2 *sphSet = cudaAllocateVx(SphParticleSet2, 1);
+    sphSet->SetParticleData(pSet);
+    return sphSet;
+}
+
+SphParticleSet2 *SphParticleSet2FromProgressiveBuilder(ProgressiveParticleSetBuilder2 *builder){
+    AssertA(builder, "Invalid builder pointer for SphParticleSet2FromProgressiveBuilder");
+    ParticleSet2 *pSet = builder->GetParticleSet();
+    SphParticleSet2 *sphSet = cudaAllocateVx(SphParticleSet2, 1);
+    sphSet->SetParticleData(pSet);
+    return sphSet;
+}
+
+SphParticleSet3 *SphParticleSet3FromProgressiveBuilder(ProgressiveParticleSetBuilder3 *builder){
+    AssertA(builder, "Invalid builder pointer for SphParticleSet3FromBuilder");
+    ParticleSet3 *pSet = builder->GetParticleSet();
+    SphParticleSet3 *sphSet = cudaAllocateVx(SphParticleSet3, 1);
     sphSet->SetParticleData(pSet);
     return sphSet;
 }

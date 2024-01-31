@@ -164,7 +164,7 @@ void QuaternionSequence::AddQuaternion(const Quaternion &q1, const Float &t){
 }
 
 void QuaternionSequence::AddQuaternion(const Float &angle, const vec3f &axis,
-                                                const Float &t)
+                                       const Float &t)
 {
     Transform rot = Rotate(angle, axis);
     scopeStart = Min(scopeStart, t);

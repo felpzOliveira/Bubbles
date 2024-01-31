@@ -218,9 +218,10 @@ bb_cpu_gpu Float Shape::ClosestDistance(const vec3f &point) const{
         } break;
 
         case ShapeType::ShapeSDF:{
-            ClosestPointQuery query;
-            ClosestPointBySDF(point, &query);
-            return query.signedDistance;
+            return grid->Sample(point);
+            //ClosestPointQuery query;
+            //ClosestPointBySDF(point, &query);
+            //return query.signedDistance;
         } break;
 
         default:{
@@ -355,7 +356,7 @@ bb_cpu_gpu vec3f GenerateMinimalRayDirection(const vec3f &origin, const Bounds3f
 }
 
 bb_cpu_gpu bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
-                                    const Bounds3f &bounds)
+                                  const Bounds3f &bounds)
 {
     int hits = 0;
     bool hit_anything = false;
@@ -369,6 +370,29 @@ bb_cpu_gpu bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
         if(hit_anything){
             ray = SpawnRayInDirection(isect, ray.d);
             hits++;
+        }
+    }while(hit_anything);
+
+    return (hits % 2 != 0 && hits > 0);
+}
+
+bb_cpu_gpu bool MeshIsPointInsideBounded(const vec3f &point, Shape *meshShape,
+                                         const Bounds3f &bounds, Bounds3f cutBounds)
+{
+    int hits = 0;
+    bool hit_anything = false;
+    vec3f direction = GenerateMinimalRayDirection(point, bounds);
+    Ray ray(point, direction);
+
+    do{
+        SurfaceInteraction isect;
+        Float tHit = 0;
+        hit_anything = meshShape->Intersect(ray, &isect, &tHit);
+        if(hit_anything){
+            if(!Inside(isect.p, cutBounds))
+                hits++;
+
+            ray = SpawnRayInDirection(isect, ray.d);
         }
     }while(hit_anything);
 
@@ -414,7 +438,7 @@ bb_kernel void CreateShapeSDFGPU2D(Shape2 *shape){
 }
 
 bb_cpu_gpu bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p,
-                                         Float radius, Float offset)
+Float radius, Float offset)
 {
     if(meshShape == nullptr) return false;
     if(meshShape->grid == nullptr) return false;
@@ -441,10 +465,10 @@ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
 
     shape->grid = cudaAllocateVx(FieldGrid2f, 1);
     shape->grid->Build(vec2ui(resolution, resolutionY), vec2f(dx),
-                       bounds.pMin, VertexCentered);
+    bounds.pMin, VertexCentered);
 
     printf("Generating SDF for shape: [%d x %d] ... ",
-           resolution, resolutionY);
+    resolution, resolutionY);
 
     GPULaunch(shape->grid->total, CreateShapeSDFGPU2D, shape);
     shape->grid->MarkFilled();
@@ -454,7 +478,7 @@ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
 void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
     //TODO: Update grid if already exists
     int resolution = 0;
-    dx = 0.005;
+    //dx = 0.005;
     Bounds3f bounds = shape->GetBounds();
     vec3f scale(bounds.ExtentOn(0), bounds.ExtentOn(1), bounds.ExtentOn(2));
     bounds.pMin -= margin * scale;
@@ -472,12 +496,66 @@ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
 
     shape->grid = cudaAllocateVx(FieldGrid3f, 1);
     shape->grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx),
-                       bounds.pMin, VertexCentered);
+                              bounds.pMin, VertexCentered);
 
     printf("Generating SDF for shape %s: [%d x %d x %d] ... ",
-           shape->mesh->name, resolution, resolutionY, resolutionZ);
+    shape->mesh->name, resolution, resolutionY, resolutionZ);
 
     GPULaunch(shape->grid->total, CreateShapeSDFGPU, shape);
     shape->grid->MarkFilled();
     printf("OK\n");
 }
+
+void CutShapeSDF(Shape *shape, Bounds3f bounds, void **scratch){
+    if(!shape->grid || !shape->grid->Filled()){
+        printf("Shape is not filled, cannot cut\n");
+        return;
+    }
+
+    vec4f *refPoints = (vec4f *)*scratch;
+    if(!refPoints){
+        refPoints = cudaAllocateVx(vec4f, shape->grid->total);
+    }
+
+    printf("Cutting SDF for shape %s ... ", shape->mesh->name);
+    fflush(stdout);
+#if 1
+    shape->UpdateSDF(GPU_LAMBDA(vec3f point, Shape *cShape, int index) -> Float{
+        ClosestPointQuery query;
+        Float sdf = cShape->grid->Sample(point);
+        cShape->ClosestPointBySDF(point, &query);
+        refPoints[index] = vec4f(query.point.x, query.point.y, query.point.z, sdf);
+        return sdf;
+    });
+
+    shape->UpdateSDF(GPU_LAMBDA(vec3f point, Shape *cShape, int index) -> Float{
+        ParsedMesh *mesh = cShape->mesh;
+        Node *bvh = cShape->bvh;
+        int closestId = -1;
+        Float currSdf = refPoints[index].w;
+        vec3f qPoint(refPoints[index].x, refPoints[index].y, refPoints[index].z);
+        Float sign = 1.f;
+        bool insideBox = InsideExclusive(point, bounds);
+
+        // NOTE: This is not correct. However it is very good as it generates imperfections
+        //       in the lower cut plane and prevents particles from being smashed as if
+        //       their falling into the ground. It is kinda sus but very interesting result
+        if(!InsideExclusive(qPoint, bounds)){
+            return currSdf;
+        }
+
+        if(currSdf < 0 && !insideBox)
+            sign = -1.f;
+
+        Float dist = BVHMeshBoundedClosestDistance(point, &closestId, mesh, bvh, bounds);
+        Float psd = Max(Absf(dist), 0.00001);
+        return sign * psd;
+    });
+#else
+    GPULaunch(shape->grid->total, CreateShapeSDFGPU, shape);
+#endif
+    printf("OK\n");
+
+    *scratch = refPoints;
+}
+

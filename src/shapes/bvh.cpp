@@ -374,7 +374,7 @@ bb_cpu_gpu Float DistanceMeshNode(const vec3f &point, ParsedMesh *mesh, Node *no
                                   int *handle)
 {
     Assert(node->n > 0 && node->is_leaf && node->handles);
-    Float distance = Infinity;
+    Float distance = SqrtInfinity;
     for(int i = 0; i < node->n; i++){
         int nTri = node->handles[i].handle;
         Float d = DistanceTriangle(point, nTri, mesh);
@@ -387,7 +387,109 @@ bb_cpu_gpu Float DistanceMeshNode(const vec3f &point, ParsedMesh *mesh, Node *no
     return distance;
 }
 
+bb_cpu_gpu
+inline bool IsTriangleInside(ParsedMesh *mesh, int triNum, Bounds3f bounds){
+    int i0 = mesh->indices[3 * triNum + 0].x;
+    int i1 = mesh->indices[3 * triNum + 1].x;
+    int i2 = mesh->indices[3 * triNum + 2].x;
+    vec3f a = mesh->p[i0];
+    vec3f b = mesh->p[i1];
+    vec3f c = mesh->p[i2];
+
+    return InsideExclusive(a, bounds) ||
+           InsideExclusive(b, bounds) ||
+           InsideExclusive(c, bounds);
+}
+
+bb_cpu_gpu Float DistanceMeshNodeBounded(const vec3f &point, ParsedMesh *mesh, Node *node,
+                                         int *handle, Bounds3f bounds)
+{
+    Assert(node->n > 0 && node->is_leaf && node->handles);
+    Float distance = SqrtInfinity;
+    for(int i = 0; i < node->n; i++){
+        int nTri = node->handles[i].handle;
+        if(IsTriangleInside(mesh, nTri, bounds))
+            continue;
+
+        Float d = DistanceTriangle(point, nTri, mesh);
+        if(d < distance){
+            distance = d;
+            *handle = nTri;
+        }
+    }
+
+    return distance;
+}
+
 #define MAX_STACK_SIZE 256
+bb_cpu_gpu Float BVHMeshBoundedClosestDistance(const vec3f &point, int *closest,
+                                         ParsedMesh *mesh, Node *bvh, Bounds3f bounds)
+{
+    NodePtr stack[MAX_STACK_SIZE];
+    NodePtr *stackPtr = stack;
+    Float closestDistance = SqrtInfinity;
+    NodePtr node = bvh;
+    int tmpClosest = -1;
+
+    *stackPtr++ = NULL;
+
+    while(node != nullptr){
+        if(node->is_leaf){
+            Float distance = DistanceMeshNodeBounded(point, mesh, node,
+                                                     &tmpClosest, bounds);
+            if(distance < closestDistance){
+                closestDistance = distance;
+                *closest = tmpClosest;
+            }
+
+            node = *--stackPtr;
+
+        }else{
+            const Float closestDistance2 = closestDistance * closestDistance;
+            NodePtr childL = node->left;
+            NodePtr childR = node->right;
+            Float leftDist2 = Infinity;
+            Float rightDist2 = Infinity;
+            bool shouldVisitLeft  = !Inside(childL->bound, bounds);
+            bool shouldVisitRight = !Inside(childR->bound, bounds);
+
+            if(shouldVisitLeft){
+                vec3f closestLeft  = childL->bound.Clamped(point);
+                leftDist2 = SquaredDistance(closestLeft, point);
+                shouldVisitLeft  = leftDist2  < closestDistance2;
+            }
+
+            if(shouldVisitRight){
+                vec3f closestRight = childR->bound.Clamped(point);
+                rightDist2 = SquaredDistance(closestRight, point);
+                shouldVisitRight = rightDist2 < closestDistance2;
+            }
+
+            if(shouldVisitLeft && shouldVisitRight){
+                NodePtr firstChild = nullptr, secondChild = nullptr;
+                if(leftDist2 < rightDist2){
+                    firstChild = childL;
+                    secondChild = childR;
+                }else{
+                    firstChild = childR;
+                    secondChild = childL;
+                }
+
+                *stackPtr++ = secondChild;
+                node = firstChild;
+            }else if(shouldVisitRight){
+                node = childR;
+            }else if(shouldVisitLeft){
+                node = childL;
+            }else{
+                node = *--stackPtr;
+            }
+        }
+    }
+
+    return closestDistance;
+}
+
 bb_cpu_gpu Float BVHMeshClosestDistance(const vec3f &point, int *closest,
                                         ParsedMesh *mesh, Node *bvh)
 {

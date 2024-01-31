@@ -193,7 +193,7 @@ class Shape{
         GPUParallelLambda("Shape SDF", grid->total, GPU_LAMBDA(int index){
             vec3ui u = DimensionalIndex(index, grid->resolution, 3);
             vec3f p = grid->GetDataPosition(u);
-            Float distance = sdf(p, this);
+            Float distance = sdf(p, this, index);
             grid->SetValueAt(distance, u);
         });
     }
@@ -229,7 +229,7 @@ class Shape{
         printf("OK\n");
     }
 
-    private:
+    public:
     ///////////////////////
     // SPHERE functions
     ///////////////////////
@@ -305,6 +305,29 @@ bb_cpu_gpu bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
 
 bb_cpu_gpu bool MeshShapeIsPointInside(Shape *meshShape, const vec3f &p,
                                        Float radius, Float offset=0.0f);
+
+bb_cpu_gpu Float BVHMeshBoundedClosestDistance(const vec3f &point, int *closest,
+                                         ParsedMesh *mesh, Node *bvh, Bounds3f bounds);
+
+void CutShapeSDF(Shape *shape, Bounds3f bounds, void **scratch);
+
+template<typename F>
+FieldGrid3f *UpdatedSDFToOther(FieldGrid3f *field, FieldGrid3f *other, F updateFn){
+    FieldGrid3f *ptr = other;
+    if(ptr == nullptr){
+        ptr = cudaAllocateVx(FieldGrid3f, 1);
+        ptr->Build(field->resolution, field->spacing, field->minPoint, field->type);
+    }
+
+    GPUParallelLambda("UpdateTo", ptr->total, GPU_LAMBDA(int index){
+        vec3ui u = DimensionalIndex(index, ptr->resolution, 3);
+        vec3f p = ptr->GetDataPosition(u);
+        Float distance = updateFn(p, field, index);
+        ptr->SetValueAt(distance, u);
+    });
+
+    return ptr;
+}
 
 // TODO: Is this busted? see surface.cpp build for zhu-bridson and this one,
 //       this routine only samples p.y > 0 ??? marching cubes issues?

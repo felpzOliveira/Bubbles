@@ -12,9 +12,149 @@
 #include <transform_sequence.h>
 #include <sdfs.h>
 #include <dilts.h>
+#include <marching_cubes.h>
 
 #define MODELS_PATH "/home/felpz/Documents/CGStuff/models/"
 #define SIM_PATH "/home/felpz/Documents/Bubbles/simulations/"
+
+void set_particle_color(float *pos, float *col, ParticleSet3 *pSet);
+
+void test_pcisph3_prog(){
+    printf("===== PCISPH Solver 3D -- Prog\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    const char *meshPath = "/home/felpz/Documents/CGStuff/models/head.obj";
+    ParsedMesh *pmesh = LoadObj(meshPath);
+    //ParsedMesh *umesh = LoadObj("test_mesh.ply");
+
+    vec3f origin(3.5f);
+    vec3f target(0.0f);
+    vec3f containerSize(5.0, 6.0, 4.5);
+    Float spacing = 0.05;
+    Float spacingScale = 1.8;
+
+    Transform translate = Translate(-0.05845f, 0.83603, -0.9496f);
+    Transform scale  = Scale(10);
+
+    Shape *container = MakeBox(Transform(), containerSize, true);
+    Shape *headShape = MakeMesh(pmesh, translate * scale);
+    //Shape *colShape = MakeMesh(umesh, Transform());
+    GenerateShapeSDF(headShape, 0.01, 0.01);
+
+    ColliderSetBuilder3 cBuilder;
+    cBuilder.AddCollider3(headShape);
+    cBuilder.AddCollider3(container);
+
+    const int maxParticles = 5.0 * kDefaultMaxParticles;
+    ProgressiveParticleSetBuilder3 tmpBuilder(maxParticles), pBuilder(maxParticles);
+    VolumeParticleEmitterSet3 emitterSet;
+    emitterSet.AddEmitter(headShape, spacing);
+
+    tmpBuilder.SetKernelRadius(spacing * spacingScale);
+    pBuilder.SetKernelRadius(spacing * spacingScale);
+
+    ColliderSet3 *colliders = cBuilder.GetColliderSet();
+    emitterSet.Emit(&tmpBuilder);
+
+    // TODO: The container for the object needs to have the same extension
+    //       the domain has, otherwise coordinates get into different spaces and we cant
+    //       correctly clip. Fix this, as it is a massive waste.
+    Grid3 *headGrid = UtilBuildGridForDomain(container->GetBounds(),
+                                             spacing, spacingScale);
+    Grid3 *domainGrid = UtilBuildGridForDomain(container->GetBounds(),
+                                               spacing, spacingScale);
+
+    SphParticleSet3 *tmpSphSet = SphParticleSet3FromProgressiveBuilder(&tmpBuilder);
+    SphParticleSet3 *sphSet  = SphParticleSet3FromProgressiveBuilder(&pBuilder);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+
+    ResetAndDistribute(headGrid, tmpSphSet->GetParticleSet());
+    ResetAndDistribute(domainGrid, sphSet->GetParticleSet());
+
+    pBuilder.MapGrid(domainGrid);
+    tmpBuilder.MapGrid(headGrid);
+
+    Bounds3f lBounds = domainGrid->GetBounds();
+    vec3f lower = vec3f(-10.0, 0.0f, -10.0f);
+    vec3f upper = vec3f(10.0, 10.0, 10.0);
+    Bounds3f cutBounds(lower, upper);
+    void *scratch = nullptr;
+
+    CutShapeSDF(headShape, cutBounds, &scratch);
+
+    std::vector<vec3f> particles;
+    UtilGetSDFParticles(headShape->grid, &particles, 0, spacing/2.0);
+
+    lower.y += 5.0 * spacing;
+
+    FieldGrid3f *grid = headShape->grid;
+    HostTriangleMesh3 mesh;
+
+    printf("Running Marching Cubes\n");
+    MarchingCubes(grid, &mesh, 0.f, false);
+
+    mesh.writeToDisk("test_mesh.ply", FORMAT_OBJ);
+
+    tmpBuilder.MapGridEmitToOther(&pBuilder, ZeroVelocityField3, Bounds3f(lower, upper));
+
+    PciSphSolver3 solver;
+    solver.Initialize(DefaultSphSolverData3());
+    solver.Setup(WaterDensity, spacing, spacingScale, domainGrid, sphSet);
+    solver.SetColliders(colliders);
+
+    pSet->SetUserVec3Buffer(1);
+    for(int i = 0; i < pSet->GetParticleCount(); i++){
+        vec3f p = pSet->GetParticlePosition(i);
+        if(p.x > 0)
+            pSet->SetParticleUserBufferVec3(i, vec3f(1,0,0), 0);
+        else
+            pSet->SetParticleUserBufferVec3(i, vec3f(0,1,0), 0);
+    }
+
+    Assure(UtilIsDistributionConsistent(pSet, domainGrid) == 1);
+    Float targetInterval =  1.0 / 240.0;
+
+    int count = pSet->GetParticleCount() + particles.size();
+    float *pos = new float[count * 3];
+    float *col = new float[count * 3];
+
+    memset(col, 0, sizeof(float) * 3 * count);
+    graphy_vector_set(origin, target);
+    set_particle_color(pos, col, pSet);
+
+    int it = 0;
+    for(int i = pSet->GetParticleCount(); i < count; i++){
+        vec3f pi = particles[it++];
+        pos[3 * i + 0] = pi.x; pos[3 * i + 1] = pi.y;
+        pos[3 * i + 2] = pi.z; col[3 * i + 2] = 1;
+    }
+
+    graphy_render_points3f(pos, col, count, spacing/2.0);
+    printf("Waiting...\n");
+    getchar();
+
+    int frame_index = 0;
+    while(true){
+        solver.Advance(targetInterval);
+        set_particle_color(pos, col, pSet);
+        graphy_render_points3f(pos, col, count, spacing/2.0);
+
+        printf("CurrentFrame= %d\n", frame_index);
+        if(frame_index == 65 || frame_index == 75 || frame_index == 90 ||
+           frame_index == 100)
+        {
+            std::string path("out_");
+            path += std::to_string(frame_index);
+            path += ".txt";
+            SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
+                                            SERIALIZER_POSITION);
+        }
+        frame_index += 1;
+    }
+
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
 
 void test_pcisph3_box_drop(){
     printf("===== PCISPH Solver 3D -- Box Drop\n");
@@ -126,7 +266,7 @@ void test_pcisph3_water_box_forward(){
     Shape *baseWaterShape = MakeBox(Translate(0, -yof, 0), waterBox);
 
     ///////////////////////////////////////////////////////////////////////
-    auto sdfCompute = GPU_LAMBDA(vec3f point, Shape *shape) -> Float{
+    auto sdfCompute = GPU_LAMBDA(vec3f point, Shape *shape, int index) -> Float{
         return 1;
     };
 
@@ -833,7 +973,7 @@ void test_pcisph3_emit_test(){
 void test_pcisph3_dissolve(){
     printf("===== PCISPH Solver 3D -- Dissolve\n");
     CudaMemoryManagerStart(__FUNCTION__);
-    vec3f origin(0, 1, -15);
+    vec3f origin(0, 1, -8);
     vec3f target(0, -0.5, 0);
     Float spacingScale = 2.0;
     vec3f boxSize(2.5, 3.0, 2.5);
@@ -1688,7 +1828,7 @@ void test_pcisph3_box_mesh(){
     Shape *shape = MakeMesh(mesh, Translate(0, 0.354285, 0) * baseScale);
 #else
     Bounds3f bounds(vec3f(-1), vec3f(1));
-    Shape *shape = MakeSDFShape(bounds, GPU_LAMBDA(vec3f point, Shape *) -> Float{
+    Shape *shape = MakeSDFShape(bounds, GPU_LAMBDA(vec3f point, Shape *, int) -> Float{
         auto boxSDF = [](vec3f p) -> Float{
             vec3f r(0.1);
             vec3f q = Abs(p) - r;

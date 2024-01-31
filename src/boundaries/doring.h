@@ -76,7 +76,7 @@ inline bb_cpu_gpu Float ComputeMinEigenvalue(const Matrix2x2 &m){
 * In the original paper there is nothing talking about λ = 0,
 * it makes sense since this implies det(A) = 0 and A not invertible
 * but since the formulation is based on the fact that it is
-* possible to invert the renormalization matrix I'll won't return
+* possible to invert the renormalization matrix I won't return
 * 0 here.
 */
 inline bb_cpu_gpu Float ComputeMinEigenvalueZero(const Matrix2x2 &m){

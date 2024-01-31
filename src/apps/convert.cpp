@@ -9,6 +9,8 @@
 #include <graphy.h>
 #include <memory.h>
 #include <util.h>
+#include <cstdlib>
+#include <ctime>
 
 // To generate whale mesh use:
 //    ./bbtool convert -in HappyWhale.obj -scale 0.3 -spacing 0.02
@@ -259,7 +261,6 @@ std::map<const char *, arg_desc> argument_map = {
     },
 };
 
-
 void PreviewParticles(SphParticleSet3 *sphSet, config_opts *opts){
     vec3f at = opts->origin;
     vec3f to = opts->target;
@@ -271,13 +272,17 @@ void PreviewParticles(SphParticleSet3 *sphSet, config_opts *opts){
 
     memset(col, 0x00, 3 * pCount * sizeof(float));
     for(int i = 0; i < pCount; i++){
+        vec3f ci = vec3f(1,0,0);
         vec3f pi = pSet->GetParticlePosition(i);
+        if(pi.x < 0)
+            ci = vec3f(0,1,0);
         pos[it++] = pi.x; pos[it++] = pi.y;
-        pos[it++] = pi.z; col[3 * i + 0] = 1;
+        pos[it++] = pi.z; col[3 * i + 0] = ci.x;
+        col[3 * i + 1] = ci.y; col[3 * i + 2] = ci.z;
     }
 
     graphy_set_3d(at.x, at.y, at.z, to.x, to.y, to.z, 45.0, 0.1f, 100.0f);
-    graphy_render_points3f(pos, col, pCount, 0.012);
+    graphy_render_points3f(pos, col, pCount, opts->spacing * 0.5);
 
     std::cout << "Press anything ... " << std::flush;
     getchar();
@@ -398,8 +403,12 @@ void MeshToParticles(const char *name, const Transform &transform,
     ParsedMesh *mesh = LoadObj(name);
 
     Shape *shape = MakeMesh(mesh, transform);
+    GenerateShapeSDF(shape, 0.01, 0.01);
+    //shape->type = ShapeType::ShapeSDF;
+
     ParticleSetBuilder3 builder;
-    VolumeParticleEmitter3 emitter(shape, shape->GetBounds(), spacing);
+    VolumeParticleEmitterSet3 emitter;
+    emitter.AddEmitter(shape, spacing);
 
     emitter.Emit(&builder);
 

@@ -242,7 +242,7 @@ bb_cpu_gpu bool ColliderSet3::ResolveCollision(Float radius, Float restitutionCo
     int targetCollider = -1;
     Float minDistance = Infinity;
     for(int i = 0; i < nColiders; i++){
-        if(colliders[i]->OptmizedClosestPointCheck(*position)){
+        if(colliders[i]->isActive && colliders[i]->OptmizedClosestPointCheck(*position)){
             Float distance = Absf(colliders[i]->shape->ClosestDistance(*position));
             if(distance < minDistance){
                 targetCollider = i;
@@ -258,7 +258,7 @@ bb_cpu_gpu bool ColliderSet3::ResolveCollision(Float radius, Float restitutionCo
     }
 
     AssertA(targetCollider >= 0 && targetCollider < nColiders,
-            "Invalid collider id for ColliderSet2::ResolveCollision");
+            "Invalid collider id for ColliderSet3::ResolveCollision");
     return colliders[targetCollider]->ResolveCollision(radius, restitutionCoefficient,
                                                        position, velocity);
 }
@@ -340,7 +340,7 @@ Collider2 *MakeCollider2(Shape2 *shape, Float frictionCoef){
 Collider3 *MakeCollider3(Shape *shape, Float frictionCoef){
     Collider3 *collider = cudaAllocateVx(Collider3, 1);
     collider->Initialize(shape, frictionCoef);
-    if(shape->type == ShapeMesh){
+    if(shape->type == ShapeMesh && shape->grid == nullptr){
         // make sure this mesh has SDF otherwise we can't collide
         GenerateShapeSDF(shape);
     }

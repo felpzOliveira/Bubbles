@@ -194,6 +194,72 @@ void test_pcisph2_water_block(){
     printf("===== OK\n");
 }
 
+///////////////////////////////////////////////////////////////////////////////
+void test_pcisph2_progressive_emitter(){
+    printf("===== PCISPH Solver 2D -- Progressive Emitter\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    PciSphSolver2 solver;
+    Float spacing = 0.01;
+    Float spacingScale = 2.0;
+    Float targetDensity = WaterDensity;
+    vec2f center(0,0);
+    Float lenc = 2;
+
+    vec2f pMin, pMax;
+    Bounds2f containerBounds;
+    ColliderSetBuilder2 colliderBuilder;
+    ProgressiveParticleSetBuilder2 builder;
+
+    int reso = (int)std::floor(lenc / (spacing * 2.0));
+    printf("Using grid with resolution %d x %d\n", reso, reso);
+
+    vec2ui res(reso, reso);
+    Shape2 *rect = MakeRectangle2(Translate2(center.x, center.y+0.45), vec2f(1));
+    Shape2 *block = MakeSphere2(Translate2(center.x, center.y-0.3), 0.2);
+    Shape2 *container = MakeRectangle2(Translate2(center.x, center.y), vec2f(lenc), true);
+
+    containerBounds = container->GetBounds();
+    pMin = containerBounds.pMin - 4.0 * vec2f(spacing);
+    pMax = containerBounds.pMax + 4.0 * vec2f(spacing);
+
+    VolumeParticleEmitter2 emitter(rect, rect->GetBounds(), spacing);
+    emitter.Emit(&builder);
+
+    SphParticleSet2 *sphSet = SphParticleSet2FromProgressiveBuilder(&builder);
+    ParticleSet2 *set2 = sphSet->GetParticleSet();
+    int count = set2->GetParticleCount();
+
+    Grid2 *grid = MakeGrid(res, pMin, pMax);
+    colliderBuilder.AddCollider2(block);
+    colliderBuilder.AddCollider2(container);
+    ColliderSet2 *collider = colliderBuilder.GetColliderSet();
+
+    solver.Initialize(DefaultSphSolverData2());
+    solver.SetViscosityCoefficient(0.04);
+    solver.Setup(targetDensity, spacing, spacingScale, grid, sphSet);
+    solver.SetColliders(collider);
+
+    Float targetInterval = 1.0 / 240.0;
+
+    SphSolverData2 *data = solver.GetSphSolverData();
+
+    auto onStepUpdate = [&](int step) -> int{ return 1; };
+
+    auto colorFunction = [&](float *colors, int pCount) -> void{
+        (void)pCount;
+        set_colors_lnm(colors, data, 0, 0);
+    };
+
+    UtilRunSimulation2<PciSphSolver2, ParticleSet2>(&solver, set2, spacing,
+                                                    vec2f(-1, -1), vec2f(1, 1),
+                                                    targetInterval, onStepUpdate,
+                                                    colorFunction);
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+///////////////////////////////////////////////////////////////////////////////
+
 void test_pcisph2_continuous_emitter(){
     printf("===== PCISPH Solver 2D -- Continuous Emitter\n");
     PciSphSolver2 solver;

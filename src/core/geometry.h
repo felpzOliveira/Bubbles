@@ -241,6 +241,15 @@ void atomic_increase(T *value){
 #endif
 }
 
+template<typename T> inline bb_cpu_gpu
+T atomic_increase_get(T *value){
+#if defined(__CUDA_ARCH__)
+    return atomicAdd(value, T(1));
+#else
+    return __atomic_fetch_add(value, T(1), __ATOMIC_SEQ_CST);
+#endif
+}
+
 template <typename T, typename U, typename V>
 inline bb_cpu_gpu T Clamp(T val, U low, V high){
     if(val < low) return low;
@@ -1377,6 +1386,12 @@ class Bounds2 {
         return (pMin + pMax) * 0.5;
     }
 
+    bb_cpu_gpu vec2<Float> Size() const{
+        return vec2<Float>(Absf(pMax.x - pMin.x),
+                           Absf(pMax.y - pMin.y));
+    }
+
+
     bb_cpu_gpu T ExtentOn(int i) const{
         Assert(i >= 0 && i < 2);
         if(i == 0) return Absf(pMax.x - pMin.x);
@@ -1503,6 +1518,12 @@ class Bounds3 {
     bb_cpu_gpu T Volume() const{
         vec3<T> d = Diagonal();
         return d.x * d.y * d.z;
+    }
+
+    bb_cpu_gpu vec3<Float> Size() const{
+        return vec3<Float>(Absf(pMax.x - pMin.x),
+                           Absf(pMax.y - pMin.y),
+                           Absf(pMax.z - pMin.z));
     }
 
     bb_cpu_gpu T ExtentOn(int i) const{

@@ -55,8 +55,7 @@ class QuaternionSequence{
 
     QuaternionSequence();
     void AddQuaternion(const Quaternion &q1, const Float &t);
-    void AddQuaternion(const Float &angle, const vec3f &axis,
-                                const Float &t);
+    void AddQuaternion(const Float &angle, const vec3f &axis, const Float &t);
     void Interpolate(Float t, Transform *transform, vec3f *angular=nullptr);
 };
 

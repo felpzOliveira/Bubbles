@@ -139,7 +139,7 @@ bb_cpu_gpu void PredictPressureForceFor(PciSphSolverData3 *pciData, int particle
             Float dist = Distance(pi, pj);
             bool valid = IsWithinSpiky(dist, sphRadius);
 
-            if(valid){
+            if(valid && !IsZero(dj2)){
                 AssertA(!IsZero(dj2), "Zero neighbor density {ComputePressureForceFor}");
                 if(dist > 0 && !IsZero(dist)){
                     vec3f dir = (pj - pi) / dist;

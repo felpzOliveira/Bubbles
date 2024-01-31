@@ -24,7 +24,7 @@ typedef struct{
     Float spacing;
     Float marchingCubeSpacing;
     Float delaunayMu;
-    bool delaunayUseBoundary;
+    int delaunayIntervalLevel;
     std::string input;
     std::string output;
     SurfaceMethod method;
@@ -77,8 +77,8 @@ void default_surface_opts(surface_opts *opts){
     opts->inflags = SERIALIZER_POSITION;
     opts->kernel = 0.04;
     opts->spacing = 0.02;
+    opts->delaunayIntervalLevel = 8;
     opts->delaunayMu = 1.1;
-    opts->delaunayUseBoundary = true;
     opts->marchingCubeSpacing = 0.01;
     opts->outformat = FORMAT_OBJ;
     opts->byResolution = false;
@@ -91,7 +91,8 @@ void print_surface_configs(surface_opts *opts){
     std::cout << "    * Output : " << opts->output << std::endl;
     std::cout << "    * Spacing : " << opts->spacing << std::endl;
     std::cout << "    * Delaunay μ : " << opts->delaunayMu << std::endl;
-    std::cout << "    * Delaunay boundary : " << opts->delaunayUseBoundary << std::endl;
+    std::cout << "    * Delaunay interval level : " << opts->delaunayIntervalLevel <<
+                std::endl;
     std::cout << "    * Reconstruction method : " <<
                         StringFromSDFMethod(opts->method) << std::endl;
     std::cout << "    * Kernel : " << opts->kernel << std::endl;
@@ -119,18 +120,13 @@ ARGUMENT_PROCESS(surface_inflags_args){
     std::string flags = ParseNext(argc, argv, i, "-inflags", 1);
     opts->inflags = SerializerFlagsFromString(flags.c_str());
     if(opts->inflags < 0) return -1;
+    opts->legacy = 1;
     return 0;
 }
 
 ARGUMENT_PROCESS(surface_out_args){
     surface_opts *opts = (surface_opts *)config;
     opts->output = ParseNext(argc, argv, i, "-out", 1);
-    return 0;
-}
-
-ARGUMENT_PROCESS(surface_delaunay_boundary_args){
-    surface_opts *opts = (surface_opts *)config;
-    opts->delaunayUseBoundary = false;
     return 0;
 }
 
@@ -206,6 +202,18 @@ ARGUMENT_PROCESS(surface_method){
     return 0;
 }
 
+ARGUMENT_PROCESS(surface_del_interval_level){
+    surface_opts *opts = (surface_opts *)config;
+    unsigned int level = ParseNextFloat(argc, argv, i, "-delaunay-level");
+    if(level == 0){
+        printf("Invalid delaunay level given\n");
+        return -1;
+    }
+
+    opts->delaunayIntervalLevel = level;
+    return 0;
+}
+
 ARGUMENT_PROCESS(surface_resolution_args){
     surface_opts *opts = (surface_opts *)config;
     unsigned int nx = ParseNextFloat(argc, argv, i, "-res");
@@ -263,16 +271,16 @@ std::map<const char *, arg_desc> surface_arg_map = {
             .help = "Configures spacing used during simulation."
         }
     },
+    {"-delaunay-level",
+        {
+            .processor = surface_del_interval_level,
+            .help = "Sets the level to use for the interval method during delaunay reconstruction. (default: 8)"
+        }
+    },
     {"-delaunay-mu",
         {
             .processor = surface_delaunay_mu_args,
             .help = "Sets the value of the delaunay μ term. (default: 1.1)"
-        }
-    },
-    {"-delaunay-no-bounds",
-        {
-            .processor = surface_delaunay_boundary_args,
-            .help = "Sets the delaunay reconstruction method to not compute exact boundary."
         }
     },
     {"-kernel",
@@ -444,17 +452,11 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     pSet->ClearDataBuffer(&pSet->v0s);
 
     std::cout << "Done\nInspecting neighbors... " << std::flush;
-    if(opts->delaunayUseBoundary){
-        timer.Start("Interval Boundary Computation");
-        IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision, 2);
-        //XiaoweiBoundary(pSet, grid, opts->spacing);
-        timer.Stop();
-    }
-    else{
-        timer.Start("Estimate Boundary Computation");
-        DelaunayClassifyNeighbors(pSet, grid, 30, opts->spacing, opts->delaunayMu);
-        timer.Stop();
-    }
+    timer.Start("Interval Boundary Computation");
+    //IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision,
+                     //opts->delaunayIntervalLevel);
+    LNMBoundary(pSet, grid, opts->spacing);
+    timer.Stop();
 
     /* apply delaunay triangulation and filtering to get mesh */
     std::cout << "Done\nComputing delaunay surface... " << std::endl;
@@ -735,6 +737,78 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
     return sdfGrid;
 }
 
+void compute_weizenbock_values(HostTriangleMesh3 *mesh){
+    struct WeizenbockBucket{
+        uint64_t counter;
+        WeizenbockBucket(){ counter = 0; }
+    };
+
+    WeizenbockBucket buckets[10];
+    const Float four_sqrt3 = 6.928203230275509;
+
+    for(vec3ui &index : mesh->pointIndices){
+        vec3f p0 = mesh->points[index.x];
+        vec3f p1 = mesh->points[index.y];
+        vec3f p2 = mesh->points[index.z];
+
+        double a = Distance(p0, p1);
+        double b = Distance(p0, p2);
+        double c = Distance(p1, p2);
+
+        double s = (a + b + c) / 2.f;
+        double area2 = s * (s - a) * (s - b) * (s - c);
+        double term0 = (a * a + b * b + c * c);
+
+        if(area2 < 0){
+            if(!IsZero(area2)){
+                printf("Negative area [%g] != 0 ( bug? )\n", area2);
+            }
+            area2 = 0;
+        }
+
+        double term1 = four_sqrt3 * sqrt(area2);
+        double R = term1 / term0;
+    #if 0 // TODO: ????
+        int idx = std::floor(Clamp(R, 0, 0.9999) * 10.0);
+    #else
+        int idx = 0;
+        if(R > 0.10001 && R < 0.20001) idx = 1;
+        if(R > 0.20001 && R < 0.30001) idx = 2;
+        if(R > 0.30001 && R < 0.40001) idx = 3;
+        if(R > 0.40001 && R < 0.50001) idx = 4;
+        if(R > 0.50001 && R < 0.60001) idx = 5;
+        if(R > 0.60001 && R < 0.70001) idx = 6;
+        if(R > 0.70001 && R < 0.80001) idx = 7;
+        if(R > 0.80001 && R < 0.90001) idx = 8;
+        if(R > 0.90001) idx = 9;
+    #endif
+        if(idx < 0 || idx > 9)
+            printf("IDX = %d, R = %g, (%g / %g) ( %g )\n", idx, R, term1, term0, area2);
+        buckets[idx].counter += 1;
+    }
+
+    FILE *fp = fopen("weizenbock.txt",  "w");
+
+    std::string arr;
+    std::cout << "************************" << std::endl;
+    std::cout << "Weizenbock buckets:" << std::endl;
+    for(int i = 0; i < 10; i++){
+        std::cout << " - " << i << ":" << buckets[i].counter << std::endl;
+        std::string val = std::to_string(buckets[i].counter);
+        if(fp){
+            fprintf(fp, "%s\n", val.c_str());
+        }
+
+        arr += val;
+        if(i < 9)
+             arr += ",";
+    }
+    if(fp)
+        fclose(fp);
+    std::cout << "values = [" << arr << "]" << std::endl;
+    std::cout << "************************" << std::endl;
+}
+
 void surface_command(int argc, char **argv){
     surface_opts opts;
     ParticleSetBuilder3 builder;
@@ -828,5 +902,6 @@ void surface_command(int argc, char **argv){
     printf("Finished, triangle count: %ld\n", mesh.numberOfTriangles());
     timer.PrintEvents();
     std::cout << "**********************************" << std::endl;
+    compute_weizenbock_values(&mesh);
     CudaMemoryManagerClearCurrent();
 }

@@ -496,7 +496,7 @@ void test_pcisph3_water_drop(){
 
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;
-        UtilPrintStepStandard(&solver,step-1,{0, 16, 31, 74, 151, 235, 256, 278, 361, 420});
+        UtilPrintStepStandard(&solver,step-1);
         ProfilerReport();
         return step > 450 ? 0 : 1;
     };
@@ -1080,7 +1080,7 @@ void test_pcisph3_dragon_shower(){
         //SerializerSaveSphDataSet3(solver.GetSphSolverData(), respath.c_str(),
         //SERIALIZER_POSITION);
 
-        UtilPrintStepStandard(&solver, step-1, {0, 16, 31, 74, 151, 235, 256, 278, 361});
+        UtilPrintStepStandard(&solver, step-1);
 
         if(step < 400){
             pBuilder.MapGridEmit(velocityField, spacing);
@@ -2002,8 +2002,7 @@ void test_pcisph3_quadruple_dam(){
 #else
     auto callback = [&](int step) -> int{
         if(step == 0) return 1;
-        UtilPrintStepStandard(&solver, step-1, {0, 16, 31, 74, 151, 235,
-                                  256, 278, 361, 420});
+        UtilPrintStepStandard(&solver, step-1);
         ProfilerReport();
         return step > 450 ? 0 : 1;
     };
@@ -2091,7 +2090,6 @@ void test_pcisph3_lucy_ball(){
         outputName += ".txt";
         SerializerSaveSphDataSet3(solver.GetSphSolverData(), outputName.c_str(),
                                   SERIALIZER_POSITION);
-        //printf("Step: %d            \n", i+1);
     }
 
 

@@ -90,13 +90,6 @@ void SphSolver3::Advance(Float timeIntervalInSeconds){
 
     ProfilerEndStep();
     stepInterval = ProfilerGetStepInterval();
-
-    pSet->ClearDataBuffer(&pSet->v0s);
-    data->domain->UpdateQueryState();
-
-    lnmTimer.Start();
-    LNMBoundary(pSet, data->domain, h, 0);
-    lnmTimer.Stop();
 }
 
 void SphSolver3::Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,
@@ -144,14 +137,14 @@ SphSolverData3 *DefaultSphSolverData3(bool with_gravity){
     data->Tmax = 20;
     data->Tamb = 0;
     data->cInteractionsCount = 0;
+    data->fInteractionsCount = 0;
     data->cInteractions = nullptr;
+    data->fInteractions = nullptr;
 
     if(with_gravity){
         InteractionsBuilder3 builder;
-        builder.AddConstantInteraction(vec3f(0.f, -9.8f, 0.f));
-
-        data->cInteractionsCount = 1;
-        data->cInteractions = builder.MakeConstantInteractions();
+        AddConstantInteraction(builder, vec3f(0.f, -9.8f, 0.f));
+        data->cInteractions = builder.MakeConstantInteractions(data->cInteractionsCount);
     }
 
     return data;

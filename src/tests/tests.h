@@ -142,6 +142,7 @@ void test_bounds_split3();
 void test_pcisph3_water_block();
 void test_pcisph3_dissolve();
 void test_pcisph3_emit_test();
+void test_pcisph3_gravity_field();
 
 void test_pbf2_double_dam_break();
 

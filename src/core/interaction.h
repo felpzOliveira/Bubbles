@@ -70,20 +70,68 @@ T SampleInteraction(ConstantInteraction<T> *interaction, T p){
     return interaction->value;
 }
 
-typedef ConstantInteraction<vec2f> ConstantInteraction2v;
-typedef ConstantInteraction<vec3f> ConstantInteraction3v;
+typedef ConstantInteraction<vec2f> ConstantInteraction2;
+typedef ConstantInteraction<vec3f> ConstantInteraction3;
 
-template<typename T>
+#define FUNC_2D_CALL(name) vec2f name(vec2f p, void *prv)
+typedef FUNC_2D_CALL(func2d_type);
+
+#define FUNC_3D_CALL(name) vec3f name(vec3f p, void *prv)
+typedef FUNC_3D_CALL(func3d_type);
+
+#define DeclareFunctionalInteraction2D(name, ...)\
+bb_gpu vec2f name##DeviceFn(vec2f point, void *prv){ __VA_ARGS__ }\
+bb_cpu vec2f name##HostFn(vec2f point, void *prv){ __VA_ARGS__ }\
+bb_gpu vec2f (*name##_basePtr)(vec2f, void *) = name##DeviceFn;
+
+#define DeclareFunctionalInteraction3D(name, ...)\
+bb_gpu vec3f name##DeviceFn(vec3f point, void *prv){ __VA_ARGS__ }\
+bb_cpu vec3f name##HostFn(vec3f point, void *prv){ __VA_ARGS__ }\
+bb_gpu vec3f (*name##_basePtr)(vec3f, void *) = name##DeviceFn;
+
+#define FunctionalInteractionSet(fnIntr, funcType, name, user) do{\
+    cudaMemcpyFromSymbol(&(fnIntr)->devFn, name##_basePtr, sizeof(funcType*));\
+    (fnIntr)->hostFn = name##HostFn;\
+    (fnIntr)->userPtr = user;\
+}while(0)
+
+template<typename FnType>
+struct FunctionalInteraction{
+    FnType *hostFn;
+    FnType *devFn;
+    void *userPtr;
+};
+
+typedef FunctionalInteraction<func2d_type> FunctionalInteraction2;
+typedef FunctionalInteraction<func3d_type> FunctionalInteraction3;
+
+inline bb_cpu_gpu
+vec2f SampleInteraction(FunctionalInteraction2 *interaction, vec2f p){
+#if defined(__CUDA_ARCH__)
+    return interaction->devFn(p, interaction->userPtr);
+#else
+    return interaction->hostFn(p, interaction->userPtr);
+#endif
+}
+
+inline bb_cpu_gpu
+vec3f SampleInteraction(FunctionalInteraction3 *interaction, vec3f p){
+#if defined(__CUDA_ARCH__)
+    return interaction->devFn(p, interaction->userPtr);
+#else
+    return interaction->hostFn(p, interaction->userPtr);
+#endif
+}
+
+template<typename T, typename FnType>
 class InteractionsBuilder{
     public:
     std::vector<T> cInteractionsVecs;
+    FunctionalInteraction<FnType> *fInteractions = nullptr;
+    int fIt = 0;
 
     InteractionsBuilder() = default;
     ~InteractionsBuilder() = default;
-
-    void AddConstantInteraction(T value){
-        cInteractionsVecs.push_back(value);
-    }
 
     template<typename Q>
     ConstantInteraction<Q> *MakeConstantInteractions(std::vector<Q> *ref){
@@ -99,10 +147,58 @@ class InteractionsBuilder{
         return ptr;
     }
 
-    ConstantInteraction<T> *MakeConstantInteractions(){
+    ConstantInteraction<T> *MakeConstantInteractions(int &size){
+        size = cInteractionsVecs.size();
+        if(size == 0)
+            return nullptr;
         return MakeConstantInteractions<T>(&cInteractionsVecs);
+    }
+
+    FunctionalInteraction<FnType> *MakeFunctionalInteractions(int &size){
+        size = fIt;
+        return fInteractions;
     }
 };
 
-typedef InteractionsBuilder<vec2f> InteractionsBuilder2;
-typedef InteractionsBuilder<vec3f> InteractionsBuilder3;
+
+template<typename T, typename FnType>
+void _AddConstantInteraction(InteractionsBuilder<T, FnType> &builder, T value){
+    builder.cInteractionsVecs.push_back(value);
+}
+
+#define AddFunctionalInteraction(builder, FnType, name, user)do{\
+    if(builder.fInteractions == nullptr){\
+        builder.fInteractions = cudaAllocateVx(FunctionalInteraction<FnType>, 16);\
+        builder.fIt = 0;\
+    }\
+    if(builder.fIt >= 16){\
+        printf("[ERROR] Too much functional interactions\n");\
+        exit(0);\
+    }\
+    FunctionalInteractionSet(&builder.fInteractions[builder.fIt], FnType, name, user);\
+    builder.fIt++;\
+}while(0)
+
+#define AddFunctionalInteraction2D(builder, name)\
+    AddFunctionalInteraction(builder, func2d_type, name, nullptr)
+
+#define AddFunctionalInteraction3D(builder, name)\
+    AddFunctionalInteraction(builder, func3d_type, name, nullptr)
+
+#define AddFunctionalInteractionUser2D(builder, name, user)\
+    AddFunctionalInteraction(builder, func2d_type, name, user)
+
+#define AddFunctionalInteractionUser3D(builder, name)\
+    AddFunctionalInteraction(builder, func3d_type, name, user)
+
+typedef InteractionsBuilder<vec2f, func2d_type> InteractionsBuilder2;
+typedef InteractionsBuilder<vec3f, func3d_type> InteractionsBuilder3;
+
+inline void AddConstantInteraction(InteractionsBuilder2 &builder, vec2f value){
+    _AddConstantInteraction<vec2f, func2d_type>(builder, value);
+}
+
+inline void AddConstantInteraction(InteractionsBuilder3 &builder, vec3f value){
+    _AddConstantInteraction<vec3f, func3d_type>(builder, value);
+}
+

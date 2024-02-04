@@ -768,35 +768,10 @@ inline void UtilRunDynamicSimulation3(Solver *solver, ParticleAccessor *pSet,
 }
 
 template<typename Solver>
-inline void UtilPrintStepSimple(Solver *solver, int step){
+inline void UtilPrintStepStandard(Solver *solver, int step){
     Float advTime = solver->GetAdvanceTime();
     int pCount = solver->GetParticleCount();
     printf("\rStep (%d) : %d ms - Particles: %d    ", step, (int)advTime, pCount);
-}
-
-/*
-* Print LNM stats after a step of simulation.
-*/
-template<typename Solver>
-inline void UtilPrintStepStandard(Solver *solver, int step, std::vector<int> refFrames={}){
-    LNMData faster, slower, last, average;
-    LNMStats stats = solver->GetLNMStats();
-    Float advTime = solver->GetAdvanceTime();
-    average = stats.Average(&faster, &slower);
-    last = stats.Last();
-    int pCount = solver->GetParticleCount();
-    int takeFrame = 0;
-    for(int &f : refFrames){
-        if(step == f){
-            takeFrame = 1;
-            break;
-        }
-    }
-
-    printf("\rStep (%d) : %d ms - Particles: %d - (LNM: %g ms %g%%) (Slower: %g ms %g%%) (Faster: %g ms %g%%)    ",
-           step, (int)advTime, pCount, average.timeTaken, average.simPercentage,
-           slower.timeTaken, slower.simPercentage, faster.timeTaken, faster.simPercentage);
-    if(takeFrame) printf("\n");
 }
 
 /*

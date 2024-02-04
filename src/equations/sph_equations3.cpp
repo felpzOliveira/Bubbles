@@ -61,15 +61,20 @@ bb_cpu_gpu void ComputeDensityFor(SphSolverData3 *data, int particleId,
 //            F O R C E S    C O M P U T A T I O N            //
 /**************************************************************/
 bb_cpu_gpu void ComputeParticleInteraction(SphSolverData3 *data, int particleId){
+    vec3f acc(0.f, 0.f, 0.f);
     ParticleSet3 *pSet = data->sphpSet->GetParticleSet();
     vec3f pi = pSet->GetParticlePosition(particleId);
 
-    // TODO: Adjust for all components
-    vec3f extAcc = SampleInteraction(data->cInteractions, pi);
-    //if(particleId == 0)
-        //printf("{%g %g %g}\n", extAcc.x, extAcc.y, extAcc.z);
+    // TODO: Consider splitting by type
+    for(int i = 0; i < data->cInteractionsCount; i++){
+        acc += SampleInteraction(&data->cInteractions[i], pi);
+    }
 
-    pSet->SetParticleInteraction(particleId, extAcc);
+    for(int i = 0; i < data->fInteractionsCount; i++){
+        acc += SampleInteraction(&data->fInteractions[i], pi);
+    }
+
+    pSet->SetParticleInteraction(particleId, acc);
 }
 
 bb_cpu_gpu void ComputeNonPressureForceFor(SphSolverData3 *data, int particleId){

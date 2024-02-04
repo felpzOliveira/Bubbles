@@ -86,18 +86,6 @@ void PciSphSolver3::Advance(Float timeIntervalInSeconds){
 
     ProfilerEndStep();
     stepInterval = ProfilerGetStepInterval();
-
-    data->domain->UpdateQueryState();
-    pSet->ClearDataBuffer(&pSet->v0s);
-
-    lnmTimer.Start();
-    LNMBoundary(pSet, data->domain, h, 0);
-    //DiltsSpokeBoundary(data->domain, pSet);
-    lnmTimer.Stop();
-
-    Float lnm = lnmTimer.GetElapsedGPU(0);
-    Float pct = lnm * 100.0 / ProfilerGetEvaluation("AdvanceTimeStep");
-    lnmStats.Add(LNMData(lnm, pct));
 }
 
 Float PciSphSolver3::GetAdvanceTime(){

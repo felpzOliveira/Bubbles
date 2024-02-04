@@ -95,21 +95,6 @@ void PciSphSolver2::Advance(Float timeIntervalInSeconds){
 
     ProfilerEndStep();
     stepInterval = ProfilerGetStepInterval();
-
-    pSet->ClearDataBuffer(&pSet->v0s);
-    data->domain->UpdateQueryState();
-
-    lnmTimer.Start();
-    LNMBoundary(pSet, data->domain, h);
-    //DiltsSpokeBoundary(pSet, data->domain);
-    //MullerBoundary(pSet, data->domain, h);
-    //XiaoweiBoundary(pSet, data->domain, h);
-    //IntervalBoundary(pSet, data->domain, h);
-    lnmTimer.Stop();
-
-    Float lnm = lnmTimer.GetElapsedGPU(0);
-    Float pct = lnm * 100.0 / stepInterval;
-    lnmStats.Add(LNMData(lnm, pct));
 }
 
 void PciSphSolver2::Setup(Float targetDensity, Float targetSpacing, Float relativeRadius,

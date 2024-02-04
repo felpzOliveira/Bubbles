@@ -85,13 +85,6 @@ void SphSolver2::Advance(Float timeIntervalInSeconds){
 
     ProfilerEndStep();
     stepInterval = ProfilerGetStepInterval();
-
-    pSet->ClearDataBuffer(&pSet->v0s);
-    data->domain->UpdateQueryState();
-
-    lnmTimer.Start();
-    LNMBoundary(pSet, data->domain, h, 0);
-    lnmTimer.Stop();
 }
 
 
@@ -141,14 +134,14 @@ SphSolverData2 *DefaultSphSolverData2(bool with_gravity){
     data->Tmax = 20;
     data->Tamb = 0;
     data->cInteractionsCount = 0;
+    data->fInteractionsCount = 0;
     data->cInteractions = nullptr;
+    data->fInteractions = nullptr;
 
     if(with_gravity){
         InteractionsBuilder2 builder;
-        builder.AddConstantInteraction(vec2f(0.f, -9.8f));
-
-        data->cInteractionsCount = 1;
-        data->cInteractions = builder.MakeConstantInteractions();
+        AddConstantInteraction(builder, vec2f(0.f, -9.8f));
+        data->cInteractions = builder.MakeConstantInteractions(data->cInteractionsCount);
     }
     return data;
 }

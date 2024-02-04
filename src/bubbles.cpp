@@ -68,7 +68,6 @@ void run_self_tests(){
     test_pcisph3_ball_many_emission();
     test_pcisph3_dragon_shower();
     test_pcisph3_box_many_emission();
-    test_pcisph3_quadruple_dam();
     test_pcisph3_happy_whale();
     test_pcisph3_dragon_pool();
     test_pcisph3_sdf();
@@ -83,7 +82,8 @@ int main(int argc, char **argv){
     /* Sets the default kernel launching parameters */
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
 
-    test_pcisph3_box_drop();
+    //test_pcisph3_box_drop();
+    test_pcisph3_gravity_field();
     //test_pcisph2_water_block();
     //test_pcisph2_marching_squares();
 

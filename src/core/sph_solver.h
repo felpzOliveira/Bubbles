@@ -12,7 +12,9 @@ typedef struct{
     Grid2 *domain;
     ColliderSet2 *collider;
     vec2f *smoothedVelocities;
-    ConstantInteraction2v *cInteractions;
+    ConstantInteraction2 *cInteractions;
+    FunctionalInteraction2 *fInteractions;
+    int fInteractionsCount;
     int cInteractionsCount;
     Float dragCoefficient;
     Float eosExponent;
@@ -29,7 +31,9 @@ typedef struct{
 typedef struct{
     SphParticleSet3 *sphpSet;
     Grid3 *domain;
-    ConstantInteraction3v *cInteractions;
+    ConstantInteraction3 *cInteractions;
+    FunctionalInteraction3 *fInteractions;
+    int fInteractionsCount;
     int cInteractionsCount;
     ColliderSet3 *collider;
     vec3f *smoothedVelocities;

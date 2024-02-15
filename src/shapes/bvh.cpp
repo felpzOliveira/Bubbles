@@ -222,16 +222,23 @@ bb_cpu_gpu Float DistanceTriangle(const vec3f &p, int triNum, ParsedMesh *mesh){
     vec3f ac = a - c; vec3f pc = p - c;
 
     vec3f nor = Cross(ba, ac);
-    return std::sqrt(
+    Float dist = std::sqrt(
                      Sign(Dot(Cross(ba, nor), pa)) +
                      Sign(Dot(Cross(cb, nor), pb)) +
                      Sign(Dot(Cross(ac, nor), pc)) < 2.0 ?
                      Min(Min(
-                             Dot2(ba * Clamp(Dot(ba, pa)/Dot2(ba), 0.0, 1.0) - pa),
-                             Dot2(cb * Clamp(Dot(cb, pb)/Dot2(cb), 0.0, 1.0) - pb) ),
-                         Dot2(ac * Clamp(Dot(ac, pc)/Dot2(ac), 0.0, 1.0) - pc) )
+                             Dot2(ba * Clamp(Dot(ba, pa)/Dot2(ba), 0.0001, 1.0) - pa),
+                             Dot2(cb * Clamp(Dot(cb, pb)/Dot2(cb), 0.0001, 1.0) - pb) ),
+                         Dot2(ac * Clamp(Dot(ac, pc)/Dot2(ac), 0.0001, 1.0) - pc) )
                      :
                      Dot(nor, pa) * Dot(nor, pa) / Dot2(nor) );
+
+    if(std::isnan(dist)){
+        printf("NaN generated: P= {%g %g %g}, A= {%g %g %g}, B= {%g %g %g}, C= {%g %g %g}\n",
+                p.x, p.y, p.z, a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    }
+
+    return dist;
 }
 
 bb_cpu_gpu bool IntersectTriangle(const Ray &ray, SurfaceInteraction * isect,

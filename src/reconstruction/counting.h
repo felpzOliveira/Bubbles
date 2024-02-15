@@ -245,6 +245,7 @@ struct FilterSolver2D{
         int i = u.x, j = u.y;
         Float val = Float(0);
         int radius = 5 + ratio * 2;
+        Float wSum = 0.f;
         Convolution(radius, [&](int x, int y){
             Float dx = Float(x);
             Float dy = Float(y);
@@ -253,9 +254,10 @@ struct FilterSolver2D{
             Float kernel = invTwoPiSigmaSquared *
                         (std::exp(-(dx2 + dy2) / (2.f * sigmaSquared)));
             val = val + sampler(vec2ui(i + x, j + y)) * kernel;
+            wSum += kernel;
         });
 
-        return val;
+        return val / wSum;
     }
 };
 
@@ -300,6 +302,7 @@ struct FilterSolver3D{
         int i = u.x, j = u.y, k = u.z;
         Float val = Float(0);
         int radius = 5 + ratio * 2;
+        Float wSum = 0.f;
         Convolution(radius, [&](int x, int y, int z){
             Float dx = Float(x);
             Float dy = Float(y);
@@ -310,9 +313,10 @@ struct FilterSolver3D{
             Float kernel = invTwoPiSigmaSquared *
                         (std::exp(-(dx2 + dy2 + dz2) / (2.f * sigmaSquared)));
             val = val + sampler(vec3ui(i + x, j + y, k + z)) * kernel;
+            wSum += kernel;
         });
 
-        return val;
+        return val / wSum;
     }
 };
 
@@ -375,6 +379,8 @@ class CountingGrid{
         ufmin = ufmin - T(depth);
         ufmax = ufmax + T(depth);
 
+        // TODO: We should probably only increase fractions of a particles
+        //       so the splat better represents the total amount of particles.
         for(int j = ufmin[1]; j <= ufmax[1]; j++){
             if(j < 0 || j >= res[1])
                 continue;
@@ -397,7 +403,7 @@ class CountingGrid{
                         U tg; tg[0] = i; tg[1] = j; tg[2] = k;
                         unsigned int h = grid->GetLinearCellIndex(tg);
                         if(CellParticleIntersection(pi, radius, pc, ds, fr))
-                            grid->stored[h] += 1;
+                            grid->stored[h] += 1; // TODO: This needs to be fractional
                     }
                 }else{
                     T index;
@@ -408,7 +414,7 @@ class CountingGrid{
                     U tg; tg[0] = i; tg[1] = j;
                     unsigned int h = grid->GetLinearCellIndex(tg);
                     if(CellParticleIntersection(pi, radius, pc, ds, fr))
-                        grid->stored[h] += 1;
+                        grid->stored[h] += 1; // TODO: This needs to be fractional
                 }
             }
         }

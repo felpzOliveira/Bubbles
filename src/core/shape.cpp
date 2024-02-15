@@ -499,63 +499,10 @@ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
                               bounds.pMin, VertexCentered);
 
     printf("Generating SDF for shape %s: [%d x %d x %d] ... ",
-    shape->mesh->name, resolution, resolutionY, resolutionZ);
+            shape->mesh->name, resolution, resolutionY, resolutionZ);
 
     GPULaunch(shape->grid->total, CreateShapeSDFGPU, shape);
     shape->grid->MarkFilled();
     printf("OK\n");
-}
-
-void CutShapeSDF(Shape *shape, Bounds3f bounds, void **scratch){
-    if(!shape->grid || !shape->grid->Filled()){
-        printf("Shape is not filled, cannot cut\n");
-        return;
-    }
-
-    vec4f *refPoints = (vec4f *)*scratch;
-    if(!refPoints){
-        refPoints = cudaAllocateVx(vec4f, shape->grid->total);
-    }
-
-    printf("Cutting SDF for shape %s ... ", shape->mesh->name);
-    fflush(stdout);
-#if 1
-    shape->UpdateSDF(GPU_LAMBDA(vec3f point, Shape *cShape, int index) -> Float{
-        ClosestPointQuery query;
-        Float sdf = cShape->grid->Sample(point);
-        cShape->ClosestPointBySDF(point, &query);
-        refPoints[index] = vec4f(query.point.x, query.point.y, query.point.z, sdf);
-        return sdf;
-    });
-
-    shape->UpdateSDF(GPU_LAMBDA(vec3f point, Shape *cShape, int index) -> Float{
-        ParsedMesh *mesh = cShape->mesh;
-        Node *bvh = cShape->bvh;
-        int closestId = -1;
-        Float currSdf = refPoints[index].w;
-        vec3f qPoint(refPoints[index].x, refPoints[index].y, refPoints[index].z);
-        Float sign = 1.f;
-        bool insideBox = InsideExclusive(point, bounds);
-
-        // NOTE: This is not correct. However it is very good as it generates imperfections
-        //       in the lower cut plane and prevents particles from being smashed as if
-        //       their falling into the ground. It is kinda sus but very interesting result
-        if(!InsideExclusive(qPoint, bounds)){
-            return currSdf;
-        }
-
-        if(currSdf < 0 && !insideBox)
-            sign = -1.f;
-
-        Float dist = BVHMeshBoundedClosestDistance(point, &closestId, mesh, bvh, bounds);
-        Float psd = Max(Absf(dist), 0.00001);
-        return sign * psd;
-    });
-#else
-    GPULaunch(shape->grid->total, CreateShapeSDFGPU, shape);
-#endif
-    printf("OK\n");
-
-    *scratch = refPoints;
 }
 

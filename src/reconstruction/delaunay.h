@@ -39,7 +39,6 @@ struct DelaunayTriangulation{
     Point3HVec pointVec;
     GDelOutput output;
     size_t pLen;
-    std::vector<int> boundary;
     std::vector<vec3i> shrinked;
     std::vector<vec3f> shrinkedPs;
     std::vector<uint32_t> ids;

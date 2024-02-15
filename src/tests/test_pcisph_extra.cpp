@@ -136,13 +136,18 @@ vec3f rotateY(vec3f v, Float rads){
     return vec3f(x, y, z);
 }
 
+/*
+* NOTE: The idea for the following simulation comes from:
+*    https://github.com/rlguy/GridFluidSim3D
+* I made some slight changes.
+*/
 DeclareFunctionalInteraction3D(GravityField3D,
 {
     vec3f center(0.f, 0.f, 0.f);
     Float ming = 1.0f;
     Float maxg = 25.0f;
     Float mindsq = 1.0f;
-    Float maxdsq = 8.0*8.0;
+    Float maxdsq = 8.0 * 8.0;
     vec3f v = center - point;
 
     Float distsq = v.LengthSquared();
@@ -157,7 +162,7 @@ DeclareFunctionalInteraction3D(GravityField3D,
 void test_pcisph3_gravity_field(){
     printf("===== PCISPH Solver 3D -- Gravity Field\n");
     CudaMemoryManagerStart(__FUNCTION__);
-    Float baseContainerSize = 2.0;
+    Float baseContainerSize = 2.0f;
     Float spacing = 0.02;
     Float spacingScale = 1.8;
     int frame_index = 1;
@@ -168,15 +173,17 @@ void test_pcisph3_gravity_field(){
 
     vec3f currentEmitterVelocity = emitterVelocity;
     Float half_size = 0.5 * baseContainerSize;
-    Float sphereRadius = baseContainerSize / 16.0;
-    vec3f containerSize(baseContainerSize * 2.0f);
+    Float sphereRadius = baseContainerSize / 16.0f;
+    vec3f containerSize(baseContainerSize * 2.f);
     vec3f sphereCenter(0.f, half_size - 0.1 * baseContainerSize, 0.f);
     Shape *container = MakeBox(Transform(), containerSize, true);
+    Shape *sphereCollider = MakeSphere(Translate(vec3f(0, 0, 0)), 0.3f);
     Shape *sphereEmitter = MakeSphere(Translate(sphereCenter), sphereRadius);
 
     // Colliders
     ColliderSetBuilder3 cBuilder;
     // TODO: Add the central sphere?
+    cBuilder.AddCollider3(sphereCollider);
     cBuilder.AddCollider3(container);
     ColliderSet3 *colliders = cBuilder.GetColliderSet();
 
@@ -251,6 +258,7 @@ void test_pcisph3_gravity_field(){
         }
 
         UtilPrintStepStandard(&solver, step-1);
+
         std::string path("/home/felpz/Documents/Bubbles/simulations/gravity/out_");
         path += std::to_string(step-1);
         path += ".txt";

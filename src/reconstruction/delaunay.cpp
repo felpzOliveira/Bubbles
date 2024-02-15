@@ -11,12 +11,10 @@
 #include <cutil.h>
 #include <unordered_map>
 
-#define is_bit_set(n, b) (((n) >> (b)) & 1)
-#define set_bit(n, b) ((n) |= (1 << (b)))
-
 struct DelaunaySet{
     int nPos = 0;
     int offset = 0;
+    int totalSize = 0;
     Point3 *positions;
 
     bb_cpu_gpu vec3f GetParticlePosition(int id){
@@ -37,18 +35,6 @@ struct DelaunaySet{
     }
 };
 
-bb_cpu_gpu
-void printBinary(int num, char bin[9]){
-    for(int i = 7; i >= 0; i--){
-        if(is_bit_set(num, i))
-            bin[7-i] = '1';
-        else
-            bin[7-i] = '0';
-    }
-
-    bin[8] = 0;
-}
-
 inline
 bb_cpu_gpu vec3f DelaunayPosition(ParticleSet3 *pSet, DelaunaySet *dSet, int id){
     int count = pSet->GetParticleCount();
@@ -56,11 +42,6 @@ bb_cpu_gpu vec3f DelaunayPosition(ParticleSet3 *pSet, DelaunaySet *dSet, int id)
         return pSet->GetParticlePosition(id);
     else
         return dSet->GetParticlePosition(id);
-}
-
-inline bb_cpu_gpu void DelaunaySetBoundary(DelaunaySet *dSet, int id, int *u_bound){
-    if(!dSet->InSet(id))
-        u_bound[id] = 1;
 }
 
 template<unsigned int N>
@@ -123,28 +104,6 @@ bb_cpu_gpu void ParticleFlag(ParticleSet3 *pSet, Grid3 *grid, int pId, Float rad
         pSet->SetParticleV0(pId, 1);
 }
 
-
-void DumpPoints(ParticleSet3 *pSet){
-    FILE *fp = fopen("test_points.txt", "wb");
-    if(fp){
-        int nCount = pSet->GetParticleCount();
-        int total = 0;
-        std::stringstream ss;
-        for(int i = 0; i < nCount; i++){
-            vec3f pi = pSet->GetParticlePosition(i);
-            int vi = pSet->GetParticleV0(i);
-            if(vi >= 0){
-                total += 1;
-                ss << pi.x << " " << pi.y << " " << pi.z << " " << vi << std::endl;
-            }
-        }
-
-        fprintf(fp, "%d\n", total);
-        fprintf(fp, "%s", ss.str().c_str());
-        fclose(fp);
-    }
-}
-
 void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
                                Float spacing, Float mu)
 {
@@ -196,8 +155,8 @@ bb_cpu_gpu vec3ui matching_orientation(i3 face, Tet &tet){
 }
 
 bb_cpu_gpu bool
-__debug_check_triangle(i3 tri, uint32_t *ids, ParticleSet3 *pSet, DelaunaySet *dSet,
-                       Float radius)
+check_triangle(i3 tri, uint32_t *ids, ParticleSet3 *pSet, DelaunaySet *dSet,
+               Float radius)
 {
     int idA = ids[tri.t[0]], idB = ids[tri.t[1]], idC = ids[tri.t[2]];
     Float r = 2.0 * radius;
@@ -218,7 +177,7 @@ __debug_check_triangle(i3 tri, uint32_t *ids, ParticleSet3 *pSet, DelaunaySet *d
 static void
 DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangulation,
                            ParticleSet3 *pSet, DelaunaySet *dSet, uint32_t *ids,
-                           int *bound, Float mu, Float spacing, DelaunayWorkQueue *delQ,
+                           Float mu, Float spacing, DelaunayWorkQueue *delQ,
                            TimerList &timer)
 {
     Tet *kernTet = toKernelPtr(triangulator->_tetVec);
@@ -247,6 +206,7 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
 
             int idA = ids[A], idB = ids[B],
                 idC = ids[C], idD = ids[D];
+
             vec3f pA = DelaunayPosition(pSet, dSet, idA);
             vec3f pB = DelaunayPosition(pSet, dSet, idB);
             vec3f pC = DelaunayPosition(pSet, dSet, idC);
@@ -271,36 +231,13 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
             Float bD = Distance(pB, pD);
             Float cD = Distance(pC, pD);
 
-#if 1
             bool is_tetra_valid =  aB < rAB && aC < rAC && aD < rAD &&
                                    bC < rBC && bD < rBD &&
                                    cD < rCD;
             if(!is_tetra_valid){
-                DelaunaySetBoundary(dSet, idA, bound);
-                DelaunaySetBoundary(dSet, idB, bound);
-                DelaunaySetBoundary(dSet, idC, bound);
-                DelaunaySetBoundary(dSet, idD, bound);
                 tetFlags[i] = 0;
             }else
                 tetFlags[i] = 0x0f;
-#else
-            int ABCvalid = aB < rAB && aC < rAC && bC < rBC;
-            int ABDvalid = aB < rAB && bD < rBD && aD < rAD;
-            int BCDvalid = bC < rBC && bD < rBD && cD < rCD;
-            int ACDvalid = aC < rAC && aD < rAD && cD < rCD;
-            // ABC ABD ACD BCD
-            //  1   1   1   1
-            if(ABCvalid) { set_bit(tetFlags[i], 0); }
-            if(ABDvalid) { set_bit(tetFlags[i], 1); }
-            if(ACDvalid) { set_bit(tetFlags[i], 2); }
-            if(BCDvalid) { set_bit(tetFlags[i], 3); }
-
-
-            //tetFlags[i] |= ABCvalid ? (1 << 0) : 0;
-            //tetFlags[i] |= ABDvalid ? (1 << 1) : 0;
-            //tetFlags[i] |= ACDvalid ? (1 << 2) : 0;
-            //tetFlags[i] |= BCDvalid ? (1 << 3) : 0;
-#endif
         }
     });
 
@@ -398,7 +335,7 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
         }
 
         for(int s = 0; s < 4; s++){
-            bool valid_face = __debug_check_triangle(faces[s], ids, pSet, dSet, radius);
+            bool valid_face = check_triangle(faces[s], ids, pSet, dSet, radius);
             if(!valid_face)
                 continue;
 
@@ -411,8 +348,6 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
     });
 
     timer.Stop();
-
-    printf("Extra info = %d\n", *extraCounter);
     cudaFree(extraCounter);
     cudaFree(tetFlags);
 }
@@ -423,7 +358,6 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
                 TimerList &timer)
 {
     GpuDel triangulator;
-    int *u_bound = nullptr;
     vec3i *u_tri = nullptr;
     uint32_t *u_ids = nullptr;
     DelaunayWorkQueue *delQ = nullptr;
@@ -435,14 +369,10 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
 
     DelaunaySet *dSet = nullptr;
     ParticleSet3 *pSet = sphSet->GetParticleSet();
-    std::vector<int> *boundary = &triangulation.boundary;
 
     printf(" * Delaunay: [μ = %g] [h = %g]\n", mu, spacing);
 
     std::cout << " - Adjusting domain..." << std::flush;
-    // TODO: Adjust based on extended domain
-    u_bound = cudaAllocateUnregisterVx(int, pSet->GetParticleCount());
-    boundary->reserve(pSet->GetParticleCount());
 
     int totalCount = 0;
     for(int i = 0; i < pSet->GetParticleCount(); i++){
@@ -453,6 +383,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     dSet = cudaAllocateUnregisterVx(DelaunaySet, 1);
     u_ids = cudaAllocateUnregisterVx(uint32_t, totalCount);
     dSet->positions = cudaAllocateUnregisterVx(Point3, totalCount);
+    dSet->totalSize = totalCount;
     dSet->offset = pSet->GetParticleCount();
 
     int *iIndex = cudaAllocateUnregisterVx(int, 1);
@@ -492,14 +423,12 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
             dSet->positions[key] = {pi.x, pi.y, pi.z};
             u_ids[key] = id;
         }
-
-        u_bound[pId] = 0;
     });
 #endif
 
     *refIndex = *iIndex;
     *iIndex = 0;
-#if 1
+
     AutoParallelFor("Delaunay_Tet-Spawn", pSet->GetParticleCount(), AutoLambda(int pId){
         int bi = pSet->GetParticleV0(pId);
 
@@ -527,11 +456,11 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
         if(acceptpart == 1){
             int key = atomic_increase_get(iIndex);
             int id = pSet->GetParticleCount() + *refIndex + 4 * key;
-            Float edgeLen = mu * spacing * 0.9;
+            Float edgeLen = mu * spacing;
             const Float one_over_sqrt2 = 0.7071067811865475;
 
             Float a = edgeLen * one_over_sqrt2;
-            Float ha = 0.5 * a;
+            Float ha = a * 0.5f;
 
             vec3f u0 = vec3f(+ha, +ha, +ha);
             vec3f u1 = vec3f(-ha, +ha, -ha);
@@ -552,10 +481,8 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
             u_ids[*refIndex + 4 * key + 2] = id + 2;
             u_ids[*refIndex + 4 * key + 3] = id + 3;
         }
-
-        u_bound[pId] = 0;
     });
-#endif
+
     timer.Stop();
 
     dSet->nPos = *refIndex + 4 * (*iIndex);
@@ -577,7 +504,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
 
     delQ = cudaAllocateUnregisterVx(DelaunayWorkQueue, 1);
     DelaunayWorkQueueAndFilter(&triangulator, triangulation, pSet, dSet,
-                                u_ids, u_bound, mu, spacing, delQ, timer);
+                                u_ids, mu, spacing, delQ, timer);
 
     if(delQ->size == 0){
         std::cout << " - Filter gave no triangles\n";
@@ -590,26 +517,15 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     triangulation.shrinked.resize(delQ->size);
 
     timer.Start("(Extra) Mark Boundary");
-    AutoParallelFor("Delaunay_MarkTrisAndBoundary", delQ->size, AutoLambda(int i){
+    AutoParallelFor("Delaunay_MarkTriangles", delQ->size, AutoLambda(int i){
         DelaunayTriangleInfo *uniqueTri = delQ->Ref(i);
         vec3ui tri = uniqueTri->tri;
-        int opp = uniqueTri->opp;
 
         int A = tri.x;
         int B = tri.y;
         int C = tri.z;
 
-        int idA = u_ids[A];
-        int idB = u_ids[B];
-        int idC = u_ids[C];
-        int idD = u_ids[opp];
-
         vec3i index = vec3i(A, C, B);
-
-        DelaunaySetBoundary(dSet, idA, u_bound);
-        DelaunaySetBoundary(dSet, idB, u_bound);
-        DelaunaySetBoundary(dSet, idC, u_bound);
-        DelaunaySetBoundary(dSet, idD, u_bound);
         u_tri[i] = index;
     });
     timer.Stop();
@@ -618,7 +534,6 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
 
     std::cout << " - Copying to host..." << std::flush;
     int n_it = pSet->GetParticleCount();
-    int b_len = 0;
     int max_it = Max(n_it, delQ->size);
 
     // NOTE: This remapping does not really do anything usefull, it just
@@ -677,11 +592,6 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
 
             triangulation.shrinked[i] = vec3i(aId, bId, cId);
         }
-
-        if(i < pSet->GetParticleCount()){
-            b_len += u_bound[i] > 0;
-            boundary->push_back(u_bound[i]);
-        }
     }
     timer.Stop();
 
@@ -691,7 +601,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
             counter += 1;
     }
 
-    std::cout << "done ( boundary: " << b_len << " / " << n_it << " ) " << std::endl;
+    std::cout << "done" << std::endl;
     std::cout << " - Edges with > 2 : " << counter << std::endl;
     std::cout << " - Finished building mesh" << " ( " << triangulation.shrinkedPs.size() << " vertices | "
               << triangulation.shrinked.size() << " triangles )" << std::endl;
@@ -703,29 +613,8 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     cudaFree(delQ);
     cudaFree(u_tri);
     cudaFree(u_ids);
-    cudaFree(u_bound);
     cudaFree(iIndex);
     cudaFree(refIndex);
-}
-
-void
-DelaunayWriteBoundary(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                      const char *path)
-{
-    FILE *fp = fopen(path, "w");
-    ParticleSet3 *pSet = sphSet->GetParticleSet();
-    if(fp){
-        std::vector<int> &boundary = triangulation.boundary;
-        //std::vector<int> boundary;
-        //int n = UtilGetBoundaryState(pSet, &boundary);
-        //printf(" Filter ( %d / %d )\n", n, pSet->GetParticleCount());
-        fprintf(fp, "%lu\n", boundary.size());
-        for(int i = 0; i < boundary.size(); i++){
-            vec3f p = pSet->GetParticlePosition(i);
-            fprintf(fp, "%g %g %g %d\n", p.x, p.y, p.z, boundary[i]);
-        }
-        fclose(fp);
-    }
 }
 
 void

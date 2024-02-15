@@ -452,7 +452,7 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     pSet->ClearDataBuffer(&pSet->v0s);
 
     std::cout << "Done\nInspecting neighbors... " << std::flush;
-    timer.Start("Interval Boundary Computation");
+    timer.Start("Volume Flag Computation");
     //IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision,
                      //opts->delaunayIntervalLevel);
     LNMBoundary(pSet, grid, opts->spacing);
@@ -462,9 +462,6 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     std::cout << "Done\nComputing delaunay surface... " << std::endl;
     DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu,
                     grid, &solver, timer);
-
-    std::cout << "Writing delaunay boundary... " << std::flush;
-    DelaunayWriteBoundary(triangulation, sphpSet, "bound.txt");
 
     std::cout << "Done\nFetching geometry... " << std::endl;
     DelaunayGetTriangleMesh(triangulation, mesh);

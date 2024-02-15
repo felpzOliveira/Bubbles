@@ -174,13 +174,13 @@ int cudaKernelSynchronize(){
     int rv = 0;
     cudaError_t errAsync = cudaDeviceSynchronize();
     cudaError_t errSync = cudaGetLastError();
-	if(errSync != cudaSuccess){
+    if(errSync != cudaSuccess){
         std::cout << "Sync kernel error: " << cudaGetErrorString(errSync) << std::endl;
-		rv = 1;
+        rv = 1;
     }
-	if(errAsync != cudaSuccess){
+    if(errAsync != cudaSuccess){
         std::cout << "Async kernel error: " << cudaGetErrorString(errAsync) << std::endl;
-		rv = 1;
+        rv = 1;
     }
 
     return rv;
@@ -188,7 +188,7 @@ int cudaKernelSynchronize(){
 
 DeviceMemoryStats cudaReportMemoryUsage(){
     DeviceMemoryStats memStats;
-	cudaError_t status = cudaMemGetInfo(&memStats.free_bytes, &memStats.total_bytes);
+    cudaError_t status = cudaMemGetInfo(&memStats.free_bytes, &memStats.total_bytes);
     if(status != cudaSuccess){
         std::cout << "Could not query device for memory!" << std::endl;
         memStats.valid = 0;

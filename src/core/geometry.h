@@ -494,7 +494,7 @@ template<typename T> class vec3{
     public:
     T x, y, z;
     bb_cpu_gpu vec3(){ x = y = z = (T)0; }
-    bb_cpu_gpu vec3(T a){ x = y = z = a; }
+    bb_cpu_gpu vec3(T a){ x = y = z = a; Assert(!HasNaN()); }
 
     bb_cpu_gpu vec3(T a, T b, T c): x(a), y(b), z(c){
         Assert(!HasNaN());

@@ -930,19 +930,6 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         timer.Start();
         MarroneAdaptBoundary(pSet, grid, opts->spacing, marroneWorkQ);
         timer.Stop();
-    }else if(opts->method == BOUNDARY_DELAUNAY){
-        DelaunayTriangulation triangulation;
-        TimerList dummyTimer;
-        // TODO: delaunay μ to cmd
-        timer.Start();
-        DelaunaySurface(triangulation, sphpSet, opts->spacing, 1.1, grid,
-                        &solver, dummyTimer);
-        timer.Stop();
-
-        boundary = triangulation.boundary;
-        for(int i = 0; i < boundary.size(); i++){
-            n += boundary[i] != 0 ? 1 : 0;
-        }
     }
     /*
         The following methods are implemented correctly
@@ -962,8 +949,7 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
 
     Float interval = timer.GetElapsedGPU(0);
 
-    if(opts->method != BOUNDARY_DELAUNAY)
-        n = UtilGetBoundaryState(pSet, &boundary);
+    n = UtilGetBoundaryState(pSet, &boundary);
 
     printf("Got %d / %d - %g ms\n", n, (int)boundary.size(), interval);
 

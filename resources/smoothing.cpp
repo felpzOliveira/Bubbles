@@ -1,4 +1,6 @@
 #include <vcg/complex/complex.h>
+#include <vcg/complex/algorithms/clean.h>
+#include <vcg/complex/algorithms/hole.h>
 
 #include <vcg/complex/algorithms/clean.h>
 #include <vcg/complex/algorithms/create/platonic.h>
@@ -17,11 +19,17 @@ using namespace std;
 
 class TFace;
 class TVertex;
+class TEdge;
 
-struct TUsedTypes: public vcg::UsedTypes< vcg::Use<TVertex>::AsVertexType, vcg::Use<TFace>::AsFaceType >{};
+struct TUsedTypes: public vcg::UsedTypes< vcg::Use<TVertex>::AsVertexType,
+                                          vcg::Use<TEdge>::AsEdgeType,
+                                          vcg::Use<TFace>::AsFaceType >{};
+
+class TEdge : public vcg::Edge<TUsedTypes>{};
 
 class TVertex : public Vertex< TUsedTypes,
     vertex::BitFlags,
+    vertex::VFAdj,
     vertex::Coord3f,
     vertex::Normal3f,
     vertex::Mark >{};
@@ -30,12 +38,15 @@ class TFace   : public Face<   TUsedTypes,
     face::VertexRef,    // three pointers to vertices
     face::Normal3f,     // normal
     face::BitFlags,     // flags
+    face::VFAdj,
     face::FFAdj         // three pointers to adjacent faces
 > {};
 
 /* mesh container */
-class TMesh   : public vcg::tri::TriMesh< vector<TVertex>, vector<TFace> > {};
-
+class TMesh   : public vcg::tri::TriMesh< vector<TVertex>, vector<TFace> > {
+    public:
+    bool HasVFAdjacency() const { return true; }
+};
 using namespace vcg;
 using namespace std;
 
@@ -75,11 +86,11 @@ bool arg_int_value(int argc, char **argv, int &iter, int &value, const char *arg
 }
 
 bool method_is_valid(std::string method){
-    return method == "taubin" || method == "laplacian" || method == "loop";
+    return method == "taubin" || method == "laplacian" || method == "loop" || method == "cl";
 }
 
 std::string methods_string(){
-    return "taubin, laplacian or loop";
+    return "taubin, laplacian, loop or cl";
 }
 
 bool _is_file_ply(const char *path){
@@ -150,6 +161,10 @@ int main(int argc, char **argv){
         return 0;
     }
 
+    if(method == "cl"){
+        cleanFaces = true;
+    }
+
     is_ply = _is_file_ply(input.c_str());
 
     std::cout << " - Loading..." << std::flush;
@@ -165,8 +180,34 @@ int main(int argc, char **argv){
     std::cout << "   * Non Manifold vertices: " <<
                     tri::Clean<TMesh>::CountNonManifoldVertexFF(mm) << std::endl;
 
-    if(cleanFaces)
-        tri::Clean<TMesh>::RemoveNonManifoldFace(mm);
+    if(cleanFaces){
+        std::cout << " - Clearing..." << std::flush;
+        vcg::tri::Clean<TMesh>::RemoveNonManifoldFace(mm);
+        vcg::tri::Clean<TMesh>::RemoveUnreferencedVertex(mm);
+
+        vcg::tri::UpdateTopology<TMesh>::VertexFace(mm);
+
+        // Repair the mesh to fill in holes
+        vcg::tri::UpdateTopology<TMesh>::FaceFace(mm);
+        vcg::tri::UpdateTopology<TMesh>::VertexFace(mm);
+        vcg::tri::UpdateFlags<TMesh>::FaceBorderFromFF(mm);
+        vcg::tri::UpdateFlags<TMesh>::FaceBorderFromVF(mm);
+        vcg::tri::Clean<TMesh>::RemoveDuplicateVertex(mm);
+        vcg::tri::Clean<TMesh>::RemoveDuplicateFace(mm);
+        vcg::tri::Allocator<TMesh>::CompactEveryVector(mm);
+        std::cout << "done" << std::endl;
+
+        int numHoles = vcg::tri::Clean<TMesh>::CountHoles(mm);
+
+        if(numHoles > 0){
+            numHoles = vcg::tri::Hole<TMesh>::EarCuttingFill<tri::TrivialEar<TMesh>>(mm, 10, false);
+            vcg::tri::UpdateFlags<TMesh>::FaceBorderFromFF(mm);
+        }
+
+        if(method == "cl"){
+            goto __output;
+        }
+    }
 
     if(method == "taubin"){
         std::cout << " - Taubin Smoothing ( μ = " << mu << " λ = " << lambda << " )..." << std::flush;
@@ -181,8 +222,9 @@ int main(int argc, char **argv){
                                       loopThreshold);
         }
     }
-
-    std::cout << "done\n - Outputing..." << std::flush;
+    std::cout << "done" << std::endl;
+__output:
+    std::cout << " - Outputing..." << std::flush;
     if(output.substr(output.size()-3) == "ply")
         tri::io::ExporterPLY<TMesh>::Save(mm, output.c_str());
     else

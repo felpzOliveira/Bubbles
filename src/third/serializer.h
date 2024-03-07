@@ -52,7 +52,7 @@ void SerializerSaveSphDataSet2Legacy(SphSolverData2 *pSet, const char *filename,
 void SerializerLoadLegacySystem3(std::vector<vec3f> *points, const char *filename,
                                  int flags, std::vector<int> *boundaries = nullptr);
 
-int SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder, const char *filename, 
+int SerializerLoadSphDataSet3(ParticleSetBuilder3 *builder, const char *filename,
                               int &flags, std::vector<int> *boundary = nullptr);
 
 void SerializerLoadPoints3(std::vector<vec3f> *points, const char *filename, int &flags);
@@ -60,7 +60,7 @@ void SerializerLoadPoints3(std::vector<vec3f> *points, const char *filename, int
 int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &flags,
                         int start, int end, int legacy=0);
 
-int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet, 
+int SerializerLoadParticles3(std::vector<SerializedParticle> *pSet,
                              const char *filename, int &flags);
 
 void SerializerSaveDomain(SphSolverData3 *pSet, const char *filename);
@@ -79,3 +79,7 @@ int SerializerFlagsFromString(const char *spec);
 std::string SerializerStringFromFlags(int flags);
 
 const char *SerializerGetShapeName(ShapeType type);
+
+void SerializerSetWrites(bool write);
+
+bool SerializerIsWrittable();

@@ -593,6 +593,16 @@ void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
     ofs.close();
 }
 
+std::string modelsResources;
+std::string outputResources;
+void UtilSetGlobalModelPath(const char *path){
+    modelsResources = std::string(path);
+}
+
+void UtilSetGlobalOutputPath(const char *path){
+    outputResources = std::string(path);
+}
+
 #define TRI_MAP_ADD(a, b, c, u_map)do{\
     i3 i_val(a, b, c);\
     if(u_map.find(i_val) == u_map.end()){\

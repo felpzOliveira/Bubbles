@@ -17,6 +17,13 @@ struct DelaunaySet{
     int totalSize = 0;
     Point3 *positions;
 
+    bb_cpu_gpu void SetParticlePosition(int id, vec3f v){
+        if(nPos > 0){
+            int trueId = id - offset;
+            positions[trueId] = {v.x, v.y, v.z};
+        }
+    }
+
     bb_cpu_gpu vec3f GetParticlePosition(int id){
         if(nPos > 0){
             int trueId = id - offset;
@@ -38,8 +45,10 @@ struct DelaunaySet{
 inline
 bb_cpu_gpu vec3f DelaunayPosition(ParticleSet3 *pSet, DelaunaySet *dSet, int id){
     int count = pSet->GetParticleCount();
-    if(id < count)
+    if(id < count){
+        printf("[ERROR] Invalid position query\n");
         return pSet->GetParticlePosition(id);
+    }
     else
         return dSet->GetParticlePosition(id);
 }
@@ -194,16 +203,20 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
 
     *extraCounter = 0;
     timer.Start("Tetrahedra Filtering");
+    /*
+    * Classify the tetras in 3 possibilites:
+    * 1 - completely valid -> flag= 0xf
+    * 2 - at least one edge is invalid -> flag= 0x0
+    * 3 - virtual/invalid tetras -> flag= -1
+    */
     AutoParallelFor("Delaunay_Filter", size, AutoLambda(int i){
         Tet tet = kernTet[i];
+        const TetOpp botOpp = loadOpp(kernTetOpp, i);
         int A = tet._v[0], B = tet._v[1],
             C = tet._v[2], D = tet._v[3];
-        const TetOpp botOpp = loadOpp(kernTetOpp, i);
-
         tetFlags[i] = -1;
 
         if(DelaunayIsTetValid(tet, botOpp, kernChar[i], pLen)){
-
             int idA = ids[A], idB = ids[B],
                 idC = ids[C], idD = ids[D];
 
@@ -237,13 +250,17 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
             if(!is_tetra_valid){
                 tetFlags[i] = 0;
             }else
-                tetFlags[i] = 0x0f;
+                tetFlags[i] = 0xf;
         }
     });
 
     /*
     * TODO: The following two kernels can be merged into a single one
     * it is just splitted so we can compute the actual contribution of each one
+    */
+    /*
+    * Process only the completely valid tetras (flag == 0xf), these provide valid
+    * triangles no matter what and can be pushed into the unique tri list directly.
     */
     timer.StopAndNext("Find Unique Triangles - Part 1");
     AutoParallelFor("Delaunay_UniqueTriangles_NoTetras", size, AutoLambda(int tetIndex){
@@ -262,7 +279,6 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
 
         for(int botVi = 0; botVi < 4; botVi++){
             const int topTi = botOpp.getOppTet(botVi);
-            const int topVi = botOpp.getOppVi(botVi);
             const Tet topTet  = kernTet[topTi];
             int triStatesTi = tetFlags[topTi];
 
@@ -289,6 +305,11 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
     });
 
     timer.StopAndNext("Find Unique Triangles - Part 2");
+    /*
+    * Process the possibly invalid tetras (flag == 0). Checks each face and
+    * validate against neighbors and previously added faces. Generate missing
+    * faces and possibly helps fill-in possible holes in the mesh.
+    */
     AutoParallelFor("Delaunay_UniqueTriangles_Tetras", size, AutoLambda(int tetIndex){
         Tet tet = kernTet[tetIndex];
         const TetOpp botOpp = loadOpp(kernTetOpp, tetIndex);
@@ -305,7 +326,6 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
 
         for(int botVi = 0; botVi < 4; botVi++){
             const int topTi = botOpp.getOppTet(botVi);
-            const int topVi = botOpp.getOppVi(botVi);
             const Tet topTet  = kernTet[topTi];
             int triStatesTi = tetFlags[topTi];
 
@@ -348,6 +368,7 @@ DelaunayWorkQueueAndFilter(GpuDel *triangulator, DelaunayTriangulation &triangul
     });
 
     timer.Stop();
+
     cudaFree(extraCounter);
     cudaFree(tetFlags);
 }
@@ -375,9 +396,16 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     std::cout << " - Adjusting domain..." << std::flush;
 
     int totalCount = 0;
+    int supports = 0;
     for(int i = 0; i < pSet->GetParticleCount(); i++){
-        //totalCount += 1;
-        totalCount += pSet->GetParticleV0(i) > 0 ? 4 : 1;
+        if(pSet->GetParticleV0(i) > 0){
+            supports += 3;
+            totalCount += 4;
+        }else{
+        #if defined(DELAUNAY_WITH_INTERIOR)
+            totalCount += 1;
+        #endif
+        }
     }
 
     dSet = cudaAllocateUnregisterVx(DelaunaySet, 1);
@@ -493,7 +521,9 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     }
 
     pointNum = triangulation.pointVec.size();
-    std::cout << "done\n - Support points " << dSet->nPos << std::endl;
+    Float frac = 100.0 * supports / pSet->GetParticleCount();
+    std::cout << "done\n - Support points " << supports <<
+                 " ( " << frac << "% )" << std::endl;
 
     std::cout << " - Running delaunay triangulation..." << std::flush;
     timer.Start("Delaunay Triangulation");
@@ -615,6 +645,78 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     cudaFree(u_ids);
     cudaFree(iIndex);
     cudaFree(refIndex);
+}
+
+inline bb_cpu_gpu bool shiftface(vec3i &face, size_t i){
+    if(face[0] == i){
+        face = vec3i(face[1], face[2], i);
+    }else if(face[1] == i){
+        face = vec3i(face[0], face[2], i);
+    }else if(face[2] == i){
+        face = vec3i(face[0], face[1], i);
+    }
+    return face[2] == i;
+}
+
+void LaplacianSmoothOnce(vec3f *readBuf, vec3f *writeBuf, size_t verticeCount,
+                         vec3i *faces, size_t faceCount)
+{
+    vec3f *sourceBuf = readBuf;
+    vec3f *destBuf = writeBuf;
+    vec3i *faceBuf = faces;
+    AutoParallelFor("Laplacian Smooth", verticeCount, AutoLambda(int index){
+        vec3f laplacianSum(0.f, 0.f, 0.f);
+        int count = 0;
+
+        for(size_t fi = 0; fi < faceCount; fi++){
+            vec3i face = faceBuf[fi];
+            if(shiftface(face, index)){
+                vec3f vi = sourceBuf[face[2]];
+                vec3f vj = sourceBuf[face[0]];
+                vec3f vl = sourceBuf[face[1]];
+                vec3f edge1 = vj - vi;
+                vec3f edge2 = vl - vi;
+                laplacianSum += edge1 + edge2;
+                count += 2;
+            }
+        }
+
+        if(count > 0){
+            Float inv = 1.f / (Float)count;
+            destBuf[index] = sourceBuf[index] + laplacianSum * inv;
+        }else{
+            destBuf[index] = sourceBuf[index];
+        }
+    });
+}
+
+void DelaunaySmooth(DelaunayTriangulation &triangulation, int iterations){
+    size_t vsize = triangulation.shrinkedPs.size();
+    size_t fsize = triangulation.shrinked.size();
+    vec3f *bufferA = cudaAllocateUnregisterVx(vec3f, vsize);
+    vec3f *bufferB = cudaAllocateUnregisterVx(vec3f, vsize);
+    vec3i *faceBuf = cudaAllocateUnregisterVx(vec3i, fsize);
+
+    memcpy(bufferA, triangulation.shrinkedPs.data(), vsize * sizeof(vec3f));
+    memcpy(faceBuf, triangulation.shrinked.data(), fsize * sizeof(vec3i));
+
+    vec3f *buffers[2] = {bufferA, bufferB};
+    int active = 1;
+    for(int i = 0; i < iterations; i++){
+        vec3f *writeBuf = buffers[active];
+        vec3f *readBuf  = buffers[1-active];
+
+        LaplacianSmoothOnce(readBuf, writeBuf, vsize, faceBuf, fsize);
+        active = 1 - active;
+    }
+
+    for(int i = 0; i < vsize; i++){
+        triangulation.shrinkedPs[i] = bufferA[i];
+    }
+
+    cudaFree(bufferA);
+    cudaFree(bufferB);
+    cudaFree(faceBuf);
 }
 
 void

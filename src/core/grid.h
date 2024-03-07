@@ -1042,6 +1042,20 @@ class FieldGrid{
         }
     }
 
+    bb_cpu_gpu void SetValueAt(F value, size_t i, size_t j, size_t k){
+        vec3ui r(resolution[0], resolution[1], resolution[2]);
+        vec3ui u(i, j, k);
+        unsigned int h = LinearIndex<vec3ui>(u, r, dimensions);
+        field[h] = value;
+    }
+
+    bb_cpu_gpu void SetValueAt(F value, size_t i, size_t j){
+        vec2ui r(resolution[0], resolution[1]);
+        vec2ui u(i, j);
+        unsigned int h = LinearIndex<vec2ui>(u, r, dimensions);
+        field[h] = value;
+    }
+
     bb_cpu_gpu void SetValueAt(const F &value, const U &u){
         unsigned int h = LinearIndex(u, resolution, dimensions);
         field[h] = value;

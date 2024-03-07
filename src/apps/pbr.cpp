@@ -4,9 +4,9 @@
 #include <fstream>
 #include <obj_loader.h> // get parser utilities
 #include <transform.h>
+#include <util.h>
 
 // Two dragons scene: -clip 4 3.6 2 -layered -mat diffuse -mat-value 0.549 0.647 0.643
-#define MESH_FOLDER "/home/felipe/Documents/CGStuff/models"
 
 #define __to_stringf __to_string<Float>
 #define __to_stringi __to_string<int>
@@ -275,6 +275,15 @@ ARGUMENT_PROCESS(pbr_level_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(pbr_scale_arg){
+    pbr_opts *opts = (pbr_opts *)config;
+    std::string value = ParseNext(argc, argv, i, "-scale");
+    const char *token = value.c_str();
+    Float scale = ParseFloat(&token);
+    opts->transform = Scale(scale) * opts->transform;
+    return 0;
+}
+
 ARGUMENT_PROCESS(pbr_rotate_y_arg){
     pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-rotateY");
@@ -448,6 +457,11 @@ std::map<const char *, arg_desc> pbr_argument_map = {
     {"-translate",
         { .processor = pbr_translate_arg,
             .help = "Translate input set."
+        }
+    },
+    {"-scale",
+        { .processor = pbr_scale_arg,
+            .help = "Scales input set."
         }
     },
     {"-clip",
@@ -1008,7 +1022,7 @@ void pbr_command(int argc, char **argv){
 
         count = SplitByLayer(&rendergroups, &particles, total, &opts);
 
-        std::string refPath(MESH_FOLDER);
+        std::string refPath(outputResources);
         int has_mesh = 0;
         // add objects first for easier manual configuration
         for(SerializedShape &sh : shapes){

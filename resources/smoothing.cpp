@@ -186,7 +186,6 @@ int main(int argc, char **argv){
         vcg::tri::Clean<TMesh>::RemoveUnreferencedVertex(mm);
 
         vcg::tri::UpdateTopology<TMesh>::VertexFace(mm);
-
         // Repair the mesh to fill in holes
         vcg::tri::UpdateTopology<TMesh>::FaceFace(mm);
         vcg::tri::UpdateTopology<TMesh>::VertexFace(mm);
@@ -196,14 +195,14 @@ int main(int argc, char **argv){
         vcg::tri::Clean<TMesh>::RemoveDuplicateFace(mm);
         vcg::tri::Allocator<TMesh>::CompactEveryVector(mm);
         std::cout << "done" << std::endl;
-
+#if 0
         int numHoles = vcg::tri::Clean<TMesh>::CountHoles(mm);
 
         if(numHoles > 0){
             numHoles = vcg::tri::Hole<TMesh>::EarCuttingFill<tri::TrivialEar<TMesh>>(mm, 10, false);
             vcg::tri::UpdateFlags<TMesh>::FaceBorderFromFF(mm);
         }
-
+#endif
         if(method == "cl"){
             goto __output;
         }

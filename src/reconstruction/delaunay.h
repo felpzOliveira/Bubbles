@@ -49,6 +49,8 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
                 Float spacing, Float mu, Grid3 *domain, SphSolver3 *solver,
                 TimerList &timer);
 
+void DelaunaySmooth(DelaunayTriangulation &triangulation, int iterations);
+
 void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
                                Float spacing, Float mu);
 

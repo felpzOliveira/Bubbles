@@ -18,6 +18,11 @@
 * and is the method presented in:
 *    Counting Particles: a simple and fast surface reconstruction
 *                        method for particle-based fluids
+*
+* Added also implementation of the field alternative presented in (as it is very simple):
+*    Surface reconstruction method for particle-based fluids
+*        using discrete indicator functions
+*
 */
 
 /*
@@ -70,6 +75,7 @@ class LightweightGrid{
     int dimensions;
     Q bounds;
     DataType *stored;
+    T *centroids;
 
     bb_cpu_gpu LightweightGrid(){}
     void SetDimension(vec2f){ dimensions = 2; }
@@ -172,9 +178,11 @@ class LightweightGrid{
         bounds = Q(minPoint, maxPoint);
         if(with_data){
             stored = cudaAllocateVx(DataType, total);
+            centroids = cudaAllocateVx(T, total);
 
             for(int i = 0; i < total; i++){
                 stored[i] = DataType(0);
+                centroids[i] = T(0);
             }
         }
     }
@@ -402,8 +410,10 @@ class CountingGrid{
                         T pc = bounds.pMin + ds * index;
                         U tg; tg[0] = i; tg[1] = j; tg[2] = k;
                         unsigned int h = grid->GetLinearCellIndex(tg);
-                        if(CellParticleIntersection(pi, radius, pc, ds, fr))
+                        if(CellParticleIntersection(pi, radius, pc, ds, fr)){
+                            grid->centroids[h] = grid->centroids[h] + pi;
                             grid->stored[h] += 1; // TODO: This needs to be fractional
+                        }
                     }
                 }else{
                     T index;
@@ -413,8 +423,10 @@ class CountingGrid{
                     T pc = bounds.pMin + ds * index;
                     U tg; tg[0] = i; tg[1] = j;
                     unsigned int h = grid->GetLinearCellIndex(tg);
-                    if(CellParticleIntersection(pi, radius, pc, ds, fr))
+                    if(CellParticleIntersection(pi, radius, pc, ds, fr)){
+                        grid->centroids[h] = grid->centroids[h] + pi;
                         grid->stored[h] += 1; // TODO: This needs to be fractional
+                    }
                 }
             }
         }
@@ -455,6 +467,7 @@ class CountingGrid{
                 U u = grid->GetHashedPosition(p);
                 unsigned int h = grid->GetLinearCellIndex(u);
                 grid->stored[h] += 1;
+                grid->centroids[h] = grid->centroids[h] + p;
             }
         }
 
@@ -471,7 +484,7 @@ class CountingGrid{
             bounds = Union(bounds, p);
         }
 
-        bounds.Expand(20.0 * spacing);
+        bounds.Expand(5.0 * spacing);
 
         SetDimension(T(0));
 
@@ -495,6 +508,7 @@ class CountingGrid{
                 U u = grid->GetHashedPosition(p);
                 unsigned int h = grid->GetLinearCellIndex(u);
                 grid->stored[h] += 1;
+                grid->centroids[h] = grid->centroids[h] + p;
             }
         }
 
@@ -514,15 +528,18 @@ class CountingGrid{
         countField = grid->stored;
 
         for(int i = 0; i < total; i++){
-            if(countField[i] > 0){
-                particleCount += countField[i];
-                initialCellCount += 1.f;
-            }
             // TODO: Check if this is ok. Theoretically according to page 2
             //       S(k) = Nk / μ0, since we start assuming there are no particles
             //       the field is 0 everywhere.
             fieldDIF[i] = 0;
             smoothFieldDIF[i] = 0;
+
+            if(countField[i] > 0){
+                Float inv = 1.f / countField[i];
+                particleCount += countField[i];
+                initialCellCount += 1.f;
+                grid->centroids[i] *= inv;
+            }
         }
 
         /* Equation for μ0 on page 2 */
@@ -532,7 +549,7 @@ class CountingGrid{
         }
     }
 
-    FieldGridType *Solve(){
+    FieldGridType *Solve(bool use_asymetry, Float sigma){
         FieldGridType *field = cudaAllocateVx(FieldGridType, 1);
         Q bounds = grid->GetBounds();
         T spacing = grid->GetCellSize();
@@ -541,7 +558,7 @@ class CountingGrid{
         T p0 = bounds.pMin + 0.5 * spacing;
         field->Build(cells - U(1), spacing, p0, VertexCentered);
 
-        ComputeDIF(this);
+        ComputeDIF(this, use_asymetry, sigma);
 
         AssureA(field->total == total, "Invalid build");
         for(int i = 0; i < field->total; i++){
@@ -555,7 +572,9 @@ class CountingGrid{
 };
 
 template<typename T, typename U, typename Q, typename FilterSolver>
-inline void ComputeDIF(CountingGrid<T, U, Q, FilterSolver> *cGrid, Float sigma=1.2){
+inline void ComputeDIF(CountingGrid<T, U, Q, FilterSolver> *cGrid,
+                       bool asymetry, Float sigma)
+{
     LightweightGrid<T, U, Q, Float> *grid = cGrid->grid;
     Float *countField = cGrid->countField;
     Float *DIF = cGrid->fieldDIF;
@@ -566,10 +585,47 @@ inline void ComputeDIF(CountingGrid<T, U, Q, FilterSolver> *cGrid, Float sigma=1
     int dimensions = grid->GetDimensions();
     Float ratio = cGrid->scaledRatio;
 
-    /* Compute S(k): Equation 2, page 3 */
-    AutoParallelFor("CountingGrid - DIF", total, AutoLambda(int i){
-        DIF[i] = Min(mu_0, (Float)countField[i]) / mu_0;
-    });
+    T ds = grid->GetCellSize();
+    U usizes = grid->GetIndexCount();
+    Float diag = ds.Length();
+
+    if(!asymetry){ // pcount
+        /* Compute S(k): Equation 2, page 3 */
+        AutoParallelFor("CountingGrid - PCount", total, AutoLambda(int i){
+            DIF[i] = Min(mu_0, (Float)countField[i]) / mu_0;
+        });
+    }else{
+        AutoParallelFor("CountingGrid - Asymetry", total, AutoLambda(int i){
+            Float a_0 = 0.f;
+            Float field = Min(mu_0, (Float)countField[i]) / mu_0;
+
+            if(countField[i] > 0){
+                T pc;
+                U index = grid->GetCellIndex(i);
+                T origin = grid->minPoint + 0.5 * ds;
+                for(int j = 0; j < dimensions; j++)
+                    pc[j] = origin[j] + ds[j] * (Float)index[j];
+
+                Float dist = Distance(pc, grid->centroids[i]);
+                a_0 = dist / diag;
+            }
+
+            /*
+            * NOTE: In the original paper the field S(k) is given by Equation 7 in page 8
+            * which is dif = 1 - 2||c-p||/diag, however I'm a little confused because
+            * this means that at filled cells the field would be 1 (?), and at the other
+            * extrem would be -1. So in theory the field should oscilate between (-1,1)
+            * At 0 we would have ||c-p|| = diag/2. I can't see this being realistic but
+            * maybe the filtering adjusts these requirements, but I didn't check the math.
+            * I find that shifting the original field based on the centroid positions
+            * achieves similar results and it makes it much easier to define what is
+            * the appropriate iso-values for marching cubes, as it goes to 0 where we
+            * expect the surface to exist.
+            */
+            //DIF[i] = (1.f - 2.f * a_0);
+            DIF[i] = (1.f - a_0) * field;
+        });
+    }
 
     /* Apply box filter */
     AutoParallelFor("CountingGrid - Box Filter", total, AutoLambda(int i){

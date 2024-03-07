@@ -74,6 +74,28 @@ void run_self_tests(){
 }
 #endif
 
+void test_routine(){
+    Bounds3f bounds;
+    std::string basePath("../simulations/gravity/out_");
+    int total = 1432;
+    std::cout << bounds << std::endl;
+    for(int i = 0; i < total; i++){
+        std::vector<vec3f> points;
+        int flags = SERIALIZER_POSITION;
+        std::string filename = basePath + std::to_string(i);
+        filename += ".txt";
+        SerializerLoadLegacySystem3(&points, filename.c_str(), flags);
+
+        for(vec3f p : points){
+            bounds = Union(bounds, p);
+        }
+
+        std::cout << (i+1) << "/" << total << " {" << points.size() << "}" << std::endl;
+    }
+
+    std::cout << bounds << std::endl;
+}
+
 int main(int argc, char **argv){
     BB_MSG("Bubbles Fluid Simulator");
     /* Initialize cuda API */
@@ -82,8 +104,32 @@ int main(int argc, char **argv){
     /* Sets the default kernel launching parameters */
     cudaSetLaunchStrategy(CudaLaunchStrategy::CustomizedBlockSize, 16);
 
+    /* Path to where to find models */
+    UtilSetGlobalModelPath("/home/felpz/Documents/CGStuff/models");
+
+    /* Path to where to write file output */
+    UtilSetGlobalOutputPath("../simulations");
+
+    /* Disable file output */
+    SerializerSetWrites(false);
+
+    for(int i = 1; i < argc; i++){
+        std::string arg(argv[i]);
+        if(arg == "--enable-output")
+            SerializerSetWrites(true);
+    }
+
+    if(!SerializerIsWrittable()){
+        printf("(Note): Serializer is not writtable, will not output.\n"
+               "        Consider using --enable-output.\n");
+    }
+
+    //test_routine();
+    //test_pcisph2_helix();
+    //test_pcisph3_helix();
+    //test_pcisph3_dam_break();
     //test_pcisph3_box_drop();
-    test_pcisph3_gravity_field();
+    //test_pcisph3_gravity_field();
     //test_pcisph2_water_block();
     //test_pcisph2_marching_squares();
 
@@ -95,6 +141,7 @@ int main(int argc, char **argv){
     //test_pcisph3_dam_break_double_dragon();
     //test_pcisph3_quadruple_dam();
     //test_pcisph3_pathing();
+
     //test_pcisph3_box_drop();
     //test_pcisph3_happy_whale();
     //test_pcisph3_water_drop();

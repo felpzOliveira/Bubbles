@@ -14,9 +14,6 @@
 #include <dilts.h>
 #include <marching_cubes.h>
 
-#define MODELS_PATH "/home/felpz/Documents/CGStuff/models/"
-#define SIM_PATH "/home/felpz/Documents/Bubbles/simulations/"
-
 void set_particle_color(float *pos, float *col, ParticleSet3 *pSet);
 
 void test_pcisph3_water_box_forward(){
@@ -266,12 +263,12 @@ void test_pcisph3_rotating_water_box(){
             container->Update(g_transform * transform);
             container->SetVelocities(linear, angular * 50.0);
         }
-#if 0
+
         std::vector<int> bounds;
         int n = UtilGetBoundaryState(pSet, &bounds);
         printf("Boundary %d / %d\n", (int)n, (int)pSet->GetParticleCount());
 
-        std::string path("/home/felipe/Documents/Bubbles/simulations/box_rotate2/out_");
+        std::string path = outputResources + "/box_rotate2/out_";
         path += std::to_string(step-1);
         path += ".txt";
         int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
@@ -279,7 +276,6 @@ void test_pcisph3_rotating_water_box(){
                                                          //path.c_str(), flags, &bounds);
         SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
                                         flags, &bounds);
-#endif
 
         UtilPrintStepStandard(&solver,step-1);
         ProfilerReport();
@@ -373,9 +369,7 @@ void test_pcisph3_water_sphere_movable(){
         sphereContainer->Update(transform);
         sphereContainer->SetVelocities(vel, vec3f(0, Radians(1.0) / targetInterval, 0));
 
-        std::string respath("/home/felipe/Documents/Bubbles/simulations/move_sphere/output_");
-        respath += std::to_string(step-1);
-        respath += ".txt";
+        std::string respath = FrameOutputPath("move_sphere/output_", step-1);
 
         UtilGetBoundaryState(pSet, &boundaries);
         //int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
@@ -471,13 +465,11 @@ void test_pcisph3_water_drop(){
             colors[3 * i + 2] = 1;
         }
     };
-#if 0
+
     std::vector<int> boundaries;
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;
-        std::string respath("/home/felipe/Documents/Bubbles/simulations/water_drop/output_");
-        respath += std::to_string(step-1);
-        respath += ".txt";
+        std::string respath = FrameOutputPath("water_drop/output_", step-1);
 
         UtilGetBoundaryState(pSet, &boundaries);
         int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
@@ -487,26 +479,17 @@ void test_pcisph3_water_drop(){
         UtilPrintStepStandard(&solver, step-1);
         return step > 500 ? 0 : 1;
     };
-#else
+
 
     auto filler = [&](float *pos, float *col) -> int{
         return UtilGenerateBoxPoints(pos, col, vec3f(1,1,0), boxSize,
                                      extraParts-12, container->ObjectToWorld);
     };
 
-    auto onStepUpdate = [&](int step) -> int{
-        if(step == 0) return 1;
-        UtilPrintStepStandard(&solver,step-1);
-        ProfilerReport();
-        return step > 450 ? 0 : 1;
-    };
-#endif
     UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
                                                            target, targetInterval, extraParts,
                                                            {}, onStepUpdate, colorFunction,
                                                            filler);
-//    PciSphRunSimulation3(&solver, spacing, origin, target,
-//                         targetInterval, {}, onStepUpdate);
 
     CudaMemoryManagerClearCurrent();
     printf("===== OK\n");
@@ -690,8 +673,8 @@ void test_pcisph3_emit_test(){
     Float spacing = 0.02;
     Float targetScale = 0;
 
-    const char *meshPath = MODELS_PATH "lucy.obj";
-    ParsedMesh *mesh = LoadObj(meshPath);
+    std::string meshPath = ModelPath("lucy.obj");
+    ParsedMesh *mesh = LoadObj(meshPath.c_str());
     Transform scale = UtilComputeFitTransform(mesh, boxSize.y, &targetScale);
     printf("Target scale = %g\n", targetScale);
 
@@ -723,15 +706,13 @@ void test_pcisph3_emit_test(){
     Float targetInterval = 1.0 / 240.0;
     auto callback = [&](int step) -> int{
         if(step == 0) return 1;
-#if 0
-        std::string path(SIM_PATH "dragon_pool/output_");
-        path += std::to_string(step-1);
-        path += ".txt";
+
+        std::string path = FrameOutputPath("dragon_pool/output_", step-1);
         int flags = SERIALIZER_POSITION | SERIALIZER_DENSITY |
                     SERIALIZER_MASS | SERIALIZER_BOUNDARY;
 
         UtilSaveSimulation3(&solver, pSet, path.c_str(), flags);
-#endif
+
         return 1;
     };
     PciSphRunSimulation3(&solver, spacing, origin, target, targetInterval,
@@ -752,9 +733,8 @@ void test_pcisph3_dissolve(){
     Float spacing = 0.02;
     Float targetScale = 0;
 
-    //const char *meshPath = MODELS_PATH "walking_teapot_n.obj";
-    const char *meshPath = MODELS_PATH "lucy.obj";
-    ParsedMesh *mesh = LoadObj(meshPath);
+    std::string meshPath = ModelPath("lucy.obj");
+    ParsedMesh *mesh = LoadObj(meshPath.c_str());
     Transform scale = UtilComputeFitTransform(mesh, boxSize.y, &targetScale);
 
     Shape *container = MakeBox(Transform(), boxSize, true);
@@ -849,10 +829,8 @@ void test_pcisph3_dissolve(){
             pBuilder2.MapGridEmitToOther(&pBuilder, ZeroVelocityField3, spacing);
             count++;
         }
-#if 0
-        std::string path(SIM_PATH "dragon_pool/output_");
-        path += std::to_string(step-1);
-        path += ".txt";
+
+        std::string path = FrameOutputPath("dragon_pool/output_", step-1);
         int flags = SERIALIZER_POSITION | SERIALIZER_DENSITY | SERIALIZER_MASS;
         if(step < emitFrame){
             std::vector<ParticleSet3 *> sets = {pSet, pSet2};
@@ -860,7 +838,7 @@ void test_pcisph3_dissolve(){
         }else{
             UtilSaveSimulation3(&solver, pSet, path.c_str(), flags);
         }
-#endif
+
         return step < 800 ? 1 : 0;
     };
 
@@ -883,9 +861,9 @@ void test_pcisph3_dragon_pool(){
     Float targetScale = 0.0f;
     CudaMemoryManagerStart(__FUNCTION__);
 
-    //const char *dragonPath = "/home/felipe/Documents/CGStuff/models/stanfordDragon.obj";
-    const char *dragonPath = "/home/felipe/Documents/CGStuff/models/walking_teapot_n.obj";
-    ParsedMesh *mesh = LoadObj(dragonPath);
+    std::string dragonPath = ModelPath("stanfordDragon.obj");
+    //std::string dragonPath = ModelPath("walking_teapot_n.obj");
+    ParsedMesh *mesh = LoadObj(dragonPath.c_str());
 
     Float elevation = 0.2 + spacing;
     Transform dragonScale = Scale(0.25) * UtilComputeFitTransform(mesh,
@@ -893,8 +871,8 @@ void test_pcisph3_dragon_pool(){
     Bounds3f bounds = UtilComputeBoundsAfter(mesh, dragonScale);
     Float yof = (boxSize.y - bounds.ExtentOn(1)) * 0.5; yof += 2.2 * spacing;
 
-    //Shape *dragonShape = MakeMesh(mesh, Translate(0, -yof, 0) * RotateY(-90) * Scale(0.9) * dragonScale);
-    Shape *dragonShape = MakeMesh(mesh, Translate(0, -yof, 0) * dragonScale);
+    Shape *dragonShape = MakeMesh(mesh, Translate(0, -yof, 0) * RotateY(-90) * Scale(0.9) * dragonScale);
+    //Shape *dragonShape = MakeMesh(mesh, Translate(0, -yof, 0) * dragonScale);
 
     Shape *container = MakeBox(Transform(), boxSize, true);
     Shape *shower = MakeSphere(Translate(0.8, 0, 0), emitRadius);
@@ -982,16 +960,12 @@ void test_pcisph3_dragon_pool(){
 
     auto callback = [&](int step) -> int{
         if(step == 0) return 1;
-        //ProfilerReport();
-#if 0
-        const char *targetOutput = "/home/felipe/Documents/Bubbles/simulations/dragon_pool/output_";
-        std::string respath(targetOutput);
-        respath += std::to_string(step-1);
-        respath += ".txt";
+        ProfilerReport();
+
+        std::string respath = FrameOutputPath("dragon_pool/output_", step-1);
         int flags = SERIALIZER_POSITION | SERIALIZER_DENSITY |
-            SERIALIZER_MASS | SERIALIZER_BOUNDARY;
+                    SERIALIZER_MASS | SERIALIZER_BOUNDARY;
         UtilSaveSimulation3(&solver, pSet, respath.c_str(), flags);
-#endif
 
         if(step < 400){
             pBuilder.MapGridEmit(velocityField, spacing);
@@ -1021,14 +995,15 @@ void test_pcisph3_dragon_shower(){
     Float emitRadius = 0.15;
     CudaMemoryManagerStart(__FUNCTION__);
 
-    const char *dragonPath = "/home/felipe/Documents/CGStuff/models/stanfordDragon.obj";
-    ParsedMesh *mesh = LoadObj(dragonPath);
+    std::string dragonPath = ModelPath("stanfordDragon.obj");
+    ParsedMesh *mesh = LoadObj(dragonPath.c_str());
     Transform dragonScale = UtilComputeFitTransform(mesh, boxSize.x);
     Bounds3f bounds = UtilComputeBoundsAfter(mesh, dragonScale);
     Float yof = (boxSize.y - bounds.ExtentOn(1)) * 0.5; yof += 2.2 * spacing;
     yof += 0.08;
 
-    Shape *dragonShape = MakeMesh(mesh, Translate(0, -yof, -0.08) * RotateY(-90) * dragonScale);
+    Shape *dragonShape = MakeMesh(mesh, Translate(0, -yof, -0.08) *
+                            RotateY(-90) * dragonScale);
     Shape *container = MakeBox(Transform(), boxSize, true);
     Shape *shower = MakeSphere(Translate(0.3, 1, 0), emitRadius);
     Shape *shower2 = MakeSphere(Translate(-0.3, 1, 0), emitRadius);
@@ -1074,11 +1049,10 @@ void test_pcisph3_dragon_shower(){
 
     auto callback = [&](int step) -> int{
         if(step == 0) return 1;
-        //std::string respath("shower/output_");
-        //respath += std::to_string(step-1);
-        //respath += ".txt";
-        //SerializerSaveSphDataSet3(solver.GetSphSolverData(), respath.c_str(),
-        //SERIALIZER_POSITION);
+
+        std::string respath = FrameOutputPath("shower/output_", step-1);
+        SerializerSaveSphDataSet3(solver.GetSphSolverData(), respath.c_str(),
+                                  SERIALIZER_POSITION);
 
         UtilPrintStepStandard(&solver, step-1);
 
@@ -1139,13 +1113,11 @@ void test_pcisph3_dragon(){
     {
         if(step > 0){
             UtilPrintStepStandard(&solver, step-1);
-#if 0
-            std::string path("/home/felipe/Documents/Bubbles/simulations/dragon2/out_");
-            path += std::to_string(step-1);
-            path += ".txt";
+
+            std::string path = FrameOutputPath("dragon2/out_", step-1);
             SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
                                             SERIALIZER_POSITION);
-#endif
+
         }
         return 1;
     });
@@ -1249,13 +1221,9 @@ void test_pcisph3_water_block(){
     Float targetInterval = 1.0 / 240.0;
 
     auto callback = [&](int step) -> int{
-        const char *sim_folder = "/home/felipe/Documents/Bubbles/simulations/";
-        std::string path(sim_folder);
+        std::string path = FrameOutputPath("water_block/output_", step-1);
         std::vector<int> bounds;
         int n = UtilGetBoundaryState(set2, &bounds);
-        path += "water_block/output_";
-        path += std::to_string(step-1);
-        path += ".txt";
         int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
         UtilEraseFile(path.c_str());
         SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
@@ -1276,7 +1244,7 @@ void test_pcisph3_rock_dam(){
     Float spacingScale = 2.0;
     vec3f origin(8, 0, 0);
     vec3f target(0,-1,0);
-    const char *objPath = "/home/felipe/Documents/CGStuff/models/rock.obj";
+    std::string objPath = ModelPath("rock.obj");
 
     vec3f targetPos(0, -1.1, 1.0);
     Float rockMaxSize = 2.4;
@@ -1285,7 +1253,7 @@ void test_pcisph3_rock_dam(){
 
     CudaMemoryManagerStart("test_pcisph3_rock_dam");
 
-    ParsedMesh *mesh = LoadObj(objPath);
+    ParsedMesh *mesh = LoadObj(objPath.c_str());
 
     Transform meshScale = UtilComputeFitTransform(mesh, rockMaxSize);
     Shape *rock = MakeMesh(mesh, Translate(targetPos) * RotateY(90) * meshScale);
@@ -1589,7 +1557,8 @@ void test_pcisph3_box_mesh(){
     vec3f boxSize(3.0);
 #if 0
     Float targetScale = 0;
-    ParsedMesh *mesh = LoadObj(MODELS_PATH "box.obj");
+    std::string boxpath = ModelPath("box.obj");
+    ParsedMesh *mesh = LoadObj(boxpath.c_str());
     (void)UtilComputeFitTransform(mesh, 1.0, &targetScale);
     Transform baseScale = Scale(targetScale);
 
@@ -1658,16 +1627,10 @@ void test_pcisph3_box_mesh(){
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;
         //UtilPrintStepStandard(&solver,step-1);
-#if 0
-        const char *sim_folder = "/home/felipe/Documents/Bubbles/simulations/";
-        std::string path(sim_folder);
-        path += "two_dragons/output_";
-        path += std::to_string(step-1);
-        path += ".txt";
+        std::string path = FrameOutputPath("two_dragons/output_", step-1);
         int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
         UtilSaveSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet,
                                                          path.c_str(), flags);
-#endif
         //ProfilerReport();
         return step > 900 ? 0 : 1;
     };
@@ -1699,7 +1662,8 @@ void test_pcisph3_dam_break_double_dragon(){
 
 #if defined(WITH_MESH)
     Float targetScale = 0;
-    ParsedMesh *mesh = LoadObj(MODELS_PATH "sssdragon.obj");
+    std::string dragpath = ModelPath("sssdragon.obj");
+    ParsedMesh *mesh = LoadObj(dragpath.c_str());
 
     (void)UtilComputeFitTransform(mesh, boxSize.z, &targetScale);
     Transform baseScale = Scale(targetScale * 0.8);
@@ -1749,16 +1713,10 @@ void test_pcisph3_dam_break_double_dragon(){
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;
         UtilPrintStepStandard(&solver,step-1);
-#if 0
-        const char *sim_folder = "../simulations/";
-        std::string path(sim_folder);
-        path += "two_dragons/output_";
-        path += std::to_string(step-1);
-        path += ".txt";
+        std::string path = FrameOutputPath("two_dragons/output_", step-1);
         int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
         UtilSaveSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet,
                                                          path.c_str(), flags);
-#endif
         ProfilerReport();
         return step > 900 ? 0 : 1;
     };
@@ -1834,13 +1792,9 @@ void test_pcisph3_double_dam_break(){
             return 1;
         UtilPrintStepStandard(&solver, step-1);
         ProfilerReport();
-#if 0
-        std::string path("../simulations/double_dam/out_");
-        path += std::to_string(step-1);
-        path += ".txt";
+        std::string path = FrameOutputPath("double_dam/out_", step-1);
         SerializerSaveSphDataSet3(solver.GetSphSolverData(), path.c_str(),
                                   SERIALIZER_POSITION);
-#endif
         return step > 450 ? 0 : 1;
     };
 
@@ -1864,14 +1818,15 @@ void test_pcisph3_pathing(){
     vec3f containerLen(2.0, 1.0, 1.0);
     Shape *container = MakeBox(Transform(), containerLen, true);
 
-    ParsedMesh *unityCube = LoadObj(MODELS_PATH "cube.obj");
+    std::string cubepath = ModelPath("cube.obj");
+    ParsedMesh *unityCube = LoadObj(cubepath.c_str());
     Float xExtent = 0.5;
     vec3f scaleSize(xExtent, 0.2, 0.5);
     Float xof = (containerLen.x - xExtent) * 0.5; xof -= spacing;
     Transform t = Translate(-xof, 0, 0) * RotateZ(-14) * Scale(scaleSize);
     Shape *leftRamp = MakeMesh(unityCube, t);
 
-    Shape *boxEmitter = MakeBox(Translate(0, 0, 0), vec3f(0.05));
+    Shape *boxEmitter = MakeBox(Translate(0, 0, 0), vec3f(0.2));
 
     ColliderSetBuilder3 cBuilder;
     cBuilder.AddCollider3(leftRamp);
@@ -1988,25 +1943,15 @@ void test_pcisph3_quadruple_dam(){
 
     ProfilerInitKernel(sphSet->GetParticleSet()->GetParticleCount());
 
-#if 0
     auto callback = [&](int step) -> int{
         if(step <= 0) return 1;
-        std::string respath("/media/felipe/Novo volume/quadruple_out/sim_data/out_");
-        respath += std::to_string(step-1);
-        respath += ".txt";
+        std::string respath = FrameOutputPath("quadruple_out/out_", step-1);
         SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), respath.c_str(),
                                         SERIALIZER_POSITION);
         UtilPrintStepStandard(&solver, step-1);
         return step > 500 ? 0 : 1;
     };
-#else
-    auto callback = [&](int step) -> int{
-        if(step == 0) return 1;
-        UtilPrintStepStandard(&solver, step-1);
-        ProfilerReport();
-        return step > 450 ? 0 : 1;
-    };
-#endif
+
     Float targetInterval =  1.0 / 60.0;
     PciSphRunSimulation3(&solver, spacing, origin, target,
                          targetInterval, {}, callback);
@@ -2022,8 +1967,8 @@ void test_pcisph3_lucy_ball(){
     Float sphereRadius = 1.5;
     Float waterRadius = 0.5;
 
-    const char *lucyPath = "/home/felipe/Documents/CGStuff/models/lucy.obj";
-    ParsedMesh *lucyMesh = LoadObj(lucyPath);
+    std::string lucyPath = ModelPath("lucy.obj");
+    ParsedMesh *lucyMesh = LoadObj(lucyPath.c_str());
     Transform lucyScale = UtilComputeFitTransform(lucyMesh, sphereRadius);
     Shape *lucyShape = MakeMesh(lucyMesh, Translate(0, -sphereRadius * 0.5, 0) *
                                 RotateY(-90) * lucyScale);
@@ -2082,12 +2027,10 @@ void test_pcisph3_lucy_ball(){
     graphy_render_points3f(pos, col, total, spacing/2.0);
     Float targetInterval = 1.0 / 240.0;
     for(int i = 0; i < 20 * 26 * 20; i++){
-        std::string outputName("lucy/output_");
+        std::string outputName = FrameOutputPath("lucy/output_", i);
         solver.Advance(targetInterval);
         simple_color(pos, col, pSet);
         graphy_render_points3f(pos, col, total, spacing/2.0);
-        outputName += std::to_string(i);
-        outputName += ".txt";
         SerializerSaveSphDataSet3(solver.GetSphSolverData(), outputName.c_str(),
                                   SERIALIZER_POSITION);
     }
@@ -2116,11 +2059,11 @@ void test_pcisph3_lucy_dam(){
 
     vec3f boxSize = vec3f(boxFluidLen, boxFluidYLen, boxFluidLen);
 
-    const char *lucyPath = "/home/felipe/Documents/CGStuff/models/lucy.obj";
+    std::string lucyPath = ModelPath("lucy.obj");
 
     Shape *container = MakeBox(Transform(), vec3f(boxLen), true);
     Shape *boxp = MakeBox(Translate(xof, -yof, zof), boxSize);
-    Shape *lucyShape = MakeMesh(lucyPath, Translate(0,-0.3,0) * Scale(0.015));
+    Shape *lucyShape = MakeMesh(lucyPath.c_str(), Translate(0,-0.3,0) * Scale(0.015));
 
 
     /* Emit particles */
@@ -2179,12 +2122,10 @@ void test_pcisph3_lucy_dam(){
     graphy_render_points3f(pos, col, count, spacing/2.0);
 
     for(int i = 0; i < 20 * 26 * 20; i++){
-        std::string outputName("lucy/output_");
+        std::string outputName = FrameOutputPath("lucy/output_", i);
         solver.Advance(targetInterval);
         simple_color(pos, col, pSet);
         graphy_render_points3f(pos, col, count, spacing/2.0);
-        outputName += std::to_string(i);
-        outputName += ".txt";
         SerializerSaveSphDataSet3(solver.GetSphSolverData(), outputName.c_str(),
                                   SERIALIZER_POSITION);
         //printf("Step: %d            \n", i+1);
@@ -2210,12 +2151,12 @@ void test_pcisph3_whale_obstacle(){
     Float yof = (boxLen * 0.4 - boxFluidYLen); yof -= spacing;
     vec3f boxSize = vec3f(boxFluidLen, boxFluidYLen, boxFluidLen);
 
-    const char *whaleObj = "/home/felipe/Documents/CGStuff/models/HappyWhale.obj";
+    std::string whaleObj = ModelPath("HappyWhale.obj");
     Transform transform = Translate(0, -0.8, 0) * Scale(0.1); // happy whale
 
     Shape *container = MakeBox(Transform(), vec3f(boxLen), true);
     Shape *waterBox = MakeSphere(Translate(xof, yof, zof), 0.2);
-    ParsedMesh *mesh = LoadObj(whaleObj);
+    ParsedMesh *mesh = LoadObj(whaleObj.c_str());
     Shape *meshShape = MakeMesh(mesh, transform);
 
     /* Emit particles */

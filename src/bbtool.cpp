@@ -62,6 +62,7 @@ std::map<const char *, arg_desc> command_map = {
 
 int main(int argc, char **argv){
     BB_MSG("Bubbles Tool");
+    UtilSetGlobalModelPath("/home/felpz/Documents/CGStuff/models");
     argument_process(command_map, argc, argv, "Bubbles Tool", nullptr);
     return 0;
 }

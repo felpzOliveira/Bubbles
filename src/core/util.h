@@ -14,6 +14,7 @@
 #include <gDel3D/GpuDelaunay.h>
 #include <gDel3D/CPU/PredWrapper.h>
 #include <gDel3D/CommonTypes.h>
+#include <filesystem>
 
 #if defined(DEBUG)
     #define BB_MSG(name) printf("* %s - Built %s at %s [DEBUG] *\n", name, __DATE__, __TIME__)
@@ -95,6 +96,44 @@ struct i3IsSame{
 * and check for common error conditions that will trigger several issues
 * and make us waste time debugging.
 */
+
+/*
+* Global path where to find stuff
+*/
+extern std::string modelsResources;
+extern std::string outputResources;
+
+void UtilSetGlobalModelPath(const char *path);
+void UtilSetGlobalOutputPath(const char *path);
+
+inline std::string ModelPath(const char *name){
+    return modelsResources + "/" + std::string(name);
+}
+
+inline void AssureFolderExists(const std::string &path){
+    std::filesystem::path directoryPath(path);
+    if(!std::filesystem::exists(directoryPath)){
+        std::filesystem::create_directories(directoryPath);
+    }
+}
+
+inline std::string FrameOutputPath(const char *name, int frame){
+    std::string respath = outputResources + "/" + std::string(name);
+    int dash = 0;
+    for(int i = respath.size()-1; i >= 0; i--){
+        if(respath[i] == '/'){
+            dash = i;
+            break;
+        }
+    }
+
+    std::string folder = respath.substr(0, dash);
+    AssureFolderExists(folder);
+
+    respath += std::to_string(frame);
+    respath += ".txt";
+    return respath;
+}
 
 /*
 * Get a set of scattered particles for displaying the FieldGrid SDF.
@@ -393,6 +432,9 @@ inline void UtilSaveSimulation3(Solver *solver, ParticleAccessor *pSet,
     std::stringstream ss;
     std::vector<int> boundaries;
 
+    if(!SerializerIsWrittable())
+        return;
+
     UtilEraseFile(filename);
 
     FILE *fp = fopen(filename, "a+");
@@ -421,6 +463,9 @@ template<typename Solver, typename ParticleAccessor> inline
 void UtilSaveSimulation3(Solver *solver, std::vector<ParticleAccessor *> pSets,
                          const char *filename, int flags)
 {
+    if(!SerializerIsWrittable())
+        return;
+
     std::stringstream ss;
     UtilEraseFile(filename);
     FILE *fp = fopen(filename, "a+");
@@ -778,6 +823,8 @@ inline void UtilPrintStepStandard(Solver *solver, int step){
 * Dumps the basic position of the current simulator step into disk.
 */
 inline void UtilSaveSph3Frame(const char *basedir, int step, SphSolverData3 *data){
+    if(!SerializerIsWrittable())
+        return;
     std::string path(basedir);
     path += std::to_string(step);
     path += ".txt";

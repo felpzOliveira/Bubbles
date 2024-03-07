@@ -193,3 +193,7 @@ void CudaMemoryManagerClearAll(){
     std::cout << "[Memory] Released: All [ " << mem <<" ] " << std::endl;
 #endif
 }
+
+std::string CudaGetCurrentKey(){
+    return manager.activeKey;
+}

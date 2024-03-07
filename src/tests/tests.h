@@ -3,6 +3,7 @@
 #include <geometry.h>
 #include <sph_solver.h>
 
+
 #define TEST_CHECK(x, msg) test_check((x), #x, __FILE__, __LINE__, msg)
 
 /*
@@ -112,10 +113,12 @@ void test_pcisph2_marching_squares();
 void test_pcisph2_water_rotating_obstacles();
 void test_pcisph2_water_sphere_dynamic();
 void test_pcisph2_water_square_dynamic();
+void test_pcisph2_helix();
 
 // As you can see, I'm having a lot fun with the pcisph3 solver
 void test_pcisph3_water_sphere();
 void test_pcisph3_double_dam_break();
+void test_pcisph3_dam_break();
 void test_pcisph3_dragon();
 void test_pcisph3_lucy_dam();
 void test_pcisph3_happy_whale();
@@ -143,6 +146,7 @@ void test_pcisph3_water_block();
 void test_pcisph3_dissolve();
 void test_pcisph3_emit_test();
 void test_pcisph3_gravity_field();
+void test_pcisph3_helix();
 
 void test_pbf2_double_dam_break();
 

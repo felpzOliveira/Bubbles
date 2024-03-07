@@ -157,7 +157,8 @@ vec3f grad(FieldGrid3f *grid, size_t i, size_t j, size_t k, const vec3f &invSize
 
 bb_cpu_gpu inline
 vec3f safeNormalize(const vec3f& n){
-    if(n.LengthSquared() > 0.0)
+    Float len = n.LengthSquared();
+    if(len > 0.0 && !IsZero(len))
         return Normalize(n);
     return n;
 }

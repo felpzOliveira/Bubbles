@@ -14,6 +14,7 @@ typedef enum{
     SDF_ZHU_BRIDSON = 0,
     SDF_SPH,
     SDF_ANISOTROPIC,
+    SDF_PARTICLE_ASYMETRY,
     SDF_PARTICLE_COUNT,
     SDF_DELAUNAY,
     SDF_NONE,
@@ -24,7 +25,11 @@ typedef struct{
     Float spacing;
     Float marchingCubeSpacing;
     Float delaunayMu;
+    Float iso;
     int delaunayIntervalLevel;
+    int delaunaySmoothIterations;
+    bool delaunayUsePreciseBoundary;
+    bool delaunaySmooth;
     std::string input;
     std::string output;
     SurfaceMethod method;
@@ -44,6 +49,8 @@ SurfaceMethod SDFMethodFromString(std::string method){
         return SDF_SPH;
     else if(method == "pcount")
         return SDF_PARTICLE_COUNT;
+    else if(method == "asymetry")
+        return SDF_PARTICLE_ASYMETRY;
     else if(method == "delaunay")
         return SDF_DELAUNAY;
     return SDF_NONE;
@@ -54,6 +61,7 @@ std::string StringFromSDFMethod(SurfaceMethod method){
         case SDF_ZHU_BRIDSON: return "zhu";
         case SDF_ANISOTROPIC: return "anisotropic";
         case SDF_PARTICLE_COUNT: return "pcount";
+        case SDF_PARTICLE_ASYMETRY: return "asymetry";
         case SDF_SPH: return "sph";
         case SDF_DELAUNAY: return "delaunay";
         default:{
@@ -77,12 +85,16 @@ void default_surface_opts(surface_opts *opts){
     opts->inflags = SERIALIZER_POSITION;
     opts->kernel = 0.04;
     opts->spacing = 0.02;
+    opts->delaunaySmooth = false;
+    opts->delaunaySmoothIterations = 2;
     opts->delaunayIntervalLevel = 8;
+    opts->delaunayUsePreciseBoundary = false;
     opts->delaunayMu = 1.1;
     opts->marchingCubeSpacing = 0.01;
     opts->outformat = FORMAT_OBJ;
     opts->byResolution = false;
     opts->resolution = vec3ui(0);
+    opts->iso = Infinity;
 }
 
 void print_surface_configs(surface_opts *opts){
@@ -91,8 +103,14 @@ void print_surface_configs(surface_opts *opts){
     std::cout << "    * Output : " << opts->output << std::endl;
     std::cout << "    * Spacing : " << opts->spacing << std::endl;
     std::cout << "    * Delaunay μ : " << opts->delaunayMu << std::endl;
-    std::cout << "    * Delaunay interval level : " << opts->delaunayIntervalLevel <<
-                std::endl;
+    if(opts->delaunayUsePreciseBoundary){
+        std::cout << "    * Delaunay interval level : " << opts->delaunayIntervalLevel <<
+                    std::endl;
+    }
+    if(opts->delaunaySmooth){
+        std::cout << "    * Delaunay smoothing iterations : " <<
+                    opts->delaunaySmoothIterations << std::endl;
+    }
     std::cout << "    * Reconstruction method : " <<
                         StringFromSDFMethod(opts->method) << std::endl;
     std::cout << "    * Kernel : " << opts->kernel << std::endl;
@@ -103,6 +121,24 @@ void print_surface_configs(surface_opts *opts){
         std::cout << "    * Forcing Resolution : " << opts->resolution.x
                    << " x " << opts->resolution.y << " x " << opts->resolution.z << std::endl;
     }
+}
+
+ARGUMENT_PROCESS(surface_delaunay_use_precise){
+    surface_opts *opts = (surface_opts *)config;
+    opts->delaunayUsePreciseBoundary = true;
+    return 0;
+}
+
+ARGUMENT_PROCESS(surface_delaunay_smooth_iterations){
+    surface_opts *opts = (surface_opts *)config;
+    opts->delaunaySmoothIterations = ParseNextFloat(argc, argv, i, "-delaunay-smooth");
+    if(opts->delaunaySmoothIterations < 1){
+        printf("Invalid smoothing iterations\n");
+        return -1;
+    }
+
+    opts->delaunaySmooth = true;
+    return 0;
 }
 
 ARGUMENT_PROCESS(surface_in_args){
@@ -214,6 +250,12 @@ ARGUMENT_PROCESS(surface_del_interval_level){
     return 0;
 }
 
+ARGUMENT_PROCESS(surface_isolevel_args){
+    surface_opts *opts = (surface_opts *)config;
+    opts->iso = ParseNextFloat(argc, argv, i, "-iso");
+    return 0;
+}
+
 ARGUMENT_PROCESS(surface_resolution_args){
     surface_opts *opts = (surface_opts *)config;
     unsigned int nx = ParseNextFloat(argc, argv, i, "-res");
@@ -277,6 +319,18 @@ std::map<const char *, arg_desc> surface_arg_map = {
             .help = "Sets the level to use for the interval method during delaunay reconstruction. (default: 8)"
         }
     },
+    {"-delaunay-smooth",
+        {
+            .processor = surface_delaunay_smooth_iterations,
+            .help = "Uses Laplacian smoothing during delaunay generation. Call with number of iterations.(default false)"
+        }
+    },
+    {"-delaunay-precise",
+        {
+            .processor = surface_delaunay_use_precise,
+            .help = "Sets delaunay method to use robust boundary surface extraction based on the interval method. (default: false)"
+        }
+    },
     {"-delaunay-mu",
         {
             .processor = surface_delaunay_mu_args,
@@ -305,6 +359,12 @@ std::map<const char *, arg_desc> surface_arg_map = {
         {
             .processor = surface_resolution_args,
             .help = "Sets the resolution to be used (overwrites spacing properties)."
+        }
+    },
+    {"-iso",
+        {
+            .processor = surface_isolevel_args,
+            .help = "Sets the value to use as iso-value for surface reconstruction."
         }
     }
 };
@@ -440,22 +500,22 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     UpdateGridDistributionGPU(solver.solverData);
     grid->UpdateQueryState();
 
-    /* compute density and normal */
-    timer.StopAndNext("Density Computation");
-    ComputeDensityGPU(solver.solverData);
-    timer.StopAndNext("Normal Computation");
-    ComputeNormalGPU(solver.solverData);
-    timer.Stop();
-
-    /* do neighbor processing, i.e.: find out particles that are going to be extended */
+    /* clear v0 buffer as it is going to serve as basis for point support extension */
     ParticleSet3 *pSet = sphpSet->GetParticleSet();
     pSet->ClearDataBuffer(&pSet->v0s);
-
     std::cout << "Done\nInspecting neighbors... " << std::flush;
+
+    /* compute the boundary region we are going to extend either by exact/approx solution */
     timer.Start("Volume Flag Computation");
-    //IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision,
-                     //opts->delaunayIntervalLevel);
-    LNMBoundary(pSet, grid, opts->spacing);
+    if(opts->delaunayUsePreciseBoundary){
+        /* rely on intervalar method with a high interval level as it is faster than dilts */
+        IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision,
+                         opts->delaunayIntervalLevel);
+    }else{
+        /* rely on lnm as it is fast */
+        LNMBoundary(pSet, grid, opts->spacing);
+    }
+
     timer.Stop();
 
     /* apply delaunay triangulation and filtering to get mesh */
@@ -463,16 +523,28 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu,
                     grid, &solver, timer);
 
-    std::cout << "Done\nFetching geometry... " << std::endl;
+    std::cout << "Done" << std::endl;
+    if(opts->delaunaySmooth){
+        /* apply laplacian smoothing to get a better looking mesh */
+        // NOTE: Since we don't actually have a mesh structure and we already dispose
+        //       of the one in gDel3D, vertices will need to find their faces so it
+        //       might get a bit slow even using GPU.
+        std::cout << "Applying Laplacian smoothing..." << std::flush;
+        DelaunaySmooth(triangulation, opts->delaunaySmoothIterations);
+        std::cout << "Done" << std::endl;
+    }
+
+    std::cout << "Fetching geometry..." << std::endl;
     DelaunayGetTriangleMesh(triangulation, mesh);
 }
 
 FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
-                                   TimerList &timer)
+                                   TimerList &timer, SurfaceMethod method)
 {
     CountingGrid3D countSdf;
     Float spacingScale = 2.0;
     Float spacing = opts->spacing / spacingScale;
+    bool asymetry = method == SDF_PARTICLE_ASYMETRY;
     std::cout << "Generating SDF... " << std::flush;
     timer.Start("Domain build");
     if(!opts->byResolution){
@@ -483,7 +555,7 @@ FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *
     }
     timer.StopAndNext("Build SDF");
 
-    FieldGrid3f *sdfGrid = countSdf.Solve();
+    FieldGrid3f *sdfGrid = countSdf.Solve(asymetry, 1.2);
     timer.Stop();
     vec3ui res = sdfGrid->GetResolution();
     std::cout << "OK [ Resolution: " << res.x << " x " << res.y << " x " << res.z
@@ -862,8 +934,8 @@ void surface_command(int argc, char **argv){
 
     FieldGrid3f *grid;
     TimerList timer;
-    if(opts.method == SDF_PARTICLE_COUNT)
-        grid = ParticlesToSDF_Pcount(&builder, &opts, timer);
+    if(opts.method == SDF_PARTICLE_COUNT || opts.method == SDF_PARTICLE_ASYMETRY)
+        grid = ParticlesToSDF_Pcount(&builder, &opts, timer, opts.method);
     else if(opts.method < SDF_PARTICLE_COUNT)
         grid = ParticlesToSDF_Surface(&builder, &opts, timer);
     else if(opts.method == SDF_DELAUNAY){
@@ -876,8 +948,15 @@ void surface_command(int argc, char **argv){
     }
 
     if(requires_mc){
-        printf("Running Marching Cubes\n");
+        Float iso = opts.iso;
+        if(iso == Infinity){
+            if(opts.method == SDF_PARTICLE_COUNT || opts.method == SDF_PARTICLE_ASYMETRY)
+                iso = 0.25;
+            else
+                iso = 0.0;
+        }
 
+        printf("Running Marching Cubes [iso-value= %g]\n", iso);
         /*
         * NOTE: I'm not sure why, but the triangles generated from the particle
         * sdf with Pcount method  need to be rotated otherwise normals get flipped.
@@ -885,10 +964,10 @@ void surface_command(int argc, char **argv){
         * but for now it seems that it literally is as simple as rotating the triangles.
         */
         timer.Start("Marching Cubes");
-        if(opts.method == SDF_PARTICLE_COUNT)
-            MarchingCubes(grid, &mesh, 0.25, true);
+        if(opts.method == SDF_PARTICLE_COUNT || opts.method == SDF_PARTICLE_ASYMETRY)
+            MarchingCubes(grid, &mesh, iso, true);
         else
-            MarchingCubes(grid, &mesh, 0.0, false);
+            MarchingCubes(grid, &mesh, iso, false);
         timer.Stop();
     }
 

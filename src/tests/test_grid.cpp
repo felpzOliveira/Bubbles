@@ -759,13 +759,13 @@ void test_field_grid(){
     int resolution = 64;
     Float margin = 0.01;
 
-    const char *whaleObj = "/home/felipe/Documents/CGStuff/models/HappyWhale.obj";
+    std::string whaleObj = modelsResources + "/HappyWhale.obj";
     //Transform transform = Scale(0.02); //dragon
     Transform transform = Scale(0.3); // happy whale
 
     UseDefaultAllocatorFor(AllocatorType::GPU);
 
-    ParsedMesh *mesh = LoadObj(whaleObj);
+    ParsedMesh *mesh = LoadObj(whaleObj.c_str());
     Shape *shape = MakeMesh(mesh, transform);
 
     Bounds3f bounds = shape->GetBounds();

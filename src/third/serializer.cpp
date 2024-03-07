@@ -5,6 +5,18 @@
 
 #define CAN_SKIP(x) (IS_SPACE(x) && !IS_NEW_LINE(x))
 
+static bool enable_write = true;
+
+#define RETURN_ON_DISABLE() if(!enable_write) return
+
+void SerializerSetWrites(bool write){
+    enable_write = write;
+}
+
+bool SerializerIsWrittable(){
+    return enable_write;
+}
+
 static void PrintToFile(FILE *fp, const Float &value, int spacing=0){
     if(spacing)
         fprintf(fp, " %g", value);
@@ -670,6 +682,8 @@ int SerializerLoadMany3(std::vector<vec3f> ***data, const char *basename, int &f
 
 template<typename SolverData = SphSolverData3, typename T>
 void SaveSimulationDomain(SolverData *data, const char *filename){
+    RETURN_ON_DISABLE();
+
     FILE *fp = fopen(filename, "a+");
     int dims = T(0).Dimensions();
 
@@ -702,6 +716,7 @@ typename Domain = Grid3, typename T>
 void SaveSphParticleSetLegacy(SolverData *data, const char *filename, int flags,
                               std::vector<int> *boundary = nullptr)
 {
+    RETURN_ON_DISABLE();
     ParticleSet *pSet = data->sphpSet->GetParticleSet();
     FILE *fp = fopen(filename, "a+");
     std::string format = SerializerStringFromFlags(flags);
@@ -873,6 +888,7 @@ typename Domain = Grid3, typename T>
 void SaveSphParticleSet(SolverData *data, const char *filename, int flags,
                         std::vector<int> *boundary = nullptr)
 {
+    RETURN_ON_DISABLE();
     ParticleSet *pSet = data->sphpSet->GetParticleSet();
     Float spacing = data->sphpSet->GetTargetSpacing();
     FILE *fp = fopen(filename, "a+");
@@ -911,6 +927,7 @@ typename Domain = Grid3, typename T>
 void SaveSphParticleSetMany(SolverData *data, const char *filename, int flags,
                             std::vector<ParticleSet *> pSets)
 {
+    RETURN_ON_DISABLE();
     ParticleSet *pSet = data->sphpSet->GetParticleSet();
     Float spacing = data->sphpSet->GetTargetSpacing();
     std::string format = SerializerStringFromFlags(flags);

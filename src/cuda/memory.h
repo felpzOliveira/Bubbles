@@ -18,6 +18,11 @@
 void CudaMemoryManagerStart(const char *key);
 
 /*
+* Gets the current key being used.
+*/
+std::string CudaGetCurrentKey();
+
+/*
 * Clears all memory taken in the active context.
 */
 void CudaMemoryManagerClearCurrent();

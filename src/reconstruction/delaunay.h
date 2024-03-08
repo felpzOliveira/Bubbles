@@ -19,6 +19,18 @@
 */
 #define DELAUNAY_WITH_INTERIOR
 
+typedef enum{
+    LaplacianSmooth=0,
+    TaubinSmooth
+}MeshSmoothMethod;
+
+struct MeshSmoothOpts{
+    MeshSmoothMethod method;
+    int iterations;
+    Float lambda;
+    Float mu;
+};
+
 struct DelaunayTriangleInfo{
     vec3ui tri;
     int opp;
@@ -49,7 +61,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
                 Float spacing, Float mu, Grid3 *domain, SphSolver3 *solver,
                 TimerList &timer);
 
-void DelaunaySmooth(DelaunayTriangulation &triangulation, int iterations);
+void DelaunaySmooth(DelaunayTriangulation &triangulation, MeshSmoothOpts opts);
 
 void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
                                Float spacing, Float mu);

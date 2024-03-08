@@ -13,7 +13,6 @@
 typedef enum{
     SDF_ZHU_BRIDSON = 0,
     SDF_SPH,
-    SDF_ANISOTROPIC,
     SDF_PARTICLE_ASYMETRY,
     SDF_PARTICLE_COUNT,
     SDF_DELAUNAY,
@@ -43,8 +42,6 @@ typedef struct{
 SurfaceMethod SDFMethodFromString(std::string method){
     if(method == "zhu")
         return SDF_ZHU_BRIDSON;
-    else if(method == "aniso" || method == "anisotropic")
-        return SDF_ANISOTROPIC;
     else if(method == "sph")
         return SDF_SPH;
     else if(method == "pcount")
@@ -59,7 +56,6 @@ SurfaceMethod SDFMethodFromString(std::string method){
 std::string StringFromSDFMethod(SurfaceMethod method){
     switch(method){
         case SDF_ZHU_BRIDSON: return "zhu";
-        case SDF_ANISOTROPIC: return "anisotropic";
         case SDF_PARTICLE_COUNT: return "pcount";
         case SDF_PARTICLE_ASYMETRY: return "asymetry";
         case SDF_SPH: return "sph";
@@ -525,12 +521,20 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
 
     std::cout << "Done" << std::endl;
     if(opts->delaunaySmooth){
-        /* apply laplacian smoothing to get a better looking mesh */
+        /* apply smoothing to get a better looking mesh */
         // NOTE: Since we don't actually have a mesh structure and we already dispose
         //       of the one in gDel3D, vertices will need to find their faces so it
         //       might get a bit slow even using GPU.
-        std::cout << "Applying Laplacian smoothing..." << std::flush;
-        DelaunaySmooth(triangulation, opts->delaunaySmoothIterations);
+        // TODO: Add some cmds to change these
+        MeshSmoothOpts mOpts = {
+            .method = TaubinSmooth,
+            .iterations = opts->delaunaySmoothIterations,
+            .lambda = 0.5f,
+            .mu = -0.53f,
+        };
+
+        std::cout << "Smoothing result..." << std::flush;
+        DelaunaySmooth(triangulation, mOpts);
         std::cout << "Done" << std::endl;
     }
 
@@ -563,161 +567,6 @@ FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *
 
     return sdfGrid;
 }
-
-// TODO: BROKEN! fix me!
-void ComputeAnisotropicSDF(SphSolverData3 *solverData, FieldGrid3f *sdfGrid,
-                           surface_opts *opts)
-{
-    Float spacingScale = 2.0;
-    Grid3 *grid = solverData->domain;
-    ParticleSet3 *pSet = solverData->sphpSet->GetParticleSet();
-    Float spacing = opts->spacing;
-    Float kernelRadius = opts->kernel;
-    Float inf = grid->GetBounds().Diagonal().Length();
-
-    SVDMat3d *gs = cudaAllocateUnregisterVx(SVDMat3d, pSet->GetParticleCount());
-    vec3f *xMean = cudaAllocateUnregisterVx(vec3f, pSet->GetParticleCount());
-    WorkQueue<int> *workQ = cudaAllocateUnregisterVx(WorkQueue<int>, 1);
-    workQ->SetSlots(pSet->GetParticleCount(), false);
-
-    spacing *= spacingScale;
-    Float r = 2.0 * spacing;
-    Float invH = 1.f / spacing;
-    Float h2 = spacing * spacing;
-
-    AutoParallelFor("Compute-Means", pSet->GetParticleCount(), AutoLambda(int f){
-        int *neighbors = nullptr;
-        vec3f pi = pSet->GetParticlePosition(f);
-        unsigned int cellId = grid->GetLinearHashedPosition(pi);
-        int count = grid->GetNeighborsOf(cellId, &neighbors);
-
-        vec3f mean;
-        Float wsum = 0.f;
-        size_t num = 0;
-        for(int i = 0; i < count; i++){
-            Cell3 *cell = grid->GetCell(neighbors[i]);
-            ParticleChain *pChain = cell->GetChain();
-            int size = cell->GetChainLength();
-            for(int j = 0; j < size; j++){
-                vec3f pj = pSet->GetParticlePosition(pChain->pId);
-                Float dist = Distance(pi, pj);
-                if(dist < kernelRadius){
-                    Float wj = wij((pi - pj).Length(), r);
-                    wsum += wj;
-                    mean = mean + wj * pj;
-                    num++;
-                }
-                pChain = pChain->next;
-            }
-        }
-
-        mean = mean * (1.f / wsum);
-        xMean[f] = Lerp(pi, mean, 0.5);
-
-        if(num < 25){
-            gs[f] = SVDMat3d::ScaleMatrix(invH, invH, invH);
-        }else{
-            workQ->Push(f);
-        }
-    });
-
-    AutoParallelFor("Compute-G", workQ->size, AutoLambda(int id){
-        int *neighbors = nullptr;
-        int f = workQ->At(id);
-        vec3f pi = pSet->GetParticlePosition(f);
-        vec3f mean = xMean[f];
-        unsigned int cellId = grid->GetLinearHashedPosition(pi);
-        int count = grid->GetNeighborsOf(cellId, &neighbors);
-
-        SVDMat3d mat = SVDMat3d::ScaleMatrix(h2, h2, h2);
-        Float wsum = 0.f;
-
-        for(int i = 0; i < count; i++){
-            Cell3 *cell = grid->GetCell(neighbors[i]);
-            ParticleChain *pChain = cell->GetChain();
-            int size = cell->GetChainLength();
-            for(int j = 0; j < size; j++){
-                vec3f pj = pSet->GetParticlePosition(pChain->pId);
-                Float dist = Distance(pi, pj);
-                if(dist < kernelRadius){
-                    vec3f v = pj - mean;
-                    Float wj = wij((pi - pj).Length(), r);
-                    wsum += wj;
-                    mat = mat + SVDMat3d::Vvt(v.x, v.y, v.z) * wj;
-                }
-                pChain = pChain->next;
-            }
-        }
-
-        mat = mat * (1.f / wsum);
-        gs[f] = mat;
-    });
-
-    AutoParallelFor("Compute-SVD", pSet->GetParticleCount(), AutoLambda(int f){
-        SVDMat3d u, w;
-        SVDVec3d sv;
-        SVD3(gs[f], u, sv, w);
-
-        vec3f v(Absf(sv[0]), Absf(sv[1]), Absf(sv[2]));
-        Float maxVal = Max(v.x, Max(v.y, v.z));
-        v.x = Max(v.x, maxVal / 4.f);
-        v.y = Max(v.y, maxVal / 4.f);
-        v.z = Max(v.z, maxVal / 4.f);
-
-        SVDMat3d invSigma = SVDMat3d::ScaleMatrix(1.f / v.x, 1.f / v.y, 1.f / v.z);
-        Float scaleTerm = powf(v.x * v.y * v.z, 1.f / 3.f);
-        gs[f] = (w * invSigma * u.Transpose()) * invH * scaleTerm;
-        pSet->SetParticlePosition(f, xMean[f]);
-    });
-
-    UpdateGridDistributionGPU(solverData);
-
-    AutoParallelFor("Compute-SDF", sdfGrid->total, AutoLambda(int f){
-        int *neighbors = nullptr;
-        vec3ui u = DimensionalIndex(f, sdfGrid->resolution, 3);
-        vec3f p = sdfGrid->GetDataPosition(u);
-        vec3f clampedP = grid->GetBounds().Clamped(p, Epsilon);
-        Float mass = pSet->GetMass();
-        unsigned int cellId = grid->GetLinearHashedPosition(clampedP);
-        int count = grid->GetNeighborsOf(cellId, &neighbors);
-
-        Float sum = 0;
-        for(int i = 0; i < count; i++){
-            Cell3 *cell = grid->GetCell(neighbors[i]);
-            ParticleChain *pChain = cell->GetChain();
-            int size = cell->GetChainLength();
-            for(int j = 0; j < size; j++){
-                vec3f pj = pSet->GetParticlePosition(pChain->pId);
-                Float dj = pSet->GetParticleDensity(pChain->pId);
-                Float dist = Distance(p, pj);
-                if(dist < kernelRadius){
-                    vec3f dr = pj - p;
-                    SVDMat3d *G = &gs[pChain->pId];
-                    SVDVec3d tg_p = G->PointMul(dr.x, dr.y, dr.z);
-                    Float det = G->Determinant();
-                    Float kw = k_w(vec3f(tg_p[0], tg_p[1], tg_p[2]), det);
-                    Float term = (mass / dj) * kw;
-
-                    sum += term;
-                }
-                pChain = pChain->next;
-            }
-        }
-
-        if(IsNaN(sum))
-            sum = inf;
-
-        sdfGrid->SetValueAt(0.5 - sum, u);
-    });
-
-    sdfGrid->MarkFilled();
-
-    cudaFree(gs);
-    cudaFree(xMean);
-    cudaFree(workQ->ids);
-    cudaFree(workQ);
-}
-
 
 FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
                                     TimerList &timer)
@@ -782,21 +631,18 @@ FieldGrid3f *ParticlesToSDF_Surface(ParticleSetBuilder3 *pBuilder, surface_opts 
 
     Float inf = grid->GetBounds().Diagonal().Length();
     std::cout << "Generating SDF... " << std::flush;
+
     /* compute sdf */
-    if(method == SDF_ANISOTROPIC){
-        ComputeAnisotropicSDF(solver.solverData, sdfGrid, opts);
-    }else{
-        AutoParallelFor("SDF", sdfGrid->total, AutoLambda(int i){
-            vec3ui u = DimensionalIndex(i, sdfGrid->resolution, 3);
-            vec3f p = sdfGrid->GetDataPosition(u);
-            Float estimate = inf;
-            if(method == SDF_ZHU_BRIDSON)
-                estimate = ZhuBridsonSDF(p, grid, pSet, radius, threshold);
-            else if(method == SDF_SPH)
-                estimate = SphSDF(p, grid, pSet, radius);
-            sdfGrid->SetValueAt(estimate, u);
-        });
-    }
+    AutoParallelFor("SDF", sdfGrid->total, AutoLambda(int i){
+        vec3ui u = DimensionalIndex(i, sdfGrid->resolution, 3);
+        vec3f p = sdfGrid->GetDataPosition(u);
+        Float estimate = inf;
+        if(method == SDF_ZHU_BRIDSON)
+            estimate = ZhuBridsonSDF(p, grid, pSet, radius, threshold);
+        else if(method == SDF_SPH)
+            estimate = SphSDF(p, grid, pSet, radius);
+        sdfGrid->SetValueAt(estimate, u);
+    });
 
     sdfGrid->MarkFilled();
     timer.Stop();

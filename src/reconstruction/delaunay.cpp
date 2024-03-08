@@ -658,6 +658,63 @@ inline bb_cpu_gpu bool shiftface(vec3i &face, size_t i){
     return face[2] == i;
 }
 
+// Trivial forward/backwards taubin
+void TaubinSmoothOnce(vec3f *inOut, vec3f *tmp, size_t verticeCount,
+                      vec3i *faces, size_t faceCount, Float lambda, Float mu)
+{
+    vec3f *inOutBuf = inOut;
+    vec3f *tmpBuf = tmp;
+    vec3i *faceBuf = faces;
+    AutoParallelFor("Taubin Smooth - Forward", verticeCount, AutoLambda(int index){
+        vec3f laplacian(0.f, 0.f, 0.f);
+        int count = 0;
+        for(size_t fi = 0; fi < faceCount; fi++){
+            vec3i face = faceBuf[fi];
+            if(shiftface(face, index)){
+                vec3f vi = inOutBuf[face[2]];
+                vec3f vj = inOutBuf[face[0]];
+                vec3f vl = inOutBuf[face[1]];
+                vec3f edge1 = vj - vi;
+                vec3f edge2 = vl - vi;
+                laplacian += edge1 + edge2;
+                count += 2;
+            }
+        }
+
+        if(count > 0){
+            Float inv = 1.f / (Float)count;
+            tmpBuf[index] = inOutBuf[index] + lambda * (laplacian * inv - inOutBuf[index]);
+        }else{
+            tmpBuf[index] = inOutBuf[index];
+        }
+    });
+
+    AutoParallelFor("Taubin Smooth - Backwards", verticeCount, AutoLambda(int index){
+        vec3f laplacian(0.f, 0.f, 0.f);
+        int count = 0;
+        for(size_t fi = 0; fi < faceCount; fi++){
+            vec3i face = faceBuf[fi];
+            if(shiftface(face, index)){
+                vec3f vi = tmpBuf[face[2]];
+                vec3f vj = tmpBuf[face[0]];
+                vec3f vl = tmpBuf[face[1]];
+                vec3f edge1 = vj - vi;
+                vec3f edge2 = vl - vi;
+                laplacian += edge1 + edge2;
+                count += 2;
+            }
+        }
+
+        if(count > 0){
+            Float inv = 1.f / (Float)count;
+            inOutBuf[index] = tmpBuf[index] + mu * (laplacian * inv - tmpBuf[index]);
+        }else{
+            inOutBuf[index] = tmpBuf[index];
+        }
+    });
+}
+
+// Trivial laplacian
 void LaplacianSmoothOnce(vec3f *readBuf, vec3f *writeBuf, size_t verticeCount,
                          vec3i *faces, size_t faceCount)
 {
@@ -690,7 +747,7 @@ void LaplacianSmoothOnce(vec3f *readBuf, vec3f *writeBuf, size_t verticeCount,
     });
 }
 
-void DelaunaySmooth(DelaunayTriangulation &triangulation, int iterations){
+void DelaunaySmooth(DelaunayTriangulation &triangulation, MeshSmoothOpts opts){
     size_t vsize = triangulation.shrinkedPs.size();
     size_t fsize = triangulation.shrinked.size();
     vec3f *bufferA = cudaAllocateUnregisterVx(vec3f, vsize);
@@ -701,17 +758,24 @@ void DelaunaySmooth(DelaunayTriangulation &triangulation, int iterations){
     memcpy(faceBuf, triangulation.shrinked.data(), fsize * sizeof(vec3i));
 
     vec3f *buffers[2] = {bufferA, bufferB};
+    vec3f *outputBuf = bufferA;
     int active = 1;
-    for(int i = 0; i < iterations; i++){
-        vec3f *writeBuf = buffers[active];
-        vec3f *readBuf  = buffers[1-active];
+    for(int i = 0; i < opts.iterations; i++){
+        if(opts.method == LaplacianSmooth){
+            vec3f *writeBuf = buffers[active];
+            vec3f *readBuf  = buffers[1-active];
 
-        LaplacianSmoothOnce(readBuf, writeBuf, vsize, faceBuf, fsize);
-        active = 1 - active;
+            LaplacianSmoothOnce(readBuf, writeBuf, vsize, faceBuf, fsize);
+            active = 1 - active;
+            outputBuf = writeBuf;
+        }else if(opts.method == TaubinSmooth){
+            TaubinSmoothOnce(bufferA, bufferB, vsize, faceBuf, fsize, opts.lambda, opts.mu);
+            outputBuf = bufferA;
+        }
     }
 
     for(int i = 0; i < vsize; i++){
-        triangulation.shrinkedPs[i] = bufferA[i];
+        triangulation.shrinkedPs[i] = outputBuf[i];
     }
 
     cudaFree(bufferA);

@@ -11,9 +11,6 @@
 #include <serializer.h>
 #include <sph_solver.h>
 #include <sstream>
-#include <gDel3D/GpuDelaunay.h>
-#include <gDel3D/CPU/PredWrapper.h>
-#include <gDel3D/CommonTypes.h>
 #include <filesystem>
 
 #if defined(DEBUG)
@@ -21,74 +18,6 @@
 #else
     #define BB_MSG(name) printf("* %s - Built %s at %s *\n", name, __DATE__, __TIME__)
 #endif
-
-struct i2{
-    public:
-    int t[2];
-
-    bb_cpu_gpu
-    i2(){ t[0] = 0; t[1] = 0; }
-
-    bb_cpu_gpu
-    i2(int a, int b){
-        if(a > b) Swap(a, b);
-        t[0] = a;
-        t[1] = b;
-    }
-
-    bb_cpu_gpu
-    bool operator==(const i2 &other){
-        return t[0] == other.t[0] && t[1] == other.t[1];
-    }
-};
-
-struct i2Comp{
-    bool operator()(i2 a, i2 b) const{
-        return std::make_pair(a.t[0], a.t[1]) > std::make_pair(b.t[0], b.t[1]);
-    }
-};
-
-struct i3{
-    public:
-    int t[3];
-
-    bb_cpu_gpu
-    i3(){ t[0] = 0; t[1] = 0; t[2] = 0; }
-
-    bb_cpu_gpu
-    i3(int a, int b, int c){
-        if(a > c) Swap(a, c);
-        if(a > b) Swap(a, b);
-        if(b > c) Swap(b, c);
-        t[0] = a;
-        t[1] = b;
-        t[2] = c;
-    }
-
-    bb_cpu_gpu
-    bool operator==(const i3 &other){
-        return t[0] == other.t[0] && t[1] == other.t[1] && t[2] == other.t[2];
-    }
-};
-
-
-struct i3Hasher{
-    public:
-    bb_cpu_gpu
-    size_t operator()(const i3 &a) const{
-        int f = a.t[0] + a.t[1] + a.t[2];
-        return f;
-        //return std::hash<int>()(f);
-    }
-};
-
-struct i3IsSame{
-    public:
-    bb_cpu_gpu
-    bool operator()(const i3 &a, const i3 &b) const{
-        return b.t[0] == a.t[0] && b.t[1] == a.t[1] && b.t[2] == a.t[2];
-    }
-};
 
 /*
 * So... our simulator is looking great! However is very hard to perform
@@ -226,67 +155,6 @@ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f col,
 */
 int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
                           vec3f length, int nPoints, Transform transform);
-
-/*
-* Writes the output of GDel3D to a ply file. The flag 'tetras' can be used to make
-* this routine write a 4-indexed file where each description is a tetrahedron and NOT
-* a quad. Setting 'tetras' to false will force decomposition of the tetrahedrons and write
-* triangles instead.
-*/
-void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
-                        const char *path, bool tetras=true);
-
-/*
-* Writes a ply file from a specific set of triangles from a given GDel3D output.
-*/
-void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
-                        GDelOutput *output, const char *path);
-
-ParsedMesh *UtilGDel3DToParsedMesh(std::vector<vec3i> *tris, Point3HVec *pointVec,
-                                   GDelOutput *output);
-
-/*
-* Get the total amount of tetras generated through GDel3D
-*/
-uint32_t GDel3D_TetraCount(GDelOutput *output);
-
-/*
-* Get the total amount of real tetras generated through GDel3D
-*/
-uint32_t GDel3D_RealTetraCount(GDelOutput *output, uint32_t pLen);
-
-/*
-* Utility routine for looping through real tetrahedrons in GDel3D.
-*/
-template<typename Fn>
-void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
-    const TetHVec tetVec      = output->tetVec;
-    const TetOppHVec oppVec   = output->tetOppVec;
-    const CharHVec tetInfoVec = output->tetInfoVec;
-
-    for(int i = 0; i < tetVec.size(); i++){
-        bool valid = true;
-        Tet tet = tetVec[i];
-        const TetOpp botOpp = oppVec[i];
-        if(!isTetAlive(tetInfoVec[i])) valid = false;
-
-        for(int s = 0; s < 4; s++){
-            if(botOpp._t[s] == -1) valid = false;
-            if(tet._v[s] == pLen) valid = false; // inf point
-        }
-
-        if(valid)
-            fn(tet, botOpp, i);
-    }
-}
-
-/*
-* Find all triangles that are unique. Be warned that the indexes given in the output
-* 'tris' are of the type 'i3', i.e.: they will be sorted from lowest to highest. This
-* does not preserve triangle orientation.
-*/
-void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
-                          GDelOutput *output, int pLen);
 
 /*
 * Utilities for bug hunting and preventing errors.

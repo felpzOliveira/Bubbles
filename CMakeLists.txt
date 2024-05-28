@@ -9,7 +9,6 @@ set (INC_PATHS      "${CMAKE_CURRENT_SOURCE_DIR}/src/core"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/shapes"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/third"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/third/graphy"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/src/third/gDel3D/GDelFlipping/src"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/cuda"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/tests"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/apps"
@@ -72,8 +71,6 @@ set_source_files_properties(${BUBBLES_CORE} PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(${BUBBLES_SRCS} PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(${BBTOOL_SRCS} PROPERTIES LANGUAGE CUDA)
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src/third/gDel3D)
-
 add_library(corelib OBJECT ${BUBBLES_CORE})
 target_include_directories(corelib PUBLIC ${INC_PATHS})
 set_target_properties(corelib PROPERTIES COMPILE_FLAGS "${BB_COMPILE}")
@@ -84,7 +81,7 @@ set_target_properties(corelib PROPERTIES
 
 add_executable(${BUBBLES} ${BUBBLES_SRCS} $<TARGET_OBJECTS:corelib>)
 target_include_directories(${BUBBLES} PUBLIC ${INC_PATHS})
-target_link_libraries(${BUBBLES} ${BB_LINK_LIBS};gflip3d;cuda)
+target_link_libraries(${BUBBLES} ${BB_LINK_LIBS};cuda)
 set_target_properties(${BUBBLES} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}")
 set_target_properties(${BUBBLES} PROPERTIES
        CUDA_ARCHITECTURES "75"
@@ -93,7 +90,7 @@ set_target_properties(${BUBBLES} PROPERTIES
 
 add_executable(${BBTOOL} ${BBTOOL_SRCS} $<TARGET_OBJECTS:corelib>)
 target_include_directories(${BBTOOL} PUBLIC ${INC_PATHS})
-target_link_libraries(${BBTOOL} ${BB_LINK_LIBS};gflip3d;cuda)
+target_link_libraries(${BBTOOL} ${BB_LINK_LIBS};cuda)
 set_target_properties(${BBTOOL} PROPERTIES COMPILE_FLAGS "${BB_COMPILE}")
 set_target_properties(${BBTOOL} PROPERTIES
        CUDA_ARCHITECTURES "75"

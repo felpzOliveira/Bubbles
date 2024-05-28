@@ -6,7 +6,6 @@
 #include <memory.h>
 #include <host_mesh.h>
 #include <counting.h>
-#include <delaunay.h>
 #include <interval.h>
 #include <svd.h>
 
@@ -15,7 +14,6 @@ typedef enum{
     SDF_SPH,
     SDF_PARTICLE_ASYMETRY,
     SDF_PARTICLE_COUNT,
-    SDF_DELAUNAY,
     SDF_NONE,
 }SurfaceMethod;
 
@@ -25,10 +23,6 @@ typedef struct{
     Float marchingCubeSpacing;
     Float delaunayMu;
     Float iso;
-    int delaunayIntervalLevel;
-    int delaunaySmoothIterations;
-    bool delaunayUsePreciseBoundary;
-    bool delaunaySmooth;
     std::string input;
     std::string output;
     SurfaceMethod method;
@@ -48,8 +42,6 @@ SurfaceMethod SDFMethodFromString(std::string method){
         return SDF_PARTICLE_COUNT;
     else if(method == "asymetry")
         return SDF_PARTICLE_ASYMETRY;
-    else if(method == "delaunay")
-        return SDF_DELAUNAY;
     return SDF_NONE;
 }
 
@@ -59,7 +51,6 @@ std::string StringFromSDFMethod(SurfaceMethod method){
         case SDF_PARTICLE_COUNT: return "pcount";
         case SDF_PARTICLE_ASYMETRY: return "asymetry";
         case SDF_SPH: return "sph";
-        case SDF_DELAUNAY: return "delaunay";
         default:{
             return "none";
         }
@@ -81,11 +72,6 @@ void default_surface_opts(surface_opts *opts){
     opts->inflags = SERIALIZER_POSITION;
     opts->kernel = 0.04;
     opts->spacing = 0.02;
-    opts->delaunaySmooth = false;
-    opts->delaunaySmoothIterations = 2;
-    opts->delaunayIntervalLevel = 8;
-    opts->delaunayUsePreciseBoundary = false;
-    opts->delaunayMu = 1.1;
     opts->marchingCubeSpacing = 0.01;
     opts->outformat = FORMAT_OBJ;
     opts->byResolution = false;
@@ -98,15 +84,6 @@ void print_surface_configs(surface_opts *opts){
     std::cout << "    * Input : " << opts->input << std::endl;
     std::cout << "    * Output : " << opts->output << std::endl;
     std::cout << "    * Spacing : " << opts->spacing << std::endl;
-    std::cout << "    * Delaunay μ : " << opts->delaunayMu << std::endl;
-    if(opts->delaunayUsePreciseBoundary){
-        std::cout << "    * Delaunay interval level : " << opts->delaunayIntervalLevel <<
-                    std::endl;
-    }
-    if(opts->delaunaySmooth){
-        std::cout << "    * Delaunay smoothing iterations : " <<
-                    opts->delaunaySmoothIterations << std::endl;
-    }
     std::cout << "    * Reconstruction method : " <<
                         StringFromSDFMethod(opts->method) << std::endl;
     std::cout << "    * Kernel : " << opts->kernel << std::endl;
@@ -117,24 +94,6 @@ void print_surface_configs(surface_opts *opts){
         std::cout << "    * Forcing Resolution : " << opts->resolution.x
                    << " x " << opts->resolution.y << " x " << opts->resolution.z << std::endl;
     }
-}
-
-ARGUMENT_PROCESS(surface_delaunay_use_precise){
-    surface_opts *opts = (surface_opts *)config;
-    opts->delaunayUsePreciseBoundary = true;
-    return 0;
-}
-
-ARGUMENT_PROCESS(surface_delaunay_smooth_iterations){
-    surface_opts *opts = (surface_opts *)config;
-    opts->delaunaySmoothIterations = ParseNextFloat(argc, argv, i, "-delaunay-smooth");
-    if(opts->delaunaySmoothIterations < 1){
-        printf("Invalid smoothing iterations\n");
-        return -1;
-    }
-
-    opts->delaunaySmooth = true;
-    return 0;
 }
 
 ARGUMENT_PROCESS(surface_in_args){
@@ -159,17 +118,6 @@ ARGUMENT_PROCESS(surface_inflags_args){
 ARGUMENT_PROCESS(surface_out_args){
     surface_opts *opts = (surface_opts *)config;
     opts->output = ParseNext(argc, argv, i, "-out", 1);
-    return 0;
-}
-
-ARGUMENT_PROCESS(surface_delaunay_mu_args){
-    surface_opts *opts = (surface_opts *)config;
-    opts->delaunayMu = ParseNextFloat(argc, argv, i, "-delaunay-mu");
-    if(opts->delaunayMu < 0.001){
-        printf("Invalid μ\n");
-        return -1;
-    }
-
     return 0;
 }
 
@@ -234,18 +182,6 @@ ARGUMENT_PROCESS(surface_method){
     return 0;
 }
 
-ARGUMENT_PROCESS(surface_del_interval_level){
-    surface_opts *opts = (surface_opts *)config;
-    unsigned int level = ParseNextFloat(argc, argv, i, "-delaunay-level");
-    if(level == 0){
-        printf("Invalid delaunay level given\n");
-        return -1;
-    }
-
-    opts->delaunayIntervalLevel = level;
-    return 0;
-}
-
 ARGUMENT_PROCESS(surface_isolevel_args){
     surface_opts *opts = (surface_opts *)config;
     opts->iso = ParseNextFloat(argc, argv, i, "-iso");
@@ -307,30 +243,6 @@ std::map<const char *, arg_desc> surface_arg_map = {
         {
             .processor = surface_spacing_args,
             .help = "Configures spacing used during simulation."
-        }
-    },
-    {"-delaunay-level",
-        {
-            .processor = surface_del_interval_level,
-            .help = "Sets the level to use for the interval method during delaunay reconstruction. (default: 8)"
-        }
-    },
-    {"-delaunay-smooth",
-        {
-            .processor = surface_delaunay_smooth_iterations,
-            .help = "Uses Laplacian smoothing during delaunay generation. Call with number of iterations.(default false)"
-        }
-    },
-    {"-delaunay-precise",
-        {
-            .processor = surface_delaunay_use_precise,
-            .help = "Sets delaunay method to use robust boundary surface extraction based on the interval method. (default: false)"
-        }
-    },
-    {"-delaunay-mu",
-        {
-            .processor = surface_delaunay_mu_args,
-            .help = "Sets the value of the delaunay μ term. (default: 1.1)"
         }
     },
     {"-kernel",
@@ -471,75 +383,6 @@ bb_cpu_gpu Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
     }else{
         return inf;
     }
-}
-
-void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
-                                 HostTriangleMesh3 *mesh, TimerList &timer)
-{
-    DelaunayTriangulation triangulation;
-    // TODO: We need the solver simply to distribute particles and update the buckets
-    //       it would be nice if we could do that without having to build a solver
-    SphSolver3 solver;
-    solver.Initialize(DefaultSphSolverData3());
-
-    // TODO: Even this spacingScale is irrelevant it would be best if it were
-    //       to represent the original simulation domain, i.e.: add flags to cmd
-    Float domainSpacing = opts->spacing * 0.5f;
-    std::cout << "Building domain... " << std::flush;
-    Grid3 *grid = UtilBuildGridForBuilder(pBuilder, domainSpacing, 2.0);
-    SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(pBuilder);
-
-    solver.Setup(WaterDensity, domainSpacing, 2.0, grid, sphpSet);
-
-    std::cout << "Distributing particles..." << std::flush;
-    timer.Start("Hash Particles");
-    UpdateGridDistributionGPU(solver.solverData);
-    grid->UpdateQueryState();
-
-    /* clear v0 buffer as it is going to serve as basis for point support extension */
-    ParticleSet3 *pSet = sphpSet->GetParticleSet();
-    pSet->ClearDataBuffer(&pSet->v0s);
-    std::cout << "Done\nInspecting neighbors... " << std::flush;
-
-    /* compute the boundary region we are going to extend either by exact/approx solution */
-    timer.Start("Volume Flag Computation");
-    if(opts->delaunayUsePreciseBoundary){
-        /* rely on intervalar method with a high interval level as it is faster than dilts */
-        IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision,
-                         opts->delaunayIntervalLevel);
-    }else{
-        /* rely on lnm as it is fast */
-        LNMBoundary(pSet, grid, opts->spacing);
-    }
-
-    timer.Stop();
-
-    /* apply delaunay triangulation and filtering to get mesh */
-    std::cout << "Done\nComputing delaunay surface... " << std::endl;
-    DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu,
-                    grid, &solver, timer);
-
-    std::cout << "Done" << std::endl;
-    if(opts->delaunaySmooth){
-        /* apply smoothing to get a better looking mesh */
-        // NOTE: Since we don't actually have a mesh structure and we already dispose
-        //       of the one in gDel3D, vertices will need to find their faces so it
-        //       might get a bit slow even using GPU.
-        // TODO: Add some cmds to change these
-        MeshSmoothOpts mOpts = {
-            .method = TaubinSmooth,
-            .iterations = opts->delaunaySmoothIterations,
-            .lambda = 0.5f,
-            .mu = -0.53f,
-        };
-
-        std::cout << "Smoothing result..." << std::flush;
-        DelaunaySmooth(triangulation, mOpts);
-        std::cout << "Done" << std::endl;
-    }
-
-    std::cout << "Fetching geometry..." << std::endl;
-    DelaunayGetTriangleMesh(triangulation, mesh);
 }
 
 FieldGrid3f *ParticlesToSDF_Pcount(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
@@ -784,10 +627,7 @@ void surface_command(int argc, char **argv){
         grid = ParticlesToSDF_Pcount(&builder, &opts, timer, opts.method);
     else if(opts.method < SDF_PARTICLE_COUNT)
         grid = ParticlesToSDF_Surface(&builder, &opts, timer);
-    else if(opts.method == SDF_DELAUNAY){
-        ParticlesToDelaunay_Surface(&builder, &opts, &mesh, timer);
-        requires_mc = false;
-    }else{
+    else{
         printf("Invalid method selected\n");
         CudaMemoryManagerClearCurrent();
         return;

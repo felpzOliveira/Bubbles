@@ -9,7 +9,6 @@
 #include <sstream>
 #include <map>
 #include <narrowband.h>
-#include <delaunay.h>
 
 typedef struct{
     int count;

@@ -1,10 +1,6 @@
 #include <serializer.h>
 #include <geometry.h>
 #include <util.h>
-#include <gDel3D/GpuDelaunay.h>
-#include <gDel3D/CPU/PredWrapper.h>
-#include <gDel3D/CommonTypes.h>
-#include <deque>
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
@@ -20,43 +16,6 @@
     pc[3 * id + 2] = c.z;\
     id++;\
 }while(0)
-
-ParsedMesh *UtilGDel3DToParsedMesh(std::vector<vec3i> *tris, Point3HVec *pointVec,
-                                   GDelOutput *output)
-{
-    PredWrapper predWrapper;
-    predWrapper.init(*pointVec, output->ptInfty);
-    int size = predWrapper.pointNum();
-    ParsedMesh *mesh = cudaAllocateVx(ParsedMesh, 1);
-
-    mesh->nVertices = size;
-    mesh->nTriangles = tris->size();
-    mesh->nNormals = 0;
-    mesh->nUvs = 0;
-    mesh->uv = nullptr;
-    mesh->s = nullptr;
-    mesh->n = nullptr;
-
-    mesh->p = cudaAllocateVx(Point3f, mesh->nVertices);
-    mesh->indices = cudaAllocateVx(Point3i, 3 * tris->size());
-    for(int i = 0; i < mesh->nVertices; i++){
-        const Point3 pt = predWrapper.getPoint(i);
-        mesh->p[i] = Point3f(pt._p[0], pt._p[1], pt._p[2]);
-    }
-
-    for(int i = 0; i < tris->size(); i++){
-        vec3i val = tris->at(i);
-        mesh->indices[3 * i + 0] = Point3i(val.x, 0, 0);
-        mesh->indices[3 * i + 1] = Point3i(val.y, 0, 0);
-        mesh->indices[3 * i + 2] = Point3i(val.z, 0, 0);
-    }
-
-    mesh->transform = Transform();
-    mesh->allocator = AllocatorType::GPU;
-    sprintf(mesh->name, "gdel3mesh");
-
-    return mesh;
-}
 
 int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
                                    vec3f length, int nPoints, Transform transform)
@@ -491,108 +450,6 @@ int UtilIsEmitterOverlapping(VolumeParticleEmitterSet3 *emitterSet,
     return emitter_collider_overlaps + emitter_overlaps;
 }
 
-#define PLY_ADD_TRI(a, b, c, triSet, stream)do{\
-    if(triSet.find(i3(a, b, c)) == triSet.end()){\
-        stream << "3 " << a << " " << b << " " << c << " \n";\
-        triSet.insert(i3(a, b, c));\
-    }\
-}while(0)
-
-inline void GDel3D_WriteVertex(PredWrapper *predWrapper, std::ofstream &ofs){
-    for(int i = 0; i < (int)predWrapper->pointNum(); i++){
-        const Point3 pt = predWrapper->getPoint(i);
-        for(int vi = 0; vi < 3; vi++){
-            ofs << pt._p[vi] << " ";
-        }
-        ofs << "\n";
-    }
-}
-
-void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
-                                 GDelOutput *output, const char *path)
-{
-    PredWrapper predWrapper;
-    predWrapper.init(*pointVec, output->ptInfty);
-    std::ofstream ofs(path);
-    ofs << "ply\n";
-    ofs << "format ascii 1.0\n";
-    ofs << "element vertex " << (int) predWrapper.pointNum() << "\n";
-    ofs << "property double x\n";
-    ofs << "property double y\n";
-    ofs << "property double z\n";
-    ofs << "element face " << tris->size() << "\n";
-    ofs << "property list uchar int vertex_indices\n";
-    ofs << "end_header\n";
-
-    GDel3D_WriteVertex(&predWrapper, ofs);
-
-    for(int i = 0; i < tris->size(); i++){
-        vec3i val = tris->at(i);
-        ofs << "3 " << val[0] << " " << val[1] << " " << val[2] << " \n";
-    }
-    ofs.close();
-}
-
-void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
-                                 const char *path, bool tetras)
-{
-    PredWrapper predWrapper;
-    std::unordered_set<i3, i3Hasher, i3IsSame> triSet;
-    predWrapper.init(*pointVec, output->ptInfty);
-
-    // - write header
-    std::ofstream ofs(path);
-    ofs << "ply\n";
-    ofs << "format ascii 1.0\n";
-    ofs << "element vertex " << (int) predWrapper.pointNum() << "\n";
-    ofs << "property double x\n";
-    ofs << "property double y\n";
-    ofs << "property double z\n";
-
-    // - write geometry
-    if(tetras){
-        static int warned = 0;
-        if(warned == 0){
-            std::cout << "[PLY] Warning: Output is 4-indexed and " <<
-                        "represents a tetrahedron, NOT a quad." << std::endl;
-            warned = 1;
-        }
-        ofs << "element face " << GDel3D_RealTetraCount(output, pLen) << "\n";
-        ofs << "property list uchar int vertex_indices\n";
-        ofs << "end_header\n";
-
-        // write vertices
-        GDel3D_WriteVertex(&predWrapper, ofs);
-
-        GDel3D_ForEachRealTetra(output, pLen, [&](Tet tet, TetOpp botOpp, int i) -> void{
-            ofs << "4 "<< tet._v[0] << " " << tet._v[1] << " " << tet._v[2] << " "
-                    << tet._v[3] << std::endl;
-        });
-    }else{
-        std::stringstream ss;
-        GDel3D_ForEachRealTetra(output, pLen, [&](Tet tet, TetOpp botOpp, int i) -> void{
-            uint32_t A = tet._v[0], B = tet._v[1],
-                     C = tet._v[2], D = tet._v[3];
-            // triangles are: ACB, ABD, ADC, BDC
-            PLY_ADD_TRI(A, C, B, triSet, ss);
-            PLY_ADD_TRI(A, B, D, triSet, ss);
-            PLY_ADD_TRI(A, D, C, triSet, ss);
-            PLY_ADD_TRI(B, D, C, triSet, ss);
-        });
-
-        ofs << "element face " << triSet.size() << "\n";
-        ofs << "property list uchar int vertex_indices\n";
-        ofs << "end_header\n";
-
-        // write vertices
-        GDel3D_WriteVertex(&predWrapper, ofs);
-
-        ofs << ss.str();
-    }
-
-    ofs.close();
-}
-
 std::string modelsResources;
 std::string outputResources;
 void UtilSetGlobalModelPath(const char *path){
@@ -601,48 +458,5 @@ void UtilSetGlobalModelPath(const char *path){
 
 void UtilSetGlobalOutputPath(const char *path){
     outputResources = std::string(path);
-}
-
-#define TRI_MAP_ADD(a, b, c, u_map)do{\
-    i3 i_val(a, b, c);\
-    if(u_map.find(i_val) == u_map.end()){\
-        u_map[i_val] = 1;\
-    }else{\
-        u_map[i_val] += 1;\
-    }\
-}while(0)
-
-void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
-                                   GDelOutput *output, int pLen)
-{
-    std::unordered_map<i3, int, i3Hasher, i3IsSame> triMap;
-    GDel3D_ForEachRealTetra(output, pLen, [&](Tet tet, TetOpp botOpp, int i) -> void{
-        uint32_t A = tet._v[0], B = tet._v[1],
-                 C = tet._v[2], D = tet._v[3];
-            // triangles are: ACB, ABD, ADC, BDC
-            TRI_MAP_ADD(A, C, B, triMap);
-            TRI_MAP_ADD(A, B, D, triMap);
-            TRI_MAP_ADD(A, D, C, triMap);
-            TRI_MAP_ADD(B, D, C, triMap);
-    });
-
-    for(auto it = triMap.begin(); it != triMap.end(); it++){
-        if(it->second == 1){
-            tris.push_back(it->first);
-        }
-    }
-}
-
-
-uint32_t GDel3D_TetraCount(GDelOutput *output){
-    return output->tetVec.size();
-}
-
-uint32_t GDel3D_RealTetraCount(GDelOutput *output, uint32_t pLen){
-    uint32_t counter = 0;
-    GDel3D_ForEachRealTetra(output, pLen, [&](Tet &, const TetOpp &, int){
-        counter += 1;
-    });
-    return counter;
 }
 

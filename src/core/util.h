@@ -11,9 +11,6 @@
 #include <serializer.h>
 #include <sph_solver.h>
 #include <sstream>
-#include <gDel3D/GpuDelaunay.h>
-#include <gDel3D/CPU/PredWrapper.h>
-#include <gDel3D/CommonTypes.h>
 #include <filesystem>
 
 #if defined(DEBUG)
@@ -226,67 +223,6 @@ int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f col,
 */
 int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
                           vec3f length, int nPoints, Transform transform);
-
-/*
-* Writes the output of GDel3D to a ply file. The flag 'tetras' can be used to make
-* this routine write a 4-indexed file where each description is a tetrahedron and NOT
-* a quad. Setting 'tetras' to false will force decomposition of the tetrahedrons and write
-* triangles instead.
-*/
-void UtilGDel3DWritePly(Point3HVec *pointVec, GDelOutput *output, int pLen,
-                        const char *path, bool tetras=true);
-
-/*
-* Writes a ply file from a specific set of triangles from a given GDel3D output.
-*/
-void UtilGDel3DWritePly(std::vector<vec3i> *tris, Point3HVec *pointVec,
-                        GDelOutput *output, const char *path);
-
-ParsedMesh *UtilGDel3DToParsedMesh(std::vector<vec3i> *tris, Point3HVec *pointVec,
-                                   GDelOutput *output);
-
-/*
-* Get the total amount of tetras generated through GDel3D
-*/
-uint32_t GDel3D_TetraCount(GDelOutput *output);
-
-/*
-* Get the total amount of real tetras generated through GDel3D
-*/
-uint32_t GDel3D_RealTetraCount(GDelOutput *output, uint32_t pLen);
-
-/*
-* Utility routine for looping through real tetrahedrons in GDel3D.
-*/
-template<typename Fn>
-void GDel3D_ForEachRealTetra(GDelOutput *output, uint32_t pLen, Fn fn){
-    const TetHVec tetVec      = output->tetVec;
-    const TetOppHVec oppVec   = output->tetOppVec;
-    const CharHVec tetInfoVec = output->tetInfoVec;
-
-    for(int i = 0; i < tetVec.size(); i++){
-        bool valid = true;
-        Tet tet = tetVec[i];
-        const TetOpp botOpp = oppVec[i];
-        if(!isTetAlive(tetInfoVec[i])) valid = false;
-
-        for(int s = 0; s < 4; s++){
-            if(botOpp._t[s] == -1) valid = false;
-            if(tet._v[s] == pLen) valid = false; // inf point
-        }
-
-        if(valid)
-            fn(tet, botOpp, i);
-    }
-}
-
-/*
-* Find all triangles that are unique. Be warned that the indexes given in the output
-* 'tris' are of the type 'i3', i.e.: they will be sorted from lowest to highest. This
-* does not preserve triangle orientation.
-*/
-void UtilGDel3DUniqueTris(std::vector<i3> &tris, Point3HVec *pointVec,
-                          GDelOutput *output, int pLen);
 
 /*
 * Utilities for bug hunting and preventing errors.

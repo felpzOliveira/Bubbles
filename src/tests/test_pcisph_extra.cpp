@@ -442,10 +442,14 @@ void test_pcisph3_gravity_field(){
     Float half_size = 0.5 * baseContainerSize;
     Float sphereRadius = baseContainerSize / 16.0f;
     vec3f containerSize(baseContainerSize * 2.f);
-    vec3f sphereCenter(0.f, half_size - 0.1 * baseContainerSize, 0.f);
+    vec3f sphereCenter(0.f, 7.0f * sphereRadius, 0.f);
     Shape *container = MakeBox(Transform(), containerSize, true);
-    Shape *sphereCollider = MakeSphere(Translate(vec3f(0, 0, 0)), 0.3f);
+    Shape *sphereCollider = MakeSphere(Translate(vec3f(0, 0, 0)), 2.0f * sphereRadius);
     Shape *sphereEmitter = MakeSphere(Translate(sphereCenter), sphereRadius);
+
+    printf("Collider radius= %g\n", sphereCollider->radius);
+    printf("Emitter radius= %g\n", sphereEmitter->radius);
+    std::cout << "Container= " << container->GetBounds() << std::endl;
 
     // Colliders
     ColliderSetBuilder3 cBuilder;

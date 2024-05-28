@@ -192,7 +192,7 @@ int UtilGenerateSquarePoints(float *posBuffer, float *colBuffer, vec3f col,
 }
 
 int UtilGenerateSpherePoints(float *posBuffer, float *colBuffer, vec3f col,
-                                      Float rad, int nPoints, Transform transform)
+                             Float rad, int nPoints, Transform transform)
 {
     int it = 0;
     Float area = 4.0 * Pi * rad * rad / (Float)nPoints;

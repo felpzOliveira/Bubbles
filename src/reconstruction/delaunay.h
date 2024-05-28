@@ -9,21 +9,24 @@
 #include <statics.h>
 
 /*
-* NOTE: We have to include the interior particles otherwise we could generate
-* incorrect geometry in the interior. While this geometry would not break the surface
-* and it makes the algorithm runs faster it will generate a larger error on the
-* Hausdorff computation. It also affects the shape of the mesh with regards to the
-* weizenbock quality. So it is kinda of a trade-off, do you want faster computation
-* with smaller memory footprint even if there are some incorrect geometry in the
-* interior of the mesh and possibly some lower quality triangles?
+* Use to output 2 files with particles list for interior particles and particles
+* that were generated from whatever method gave us the boundary.
 */
-#define DELAUNAY_WITH_INTERIOR
+#define DELAUNAY_OUTPUT_PARTICLES 0
 
 typedef enum{
     LaplacianSmooth=0,
     TaubinSmooth
 }MeshSmoothMethod;
 
+typedef enum{
+    GatherSurface=0, // returns the fluid surface, most likely what you want
+    GatherConvexHull, // returns the convex hull of the fluid
+    GatherEverything, // returns all triangles from the delaunay triangulation (SLOW)
+    GatherNone
+}DelaunayOutputType;
+
+/* Options for mesh smoothing, we only do simple laplacian and taubin */
 struct MeshSmoothOpts{
     MeshSmoothMethod method;
     int iterations;
@@ -31,21 +34,13 @@ struct MeshSmoothOpts{
     Float mu;
 };
 
-struct DelaunayTriangleInfo{
-    vec3ui tri;
-    int opp;
-
-    bb_cpu_gpu
-    DelaunayTriangleInfo(int){}
-
-    bb_cpu_gpu
-    DelaunayTriangleInfo(vec3ui _tri, int op){
-        tri = _tri;
-        opp = op;
-    }
+struct DelaunayOptions{
+    bool extendBoundary;
+    bool withInteriorParticles;
+    DelaunayOutputType outType;
+    Float mu;
+    Float spacing;
 };
-
-typedef WorkQueue<DelaunayTriangleInfo> DelaunayWorkQueue;
 
 struct DelaunayTriangulation{
     Point3HVec pointVec;
@@ -56,20 +51,53 @@ struct DelaunayTriangulation{
     std::vector<uint32_t> ids;
 };
 
+/*
+* Gets a set of default options for delaunay surface generation.
+*/
+DelaunayOptions DelaunayDefaultOptions();
+
+/*
+* Computes the surface using delaunay triangulation.
+*/
 void
 DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                Float spacing, Float mu, Grid3 *domain, SphSolver3 *solver,
-                TimerList &timer);
+                DelaunayOptions opts, TimerList &timer);
 
+/*
+* Smooths the results of the delaunay triangulation.
+*/
 void DelaunaySmooth(DelaunayTriangulation &triangulation, MeshSmoothOpts opts);
 
-void DelaunayClassifyNeighbors(ParticleSet3 *pSet, Grid3 *domain, int threshold,
-                               Float spacing, Float mu);
-
+/*
+* Fetchs the underlying mesh resulting from the triangulation.
+*/
 void
 DelaunayGetTriangleMesh(DelaunayTriangulation &triangulation, HostTriangleMesh3 *mesh);
 
-void
-DelaunayWriteBoundary(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                      const char *path);
 
+/* Some type manipulation */
+
+inline DelaunayOutputType DelaunayOutputTypeFromString(std::string val){
+    if(val == "ConvexHull" || val == "chull" || val == "convexhull")
+        return GatherConvexHull;
+    if(val == "surface" || val == "Surface")
+        return GatherSurface;
+    if(val == "all" || val == "All" || val == "everything" || val == "Everything")
+        return GatherEverything;
+    return GatherNone;
+}
+
+inline bool DelaunayIsOutputTypeValid(int val){
+    return (DelaunayOutputType)val == GatherSurface ||
+           (DelaunayOutputType)val == GatherConvexHull ||
+           (DelaunayOutputType)val == GatherEverything;
+}
+
+inline const char *DelaunayOutputTypeString(DelaunayOutputType type){
+    switch(type){
+        case GatherSurface: return "Surface";
+        case GatherConvexHull: return "ConvexHull";
+        case GatherEverything: return "All";
+        default: return "(None)";
+    }
+}

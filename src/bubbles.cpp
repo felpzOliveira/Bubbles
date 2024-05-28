@@ -8,6 +8,8 @@
 #include <marching_squares.h>
 #include <graphy.h>
 #include <util.h>
+#include <marching_cubes.h>
+#include <sdfs.h>
 
 #define RUN_TESTS
 
@@ -74,10 +76,9 @@ void run_self_tests(){
 }
 #endif
 
-void test_routine(){
+void test_routine(int total){
     Bounds3f bounds;
     std::string basePath("../simulations/gravity/out_");
-    int total = 1432;
     std::cout << bounds << std::endl;
     for(int i = 0; i < total; i++){
         std::vector<vec3f> points;
@@ -94,6 +95,28 @@ void test_routine(){
     }
 
     std::cout << bounds << std::endl;
+    exit(0);
+}
+
+void test_sdf_teddies(){
+    HostTriangleMesh3 mesh;
+    Float iso = 0.04;
+    Float dx  = 0.02;
+    Bounds3f bounds(vec3f(-5), vec3f(5));
+    FieldGrid3f *field = CreateSDF(bounds, dx, AutoLambda(vec3f point){
+        //return T_OrigamiBoat(point, -1);
+        //return T_OrigamiDragon(point);
+        //return T_OrigamiWhale(point, 2);
+        //return Teddy_Lying(point);
+        //return Teddy_Sitting(point);
+        return Teddy_Standing(point);
+    });
+
+    vec3ui res = field->GetResolution();
+    printf("Resolution= {%u %u %u}\n", res.x, res.y, res.z);
+    MarchingCubes(field, &mesh, iso, false);
+    mesh.writeToDisk("test_sdf.ply", FORMAT_PLY);
+    exit(0);
 }
 
 int main(int argc, char **argv){
@@ -124,7 +147,8 @@ int main(int argc, char **argv){
                "        Consider using --enable-output.\n");
     }
 
-    //test_routine();
+    test_sdf_teddies();
+    //test_routine(1400);
     //test_pcisph2_helix();
     //test_pcisph3_helix();
     //test_pcisph3_dam_break();

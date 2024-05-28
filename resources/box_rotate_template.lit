@@ -1,0 +1,3 @@
+Shape{ type[mesh] geometry[models/cube_outline.obj] name[outline]
+       mat[outline_mat] scale[3.05445 1.92168 3.22245]
+

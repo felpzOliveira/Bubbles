@@ -1094,6 +1094,10 @@ template<typename T> inline bb_cpu_gpu vec3<T> Floor(const vec3<T> &v){
     return vec3<T>(std::floor(v.x), std::floor(v.y), std::floor(v.z));
 }
 
+template<typename T> inline bb_cpu_gpu vec4<T> Floor(const vec4<T> &v){
+    return vec4<T>(std::floor(v.x), std::floor(v.y), std::floor(v.z), std::floor(v.w));
+}
+
 template<typename T> inline bb_cpu_gpu T Fract(T val){
     return val - Floor(val);
 }

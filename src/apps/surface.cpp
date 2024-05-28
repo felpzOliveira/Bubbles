@@ -27,8 +27,11 @@ typedef struct{
     Float iso;
     int delaunayIntervalLevel;
     int delaunaySmoothIterations;
+    bool delaunayExtend;
+    bool delaunayWithInterior;
     bool delaunayUsePreciseBoundary;
     bool delaunaySmooth;
+    DelaunayOutputType delaunayOutputType;
     std::string input;
     std::string output;
     SurfaceMethod method;
@@ -82,8 +85,11 @@ void default_surface_opts(surface_opts *opts){
     opts->kernel = 0.04;
     opts->spacing = 0.02;
     opts->delaunaySmooth = false;
+    opts->delaunayOutputType = GatherSurface;
     opts->delaunaySmoothIterations = 2;
     opts->delaunayIntervalLevel = 8;
+    opts->delaunayExtend = true;
+    opts->delaunayWithInterior = true;
     opts->delaunayUsePreciseBoundary = false;
     opts->delaunayMu = 1.1;
     opts->marchingCubeSpacing = 0.01;
@@ -107,6 +113,9 @@ void print_surface_configs(surface_opts *opts){
         std::cout << "    * Delaunay smoothing iterations : " <<
                     opts->delaunaySmoothIterations << std::endl;
     }
+
+    std::cout << "    * Delaunay output : " <<
+                        DelaunayOutputTypeString(opts->delaunayOutputType) << std::endl;
     std::cout << "    * Reconstruction method : " <<
                         StringFromSDFMethod(opts->method) << std::endl;
     std::cout << "    * Kernel : " << opts->kernel << std::endl;
@@ -122,6 +131,18 @@ void print_surface_configs(surface_opts *opts){
 ARGUMENT_PROCESS(surface_delaunay_use_precise){
     surface_opts *opts = (surface_opts *)config;
     opts->delaunayUsePreciseBoundary = true;
+    return 0;
+}
+
+ARGUMENT_PROCESS(surface_delaunay_no_extend){
+    surface_opts *opts = (surface_opts *)config;
+    opts->delaunayExtend = false;
+    return 0;
+}
+
+ARGUMENT_PROCESS(surface_delaunay_no_interior){
+    surface_opts *opts = (surface_opts *)config;
+    opts->delaunayWithInterior = false;
     return 0;
 }
 
@@ -170,6 +191,17 @@ ARGUMENT_PROCESS(surface_delaunay_mu_args){
         return -1;
     }
 
+    return 0;
+}
+
+ARGUMENT_PROCESS(surface_delaunay_output){
+    surface_opts *opts = (surface_opts *)config;
+    std::string val = ParseNext(argc, argv, i, "-delaunay-out", 1);
+    opts->delaunayOutputType = DelaunayOutputTypeFromString(val);
+    if(!DelaunayIsOutputTypeValid(opts->delaunayOutputType)){
+        printf("Invalid output for delaunay\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -309,6 +341,18 @@ std::map<const char *, arg_desc> surface_arg_map = {
             .help = "Configures spacing used during simulation."
         }
     },
+    {"-delaunay-no-interior",
+        {
+            .processor = surface_delaunay_no_interior,
+            .help = "Sets delaunay reconstruction to not include interior particles. (default: false)"
+        }
+    },
+    {"-delaunay-no-extension",
+        {
+            .processor = surface_delaunay_no_extend,
+            .help = "Sets delaunay reconstruction to not extend particle set. (default: false)"
+        }
+    },
     {"-delaunay-level",
         {
             .processor = surface_del_interval_level,
@@ -325,6 +369,12 @@ std::map<const char *, arg_desc> surface_arg_map = {
         {
             .processor = surface_delaunay_use_precise,
             .help = "Sets delaunay method to use robust boundary surface extraction based on the interval method. (default: false)"
+        }
+    },
+    {"-delaunay-out",
+        {
+            .processor = surface_delaunay_output,
+            .help = "Sets delaunay output type. (default: surface)"
         }
     },
     {"-delaunay-mu",
@@ -368,28 +418,6 @@ std::map<const char *, arg_desc> surface_arg_map = {
 template <typename T>
 bb_cpu_gpu T cubic(T x){ return x * x * x; }
 bb_cpu_gpu Float k_cub(Float s) { return Max(0.0, cubic(1.0 - s * s)); }
-bb_cpu_gpu Float wij(Float distance, Float r) {
-    if(distance < r)
-        return 1.f - cubic(distance / r);
-    return 0.f;
-}
-
-bb_cpu_gpu
-inline double k_p(double distance){
-    const double distanceSquared = distance * distance;
-    if(distanceSquared >= 1.0){
-        return 0.0;
-    }else{
-        const double x = 1.0 - distanceSquared;
-        return x * x * x;
-    }
-}
-
-bb_cpu_gpu
-inline Float k_w(const vec3f& m,  Float gDet){
-    const Float sigma = 315.0 / (64 * Pi);
-    return sigma * gDet * k_p(m.Length());
-}
 
 bb_cpu_gpu Float SphSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet, Float kernelRadius){
     const Float cutOff = 0.5; // ??
@@ -477,6 +505,13 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
                                  HostTriangleMesh3 *mesh, TimerList &timer)
 {
     DelaunayTriangulation triangulation;
+    DelaunayOptions dOpts = DelaunayDefaultOptions();
+    dOpts.spacing = opts->spacing;
+    dOpts.mu = opts->delaunayMu;
+    dOpts.withInteriorParticles = opts->delaunayWithInterior;
+    dOpts.outType = opts->delaunayOutputType;
+    dOpts.extendBoundary = opts->delaunayExtend;
+
     // TODO: We need the solver simply to distribute particles and update the buckets
     //       it would be nice if we could do that without having to build a solver
     SphSolver3 solver;
@@ -499,27 +534,30 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     /* clear v0 buffer as it is going to serve as basis for point support extension */
     ParticleSet3 *pSet = sphpSet->GetParticleSet();
     pSet->ClearDataBuffer(&pSet->v0s);
-    std::cout << "Done\nInspecting neighbors... " << std::flush;
+    std::cout << "Done" << std::endl;
 
-    /* compute the boundary region we are going to extend either by exact/approx solution */
-    timer.Start("Volume Flag Computation");
-    if(opts->delaunayUsePreciseBoundary){
-        /* rely on intervalar method with a high interval level as it is faster than dilts */
-        IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision,
-                         opts->delaunayIntervalLevel);
-    }else{
-        /* rely on lnm as it is fast */
-        LNMBoundary(pSet, grid, opts->spacing);
+    if(dOpts.extendBoundary){
+        std::cout << "Inspecting neighbors... " << std::flush;
+        /* compute the boundary region we are going to extend either by exact/approx solution */
+        timer.Start("Boundary Classification");
+        if(opts->delaunayUsePreciseBoundary){
+            /* rely on intervalar method with a high interval level as it is faster than dilts */
+            IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision,
+                             opts->delaunayIntervalLevel);
+        }else{
+            /* rely on lnm as it is fast */
+            LNMBoundary(pSet, grid, opts->spacing);
+        }
+
+        timer.Stop();
+        std::cout << "Done" << std::endl;
     }
 
-    timer.Stop();
-
     /* apply delaunay triangulation and filtering to get mesh */
-    std::cout << "Done\nComputing delaunay surface... " << std::endl;
-    DelaunaySurface(triangulation, sphpSet, opts->spacing, opts->delaunayMu,
-                    grid, &solver, timer);
+    std::cout << "Computing delaunay surface... " << std::endl;
 
-    std::cout << "Done" << std::endl;
+    DelaunaySurface(triangulation, sphpSet, dOpts, timer);
+
     if(opts->delaunaySmooth){
         /* apply smoothing to get a better looking mesh */
         // NOTE: Since we don't actually have a mesh structure and we already dispose
@@ -724,7 +762,36 @@ void compute_weizenbock_values(HostTriangleMesh3 *mesh){
     std::cout << "************************" << std::endl;
 }
 
+void test_particle_pos(){
+    Float mu = 1.1;
+    Float spacing = 1;
+    const Float one_over_sqrt2 = 0.7071067811865475;
+    vec3f pi = vec3f(0.f, 0.f, 0.f);
+
+    Float edgeLen = mu * spacing;
+    Float a = edgeLen * one_over_sqrt2;
+    Float ha = a * 0.5f;
+
+    vec3f u0 = vec3f(+ha, +ha, +ha);
+    vec3f u1 = vec3f(-ha, +ha, -ha);
+    vec3f u2 = vec3f(-ha, -ha, +ha);
+    vec3f u3 = vec3f(+ha, -ha, -ha);
+
+    vec3f p0 = pi + u0;//
+    vec3f p1 = pi + u1;// - u0;
+    vec3f p2 = pi + u2;// - u0;
+    vec3f p3 = pi + u3;// - u0;
+
+    printf("{%g %g %g}\n", p0.x, p0.y, p0.z);
+    printf("{%g %g %g}\n", p1.x, p1.y, p1.z);
+    printf("{%g %g %g}\n", p2.x, p2.y, p2.z);
+    printf("{%g %g %g}\n", p3.x, p3.y, p3.z);
+    exit(0);
+}
+
 void surface_command(int argc, char **argv){
+    //test_particle_pos();
+    //return;
     surface_opts opts;
     ParticleSetBuilder3 builder;
     HostTriangleMesh3 mesh;

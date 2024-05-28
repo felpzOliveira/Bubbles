@@ -13,6 +13,8 @@
 #include <sdfs.h>
 #include <dilts.h>
 #include <marching_cubes.h>
+#include <fstream>
+#include <sstream>
 
 void set_particle_color(float *pos, float *col, ParticleSet3 *pSet);
 
@@ -179,6 +181,23 @@ void test_gen_quat_sequence(QuaternionSequence *sequence){
     sequence->AddQuaternion(200, vec3f(1,0,0), 2);
 }
 
+std::string read_template(std::string path){
+    if(!SerializerIsWrittable())
+        return std::string();
+
+    std::ifstream ifs(path);
+    if(!ifs.is_open()){
+        printf("[ERROR] Could not open template\n");
+        exit(0);
+    }
+
+    std::stringstream ss;
+    ss << ifs.rdbuf();
+    ifs.close();
+
+    return ss.str();
+}
+
 void test_pcisph3_rotating_water_box(){
     printf("===== PCISPH Solver 3D -- Rotating Water Block\n");
 
@@ -186,7 +205,7 @@ void test_pcisph3_rotating_water_box(){
     vec3f origin(4);
     vec3f target(0);
     vec3f boxSize(3.0, 2.0, 3.0);
-    Float spacing = 0.06;
+    Float spacing = 0.02;
     Float spacingScale = 2.0;
     int steps = 500;
     Float targetInterval =  1.0 / 240.0;
@@ -196,6 +215,8 @@ void test_pcisph3_rotating_water_box(){
     Shape *domain = MakeBox(Transform(), boxSize * 2.0, true);
     Shape *container = MakeBox(Transform(), boxSize, true);
     Shape *baseWaterShape = MakeBox(Translate(0, -yof, 0), waterBox);
+
+    std::cout << "Container= " << container->GetBounds() << std::endl;
 
     VolumeParticleEmitterSet3 emitters;
     emitters.AddEmitter(baseWaterShape, spacing);
@@ -244,6 +265,9 @@ void test_pcisph3_rotating_water_box(){
 
     int maxSteps = steps * 2.0;
 
+    Transform runningTransform;
+    std::string render_template = read_template("../resources/box_rotate_template.lit");
+    render_template = render_template.substr(0, render_template.size()-1);
     auto onStepUpdate = [&](int step) -> int{
         if(step == 0) return 1;
         if(step < maxSteps){
@@ -258,38 +282,47 @@ void test_pcisph3_rotating_water_box(){
             EuclideanInterpolate(0, 360, f, 0, 1, vec3f(1,1,0), &transform);
             EuclideanInterpolate(0, 360, g, 0, 1, vec3f(0,1,0), &g_transform);
 
+            runningTransform = g_transform * transform;
             angular *= 1.0 / (targetInterval);
             linear *= 1.0 / (targetInterval);
-            container->Update(g_transform * transform);
+            container->Update(runningTransform);
             container->SetVelocities(linear, angular * 50.0);
         }
 
-        std::vector<int> bounds;
-        int n = UtilGetBoundaryState(pSet, &bounds);
-        printf("Boundary %d / %d\n", (int)n, (int)pSet->GetParticleCount());
+        std::string path = FrameOutputPath("/box_rotate/out_", step-1);
+        std::string rPath = FrameOutputPath("/box_rotate/out_render_", step-1);
+        int flags = SERIALIZER_POSITION;
+        SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(), flags);
 
-        std::string path = outputResources + "/box_rotate2/out_";
-        path += std::to_string(step-1);
-        path += ".txt";
-        int flags = (SERIALIZER_POSITION | SERIALIZER_BOUNDARY);
-        //UtilSaveSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet,
-                                                         //path.c_str(), flags, &bounds);
-        SerializerSaveSphDataSet3Legacy(solver.GetSphSolverData(), path.c_str(),
-                                        flags, &bounds);
+        if(SerializerIsWrittable()){
+            std::string render = render_template;
+            render += "       transform[ ";
+            for(int i = 0; i < 4; i++){
+                for(int j = 0; j < 4; j++){
+                    render += std::to_string(runningTransform.m.m[i][j]);
+                    render += " ";
+                }
+                if(i < 3)
+                    render += "\n                  ";
+                else
+                    render += " ] }\n";
+            }
+
+            std::ofstream ofs(rPath);
+            if(ofs.is_open()){
+                ofs << render;
+                ofs.close();
+            }
+        }
 
         UtilPrintStepStandard(&solver,step-1);
-        ProfilerReport();
-        //return 1;
         return step > 2000 ? 0 : 1;
     };
-
-    //SetSystemUseCPU();
 
     UtilRunDynamicSimulation3<PciSphSolver3, ParticleSet3>(&solver, pSet, spacing, origin,
                                                            target, targetInterval, extraParts,
                                                            {}, onStepUpdate, colorFunction,
                                                            filler);
-
     CudaMemoryManagerClearCurrent();
     printf("===== OK\n");
 }

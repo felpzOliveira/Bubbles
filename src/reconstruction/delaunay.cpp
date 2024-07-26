@@ -32,6 +32,7 @@ struct DelaunaySet{
     int offset = 0;
     int totalSize = 0;
     Point3 *positions;
+    int internalRefId;
 
     bb_cpu_gpu void SetParticlePosition(int id, vec3f v){
         if(nPos > 0){
@@ -47,6 +48,10 @@ struct DelaunaySet{
             return vec3f(p._p[0], p._p[1], p._p[2]);
         }
         return vec3f();
+    }
+
+    bb_cpu_gpu bool IsInternal(int id){
+        return (id - offset) < internalRefId;
     }
 
     bb_cpu_gpu bool InSet(int id){
@@ -129,7 +134,7 @@ check_triangle(i3 tri, uint32_t *ids, ParticleSet3 *pSet, DelaunaySet *dSet,
     return aB < r && aC < r && bD < r;
 }
 
-static void
+void
 dump_particles(vec3f *ptr, int size, const char *path){
     std::ofstream ofs(path);
     ofs << size << std::endl;
@@ -399,7 +404,12 @@ DelaunayWorkQueueFindSurface(GpuDel *triangulator, DelaunayTriangulation &triang
         for(int s = 0; s < 4; s++){
             if(info[s] == 0){
                 vec3ui tri = matching_orientation(faces[s], tet);
-                delQ->Push({tri, opp[s]});
+                if(!(dSet->IsInternal(ids[tri.x]) ||
+                     dSet->IsInternal(ids[tri.y]) ||
+                     dSet->IsInternal(ids[tri.z])))
+                {
+                    delQ->Push({tri, opp[s]});
+                }
             }
         }
     });
@@ -461,8 +471,13 @@ DelaunayWorkQueueFindSurface(GpuDel *triangulator, DelaunayTriangulation &triang
 
             if(info[s] == 0 || info[s] == 2){
                 vec3ui tri = matching_orientation(faces[s], tet);
-                delQ->Push({tri, opp[s]});
-                atomic_increase_get(extraCounter);
+                if(!(dSet->IsInternal(ids[tri.x]) ||
+                     dSet->IsInternal(ids[tri.y]) ||
+                     dSet->IsInternal(ids[tri.z])))
+                {
+                    delQ->Push({tri, opp[s]});
+                    atomic_increase_get(extraCounter);
+                }
             }
         }
     });
@@ -492,7 +507,8 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     DelaunaySet *dSet = nullptr;
     ParticleSet3 *pSet = sphSet->GetParticleSet();
 
-    printf(" * Delaunay: [μ = %g] [h = %g]\n", mu, spacing);
+    printf(" * Delaunay: [μ = %g] [h = %g] ( %d )\n", mu, spacing,
+           pSet->GetParticleCount());
 
     std::cout << " - Adjusting domain..." << std::flush;
 
@@ -535,8 +551,9 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     timer.Start("Particle Filter and Spawn");
 
     if(opts.withInteriorParticles){
-        AutoParallelFor("Delaunay_Particle-Filter",pSet->GetParticleCount(),
-        AutoLambda(int pId){
+        AutoParallelFor("Delaunay_Particle-Filter", pSet->GetParticleCount(),
+        AutoLambda(int pId)
+        {
             int bi = pSet->GetParticleV0(pId);
             if(bi > 0)
                 return;
@@ -572,12 +589,13 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     }
 
     *refIndex = *iIndex;
+    dSet->internalRefId = *refIndex;
     *iIndex = 0;
 
     AutoParallelFor("Delaunay_Tet-Spawn", pSet->GetParticleCount(), AutoLambda(int pId){
         int bi = pSet->GetParticleV0(pId);
 
-        if(bi == 0)
+        if(bi <= 0)
             return;
 
         int acceptpart = 1;
@@ -890,6 +908,8 @@ void LaplacianSmoothOnce(vec3f *readBuf, vec3f *writeBuf, size_t verticeCount,
     });
 }
 
+// TODO: Is it worth to refactor filtering to do the smooth in the kernel like
+//       before? I'm gonna let this here as smoothing is optional.
 void DelaunaySmooth(DelaunayTriangulation &triangulation, MeshSmoothOpts opts){
     size_t vsize = triangulation.shrinkedPs.size();
     size_t fsize = triangulation.shrinked.size();

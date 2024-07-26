@@ -131,9 +131,9 @@ void PciSphSolver3::Setup(Float targetDensity, Float targetSpacing, Float relati
     massOverTargetDensitySquared *= massOverTargetDensitySquared;
     deltaDenom = ComputeDeltaDenom();
 
-    printf("[PCISPH SOLVER]Spacing: %g, Particle Count: %d, Delta: %g\n"
-           "               Grid Resolution: %d x %d x %d\n", targetSpacing,
-           actualCount, deltaDenom, res.x, res.y, res.z);
+    //printf("[PCISPH SOLVER]Spacing: %g, Particle Count: %d, Delta: %g\n"
+           //"               Grid Resolution: %d x %d x %d\n", targetSpacing,
+           //actualCount, deltaDenom, res.x, res.y, res.z);
 
     // Perform a particle distribution so that distribution
     // during simulation can be optmized

@@ -147,7 +147,9 @@ int main(int argc, char **argv){
                "        Consider using --enable-output.\n");
     }
 
-    test_sdf_teddies();
+    test_pcisph2_water_sphere_dynamic();
+
+    //test_sdf_teddies();
     //test_routine(1400);
     //test_pcisph2_helix();
     //test_pcisph3_helix();

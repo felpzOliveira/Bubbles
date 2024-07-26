@@ -31,6 +31,7 @@ typedef struct{
     bool delaunayWithInterior;
     bool delaunayUsePreciseBoundary;
     bool delaunaySmooth;
+    bool delaunayDecimate;
     DelaunayOutputType delaunayOutputType;
     std::string input;
     std::string output;
@@ -90,6 +91,7 @@ void default_surface_opts(surface_opts *opts){
     opts->delaunayIntervalLevel = 8;
     opts->delaunayExtend = true;
     opts->delaunayWithInterior = true;
+    opts->delaunayDecimate = true;
     opts->delaunayUsePreciseBoundary = false;
     opts->delaunayMu = 1.1;
     opts->marchingCubeSpacing = 0.01;
@@ -105,6 +107,7 @@ void print_surface_configs(surface_opts *opts){
     std::cout << "    * Output : " << opts->output << std::endl;
     std::cout << "    * Spacing : " << opts->spacing << std::endl;
     std::cout << "    * Delaunay μ : " << opts->delaunayMu << std::endl;
+    std::cout << "    * Delaunay decimate : " << opts->delaunayDecimate << std::endl;
     if(opts->delaunayUsePreciseBoundary){
         std::cout << "    * Delaunay interval level : " << opts->delaunayIntervalLevel <<
                     std::endl;
@@ -137,6 +140,12 @@ ARGUMENT_PROCESS(surface_delaunay_use_precise){
 ARGUMENT_PROCESS(surface_delaunay_no_extend){
     surface_opts *opts = (surface_opts *)config;
     opts->delaunayExtend = false;
+    return 0;
+}
+
+ARGUMENT_PROCESS(surface_delaunay_no_decimate){
+    surface_opts *opts = (surface_opts *)config;
+    opts->delaunayDecimate = false;
     return 0;
 }
 
@@ -341,6 +350,12 @@ std::map<const char *, arg_desc> surface_arg_map = {
             .help = "Configures spacing used during simulation."
         }
     },
+    {"-delaunay-no-decimate",
+        {
+            .processor = surface_delaunay_no_decimate,
+            .help = "Disable particle decimation during delaunay reconstruction."
+        }
+    },
     {"-delaunay-no-interior",
         {
             .processor = surface_delaunay_no_interior,
@@ -501,9 +516,83 @@ bb_cpu_gpu Float ZhuBridsonSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet,
     }
 }
 
+struct DelaunayGroup{
+    Grid3 *grid;
+    SphSolver3 solver;
+    SphParticleSet3 *sphpSet;
+};
+
+void Delaunay_InitializeFor(DelaunayGroup &group, std::vector<vec3f> &pos,
+                            surface_opts *opts, ParticleSetBuilder3 *builder,
+                            TimerList *timer)
+{
+    ParticleSetBuilder3 *pBuilder;
+    ParticleSetBuilder3 lBuilder;
+
+    if(builder != nullptr){
+        pBuilder = builder;
+    }else{
+        for(vec3f &v : pos){
+            lBuilder.AddParticle(v);
+        }
+
+        pBuilder = &lBuilder;
+    }
+
+    // TODO: Even this spacingScale is irrelevant it would be best if it were
+    //       to represent the original simulation domain, i.e.: add flags to cmd
+    Float domainSpacing = opts->spacing * 0.5f;
+    group.grid = UtilBuildGridForBuilder(pBuilder, domainSpacing, 2.0);
+
+    // TODO: We need the solver simply to distribute particles and update the buckets
+    //       it would be nice if we could do that without having to build a solver
+    group.solver.Initialize(DefaultSphSolverData3());
+    group.sphpSet = SphParticleSet3FromBuilder(pBuilder);
+
+    group.solver.Setup(WaterDensity, domainSpacing, 2.0, group.grid, group.sphpSet);
+    if(timer){
+        std::cout << "Distributing particles..." << std::flush;
+        timer->Start("Hash Particles");
+    }
+
+    UpdateGridDistributionGPU(group.solver.solverData);
+    group.grid->UpdateQueryState();
+
+    /* clear v0 buffer as it is going to serve as basis for point support extension */
+    ParticleSet3 *pSet = group.sphpSet->GetParticleSet();
+    pSet->ClearDataBuffer(&pSet->v0s);
+    if(timer)
+        std::cout << "Done" << std::endl;
+
+    if(opts->delaunayExtend){
+        if(timer){
+            std::cout << "Inspecting neighbors... " << std::flush;
+            timer->Start("Boundary Classification");
+        }
+        /* compute the boundary region we are going to extend either by exact/approx solution */
+        if(opts->delaunayUsePreciseBoundary){
+            /* rely on intervalar method with a high interval level as it is faster than dilts */
+            IntervalBoundary(pSet, group.grid, opts->spacing, PolygonSubdivision,
+                             opts->delaunayIntervalLevel);
+        }else{
+            /* rely on lnm as it is fast */
+            LNMBoundary(pSet, group.grid, opts->spacing);
+        }
+
+        if(timer){
+            timer->Stop();
+            std::cout << "Done" << std::endl;
+        }
+    }
+}
+
+void
+dump_particles(vec3f *ptr, int size, const char *path);
+
 void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *opts,
                                  HostTriangleMesh3 *mesh, TimerList &timer)
 {
+    std::vector<vec3f> refPis;
     DelaunayTriangulation triangulation;
     DelaunayOptions dOpts = DelaunayDefaultOptions();
     dOpts.spacing = opts->spacing;
@@ -512,51 +601,91 @@ void ParticlesToDelaunay_Surface(ParticleSetBuilder3 *pBuilder, surface_opts *op
     dOpts.outType = opts->delaunayOutputType;
     dOpts.extendBoundary = opts->delaunayExtend;
 
-    // TODO: We need the solver simply to distribute particles and update the buckets
-    //       it would be nice if we could do that without having to build a solver
-    SphSolver3 solver;
-    solver.Initialize(DefaultSphSolverData3());
+    DelaunayGroup entireGroup, group;
+    Delaunay_InitializeFor(entireGroup, refPis, opts, pBuilder,
+                           opts->delaunayDecimate ? nullptr : &timer);
 
-    // TODO: Even this spacingScale is irrelevant it would be best if it were
-    //       to represent the original simulation domain, i.e.: add flags to cmd
-    Float domainSpacing = opts->spacing * 0.5f;
-    std::cout << "Building domain... " << std::flush;
-    Grid3 *grid = UtilBuildGridForBuilder(pBuilder, domainSpacing, 2.0);
-    SphParticleSet3 *sphpSet = SphParticleSet3FromBuilder(pBuilder);
+    if(opts->delaunayDecimate){
+        /* decimate particles */
+        ParticleSet3 *pSet = entireGroup.sphpSet->GetParticleSet();
+        Grid3 *grid = entireGroup.grid;
+        std::vector<int> marks;
+        std::vector<int> bounds;
+        marks.resize(pSet->GetParticleCount());
 
-    solver.Setup(WaterDensity, domainSpacing, 2.0, grid, sphpSet);
-
-    std::cout << "Distributing particles..." << std::flush;
-    timer.Start("Hash Particles");
-    UpdateGridDistributionGPU(solver.solverData);
-    grid->UpdateQueryState();
-
-    /* clear v0 buffer as it is going to serve as basis for point support extension */
-    ParticleSet3 *pSet = sphpSet->GetParticleSet();
-    pSet->ClearDataBuffer(&pSet->v0s);
-    std::cout << "Done" << std::endl;
-
-    if(dOpts.extendBoundary){
-        std::cout << "Inspecting neighbors... " << std::flush;
-        /* compute the boundary region we are going to extend either by exact/approx solution */
-        timer.Start("Boundary Classification");
-        if(opts->delaunayUsePreciseBoundary){
-            /* rely on intervalar method with a high interval level as it is faster than dilts */
-            IntervalBoundary(pSet, grid, opts->spacing, PolygonSubdivision,
-                             opts->delaunayIntervalLevel);
-        }else{
-            /* rely on lnm as it is fast */
-            LNMBoundary(pSet, grid, opts->spacing);
+        for(int i = 0; i < pSet->GetParticleCount(); i++){
+            int bi = pSet->GetParticleV0(i);
+            if(bi > 0){
+                marks[i] = 1;
+                vec3f pi = pSet->GetParticlePosition(i);
+                refPis.push_back(pi);
+                bounds.push_back(bi);
+            }else{
+                marks[i] = -1;
+            }
         }
 
-        timer.Stop();
-        std::cout << "Done" << std::endl;
+        int totalReplaces = 0;
+        Float maxDist = dOpts.spacing;
+
+        for(int pId = 0; pId < pSet->GetParticleCount(); pId++){
+            if(marks[pId] >= 1)
+                continue;
+
+
+            vec3f pi = pSet->GetParticlePosition(pId);
+            vec3f pCenter = pi;
+            int counter = 1;
+
+            marks[pId] = 2;
+            ForAllNeighbors(grid, pSet, pi, [&](int j) -> int{
+                if(pId == j)
+                    return 0;
+
+                if(marks[j] < 0){
+                    vec3f pj = pSet->GetParticlePosition(j);
+                    Float dist = Distance(pi, pj);
+                    if(dist < maxDist){
+                        pCenter = pCenter + pj;
+                        counter += 1;
+                        marks[j] = 2;
+                    }
+                }
+
+                return 0;
+            }, 2);
+
+            totalReplaces += counter-1;
+            pCenter *= 1.f / (Float)counter;
+            refPis.push_back(pCenter);
+            bounds.push_back(-3);
+        }
+
+        for(int pId = 0; pId < pSet->GetParticleCount(); pId++){
+            if(marks[pId] < 0){
+                refPis.push_back(pSet->GetParticlePosition(pId));
+                bounds.push_back(-3);
+            }
+        }
+
+        printf("Removed %d particles\n", totalReplaces);
+
+        Delaunay_InitializeFor(group, refPis, opts, nullptr, &timer);
+
+        pSet = group.sphpSet->GetParticleSet();
+        for(int i = 0; i < pSet->GetParticleCount(); i++){
+            pSet->SetParticleV0(i, bounds[i]);
+        }
     }
+
 
     /* apply delaunay triangulation and filtering to get mesh */
     std::cout << "Computing delaunay surface... " << std::endl;
 
-    DelaunaySurface(triangulation, sphpSet, dOpts, timer);
+    if(opts->delaunayDecimate)
+        DelaunaySurface(triangulation, group.sphpSet, dOpts, timer);
+    else
+        DelaunaySurface(triangulation, entireGroup.sphpSet, dOpts, timer);
 
     if(opts->delaunaySmooth){
         /* apply smoothing to get a better looking mesh */

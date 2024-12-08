@@ -8,6 +8,22 @@
 #include <interval.h>
 #include <boundary.h>
 #include <counting.h>
+#include <fstream>
+
+// TODO: Remove this
+static void dump_particles(ParticleSet2 *set2, int step){
+    int count = set2->GetParticleCount();
+    std::string title("frame_info");
+    title += std::to_string(step) + ".txt";
+    std::ofstream ofs(title.c_str());
+    ofs << count << std::endl;
+    for(int s = 0; s < count; s++){
+        vec2f p = set2->GetParticlePosition(s);
+        ofs << p.x << " " << p.y << std::endl;
+    }
+
+    ofs.close();
+}
 
 void test_pcisph2_marching_squares(){
     printf("===== PCISPH Solver 2D -- Marching Squares\n");
@@ -550,6 +566,9 @@ void test_pcisph2_water_block_lnm(){
             block->SetVelocities(vel, 20.0);
         }
 
+        //printf("\rStep= %d", frame);
+        //fflush(stdout);
+
         return 1;
     };
 
@@ -712,7 +731,7 @@ void test_pcisph2_double_dam_break(){
         solver.Advance(targetInterval);
         set_colors_pressure(col, data);
         Debug_GraphyDisplaySolverParticles(sphSet->GetParticleSet(), pos, col);
-        ProfilerReport();
+        ProfilerReport(i+1);
     }
 
     delete[] pos;

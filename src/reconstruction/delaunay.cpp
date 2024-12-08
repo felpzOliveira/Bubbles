@@ -11,6 +11,14 @@
 #include <cutil.h>
 #include <unordered_map>
 
+/*
+* NOTE: Extremely slow, unoptimized code
+* for computing the 3D SIG, delaunay-based
+* surface reconstruction of a fluid. I'm missing
+* the vertice smoothing within triangle picking
+* but it shouldnt be too hard to add.
+*/
+
 struct DelaunayTriangleInfo{
     vec3ui tri;
     int opp;
@@ -41,6 +49,10 @@ struct DelaunaySet{
         }
     }
 
+    bb_cpu_gpu int GetTrueId(int id){
+        return id - offset;
+    }
+
     bb_cpu_gpu vec3f GetParticlePosition(int id){
         if(nPos > 0){
             int trueId = id - offset;
@@ -67,8 +79,11 @@ DelaunayOptions DelaunayDefaultOptions(){
     return DelaunayOptions{
         .extendBoundary = true,
         .withInteriorParticles = true,
+        .use_1nn_radius = false,
+        .use_alpha_shapes = false,
         .outType = GatherSurface,
         .mu = 1.1f,
+        .alpha = 50.f,
         .spacing = 0.02f,
     };
 }
@@ -118,20 +133,35 @@ bb_cpu_gpu vec3ui matching_orientation(i3 face, Tet &tet){
     return vec3ui();
 }
 
+bb_cpu_gpu
+Float triangle_area(const vec3f &pA, const vec3f &pB, const vec3f &pC){
+    Float ab = (pA-pB).Length();
+    Float ac = (pA-pC).Length();
+    Float bc = (pB-pC).Length();
+    Float s = (ab + bc + ac) * 0.5;
+    return std::sqrt(s * (s - ab) * (s - ac) * (s - bc));
+}
+
 bb_cpu_gpu bool
 check_triangle(i3 tri, uint32_t *ids, ParticleSet3 *pSet, DelaunaySet *dSet,
-               Float radius)
+               Float *radius)
 {
     int idA = ids[tri.t[0]], idB = ids[tri.t[1]], idC = ids[tri.t[2]];
-    Float r = 2.0 * radius;
     vec3f pA = DelaunayPosition(pSet, dSet, idA);
     vec3f pB = DelaunayPosition(pSet, dSet, idB);
     vec3f pC = DelaunayPosition(pSet, dSet, idC);
     Float aB = Distance(pA, pB);
     Float aC = Distance(pA, pC);
-    Float bD = Distance(pB, pC);
+    Float bC = Distance(pB, pC);
 
-    return aB < r && aC < r && bD < r;
+    Float rA = radius[0];
+    Float rB = radius[1];
+    Float rC = radius[2];
+
+    Float area = triangle_area(pA, pB, pC);
+    bool by_area = !IsZero(area) && !std::isnan(area);
+    bool by_edges = aB < (rA + rB) && aC < (rA + rC) && bC < (rB + rC);
+    return by_area && by_edges;
 }
 
 void
@@ -288,76 +318,17 @@ DelaunayWorkQueueConvexHull(GpuDel *triangulator, DelaunayTriangulation &triangu
     cudaFree(tetFlags);
 }
 
-static void
-DelaunayWorkQueueFindSurface(GpuDel *triangulator, DelaunayTriangulation &triangulation,
-                             ParticleSet3 *pSet, DelaunaySet *dSet, uint32_t *ids,
-                             Float mu, Float spacing, DelaunayWorkQueue *delQ,
-                             TimerList &timer)
+template<typename TriangleAcceptorFn>
+static void DelaunayForEachFinalTriangle(GpuDel *triangulator, DelaunayTriangulation &triangulation,
+                                         ParticleSet3 *pSet, DelaunaySet *dSet,
+                                         uint32_t *ids, char *tetFlags, Float *fRadius,
+                                         bool extended, bool checkRadius,
+                                         TriangleAcceptorFn &acceptor)
 {
     Tet *kernTet = toKernelPtr(triangulator->_tetVec);
     TetOpp *kernTetOpp = toKernelPtr(triangulator->_oppVec);
     char *kernChar = toKernelPtr(triangulator->_tetInfoVec);
-
     uint32_t size = triangulator->_tetVec.size();
-    uint32_t pLen = triangulation.pLen;
-    delQ->SetSlots(size * 4, false);
-
-    Float radius = mu * spacing;
-    char *tetFlags = cudaAllocateUnregisterVx(char, size);
-    int *extraCounter = cudaAllocateUnregisterVx(int, 1);
-
-    *extraCounter = 0;
-    timer.Start("Tetrahedra Filtering");
-    /*
-    * Classify the tetras in 3 possibilites:
-    * 1 - completely valid -> flag= 0xf
-    * 2 - at least one edge is invalid -> flag= 0x0
-    * 3 - virtual/invalid tetras -> flag= -1
-    */
-    AutoParallelFor("Delaunay_Filter", size, AutoLambda(int i){
-        Tet tet = kernTet[i];
-        const TetOpp botOpp = loadOpp(kernTetOpp, i);
-        int A = tet._v[0], B = tet._v[1],
-            C = tet._v[2], D = tet._v[3];
-        tetFlags[i] = -1;
-
-        if(DelaunayIsTetValid(tet, botOpp, kernChar[i], pLen)){
-            int idA = ids[A], idB = ids[B],
-                idC = ids[C], idD = ids[D];
-
-            vec3f pA = DelaunayPosition(pSet, dSet, idA);
-            vec3f pB = DelaunayPosition(pSet, dSet, idB);
-            vec3f pC = DelaunayPosition(pSet, dSet, idC);
-            vec3f pD = DelaunayPosition(pSet, dSet, idD);
-
-            Float rA = radius;
-            Float rB = radius;
-            Float rC = radius;
-            Float rD = radius;
-
-            Float rAB = rA+rB;
-            Float rAC = rA+rC;
-            Float rAD = rA+rD;
-            Float rBC = rB+rC;
-            Float rBD = rB+rD;
-            Float rCD = rC+rD;
-
-            Float aB = Distance(pA, pB);
-            Float aC = Distance(pA, pC);
-            Float aD = Distance(pA, pD);
-            Float bC = Distance(pB, pC);
-            Float bD = Distance(pB, pD);
-            Float cD = Distance(pC, pD);
-
-            bool is_tetra_valid =  aB < rAB && aC < rAC && aD < rAD &&
-                                   bC < rBC && bD < rBD &&
-                                   cD < rCD;
-            if(!is_tetra_valid){
-                tetFlags[i] = 0;
-            }else
-                tetFlags[i] = 0xf;
-        }
-    });
 
     /*
     * TODO: The following two kernels can be merged into a single one
@@ -367,11 +338,11 @@ DelaunayWorkQueueFindSurface(GpuDel *triangulator, DelaunayTriangulation &triang
     * Process only the completely valid tetras (flag == 0xf), these provide valid
     * triangles no matter what and can be pushed into the unique tri list directly.
     */
-    timer.StopAndNext("Find Unique Triangles - Part 1");
     AutoParallelFor("Delaunay_UniqueTriangles_NoTetras", size, AutoLambda(int tetIndex){
         Tet tet = kernTet[tetIndex];
         int A = tet._v[0], B = tet._v[1],
             C = tet._v[2], D = tet._v[3];
+
         const TetOpp botOpp = loadOpp(kernTetOpp, tetIndex);
 
         int triStates = tetFlags[tetIndex];
@@ -404,17 +375,19 @@ DelaunayWorkQueueFindSurface(GpuDel *triangulator, DelaunayTriangulation &triang
         for(int s = 0; s < 4; s++){
             if(info[s] == 0){
                 vec3ui tri = matching_orientation(faces[s], tet);
-                if(!(dSet->IsInternal(ids[tri.x]) ||
-                     dSet->IsInternal(ids[tri.y]) ||
-                     dSet->IsInternal(ids[tri.z])))
-                {
-                    delQ->Push({tri, opp[s]});
+            #if 0
+                bool accept = true;
+                if(extended){
+                    accept = !(dSet->IsInternal(ids[tri.x]) ||
+                               dSet->IsInternal(ids[tri.y]) ||
+                               dSet->IsInternal(ids[tri.z]));
                 }
+            #endif
+                acceptor(tri, opp[s], tetIndex, s);
             }
         }
     });
 
-    timer.StopAndNext("Find Unique Triangles - Part 2");
     /*
     * Process the possibly invalid tetras (flag == 0). Checks each face and
     * validate against neighbors and previously added faces. Generate missing
@@ -427,6 +400,7 @@ DelaunayWorkQueueFindSurface(GpuDel *triangulator, DelaunayTriangulation &triang
             C = tet._v[2], D = tet._v[3];
 
         int tetState = tetFlags[tetIndex];
+
         i3 faces[] = { i3(A, B, C), i3(A, B, D), i3(A, D, C), i3(B, D, C) };
         int info[] = { 0, 0, 0, 0 };
         int opp[] = { D, C, B, A };
@@ -465,44 +439,401 @@ DelaunayWorkQueueFindSurface(GpuDel *triangulator, DelaunayTriangulation &triang
         }
 
         for(int s = 0; s < 4; s++){
-            bool valid_face = check_triangle(faces[s], ids, pSet, dSet, radius);
-            if(!valid_face)
-                continue;
+            i3 face = faces[s];
+
+            if(checkRadius){
+                Float rs[3] = {
+                    fRadius[dSet->GetTrueId(ids[face.t[0]])],
+                    fRadius[dSet->GetTrueId(ids[face.t[1]])],
+                    fRadius[dSet->GetTrueId(ids[face.t[2]])]
+                };
+
+                bool valid_face = check_triangle(face, ids, pSet, dSet, rs);
+                if(!valid_face)
+                    continue;
+            }
 
             if(info[s] == 0 || info[s] == 2){
-                vec3ui tri = matching_orientation(faces[s], tet);
-                if(!(dSet->IsInternal(ids[tri.x]) ||
-                     dSet->IsInternal(ids[tri.y]) ||
-                     dSet->IsInternal(ids[tri.z])))
-                {
-                    delQ->Push({tri, opp[s]});
-                    atomic_increase_get(extraCounter);
+                vec3ui tri = matching_orientation(face, tet);
+            #if 0
+                bool accept = true;
+                if(extended){
+                    accept = !(dSet->IsInternal(ids[tri.x]) ||
+                               dSet->IsInternal(ids[tri.y]) ||
+                               dSet->IsInternal(ids[tri.z]));
                 }
+            #endif
+                acceptor(tri, opp[s], tetIndex, s);
             }
         }
     });
 
-    timer.Stop();
+}
+
+bb_cpu_gpu __forceinline__
+float __length(float x0, float y0, float z0){
+#if defined(__CUDA_ARCH__)
+    return __fsqrt_rn( __fmaf_rn(x0, x0,
+                       __fmaf_rn(y0, y0,
+                       __fmaf_rn(z0, z0, 0.f))) );
+#else
+    return std::sqrt(x0 * x0 + y0 * y0 + z0 * z0);
+#endif
+}
+
+bb_cpu_gpu __forceinline__
+float __distance(float x0, float y0, float z0,
+                 float x1, float y1, float z1)
+{
+    float dx, dy, dz;
+#if defined(__CUDA_ARCH__)
+    dx = __fsub_rn(x0, x1);
+    dy = __fsub_rn(y0, y1);
+    dz = __fsub_rn(z0, z1);
+    return __fsqrt_rn( __fmaf_rn(dx, dx,
+                       __fmaf_rn(dy, dy,
+                       __fmaf_rn(dz, dz, 0.f))) );
+#else
+    dx = x0 - x1;
+    dy = y0 - y1;
+    dz = z0 - z1;
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+#endif
+}
+
+bb_cpu_gpu __forceinline__
+void __cross(float x1, float y1, float z1,
+             float x2, float y2, float z2,
+             float *x, float *y, float *z)
+{
+#if defined(__CUDA_ARCH__)
+    *x = __fmaf_rn(y1, z2, __fmaf_rn(-z1, y2, 0.f));
+    *y = __fmaf_rn(z1, x2, __fmaf_rn(-x1, z2, 0.f));
+    *z = __fmaf_rn(x1, y2, __fmaf_rn(-y1, x2, 0.f));
+#else
+    *x = (y1 * z2) - (z1 * y2);
+    *y = (z1 * x2) - (x1 * z2);
+    *z = (x1 * y2) - (y1 * x2);
+#endif
+}
+
+#define _distance(v0, v1) __distance(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z)
+#define _length(v0) __length(v0.x, v0.y, v0.z)
+#define _cross(v1, v2, p) __cross(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, &p.x, &p.y, &p.z)
+
+// NOTE: Leverage 1/α and build on δ/α as testing factor
+//       for R > δ/α instead of R'> 1/α. This way we can
+//       prevent 1/δ yielding nan, and can have more stable tests.
+bb_cpu_gpu
+Float accept_alpha_test(vec3f v0, vec3f v1, vec3f v2, vec3f v3, Float invAlpha){
+    vec3f u2u3, u3u1, u1u2;
+    Float l01 = _distance(v0, v1);
+    Float l02 = _distance(v0, v2);
+    Float l03 = _distance(v0, v3);
+
+    vec3f u1 = v1 - v0;
+    vec3f u2 = v2 - v0;
+    vec3f u3 = v3 - v0;
+
+    _cross(u2, u3, u2u3);
+    _cross(u3, u1, u3u1);
+    _cross(u1, u2, u1u2);
+
+    Float delta = 2.f * Dot(u1, u2u3);
+
+    vec3f O = ( (l01 * l01 * u2u3) +
+                (l02 * l02 * u3u1) +
+                (l03 * l03 * u1u2) );
+
+    return !(_length(O) > (delta * invAlpha));
+}
+
+
+static void
+DelaunayWorkQueueAlphaShape(GpuDel *triangulator, DelaunayTriangulation &triangulation,
+                            ParticleSet3 *pSet, DelaunaySet *dSet, uint32_t *ids,
+                            Float alpha, DelaunayWorkQueue *delQ, TimerList &timer)
+{
+    Tet *kernTet = toKernelPtr(triangulator->_tetVec);
+    TetOpp *kernTetOpp = toKernelPtr(triangulator->_oppVec);
+    char *kernChar = toKernelPtr(triangulator->_tetInfoVec);
+
+    uint32_t size = triangulator->_tetVec.size();
+    uint32_t pLen = triangulation.pLen;
+
+    char *tetFlags = cudaAllocateUnregisterVx(char, size);
+    char *tetFaces = cudaAllocateUnregisterVx(char, size);
+    int *extraCounter = cudaAllocateUnregisterVx(int, 1);
+    *extraCounter = 0;
+
+    Float invAlpha = 1.f / alpha;
+
+    timer.Start("Tetrahedra Filtering - Alpha Shapes");
+    AutoParallelFor("Delaunay_Filter", size, AutoLambda(int i){
+        Tet tet = kernTet[i];
+        const TetOpp botOpp = loadOpp(kernTetOpp, i);
+        int A = tet._v[0], B = tet._v[1],
+            C = tet._v[2], D = tet._v[3];
+
+        tetFlags[i] = -1;
+        tetFaces[i] = 0;
+        if(DelaunayIsTetValid(tet, botOpp, kernChar[i], pLen)){
+            int idA = ids[A], idB = ids[B],
+                idC = ids[C], idD = ids[D];
+
+            vec3f pA = DelaunayPosition(pSet, dSet, idA);
+            vec3f pB = DelaunayPosition(pSet, dSet, idB);
+            vec3f pC = DelaunayPosition(pSet, dSet, idC);
+            vec3f pD = DelaunayPosition(pSet, dSet, idD);
+
+            if(accept_alpha_test(pA, pB, pC, pD, invAlpha)){
+                tetFlags[i] = 0xf;
+            }
+        }
+    });
+
+    auto fn = AutoLambda(vec3ui tri, int opp, int tetIndex, int faceIndex){
+        tetFaces[tetIndex] |= (1 << faceIndex);
+        atomic_increase(extraCounter);
+    };
+
+    DelaunayForEachFinalTriangle(triangulator, triangulation, pSet, dSet, ids, tetFlags,
+                                 nullptr, false, false, fn);
+
+
+    if(*extraCounter == 0){
+        printf("[BUG] Delaunay gave no valid triangle\n");
+    }else{
+        delQ->SetSlots(*extraCounter, false);
+
+        AutoParallelFor("Delaunay_UniqueTris_Push", size, AutoLambda(int tetIndex){
+            Tet tet = kernTet[tetIndex];
+            int A = tet._v[0], B = tet._v[1],
+                C = tet._v[2], D = tet._v[3];
+            i3 faces[] = { i3(A, B, C), i3(A, B, D), i3(A, D, C), i3(B, D, C) };
+            int opp[] = { D, C, B, A };
+            char pickFlag = tetFaces[tetIndex];
+
+            for(int s = 0; s < 4; s++){
+                if(pickFlag & (1 << s)){
+                    vec3ui tri = matching_orientation(faces[s], tet);
+                    delQ->Push({tri, opp[s]});
+                }
+            }
+        });
+    }
 
     cudaFree(extraCounter);
     cudaFree(tetFlags);
+    cudaFree(tetFaces);
+}
+
+static void
+DelaunayWorkQueueFindSurface(GpuDel *triangulator, DelaunayTriangulation &triangulation,
+                             ParticleSet3 *pSet, DelaunaySet *dSet, uint32_t *ids,
+                             Float *fRadius, DelaunayWorkQueue *delQ,
+                             bool extended, TimerList &timer)
+{
+    Tet *kernTet = toKernelPtr(triangulator->_tetVec);
+    TetOpp *kernTetOpp = toKernelPtr(triangulator->_oppVec);
+    char *kernChar = toKernelPtr(triangulator->_tetInfoVec);
+
+    uint32_t size = triangulator->_tetVec.size();
+    uint32_t pLen = triangulation.pLen;
+
+    char *tetFlags = cudaAllocateUnregisterVx(char, size);
+    char *tetFaces = cudaAllocateUnregisterVx(char, size);
+    int *extraCounter = cudaAllocateUnregisterVx(int, 1);
+    *extraCounter = 0;
+
+    timer.Start("Tetrahedra Filtering");
+    /*
+    * Classify the tetras in 3 possibilites:
+    * 1 - completely valid -> flag= 0xf
+    * 2 - at least one edge is invalid -> flag= 0x0
+    * 3 - virtual/invalid tetras -> flag= -1
+    */
+    AutoParallelFor("Delaunay_Filter", size, AutoLambda(int i){
+        Tet tet = kernTet[i];
+        const TetOpp botOpp = loadOpp(kernTetOpp, i);
+        int A = tet._v[0], B = tet._v[1],
+            C = tet._v[2], D = tet._v[3];
+        tetFlags[i] = -1;
+        tetFaces[i] = 0;
+
+        if(DelaunayIsTetValid(tet, botOpp, kernChar[i], pLen)){
+            int idA = ids[A], idB = ids[B],
+                idC = ids[C], idD = ids[D];
+
+            vec3f pA = DelaunayPosition(pSet, dSet, idA);
+            vec3f pB = DelaunayPosition(pSet, dSet, idB);
+            vec3f pC = DelaunayPosition(pSet, dSet, idC);
+            vec3f pD = DelaunayPosition(pSet, dSet, idD);
+
+            Float rA = fRadius[dSet->GetTrueId(idA)];
+            Float rB = fRadius[dSet->GetTrueId(idB)];
+            Float rC = fRadius[dSet->GetTrueId(idC)];
+            Float rD = fRadius[dSet->GetTrueId(idD)];
+
+            Float rAB = rA+rB;
+            Float rAC = rA+rC;
+            Float rAD = rA+rD;
+            Float rBC = rB+rC;
+            Float rBD = rB+rD;
+            Float rCD = rC+rD;
+
+            Float aB = Distance(pA, pB);
+            Float aC = Distance(pA, pC);
+            Float aD = Distance(pA, pD);
+            Float bC = Distance(pB, pC);
+            Float bD = Distance(pB, pD);
+            Float cD = Distance(pC, pD);
+
+            bool is_tetra_valid =  aB < rAB && aC < rAC && aD < rAD &&
+                                   bC < rBC && bD < rBD &&
+                                   cD < rCD;
+            if(!is_tetra_valid){
+                //tetFlags[i] = 0;
+            }else
+                tetFlags[i] = 0xf;
+        }
+    });
+
+    auto fn = AutoLambda(vec3ui tri, int opp, int tetIndex, int faceIndex){
+        tetFaces[tetIndex] |= (1 << faceIndex);
+        atomic_increase(extraCounter);
+    };
+
+    DelaunayForEachFinalTriangle(triangulator, triangulation, pSet, dSet, ids, tetFlags,
+                                 fRadius, extended, true, fn);
+
+    //DelaunayMarkNonManifold(triangulator, &tetFaces, &tetFlags);
+
+    if(*extraCounter == 0){
+        printf("[BUG] Delaunay gave no valid triangle\n");
+    }else{
+        delQ->SetSlots(*extraCounter, false);
+
+        AutoParallelFor("Delaunay_UniqueTris_Push", size, AutoLambda(int tetIndex){
+            Tet tet = kernTet[tetIndex];
+            int A = tet._v[0], B = tet._v[1],
+                C = tet._v[2], D = tet._v[3];
+            i3 faces[] = { i3(A, B, C), i3(A, B, D), i3(A, D, C), i3(B, D, C) };
+            int opp[] = { D, C, B, A };
+            char pickFlag = tetFaces[tetIndex];
+
+            for(int s = 0; s < 4; s++){
+                if(pickFlag & (1 << s)){
+                    vec3ui tri = matching_orientation(faces[s], tet);
+                    delQ->Push({tri, opp[s]});
+                }
+            }
+        });
+    }
+
+
+    cudaFree(extraCounter);
+    cudaFree(tetFlags);
+    cudaFree(tetFaces);
+}
+
+/*
+* NOTE: This is completely unnecessary and could be replaced by a single variable
+* r = μλ. The only reason it is not is because someone might ask about 1-NN.
+* Having this not only makes everything slow because we don't actually have a point
+* hash scheme for the delaunay point-set but we will have to constantly query this
+* memory during reconstruction making CUDA want to kill me. I'm sorry I promise I'll
+* do better next time.
+*/
+Float *DelaunayGetRadius(ParticleSet3 *pSet, Grid3 *domain,  DelaunaySet *dSet,
+                         uint32_t *ids, Float mu, Float spacing, bool with_ext,
+                         bool fixed=true)
+{
+    int size = dSet->nPos;
+    Float *minRadius = cudaAllocateUnregisterVx(Float, size);
+
+    if(fixed){
+        Float r = mu * spacing;
+        for(int i = 0; i < size; i++)
+            minRadius[i] = r;
+    }else{
+        if(with_ext){ // NOTE: braceyourself this is going to take several minutes
+            AutoParallelFor("Bruteforce-1NN", size, AutoLambda(int i){
+                Point3 pi = dSet->positions[i];
+                Float radius = Infinity;
+                for(int j = 0; j < dSet->nPos; j++){
+                    if(i == j)
+                        continue;
+
+                    Point3 pj = dSet->positions[j];
+                    Float dx = pi._p[0] - pj._p[0];
+                    Float dy = pi._p[1] - pj._p[1];
+                    Float dz = pi._p[2] - pj._p[2];
+
+                    Float dij = std::sqrt(dx * dx + dy * dy + dz * dz);
+                    radius = dij < radius ? dij : radius;
+                }
+
+                minRadius[i] = mu * radius;
+            });
+        }else{
+            // NOTE: If this run is without extension we can levarage the particle
+            // domain for hashing so we dont have to wait for the sun to cooldown.
+            AutoParallelFor("Compute-1NN", size, AutoLambda(int i){
+                int *neighbors = nullptr;
+                int p_id = ids[i];
+                vec3f pi = pSet->GetParticlePosition(p_id);
+                unsigned int cellId = domain->GetLinearHashedPosition(pi);
+                int count = domain->GetNeighborsOf(cellId, &neighbors);
+                int counter = 0;
+
+                Float radius = Infinity;
+                for(int i = 0; i < count; i++){
+                    Cell3 *cell = domain->GetCell(neighbors[i]);
+                    ParticleChain *pChain = cell->GetChain();
+                    int size = cell->GetChainLength();
+                    for(int j = 0; j < size; j++){
+                        if(pChain->pId != p_id){
+                            vec3f pj = pSet->GetParticlePosition(pChain->pId);
+                            Float dij = Distance(pi, pj);
+                            radius = radius < dij ? radius : dij;
+                            counter += 1;
+                        }
+
+                        pChain = pChain->next;
+                    }
+                }
+
+                if(counter == 0){
+                    printf("Distribution might not be uniform or very large "
+                           ", spacing need to be adjusted\n");
+                    // fallback to μλ
+                    radius = spacing;
+                }
+
+                minRadius[i] = mu * radius;
+            });
+        }
+    }
+
+    return minRadius;
 }
 
 void
 DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                DelaunayOptions opts, TimerList &timer)
+                Grid3 *domain, DelaunayOptions opts, TimerList &timer)
 {
     GpuDel triangulator;
     vec3i *u_tri = nullptr;
     vec3f *ext_pos = nullptr;
     vec3f *int_pos = nullptr;
     uint32_t *u_ids = nullptr;
+    Float *radius = nullptr;
     DelaunayWorkQueue *delQ = nullptr;
     int pointNum = 0;
 
     Float mu = opts.mu;
     Float spacing = opts.spacing;
-    Float dist = mu * spacing;
 
     DelaunaySet *dSet = nullptr;
     ParticleSet3 *pSet = sphSet->GetParticleSet();
@@ -671,6 +1002,9 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
         dSet->nPos = *refIndex + (*iIndex);
     }
 
+    radius = DelaunayGetRadius(pSet, domain, dSet, u_ids, mu,
+                               spacing, !opts.use_1nn_radius);
+
     triangulation.pointVec.resize(dSet->nPos);
 
     for(int i = 0, j = 0; i < dSet->nPos; i++){
@@ -682,7 +1016,10 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     std::cout << "done\n - Support points " << supports <<
                  " ( " << frac << "% )" << std::endl;
 
+    std::cout << " - Total set " << dSet->nPos << std::endl;
+
     std::cout << " - Running delaunay triangulation..." << std::flush;
+
     timer.Start("Delaunay Triangulation");
     triangulator.compute(triangulation.pointVec, &triangulation.output);
     timer.Stop();
@@ -690,13 +1027,19 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     std::cout << "done" << std::endl;
 
     delQ = cudaAllocateUnregisterVx(DelaunayWorkQueue, 1);
+
     if(opts.outType == GatherConvexHull){
         DelaunayWorkQueueConvexHull(&triangulator, triangulation, delQ, timer);
     }else if(opts.outType == GatherEverything){
         DelaunayWorkQueueAll(&triangulator, triangulation, delQ, timer);
-    }else{
+    }else if(opts.use_alpha_shapes){ // α-shapes
+        std::cout << " - Surface Extraction by Alpha Shapes [ " << opts.alpha << " ]" << std::endl;
+        DelaunayWorkQueueAlphaShape(&triangulator, triangulation, pSet, dSet,
+                                    u_ids, opts.alpha, delQ, timer);
+    }else{ // SIG
+        std::cout << " - Surface Extraction by SIG" << std::endl;
         DelaunayWorkQueueFindSurface(&triangulator, triangulation, pSet, dSet,
-                                     u_ids, mu, spacing, delQ, timer);
+                                     u_ids, radius, delQ, opts.extendBoundary, timer);
     }
 
     if(delQ->size == 0){
@@ -807,6 +1150,7 @@ DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
     cudaFree(u_tri);
     cudaFree(u_ids);
     cudaFree(iIndex);
+    cudaFree(radius);
     cudaFree(refIndex);
     if(DELAUNAY_OUTPUT_PARTICLES){
         cudaFree(ext_pos);

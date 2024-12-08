@@ -61,7 +61,7 @@ public:
     void compute( const Point3HVec& input, GDelOutput *output );
 
     // Execution configuration
-    const GDelParams _params; 
+    GDelParams _params; 
     GDelOutput*      _output; 
 
     // Input

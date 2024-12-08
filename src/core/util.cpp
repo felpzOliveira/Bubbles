@@ -18,7 +18,7 @@
 }while(0)
 
 int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
-                                   vec3f length, int nPoints, Transform transform)
+                          vec3f length, int nPoints, Transform transform)
 {
     int perEdge = (int)Floor((Float)nPoints / 12);
     vec3f hlen = 0.5 * length;
@@ -30,7 +30,7 @@ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
     int it = 0;
     f0 = vec3f(hlen.x, 0, 0);
     f1 = vec3f(-hlen.x, 0, 0);
-    for(int i = 0; i <= perEdge; i++){ // depth
+    for(int i = 0; i < perEdge; i++){ // depth
         p = f0 + vec3f(0, -hlen.y, -hlen.z + i * hz);
         p = transform.Point(p);
         PushPosition(p, col, posBuffer, colBuffer, it);
@@ -50,7 +50,7 @@ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
 
     f0 = vec3f(0, hlen.y, 0);
     f1 = vec3f(0, -hlen.y, 0);
-    for(int i = 0; i <= perEdge; i++){ // horizontal
+    for(int i = 0; i < perEdge; i++){ // horizontal
         p = f0 + vec3f(-hlen.x + i * hx, 0, -hlen.z);
         p = transform.Point(p);
         PushPosition(p, col, posBuffer, colBuffer, it);
@@ -70,7 +70,7 @@ int UtilGenerateBoxPoints(float *posBuffer, float *colBuffer, vec3f col,
 
     f0 = vec3f(-hlen.x, 0, 0);
     f1 = vec3f(hlen.x, 0, 0);
-    for(int i = 0; i <= perEdge; i++){ // vertical
+    for(int i = 0; i < perEdge; i++){ // vertical
         p = f0 + vec3f(0, -hlen.y + i * hy, -hlen.z);
         p = transform.Point(p);
         PushPosition(p, col, posBuffer, colBuffer, it);

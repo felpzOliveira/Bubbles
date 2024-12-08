@@ -162,6 +162,7 @@ typedef WorkQueue<int> LNMWorkQueue;
 typedef WorkQueue<int> IntWorkQueue;
 typedef WorkQueue<vec3f> SandimWorkQueue3;
 typedef WorkQueue<vec2f> SandimWorkQueue2;
+typedef WorkQueue<int> NicolasWorkQueue3;
 
 template<typename T, typename U, typename Q, typename Func> bb_cpu_gpu
 void ForAllNeighbors(Grid<T, U, Q> *domain, ParticleSet<T> *pSet, T pi, Func fn,

@@ -1366,6 +1366,8 @@ class ContinuousParticleSetBuilder{
 
     void MapGridEmit(const std::function<T(const T &)> velocity, Float d=0.02){
         if(reemitions > 0 && reemitOnce) return;
+        if(warned) return;
+
         std::set<unsigned int>::iterator it;
         int numNewParticles = 0;
         for(it = mappedCellSet.begin(); it != mappedCellSet.end(); it++){

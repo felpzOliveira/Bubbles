@@ -25,7 +25,7 @@ double ProfilerGetStepInterval();
 double ProfilerGetEvaluation(const char *fname);
 void   ProfilerEndStep();
 void   ProfilerFinish();
-void   ProfilerReport();
+void   ProfilerReport(int frameId=-1);
 void   ProfilerManualStart(const char *funcname);
 void   ProfilerManualFinish();
 

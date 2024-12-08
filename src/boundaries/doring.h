@@ -84,84 +84,17 @@ inline bb_cpu_gpu Float ComputeMinEigenvalueZero(const Matrix2x2 &m){
 }
 
 /*
-* Solves the 3D characterstic equation of a given tensor:
-* Given the renormalization A solves the relation:
-*    -λ³ + trace(A)λ² - 0.5(trace(A)² - trace(A²))λ + det(A) = 0
-* Not going to do Newton, this is going to simply be Cardano solutions
-* I'll use double to increase precision but there are a lot of sqrts
-* and cbrt so precision will struggle.
+* Use SVD for computing the 3D eigenvalues. Should be more stable than
+* using cardano. I dont however expects this to fix the 3D issues.
 */
 inline bb_cpu_gpu Float ComputeMinEigenvalue(const Matrix3x3 &m){
-    Matrix3x3 m2 = Matrix3x3::Mul(m, m);
-    /* division by A = -1 to bring this to: x³ + bx² + cx + d = 0 */
-    double B = -Trace(m);
-    double C = 0.5 * (B * B - Trace(m2));
-    double D = -Determinant(m);
-    double B3 = B / 3.0;
-
-    /* compute c/3a - b²/9a with a = 1 */
-    double q = C / 3.0 - B * B / 9.0;
-    /* compute -b³/27a³ + bc/6a² -d/2a with a = 1*/
-    double r = (-B3 * B3 * B3) + (B*C/6.0) - (D/2.0);
-    /* compute term inside square root: r*r + q*q*q */
-    double r1 = r*r + q*q*q;
-
-    // if r1 > 0 than there are 3 distinct solutions 1 real and 2 complex
-    if(r1 > 0){
-        /* compute positive part */
-        double s = r + sqrt(r1);
-        /* compute cubic */
-        s = s < 0 ? -cbrt(-s) : cbrt(s);
-        // now get the other side
-        double t = r - sqrt(r1);
-        t = t < 0 ? -cbrt(-t) : cbrt(t);
-        double L1 = s + t - B3;
-        return (Float)L1;
-    }else if(IsHighpZero(r1)){
-        // All roots are real, with two equals
-        double r13 = r < 0 ? -cbrt(-r) : cbrt(r);
-        double L1 = 2.0 * r13 - B3;
-        double L2 = -r13 -B3;
-        return (Float)Min(L1, L2);
-    }else{
-        // all different roots
-        q = -q;
-        double q3 = q * q * q;
-        q3 = acos(r / sqrt(q3));
-        double r13 = 2.0 * sqrt(q);
-        /* rotate solutions */
-        double L1 = -B3 + r13 * cos((q3) / 3.0);
-        double L2 = -B3 + r13 * cos((q3 + TwoPi) / 3.0);
-        double L3 = -B3 + r13 * cos((q3 + 2.0 * TwoPi) / 3.0);
-        return (Float)Min(Min(L1, L2), L3);
-    }
+    vec3f S;
+    m.Eigenvalues(S);
+    return Min(S[0], Min(S[1], S[2]));
 }
 
-/*
-* Solves the 3D characteristic equation of a given tensor when
-* the inversion is zero, i.e.:
-*    λ(-λ² + trace(A)λ - 0.5(trace(A)² - trace(A²)) = 0
-* Solutions are λ = 0 and the second degree poly.
-* Again, I'm not sure what to do with λ = 0 for det(A) = 0,
-* for 3D it is possible that the characteristic has no solutions
-* besides 0, so it will need to return here, but I'm not sure
-* about consequences of doing so.
-*/
 inline bb_cpu_gpu Float ComputeMinEigenvalueZero(const Matrix3x3 &m){
-    Matrix3x3 m2 = Matrix3x3::Mul(m, m);
-    /* Divide by A = -1 to get x² + bx + c = 0 */
-    double B = -Trace(m);
-    double C = 0.5 * (B * B - Trace(m2));
-    /* Solve the 2d equation */
-    double delta =  B * B - 4.0 * C;
-    if(delta > 0 || IsZero(delta)){ // the original equation has 3 solutions
-        double sdelta = sqrt(Max(0, delta));
-        double L1 = 0.5 * (-B + sdelta);
-        double L2 = 0.5 * (-B - sdelta);
-        return (Float)Min(L1, L2);
-    }else{ // There is no solution
-        return 0;
-    }
+    return ComputeMinEigenvalue(m);
 }
 
 /*

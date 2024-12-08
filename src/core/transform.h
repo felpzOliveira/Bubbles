@@ -112,8 +112,8 @@ struct Matrix3x3{
     }
 
     bb_cpu_gpu Matrix3x3(Float t00, Float t01, Float t02,
-                           Float t10, Float t11, Float t12,
-                           Float t20, Float t21, Float t22)
+                         Float t10, Float t11, Float t12,
+                         Float t20, Float t21, Float t22)
     {
         m[0][0] = t00; m[0][1] = t01; m[0][2] = t02;
         m[1][0] = t10; m[1][1] = t11; m[1][2] = t12;
@@ -134,6 +134,12 @@ struct Matrix3x3{
             for(int j = 0; j < 3; j++)
                 r.m[i][j] = m[i][j] * s;
         return r;
+    }
+
+    bb_cpu_gpu void Scale(Float s){
+        for(int i = 0; i < 3; i++)
+            for(int j = 0; j < 3; j++)
+                m[i][j] *= s;
     }
 
     bb_cpu_gpu vec3f Vec(vec3f v){
@@ -225,6 +231,12 @@ struct Matrix3x3{
         m[1][0] += xy; m[1][1] += y2; m[1][2] += yz;
         m[2][0] += xz; m[2][1] += yz; m[2][2] += z2;
     }
+
+    bb_cpu_gpu void SVD(Matrix3x3 &U, vec3f &S, Matrix3x3 &V) const;
+
+    bb_cpu_gpu void Eigenvalues(vec3f &S) const;
+
+    bb_cpu_gpu void EigenFactors(vec3f &S, vec3f &u1, vec3f &u2, vec3f &u3) const;
 
     bb_cpu_gpu void PrintSelf(){
         for(int i = 0; i < 3; i++){

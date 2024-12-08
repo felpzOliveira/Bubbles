@@ -10,7 +10,7 @@
 
 #define __to_stringf __to_string<Float>
 #define __to_stringi __to_string<int>
-#define GetStringColor(n) RGBStringFromHex(Colors[n])
+#define GetStringColor(n) RGBStringFromHex(colorPtr[n])
 
 typedef enum{
     LAYERED=0, FILTERED, LEVEL, ALL
@@ -70,6 +70,9 @@ const unsigned int Colors[] = {
     0xff4a94f4,
 };
 
+static unsigned int *colorPtr = (unsigned int *)&Colors[0];
+static int colorPtrSize = sizeof(Colors) / sizeof(Colors[0]);
+
 pbr_mat Materials[] = {
     {.name = "glass-BK7", .mat = "\"dielectric\" \"spectrum eta\" \"glass-BK7\"", .built=1},
     {.name = "glass-thin", .mat = "\"dielectric\" \"float eta\" [ 1.1 ]", .built=1},
@@ -85,6 +88,35 @@ pbr_mat MaterialsLit[] = {
           " clearcoat[1.0] clearcoatGloss [0.93] reflectance ", .built=0,
   .warn_msg = "Warning: Lit does not support PBRT coated material, using disney format instead"},
 };
+
+static
+std::istream &__get_line(std::istream &is, std::string &t){
+    t.clear();
+    std::istream::sentry se(is, true);
+    std::streambuf *sb = is.rdbuf();
+    if(se){
+        for(;;){
+            int c = sb->sbumpc();
+            switch(c){
+                case '\n': return is;
+                case '\r': if(sb->sgetc() == '\n') sb->sbumpc(); return is;
+                case EOF: if(t.empty()) is.setstate(std::ios::eofbit); return is;
+                default: t += static_cast<char>(c);
+            }
+        }
+    }
+
+    return is;
+}
+
+static
+void _get_line(std::istream &is, std::string &t){
+    __get_line(is, t);
+    if(t.size() > 0){
+        if(t[t.size()-1] == '\n')
+            t.erase(t.size() - 1);
+    }
+}
 
 std::string RGBStringFromHex(int hex){
     std::stringstream ss;
@@ -201,6 +233,38 @@ ARGUMENT_PROCESS(pbr_material_arg){
     return 0;
 }
 
+ARGUMENT_PROCESS(pbr_color_palette){
+    std::vector<unsigned int> colors;
+    std::string value = ParseNext(argc, argv, i, "-palette");
+    std::ifstream ifs(value.c_str());
+    if(!ifs.is_open()){
+        printf(" * Could not open file \'%s\'\n", value.c_str());
+        return -1;
+    }
+
+    while(ifs.peek() != -1){
+        std::string linebuf;
+        _get_line(ifs, linebuf);
+
+        unsigned int col = std::stoul(linebuf, nullptr, 16);
+        colors.push_back(col);
+    }
+
+    if(colors.size() == 0){
+        printf(" * Empty palette\n");
+        return -1;
+    }
+
+    unsigned int *colMem = new unsigned int[colors.size()];
+    for(int i = 0; i < colors.size(); i++){
+        colMem[i] = colors[i];
+    }
+
+    colorPtr = colMem;
+    colorPtrSize = colors.size();
+    return 0;
+}
+
 ARGUMENT_PROCESS(pbr_material_value){
     pbr_opts *opts = (pbr_opts *)config;
     std::string value = ParseNext(argc, argv, i, "-mat-value", 3);
@@ -251,6 +315,7 @@ ARGUMENT_PROCESS(pbr_serializer_inform_arg){
     pbr_opts *opts = (pbr_opts *)config;
     std::string format = ParseNext(argc, argv, i, "-inform", 1);
     opts->flags = SerializerFlagsFromString(format.c_str());
+    opts->is_legacy = 1;
     return opts->flags < 0 ? -1 : 0;
 }
 
@@ -478,6 +543,11 @@ std::map<const char *, arg_desc> pbr_argument_map = {
         { .processor = pbr_with_domain_arg,
             .help = "Writes a grid in the renderer format."
         }
+    },
+    {"-palette",
+        { .processor = pbr_color_palette,
+            .help = "Sets the colors to use for each layer (file where each line has a hex value)."
+        }
     }
 };
 
@@ -510,7 +580,7 @@ static std::string GetMaterialStringFiltered(int layer){
 * Follow color map
 */
 static std::string GetMaterialStringAll(int layer){
-    int max_layer = sizeof(Colors) / sizeof(Colors[0]);
+    int max_layer = colorPtrSize;
     if(layer > max_layer-1){
         layer = max_layer-1;
     }
@@ -522,7 +592,7 @@ static std::string GetMaterialStringAll(int layer){
 * anything other should not get here but return gray
 */
 static std::string GetMaterialStringLayered(int layer){
-    int max_layer = sizeof(Colors) / sizeof(Colors[0]);
+    int max_layer = colorPtrSize;
     if(layer > max_layer-1){
         layer = max_layer-1;
     }
@@ -618,7 +688,7 @@ int SplitByLayer(std::vector<SerializedParticle> **renderflags,
                  pbr_opts *opts)
 {
     int mCount = 0;
-    int max_layer = sizeof(Colors) / sizeof(Colors[0]);
+    int max_layer = colorPtrSize;
     std::vector<SerializedParticle> *groups;
 
     for(int i = 0; i < pCount; i++){

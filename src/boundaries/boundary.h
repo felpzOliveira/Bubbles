@@ -10,6 +10,7 @@
 #include <interval.h>
 #include <sandim.h>
 #include <marrone.h>
+#include <nicolas.h>
 
 typedef enum{
     BOUNDARY_LNM=0,
@@ -21,6 +22,7 @@ typedef enum{
     BOUNDARY_INTERVAL,
     BOUNDARY_MARRONE,
     BOUNDARY_MARRONE_ALT,
+    BOUNDARY_NICOLAS,
     BOUNDARY_NONE
 }BoundaryMethod;
 
@@ -35,6 +37,7 @@ inline std::string GetBoundaryMethodName(BoundaryMethod method){
         case BOUNDARY_INTERVAL : return "Interval";
         case BOUNDARY_MARRONE: return "Marrone";
         case BOUNDARY_MARRONE_ALT: return "MarroneAlt";
+        case BOUNDARY_NICOLAS : return "Nicolas";
         default:{
             return "NONE";
         }
@@ -61,6 +64,8 @@ inline BoundaryMethod GetBoundaryMethod(std::string method){
         return BOUNDARY_MARRONE;
     if(method == "MarroneAlt" || method == "marronealt" || method == "MARRONEALT")
         return BOUNDARY_MARRONE_ALT;
+    if(method == "Nicolas" || method == "nicolas")
+        return BOUNDARY_NICOLAS;
 
     return BOUNDARY_NONE;
 }

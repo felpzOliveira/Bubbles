@@ -37,8 +37,11 @@ struct MeshSmoothOpts{
 struct DelaunayOptions{
     bool extendBoundary;
     bool withInteriorParticles;
+    bool use_1nn_radius;
+    bool use_alpha_shapes;
     DelaunayOutputType outType;
     Float mu;
+    Float alpha;
     Float spacing;
 };
 
@@ -61,7 +64,7 @@ DelaunayOptions DelaunayDefaultOptions();
 */
 void
 DelaunaySurface(DelaunayTriangulation &triangulation, SphParticleSet3 *sphSet,
-                DelaunayOptions opts, TimerList &timer);
+                Grid3 *domain, DelaunayOptions opts, TimerList &timer);
 
 /*
 * Smooths the results of the delaunay triangulation.

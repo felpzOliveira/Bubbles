@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 //#define DEBUG
-#define ASSERT_ENABLE
+//#define ASSERT_ENABLE
 //#define PRINT_TIMER
 
 #ifdef DEBUG
@@ -142,6 +142,10 @@ inline bb_cpu_gpu void Swap(Float **a, Float **b){
 
 inline bb_cpu_gpu void Swap(Float *a, Float *b){
     Float c = *a; *a = *b; *b = c;
+}
+
+inline bb_cpu_gpu void Swap(Float &a, Float &b){
+    Float c = a; a = b; b = c;
 }
 
 inline bb_cpu_gpu void Swap(int &a, int &b){

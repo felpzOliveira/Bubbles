@@ -6,7 +6,6 @@
 #include <chrono>
 #include <thread>
 #include <lodepng.h>
-#define GraphyPath "/home/felpz/Documents/Graphics/build/libgraphy.so"
 
 #define NEW_DISPLAY "_Z14gr_new_displayii"
 #define NEW_DISPLAY_EX "_Z14gr_new_displayiiffff"
@@ -22,6 +21,7 @@
 #define GMIN(a, b) ((a) < (b) ? (a) : (b))
 #define GMAX(a, b) ((a) > (b) ? (a) : (b))
 
+std::string GraphyPath;
 static int display_width = 1000;
 static int display_height = 1000;
 
@@ -88,9 +88,9 @@ static int LoadFunctions(){
 }
 
 static void graphy_initialize(int width, int height){
-    if(!display){
+    if(!display && GraphyPath.size() > 0){
         if(!GraphyHandle){
-            GraphyHandle = dlopen(GraphyPath, RTLD_LAZY);
+            GraphyHandle = dlopen(GraphyPath.c_str(), RTLD_LAZY);
             graphy_ok = -1;
             if(!GraphyHandle){
                 std::cout << "Failed to get Graphy library pointer" << std::endl;

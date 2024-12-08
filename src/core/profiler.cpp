@@ -172,7 +172,7 @@ class Profiler{
         }
     }
 
-    void Report(){
+    void Report(int frameId){
         std::vector<std::pair<std::string, Execution *>> pairVector;
         int maxIteractions = 0, minIteractions = 99999;
         double averageIteractions = 0;
@@ -202,7 +202,11 @@ class Profiler{
         std::cout << "\nBubbles Profiler ============================================== "
             << std::endl;
         std::cout << "Step interval: " << stpInterval << " ms [ " <<
-            iterationsSteps << " ]"  << std::endl;
+            iterationsSteps << " ]";
+        if(frameId < 0)
+            std::cout << std::endl;
+        else
+            std::cout << " [ " << frameId << " ] " << std::endl;
         std::cout << "Function executions" << std::endl;
         for(auto &it : pairVector){
             double cpu, gpu;
@@ -392,7 +396,7 @@ double ProfilerGetEvaluation(const char *fname){
     return e;
 }
 
-void ProfilerReport(){
+void ProfilerReport(int frameId){
     if(profiler)
-        profiler->Report();
+        profiler->Report(frameId);
 }

@@ -108,8 +108,8 @@ void SphSolver3::Setup(Float targetDensity, Float targetSpacing, Float relativeR
     int pCount = pData->GetReservedSize();
     SphSolverData3SetupFor(solverData, pCount);
 
-    printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n",
-           rad, targetSpacing, pCount);
+    //printf("[SPH SOLVER]Radius : %g Spacing: %g, Particle Count: %d\n",
+           //rad, targetSpacing, pCount);
 
     // Perform a particle distribution so that distribution
     // during simulation can be optmized

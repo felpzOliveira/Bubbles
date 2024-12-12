@@ -256,6 +256,7 @@ ARGUMENT_PROCESS(boundary_inflags_args){
     std::string flags = ParseNext(argc, argv, i, "-inflags", 1);
     opts->inflags = SerializerFlagsFromString(flags.c_str());
     if(opts->inflags < 0) return -1;
+    opts->legacy_in = 1;
     return 0;
 }
 
@@ -928,6 +929,35 @@ void process_boundary_request(boundary_opts *opts, work_queue_stats *workQstats=
         marroneWorkQ->SetSlots(pSet->GetParticleCount());
         timer.Start();
         MarroneAdaptBoundary(pSet, grid, opts->spacing, marroneWorkQ);
+        timer.Stop();
+    }else if(opts->method == BOUNDARY_NICOLAS){
+        timer.Start();
+        float kernelRadius = opts->spacing * opts->spacingScale;
+    #if 0
+        NicolasRefinedSystem refined = NicolasRefinement(pSet, grid, kernelRadius);
+        std::ofstream ofs("tmp.txt");
+        if(ofs.is_open()){
+            int total = 0;
+            for(int i = 0; i < refined.size; i++){
+                int bi = refined.newLabels[i];
+                total += bi >= 0 ? 1 : 0;
+            }
+
+            printf("Got %d particles ( %d )\n", total, refined.size);
+            ofs << total << std::endl;
+            for(int i = 0; i < refined.size; i++){
+                vec3f pi = refined.newParticles[i];
+                int bi = refined.newLabels[i];
+                if(bi >= 0)
+                    ofs << pi.x << " " << pi.y << " " << pi.z << " " << bi << std::endl;
+            }
+
+            ofs.close();
+        }
+        exit(0);
+    #else
+        NicolasClassifier(pSet, grid, kernelRadius);
+    #endif
         timer.Stop();
     }
     /*

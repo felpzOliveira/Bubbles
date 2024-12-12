@@ -49,7 +49,7 @@ bb_cpu_gpu Float Shape::SphereClosestDistance(const vec3f &point) const{
     return Distance(pLocal, vec3f(0)) - radius;
 }
 
-bb_cpu_gpu void Shape::SphereClosestPoint(const vec3f &point, 
+bb_cpu_gpu void Shape::SphereClosestPoint(const vec3f &point,
                                             ClosestPointQuery *query) const
 {
     Float d = SphereClosestDistance(point);
@@ -59,7 +59,7 @@ bb_cpu_gpu void Shape::SphereClosestPoint(const vec3f &point,
     if(!pLocal.IsZeroVector()){
         N = Normalize(pLocal);
     }
-    
+
     vec3f pN = vec3f(N.x, N.y, N.z) * radius;
     if(reverseOrientation){
         N *= -1;
@@ -79,25 +79,25 @@ bb_cpu_gpu bool Shape::SphereIntersect(const Ray &ray, SurfaceInteraction *isect
     Float a = dx * dx + dy * dy + dz * dz;
     Float b = 2 * (ox * dx + oy * dy + oz * dz);
     Float c = ox * ox + oy * oy + oz * oz - radius * radius;
-    
+
     Float t0, t1;
     if(!Quadratic(a, b, c, &t0, &t1)) return false;
-    
+
     if(t0 > r.tMax || t1 <= 0) return false;
     Float tHit = t0;
     if(tHit <= 0 || IsUnsafeHit(tHit) || IsNaN(tHit)){
         tHit = t1;
         if(tHit > r.tMax || IsNaN(tHit)) return false;
     }
-    
+
     pHit = r(tHit);
     pHit *= radius / Distance(pHit, vec3f(0));
     vec3f nHit = pHit / radius;
     vec3f pError = gamma(5) * Abs(pHit);
-    
+
     *isect = ObjectToWorld(SurfaceInteraction(pHit, nHit, pError, this));
     if(reverseOrientation) isect->n *= -1;
     *tShapeHit = tHit;
-    
+
     return true;
 }

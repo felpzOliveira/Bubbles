@@ -131,6 +131,8 @@ void test_pcisph3_ball_many_emission();
 void test_pcisph3_box_many_emission();
 void test_pcisph3_water_drop();
 void test_pcisph3_dragon_pool();
+void test_pcisph3_tank();
+void test_pcisph3_tank_dam();
 void test_pcisph3_water_sphere_movable();
 void test_pcisph3_sdf();
 void test_pcisph3_rotating_water_box();

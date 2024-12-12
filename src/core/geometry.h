@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 //#define DEBUG
-#define ASSERT_ENABLE
+//#define ASSERT_ENABLE
 //#define PRINT_TIMER
 
 #ifdef DEBUG
@@ -142,6 +142,10 @@ inline bb_cpu_gpu void Swap(Float **a, Float **b){
 
 inline bb_cpu_gpu void Swap(Float *a, Float *b){
     Float c = *a; *a = *b; *b = c;
+}
+
+inline bb_cpu_gpu void Swap(Float &a, Float &b){
+    Float c = a; a = b; b = c;
 }
 
 inline bb_cpu_gpu void Swap(int &a, int &b){
@@ -1092,6 +1096,10 @@ template<typename T> inline bb_cpu_gpu vec2<T> Floor(const vec2<T> &v){
 
 template<typename T> inline bb_cpu_gpu vec3<T> Floor(const vec3<T> &v){
     return vec3<T>(std::floor(v.x), std::floor(v.y), std::floor(v.z));
+}
+
+template<typename T> inline bb_cpu_gpu vec4<T> Floor(const vec4<T> &v){
+    return vec4<T>(std::floor(v.x), std::floor(v.y), std::floor(v.z), std::floor(v.w));
 }
 
 template<typename T> inline bb_cpu_gpu T Fract(T val){

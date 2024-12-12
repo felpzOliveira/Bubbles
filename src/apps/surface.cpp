@@ -7,7 +7,7 @@
 #include <host_mesh.h>
 #include <counting.h>
 #include <interval.h>
-#include <svd.h>
+#include <nicolas.h>
 
 typedef enum{
     SDF_ZHU_BRIDSON = 0,
@@ -21,7 +21,6 @@ typedef struct{
     Float kernel;
     Float spacing;
     Float marchingCubeSpacing;
-    Float delaunayMu;
     Float iso;
     std::string input;
     std::string output;
@@ -40,8 +39,6 @@ SurfaceMethod SDFMethodFromString(std::string method){
         return SDF_SPH;
     else if(method == "pcount")
         return SDF_PARTICLE_COUNT;
-    else if(method == "asymetry")
-        return SDF_PARTICLE_ASYMETRY;
     return SDF_NONE;
 }
 
@@ -49,7 +46,6 @@ std::string StringFromSDFMethod(SurfaceMethod method){
     switch(method){
         case SDF_ZHU_BRIDSON: return "zhu";
         case SDF_PARTICLE_COUNT: return "pcount";
-        case SDF_PARTICLE_ASYMETRY: return "asymetry";
         case SDF_SPH: return "sph";
         default:{
             return "none";
@@ -280,28 +276,6 @@ std::map<const char *, arg_desc> surface_arg_map = {
 template <typename T>
 bb_cpu_gpu T cubic(T x){ return x * x * x; }
 bb_cpu_gpu Float k_cub(Float s) { return Max(0.0, cubic(1.0 - s * s)); }
-bb_cpu_gpu Float wij(Float distance, Float r) {
-    if(distance < r)
-        return 1.f - cubic(distance / r);
-    return 0.f;
-}
-
-bb_cpu_gpu
-inline double k_p(double distance){
-    const double distanceSquared = distance * distance;
-    if(distanceSquared >= 1.0){
-        return 0.0;
-    }else{
-        const double x = 1.0 - distanceSquared;
-        return x * x * x;
-    }
-}
-
-bb_cpu_gpu
-inline Float k_w(const vec3f& m,  Float gDet){
-    const Float sigma = 315.0 / (64 * Pi);
-    return sigma * gDet * k_p(m.Length());
-}
 
 bb_cpu_gpu Float SphSDF(vec3f p, Grid3 *grid, ParticleSet3 *pSet, Float kernelRadius){
     const Float cutOff = 0.5; // ??
@@ -568,6 +542,8 @@ void compute_weizenbock_values(HostTriangleMesh3 *mesh){
 }
 
 void surface_command(int argc, char **argv){
+    //test_particle_pos();
+    //return;
     surface_opts opts;
     ParticleSetBuilder3 builder;
     HostTriangleMesh3 mesh;
@@ -623,7 +599,7 @@ void surface_command(int argc, char **argv){
 
     FieldGrid3f *grid;
     TimerList timer;
-    if(opts.method == SDF_PARTICLE_COUNT || opts.method == SDF_PARTICLE_ASYMETRY)
+    if(opts.method == SDF_PARTICLE_COUNT)
         grid = ParticlesToSDF_Pcount(&builder, &opts, timer, opts.method);
     else if(opts.method < SDF_PARTICLE_COUNT)
         grid = ParticlesToSDF_Surface(&builder, &opts, timer);
@@ -636,7 +612,7 @@ void surface_command(int argc, char **argv){
     if(requires_mc){
         Float iso = opts.iso;
         if(iso == Infinity){
-            if(opts.method == SDF_PARTICLE_COUNT || opts.method == SDF_PARTICLE_ASYMETRY)
+            if(opts.method == SDF_PARTICLE_COUNT)
                 iso = 0.25;
             else
                 iso = 0.0;
@@ -650,7 +626,7 @@ void surface_command(int argc, char **argv){
         * but for now it seems that it literally is as simple as rotating the triangles.
         */
         timer.Start("Marching Cubes");
-        if(opts.method == SDF_PARTICLE_COUNT || opts.method == SDF_PARTICLE_ASYMETRY)
+        if(opts.method == SDF_PARTICLE_COUNT)
             MarchingCubes(grid, &mesh, iso, true);
         else
             MarchingCubes(grid, &mesh, iso, false);

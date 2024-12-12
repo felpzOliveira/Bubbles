@@ -120,7 +120,7 @@ int cudaInit(){
 #endif
         clock_t start = clock();
         cudaFree(0);
-		clock_t mid = clock();
+        clock_t mid = clock();
 
         cudaDeviceReset();
         clock_t end = clock();
@@ -146,7 +146,7 @@ int cudaInit(){
 
     }
 
-	return dev;
+    return dev;
 }
 
 void cudaPrintMemoryTaken(){

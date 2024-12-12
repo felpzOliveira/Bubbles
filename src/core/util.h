@@ -622,7 +622,7 @@ inline void UtilRunDynamicSimulation3(Solver *solver, ParticleAccessor *pSet,
     float *col = nullptr;
     int extra = 0;
     for(Shape *shape : sdfs){
-        UtilGetSDFParticles(shape->grid, &particles, 0, spacing);
+        UtilGetSDFParticles(shape->grid, &particles, 0, spacing * 0.5f);
     }
 
     sdfSize = particles.size();
@@ -685,6 +685,7 @@ inline void UtilPrintStepStandard(Solver *solver, int step){
     Float advTime = solver->GetAdvanceTime();
     int pCount = solver->GetParticleCount();
     printf("\rStep (%d) : %d ms - Particles: %d    ", step, (int)advTime, pCount);
+    fflush(stdout);
 }
 
 /*

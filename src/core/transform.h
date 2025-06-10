@@ -232,8 +232,6 @@ struct Matrix3x3{
         m[2][0] += xz; m[2][1] += yz; m[2][2] += z2;
     }
 
-    bb_cpu_gpu void SVD(Matrix3x3 &U, vec3f &S, Matrix3x3 &V) const;
-
     bb_cpu_gpu void Eigenvalues(vec3f &S) const;
 
     bb_cpu_gpu void EigenFactors(vec3f &S, vec3f &u1, vec3f &u2, vec3f &u3) const;

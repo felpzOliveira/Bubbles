@@ -176,7 +176,8 @@ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer, float
     auto canvas = gui->get_canvas();
     canvas.Radius(2.5);
     canvas.Color(0x112F41);
-    ParallelFor((size_t)0, (size_t)pSet->GetParticleCount(), [&](size_t i) -> void{
+    ParallelFor((size_t)0, (size_t)pSet->GetParticleCount(),
+    [&](size_t i) -> void{
         vec2f pi = pSet->GetParticlePosition(i);
         float r = colors[3 * i + 0];
         float g = colors[3 * i + 1];
@@ -192,7 +193,7 @@ void Debug_GraphyDisplaySolverParticles(ParticleSet2 *pSet, float *buffer, float
     gui->update();
 #else
     AssertA(pSet, "Invalid SPHParticle pointer for Debug Display");
-    Float pSize = 2.5;
+    Float pSize = 0.5;
 
     for(int i = 0; i < pSet->GetParticleCount(); i++){
         vec2f pi = pSet->GetParticlePosition(i);

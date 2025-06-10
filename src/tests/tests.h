@@ -150,6 +150,10 @@ void test_pcisph3_emit_test();
 void test_pcisph3_gravity_field();
 void test_pcisph3_helix();
 
+void test_pcisph3_water_drop2();
+void test_pcisph3_gravity_field2();
+void test_pcisph3_tank_dam_paper();
+
 void test_pbf2_double_dam_break();
 
 void test_lnm_happy_whale();
@@ -160,3 +164,6 @@ void test_espic_particles_2D();
 void test_field_grid();
 
 void test_virtual_grid();
+
+void test_enright_2D();
+void test_enright_3D();

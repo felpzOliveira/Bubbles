@@ -26,9 +26,9 @@
 */
 
 inline
-bb_cpu_gpu int NicolasSVDLevel(float a, float b, float c){
-    float alpha = 0.2f;
-    float t[3] = {a, b, c};
+bb_cpu_gpu int NicolasSVDLevel(Float a, Float b, Float c){
+    Float alpha = 0.2f;
+    Float t[3] = {a, b, c};
     if(a > c) Swap(a, c);
     if(a > b) Swap(a, b);
     if(b > c) Swap(b, c);

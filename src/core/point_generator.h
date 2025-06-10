@@ -40,7 +40,7 @@ class PointGenerator3{
 };
 
 /*
-* This guy has a complicated name and I don't know how to translate the word 'lattice'
+* This guy has a complicated name and I don't know how to translate it
 * but you can think of this as a Generator that divides the domain in Voxels and loops
 * through each important point in each Voxel. Almost like a uniform method but carefully
 * choosing points.

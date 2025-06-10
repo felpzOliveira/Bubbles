@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <util.h>
 #include <memory.h>
+#include <marching_cubes.h>
+#include <sdfs.h>
 
 // God, float point precision is hard. Don't want to use double but accumulating
 // float multiplications in matrix breaks precision on zero computations
@@ -749,3 +751,365 @@ void test_matrix_operations(){
 
     printf("===== OK\n");
 }
+
+bb_cpu_gpu
+vec2d EnrightField2D(const vec2d &pi, double t, double T){
+    double sinX  = std::sin(Pi * pi.x);
+    double sinY  = std::sin(Pi * pi.y);
+    double sin2Y = std::sin(TwoPi * pi.y);
+    double sin2X = std::sin(TwoPi * pi.x);
+    double direction = std::cos(Pi * t / T);
+    return vec2d( 2.0 * sinX * sinX * sin2Y * direction,
+                 -2.0 * sinY * sinY * sin2X * direction );
+}
+
+bb_cpu_gpu
+vec3d EnrightField3D(const vec3d &p, double t, double T){
+    double sinX  = std::sin(Pi * p.x);
+    double sinY  = std::sin(Pi * p.y);
+    double sinZ  = std::sin(Pi * p.z);
+
+    double sin2X = std::sin(TwoPi * p.x);
+    double sin2Y = std::sin(TwoPi * p.y);
+    double sin2Z = std::sin(TwoPi * p.z);
+
+    double direction = std::cos(Pi * t / T);
+
+    vec3d v =  vec3d(
+        2.0 * (2.0 * sinX * sinX * sin2Y * sin2Z * direction),
+        2.0 * (-sin2X * sinY * sinY * sin2Z * direction),
+        2.0 * (-sin2X * sin2Y * sinZ * sinZ * direction)
+    );
+
+    if(v.LengthSquared() < 1e-5){
+        //printf("Zero velocity {%g %g %g} [%g %g %g]\n",
+               //v.x, v.y, v.z, p.x, p.y, p.z);
+    }
+
+    return v;
+}
+
+template<typename Q, typename Fn> bb_cpu_gpu
+Q RK3Sample(const Q &p, double dt, double t, double T, Fn field){
+    Q k1 = field(p, t, T);
+    Q p1 = p + 0.5 * dt * k1;
+
+    Q k2 = field(p1, t + 0.5 * dt, T);
+    Q p2 = p + 0.75 * dt * k2;
+
+    Q k3 = field(p2, t + 0.75 * dt, T);
+    return p + (dt / 9.0) * (2.0 * k1 + 3.0 * k2 + 4.0 * k3);
+}
+
+template<typename Q, typename Fn> bb_cpu_gpu
+Q RK4Sample(const Q &p, double dt, double t, double T, Fn field) {
+    Q k1 = field(p, t, T);
+    Q p1 = p + 0.5 * dt * k1;
+
+    Q k2 = field(p1, t + 0.5 * dt, T);
+    Q p2 = p + 0.5 * dt * k2;
+
+    Q k3 = field(p2, t + 0.5 * dt, T);
+    Q p3 = p + dt * k3;
+
+    Q k4 = field(p3, t + dt, T);
+
+    return p + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+}
+
+bb_cpu_gpu
+vec2f RK4Enright2D(const vec2f &pi, Float dt, Float t, Float T){
+    vec2d d_pi(pi.x, pi.y);
+    vec2d p = RK4Sample<vec2f, decltype(EnrightField2D)>
+                                (d_pi, (double)dt, (double)t, (double)T,
+                                EnrightField2D);
+
+    return vec2f(p.x, p.y);
+}
+
+bb_cpu_gpu
+vec3f RK4Enright3D(const vec3f &pi, Float dt, Float t, Float T){
+    vec3d d_pi(pi.x, pi.y, pi.z);
+    vec3d p = RK4Sample<vec3d, decltype(EnrightField3D)>
+                                (d_pi, (double)dt, (double)t, (double)T,
+                                 EnrightField3D);
+    return vec3f(p.x, p.y, p.z);
+}
+
+bb_cpu_gpu
+vec2f RK3Enright2D(const vec2f &pi, Float dt, Float t, Float T){
+    vec2d d_pi(pi.x, pi.y);
+    vec2d p = RK3Sample<vec2f, decltype(EnrightField2D)>
+                                (d_pi, (double)dt, (double)t, (double)T,
+                                EnrightField2D);
+
+    return vec2f(p.x, p.y);
+}
+
+bb_cpu_gpu
+vec3f RK3Enright3D(const vec3f &pi, Float dt, Float t, Float T){
+    vec3d d_pi(pi.x, pi.y, pi.z);
+    vec3d p = RK3Sample<vec3d, decltype(EnrightField3D)>
+                                (d_pi, (double)dt, (double)t, (double)T,
+                                 EnrightField3D);
+    return vec3f(p.x, p.y, p.z);
+}
+
+void test_enright_2D(){
+    printf("===== Test Enright 2D\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    const Float sphereRadius = 0.2f;
+    const Float spacing = 0.001;
+    vec2f center(0.5f, 0.75f);
+
+    Shape2 *sphere = MakeSphere2(Transform2(), sphereRadius);
+    VolumeParticleEmitterSet2 emitters;
+
+    emitters.SetJitter(0.01);
+    emitters.AddEmitter(sphere, spacing);
+
+    ParticleSetBuilder2 builder;
+    emitters.Emit(&builder);
+
+    SphParticleSet2 *sphSet = SphParticleSet2FromBuilder(&builder);
+    ParticleSet2 *set = sphSet->GetParticleSet();
+
+    int count = set->GetParticleCount();
+    printf("Total particles= %d\n", count);
+
+    float *col = new float[count * 3];
+    float *pos = new float[count * 3];
+    for(int i = 0; i < count; i++){
+        vec3f rgb = vec3f(1, 0, 0);
+        vec2f pi = set->GetParticlePosition(i);
+
+        pos[3 * i + 0] = pi.x;  pos[3 * i + 1] = pi.y;
+        pos[3 * i + 2] = 0;     col[3 * i + 0] = rgb.x;
+        col[3 * i + 1] = rgb.y; col[3 * i + 2] = rgb.z;
+    }
+
+    int *frameId = cudaAllocateVx(int, 1);
+    *frameId = 1;
+    Float currentTime = 0;
+    do{
+        Float frameTime = 0.00001f;
+        currentTime = frameTime * (*frameId);
+        std::cout << "\r Frame " << (*frameId) << " ( " <<
+                   currentTime << " s )" << std::flush;
+        GPUParallelLambda("Update", count, GPU_LAMBDA(int i){
+            vec2f pi = set->GetParticlePosition(i);
+            vec2f projPi = pi + center;
+            Float t = frameTime * ((*frameId) - 1);
+            Float T = 6.f;
+
+            projPi = RK4Enright2D(projPi, frameTime, t, T);
+
+            pi = projPi - center;
+
+            set->SetParticlePosition(i, pi);
+        });
+
+        for(int s = 0; s < count; s++){
+            vec2f pi = set->GetParticlePosition(s);
+            pos[3 * s + 0] = pi.x;
+            pos[3 * s + 1] = pi.y;
+        }
+
+        Debug_GraphyDisplaySolverParticles(set, pos, col);
+        *frameId += 1;
+    }while(currentTime < 12);
+
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
+void test_enright_3D(){
+    printf("===== Test Enright\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    vec3f center (0.35f, 0.35f, 0.35f);
+    //vec3f center(0.f);
+    const Float sphereRadius = 0.15f;
+    const int numParticles = 1000000;
+    const Float spacing = 0.002;
+    const Float spacingScale = 2.f;
+    vec3f offset = vec3f(0.0f, 0.f, 0.f);
+
+    SphSolver3 solver;
+    SphParticleSet3 *sphpSet = nullptr;
+    ParticleSet3 *set = nullptr;
+    Grid3 *domain = nullptr;
+
+    vec3f *testPs = cudaAllocateVx(vec3f, numParticles);
+    int *testFlags = cudaAllocateVx(int, numParticles);
+    Float *rng = cudaAllocateVx(Float, numParticles * 3);
+
+    for(int i = 0; i < numParticles; i++){
+        rng[3 * i + 0] = rand_float();
+        rng[3 * i + 1] = rand_float();
+        rng[3 * i + 2] = rand_float();
+    }
+
+    GPUParallelLambda("Initialize", numParticles, GPU_LAMBDA(int i){
+        Float u1 = rng[3 * i + 0];
+        Float u2 = rng[3 * i + 1];
+        Float u3 = rng[3 * i + 2];
+        Float theta = u1 * 2.0 * Pi;
+        Float phi = std::acos(2.0 * u2 - 1.0);
+        Float r = sphereRadius * std::pow(u3, 1.0 / 3.0);
+
+        Float x = r * std::sin(phi) * std::cos(theta);
+        Float y = r * std::sin(phi) * std::sin(theta);
+        Float z = r * std::cos(phi);
+        testPs[i] = vec3f(x, y, z);
+        testFlags[i] = 1;
+    });
+
+    ParticleSetBuilder3 testBuilder, pBuilder;
+    for(int i = 0; i < numParticles; i++){
+        testBuilder.AddParticle(testPs[i]);
+    }
+
+    solver.Initialize(DefaultSphSolverData3());
+    domain = UtilBuildGridForBuilder(&testBuilder, spacing, spacingScale);
+    sphpSet = SphParticleSet3FromBuilder(&testBuilder);
+    set = sphpSet->GetParticleSet();
+    solver.Setup(WaterDensity, spacing, spacingScale, domain, sphpSet);
+
+    UpdateGridDistributionGPU(solver.solverData);
+
+    int N = set->GetParticleCount();
+    AutoParallelFor("Initialize", N, AutoLambda(int pId){
+        int *neighbors = nullptr;
+        vec3f pi = set->GetParticlePosition(pId);
+        unsigned int cellId = domain->GetLinearHashedPosition(pi);
+
+        int count = domain->GetNeighborsOf(cellId, &neighbors);
+        for(int i = 0; i < count; i++){
+            Cell3 *cell = domain->GetCell(neighbors[i]);
+            ParticleChain *pChain = cell->GetChain();
+            int size = cell->GetChainLength();
+            for(int j = 0; j < size; j++){
+                vec3f pj = set->GetParticlePosition(pChain->pId);
+                Float distance = Distance(pi, pj);
+                if(distance < 0.5f * spacing && pChain->pId < pId){
+                    testFlags[pId] = 0;
+                    return;
+                }
+            }
+        }
+    });
+
+    for(int i = 0; i < numParticles; i++){
+        if(testFlags[i] == 1){
+            vec3f pi = testPs[i];
+            pBuilder.AddParticle(pi + center);
+        }
+    }
+
+    sphpSet = SphParticleSet3FromBuilder(&pBuilder);
+    set = sphpSet->GetParticleSet();
+
+
+    int totalCount = set->GetParticleCount();
+    printf("Total particles= %d\n", totalCount);
+
+    float *col = new float[totalCount * 3];
+    float *pos = new float[totalCount * 3];
+
+    for(int i = 0; i < totalCount; i++){
+        vec3f rgb = vec3f(1, 0, 0);
+        vec3f pi = set->GetParticlePosition(i);
+
+        pos[3 * i + 0] = pi.x;  pos[3 * i + 1] = pi.y;
+        pos[3 * i + 2] = pi.z;  col[3 * i + 0] = rgb.x;
+        col[3 * i + 1] = rgb.y; col[3 * i + 2] = rgb.z;
+    }
+
+    int *frameId = cudaAllocateVx(int, 1);
+    *frameId = 1;
+    Float currentTime = 0;
+
+    //vec3f origin(1.5f, 1.5f, 1.5f);
+    //vec3f target(0.5f, 0.5f, 0.5f);
+    vec3f origin(0.527492, -0.0615508, -0.676749);
+    vec3f target(0.532272, 0.483669, 0.483669);
+    graphy_vector_set(origin, target);
+    do{
+        Float frameTime = 0.001f;
+        currentTime = frameTime * ((*frameId)-1);
+        std::cout << "\r Frame " << (*frameId) << " ( " <<
+                   currentTime << " s )" << std::flush;
+
+        GPUParallelLambda("Update", totalCount, GPU_LAMBDA(int i){
+            vec3f pi = set->GetParticlePosition(i);
+            vec3f projPi = pi + offset;
+            Float t = frameTime * ((*frameId) - 1);
+            Float T = 2.f;
+
+            projPi = RK4Enright3D(projPi, frameTime, t, T);
+            pi = projPi - offset;
+
+            set->SetParticlePosition(i, pi);
+        });
+
+        for(int s = 0; s < totalCount; s++){
+            vec3f pi = set->GetParticlePosition(s);
+            pos[3 * s + 0] = pi.x;
+            pos[3 * s + 1] = pi.y;
+            pos[3 * s + 2] = pi.z;
+        }
+
+        graphy_render_points3(pos, col, totalCount, spacing);
+
+        if(SerializerIsWrittable()){
+            std::string respath =
+                    FrameOutputPath("enright3D/output_", *frameId);
+            SerializerSaveParticleSet3Legacy(set, respath.c_str(),
+                                            SERIALIZER_POSITION);
+        }
+
+        *frameId += 1;
+    }while(currentTime < 6);
+
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
+// NOTE: can use this routines for generating the teddies/origami scene.
+void sdf_teddies(){
+    HostTriangleMesh3 mesh;
+    Float iso = 0.0;
+    Float dx  = 0.02;
+    Bounds3f bounds(vec3f(-5), vec3f(5));
+    FieldGrid3f *field = CreateSDF(bounds, dx, AutoLambda(vec3f point){
+        //return T_OrigamiBoat(point, -1);
+        //return T_OrigamiDragon(point);
+        //return T_OrigamiWhale(point, 2);
+        //return Teddy_Lying(point);
+        return Teddy_Sitting(point);
+        //return Teddy_Standing(point);
+    });
+
+    vec3ui res = field->GetResolution();
+    printf("Resolution= {%u %u %u}\n", res.x, res.y, res.z);
+#if 0
+    Bounds3f reducedB(vec3f(-1), vec3f(1));
+
+    Transform transform = Scale(vec3f(5.f));
+    auto sample_fn = GPU_LAMBDA(vec3f point, Shape *, int) -> Float{
+        vec3f query = transform.Point(point);
+        return field->Sample(query);
+    };
+
+    Shape *testShape = MakeSDFShape(reducedB, sample_fn);
+
+    MarchingCubes(testShape->grid, &mesh, iso, false);
+#else
+    MarchingCubes(field, &mesh, iso, false);
+#endif
+    mesh.writeToDisk("test_sdf.obj", FORMAT_PLY);
+    exit(0);
+}
+

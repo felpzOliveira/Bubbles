@@ -43,6 +43,9 @@ void SerializerSaveSphDataSet3Many(SphSolverData3 *data,
 void SerializerSaveSphDataSet2(SphSolverData2 *pSet, const char *filename, int flags,
                                std::vector<int> *boundary = nullptr);
 
+void SerializerSaveParticleSet3Legacy(ParticleSet3 *pSet, const char *filename, int flags,
+                                std::vector<int> *boundary = nullptr);
+
 void SerializerSaveSphDataSet3Legacy(SphSolverData3 *pSet, const char *filename,
                                      int flags, std::vector<int> *boundary = nullptr);
 

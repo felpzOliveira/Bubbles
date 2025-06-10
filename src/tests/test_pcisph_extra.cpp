@@ -634,10 +634,11 @@ void test_pcisph3_tank_dam_paper(){
     vec3f origin(0, 4, 15);
     vec3f target(0);
 
-    //Float spacing = 0.2;
-    Float spacing = 0.04;
+    Float spacing = 0.02;
+    //Float spacing = 0.06;
     Float spacingScale = 2.0;
     Float targetInterval =  1.0 / 240.0;
+    //Float targetInterval =  4e-4;
 
     ///////////////// CONTAINER
     vec2f xRange = vec2f(-10, 5);
@@ -1475,6 +1476,52 @@ void test_pcisph3_gravity_field(){
                                                            target, targetInterval, extraParts,
                                                            {}, onStepUpdate, colorFunction,
                                                            filler);
+
+    CudaMemoryManagerClearCurrent();
+    printf("===== OK\n");
+}
+
+void test_dual_ball(){
+    printf("===== Generation -- Dual Ball\n");
+    CudaMemoryManagerStart(__FUNCTION__);
+
+    ParticleSetBuilder3 pBuilder;
+    vec3f center(0.f, 0.f, 0.f);
+    Float radius = 1.0f;
+    Float spacing = 0.02;
+
+    Shape *ball = MakeSphere(Translate(center), radius);
+    VolumeParticleEmitterSet3 emitters;
+    emitters.AddEmitter(ball, spacing);
+
+    emitters.Emit(&pBuilder);
+
+    SphParticleSet3 *sphSet = SphParticleSet3FromBuilder(&pBuilder);
+    ParticleSet3 *pSet = sphSet->GetParticleSet();
+
+    for(int i = 0; i < pSet->GetParticleCount(); i++){
+        vec3f pi = pSet->GetParticlePosition(i);
+
+        ////////////////////////////////////////
+        int flag = pi.x < 0;
+        ////////////////////////////////////////
+
+        pSet->SetParticleV0(i, flag);
+    }
+
+    // NOTE: somehow we forgot to make a function to save a particle set
+    std::ofstream ofs("test_output.txt");
+    if(ofs.is_open()){
+        ofs << pSet->GetParticleCount() << std::endl;
+        for(int i = 0; i < pSet->GetParticleCount(); i++){
+            vec3f pi = pSet->GetParticlePosition(i);
+            int fi = pSet->GetParticleV0(i);
+
+            ofs << pi.x << " " << pi.y << " " << pi.z << " " <<
+                (Float)fi << std::endl;
+        }
+        ofs.close();
+    }
 
     CudaMemoryManagerClearCurrent();
     printf("===== OK\n");

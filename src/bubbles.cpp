@@ -78,45 +78,7 @@ void run_self_tests(){
 }
 #endif
 
-// NOTE: can use this routines for generating the teddies/origami scene.
-void sdf_teddies(){
-    HostTriangleMesh3 mesh;
-    Float iso = 0.0;
-    Float dx  = 0.02;
-    Bounds3f bounds(vec3f(-5), vec3f(5));
-    FieldGrid3f *field = CreateSDF(bounds, dx, AutoLambda(vec3f point){
-        //return T_OrigamiBoat(point, -1);
-        //return T_OrigamiDragon(point);
-        //return T_OrigamiWhale(point, 2);
-        //return Teddy_Lying(point);
-        return Teddy_Sitting(point);
-        //return Teddy_Standing(point);
-    });
-
-    vec3ui res = field->GetResolution();
-    printf("Resolution= {%u %u %u}\n", res.x, res.y, res.z);
-#if 0
-    Bounds3f reducedB(vec3f(-1), vec3f(1));
-
-    Transform transform = Scale(vec3f(5.f));
-    auto sample_fn = GPU_LAMBDA(vec3f point, Shape *, int) -> Float{
-        vec3f query = transform.Point(point);
-        return field->Sample(query);
-    };
-
-    Shape *testShape = MakeSDFShape(reducedB, sample_fn);
-
-    MarchingCubes(testShape->grid, &mesh, iso, false);
-#else
-    MarchingCubes(field, &mesh, iso, false);
-#endif
-    mesh.writeToDisk("test_sdf.obj", FORMAT_PLY);
-    exit(0);
-}
-
-void test_pcisph3_water_drop2();
-void test_pcisph3_gravity_field2();
-void test_pcisph3_tank_dam_paper();
+void test_dual_ball();
 
 int main(int argc, char **argv){
     BB_MSG("Bubbles Fluid Simulator");
@@ -197,7 +159,8 @@ int main(int argc, char **argv){
     //test_pcisph3_water_block();
     //test_pcisph3_dam_break_double_dragon();
     //test_pcisph3_water_sphere_movable();
-    test_pcisph3_tank_dam_paper();
+    //test_pcisph3_tank_dam_paper();
+    test_enright_3D();
 
     //test_pcisph3_dragon_pool();
     //test_pcisph3_tank();

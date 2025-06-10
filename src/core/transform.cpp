@@ -53,15 +53,17 @@ bb_cpu_gpu void Matrix3x3::EigenFactors(vec3f &S, vec3f &u1, vec3f &u2, vec3f &u
           v21, v22, v23,
           v31, v32, v33;
 
-    svd( m[0][0], m[0][1], m[0][2],
-         m[1][0], m[1][1], m[1][2],
-         m[2][0], m[2][1], m[2][2], // Input matrix
+    float s[3];
+
+    svd( (float)m[0][0], (float)m[0][1], (float)m[0][2],
+         (float)m[1][0], (float)m[1][1], (float)m[1][2],
+         (float)m[2][0], (float)m[2][1], (float)m[2][2], // Input matrix
 
          u11, u12, u13,
          u21, u22, u23,
          u31, u32, u33,
 
-         S[0], S[1], S[2],
+         s[0], s[1], s[2],
 
          v11, v12, v13,
          v21, v22, v23,
@@ -70,6 +72,7 @@ bb_cpu_gpu void Matrix3x3::EigenFactors(vec3f &S, vec3f &u1, vec3f &u2, vec3f &u
     u1.x = u11; u1.y = u21; u1.z = u31;
     u2.x = u12; u2.y = u22; u2.z = u32;
     u3.x = u13; u3.y = u23; u3.z = u33;
+    S[0] = s[0]; S[1] = s[1]; S[2] = s[2];
 }
 
 bb_cpu_gpu void Matrix3x3::Eigenvalues(vec3f &S) const{
@@ -79,6 +82,7 @@ bb_cpu_gpu void Matrix3x3::Eigenvalues(vec3f &S) const{
     float v11, v12, v13,
           v21, v22, v23,
           v31, v32, v33;
+    float s[3];
 
     svd( m[0][0], m[0][1], m[0][2],
          m[1][0], m[1][1], m[1][2],
@@ -88,27 +92,12 @@ bb_cpu_gpu void Matrix3x3::Eigenvalues(vec3f &S) const{
          u21, u22, u23,
          u31, u32, u33,
 
-         S[0], S[1], S[2],
+         s[0], s[1], s[2],
 
          v11, v12, v13,
          v21, v22, v23,
          v31, v32, v33 );
-}
-
-bb_cpu_gpu void Matrix3x3::SVD(Matrix3x3 &U, vec3f &S, Matrix3x3 &V) const{
-    svd( m[0][0], m[0][1], m[0][2],
-         m[1][0], m[1][1], m[1][2],
-         m[2][0], m[2][1], m[2][2], // Input matrix
-
-         U.m[0][0], U.m[0][1], U.m[0][2],
-         U.m[1][0], U.m[1][1], U.m[1][2],
-         U.m[2][0], U.m[2][1], U.m[2][2],
-
-         S[0], S[1], S[2],
-
-         V.m[0][0], V.m[0][1], V.m[0][2],
-         V.m[1][0], V.m[1][1], V.m[1][2],
-         V.m[2][0], V.m[2][1], V.m[2][2] );
+    S[0] = s[0]; S[1] = s[1]; S[2] = s[2];
 }
 
 bb_cpu_gpu void InterpolatedTransform::Decompose(const Matrix4x4 &m, vec3f *T,

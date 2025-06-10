@@ -403,7 +403,7 @@ void MeshToParticles(const char *name, const Transform &transform,
     ParsedMesh *mesh = LoadObj(name);
 
     Shape *shape = MakeMesh(mesh, transform);
-    GenerateShapeSDF(shape, 0.01, 0.01);
+    //GenerateShapeSDF(shape, 0.02, 0.01);
     //shape->type = ShapeType::ShapeSDF;
 
     ParticleSetBuilder3 builder;

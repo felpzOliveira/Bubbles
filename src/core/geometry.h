@@ -65,8 +65,8 @@
 #define SqrtInfinity 3.1622776601683794E+18
 #define IntInfinity 2147483646
 
-typedef float Float;
-//typedef double Float;
+//typedef float Float;
+typedef double Float;
 
 /*
 * NOTE: The Inside routines for BoundsN<T> are considering Epsilons 
@@ -1056,12 +1056,14 @@ typedef vec1<unsigned int> vec1ui;
 
 typedef vec2<Float> vec2f;
 typedef vec2<Float> Point2f;
+typedef vec2<double> vec2d;
 typedef vec2<int> vec2i;
 typedef vec2<int> Point2i;
 typedef vec2<unsigned int> vec2ui;
 
 typedef vec3<Float> vec3f;
 typedef vec3<Float> Point3f;
+typedef vec3<double> vec3d;
 typedef vec3<unsigned int> vec3ui;
 typedef vec3<int> vec3i;
 typedef vec3<int> Point3i;

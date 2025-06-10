@@ -711,13 +711,11 @@ void SaveSimulationDomain(SolverData *data, const char *filename){
     }
 }
 
-template<typename SolverData = SphSolverData3, typename ParticleSet = ParticleSet3,
-typename Domain = Grid3, typename T>
-void SaveSphParticleSetLegacy(SolverData *data, const char *filename, int flags,
+template<typename ParticleSet = ParticleSet3, typename Domain = Grid3, typename T>
+void SaveSphParticleSetLegacy(ParticleSet *pSet, const char *filename, int flags,
                               std::vector<int> *boundary = nullptr)
 {
     RETURN_ON_DISABLE();
-    ParticleSet *pSet = data->sphpSet->GetParticleSet();
     FILE *fp = fopen(filename, "a+");
     std::string format = SerializerStringFromFlags(flags);
     int logged = 0;
@@ -1021,8 +1019,9 @@ void SerializerSaveDomain(SphSolverData2 *pSet, const char *filename){
 void SerializerSaveSphDataSet3Legacy(SphSolverData3 *pSet, const char *filename,
                                      int flags, std::vector<int> *boundary)
 {
-    SaveSphParticleSetLegacy<SphSolverData3, ParticleSet3, Grid3, vec3f>(pSet, filename,
-                                                                         flags, boundary);
+    SaveSphParticleSetLegacy<ParticleSet3, Grid3, vec3f>(
+        pSet->sphpSet->GetParticleSet(), filename, flags, boundary
+    );
 }
 
 void SerializerSaveSphDataSet3(SphSolverData3 *pSet, const char *filename,
@@ -1043,8 +1042,9 @@ void SerializerSaveSphDataSet3Many(SphSolverData3 *data,
 void SerializerSaveSphDataSet2Legacy(SphSolverData2 *pSet, const char *filename,
                                      int flags, std::vector<int> *boundary)
 {
-    SaveSphParticleSetLegacy<SphSolverData2, ParticleSet2, Grid2, vec2f>(pSet, filename,
-                                                                         flags, boundary);
+    SaveSphParticleSetLegacy<ParticleSet2, Grid2, vec2f>(
+        pSet->sphpSet->GetParticleSet(), filename, flags, boundary
+    );
 }
 
 void SerializerSaveSphDataSet2(SphSolverData2 *pSet, const char *filename,
@@ -1053,3 +1053,13 @@ void SerializerSaveSphDataSet2(SphSolverData2 *pSet, const char *filename,
     SaveSphParticleSet<SphSolverData2, ParticleSet2, Grid2, vec2f>(pSet, filename,
                                                                    flags, boundary);
 }
+
+
+void SerializerSaveParticleSet3Legacy(ParticleSet3 *pSet, const char *filename, int flags,
+                                std::vector<int> *boundary)
+{
+    SaveSphParticleSetLegacy<ParticleSet3, Grid3, vec3f>(
+        pSet, filename, flags, boundary
+    );
+}
+

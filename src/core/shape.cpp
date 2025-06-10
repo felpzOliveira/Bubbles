@@ -360,7 +360,7 @@ bb_cpu_gpu bool MeshIsPointInside(const vec3f &point, Shape *meshShape,
 {
     int hits = 0;
     bool hit_anything = false;
-    vec3f direction = GenerateMinimalRayDirection(point, bounds);
+    vec3f direction = Normalize(bounds.Center() - point);//GenerateMinimalRayDirection(point, bounds);
     Ray ray(point, direction);
 
     do{
@@ -468,7 +468,8 @@ void GenerateShapeSDF(Shape2 *shape, Float dx, Float margin){
     bounds.pMin, VertexCentered);
 
     printf("Generating SDF for shape: [%d x %d] ... ",
-    resolution, resolutionY);
+            resolution, resolutionY);
+    fflush(stdout);
 
     GPULaunch(shape->grid->total, CreateShapeSDFGPU2D, shape);
     shape->grid->MarkFilled();
@@ -493,6 +494,8 @@ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
     dx = width / (Float)resolution;
     int resolutionY = (int)std::ceil(resolution * height / width);
     int resolutionZ = (int)std::ceil(resolution * depth / width);
+    std::cout << "Attempting to allocate resolution " << resolution <<
+               " x " << resolutionY << " x " << resolutionZ << std::endl;
 
     shape->grid = cudaAllocateVx(FieldGrid3f, 1);
     shape->grid->Build(vec3ui(resolution, resolutionY, resolutionZ), vec3f(dx),
@@ -500,6 +503,7 @@ void GenerateShapeSDF(Shape *shape, Float dx, Float margin){
 
     printf("Generating SDF for shape %s: [%d x %d x %d] ... ",
             shape->mesh->name, resolution, resolutionY, resolutionZ);
+    fflush(stdout);
 
     GPULaunch(shape->grid->total, CreateShapeSDFGPU, shape);
     shape->grid->MarkFilled();
